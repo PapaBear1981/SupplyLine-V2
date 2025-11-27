@@ -6,6 +6,7 @@ import { ProtectedRoute } from '@features/auth/components/ProtectedRoute';
 import { LoginPage } from '@features/auth/pages/LoginPage';
 import { DashboardPage } from '@features/dashboard/pages/DashboardPage';
 import { ToolsPage } from '@features/tools/pages/ToolsPage';
+import { ChemicalsPage } from '@features/chemicals/pages/ChemicalsPage';
 import { ROUTES } from '@shared/constants/routes';
 
 function App() {
@@ -32,7 +33,7 @@ function App() {
               <Route path={ROUTES.HOME} element={<Navigate to={ROUTES.DASHBOARD} replace />} />
               <Route path={ROUTES.DASHBOARD} element={<DashboardPage />} />
               <Route path={ROUTES.TOOLS} element={<ToolsPage />} />
-              <Route path={ROUTES.CHEMICALS} element={<div>Chemicals Page (Coming Soon)</div>} />
+              <Route path={ROUTES.CHEMICALS} element={<ChemicalsPage />} />
               <Route path={ROUTES.KITS} element={<div>Kits Page (Coming Soon)</div>} />
               <Route path={ROUTES.WAREHOUSES} element={<div>Warehouses Page (Coming Soon)</div>} />
               <Route path={ROUTES.REPORTS} element={<div>Reports Page (Coming Soon)</div>} />

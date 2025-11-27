@@ -42,7 +42,7 @@ export const ToolsTable = ({ onView, onEdit }: ToolsTableProps) => {
     try {
       await deleteTool(id).unwrap();
       message.success('Tool deleted successfully');
-    } catch (error) {
+    } catch {
       message.error('Failed to delete tool');
     }
   };

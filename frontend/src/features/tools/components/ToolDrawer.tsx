@@ -81,7 +81,7 @@ export const ToolDrawer = ({ open, mode: initialMode, toolId, onClose, onSuccess
       }
       onSuccess?.();
       onClose();
-    } catch (error) {
+    } catch {
       message.error(`Failed to ${mode === 'create' ? 'create' : 'update'} tool`);
     }
   };
