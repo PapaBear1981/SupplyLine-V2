@@ -153,7 +153,7 @@ export const MainLayout = () => {
                 size={64}
               />
               <Text strong>
-                {user?.first_name} {user?.last_name}
+                {user?.name || user?.employee_number}
               </Text>
             </Space>
           </Dropdown>
