@@ -7,6 +7,7 @@ import { LoginPage } from '@features/auth/pages/LoginPage';
 import { DashboardPage } from '@features/dashboard/pages/DashboardPage';
 import { ToolsPage } from '@features/tools/pages/ToolsPage';
 import { ChemicalsPage } from '@features/chemicals/pages/ChemicalsPage';
+import { WarehousesPage } from '@features/warehouses/pages/WarehousesPage';
 import { SettingsPage } from '@features/settings/pages/SettingsPage';
 import { ProfilePage } from '@features/profile/pages/ProfilePage';
 import { UsersPage } from '@features/users/pages/UsersPage';
@@ -42,7 +43,7 @@ function AppContent() {
               <Route path={ROUTES.TOOLS} element={<ToolsPage />} />
               <Route path={ROUTES.CHEMICALS} element={<ChemicalsPage />} />
               <Route path={ROUTES.KITS} element={<div>Kits Page (Coming Soon)</div>} />
-              <Route path={ROUTES.WAREHOUSES} element={<div>Warehouses Page (Coming Soon)</div>} />
+              <Route path={ROUTES.WAREHOUSES} element={<WarehousesPage />} />
               <Route path={ROUTES.REPORTS} element={<div>Reports Page (Coming Soon)</div>} />
               <Route path={ROUTES.USERS} element={<UsersPage />} />
               <Route path={ROUTES.PROFILE} element={<ProfilePage />} />
