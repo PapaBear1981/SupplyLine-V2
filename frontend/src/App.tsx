@@ -5,6 +5,7 @@ import { AuthLayout } from '@shared/components/layouts/AuthLayout';
 import { ProtectedRoute } from '@features/auth/components/ProtectedRoute';
 import { LoginPage } from '@features/auth/pages/LoginPage';
 import { DashboardPage } from '@features/dashboard/pages/DashboardPage';
+import { ToolsPage } from '@features/tools/pages/ToolsPage';
 import { ROUTES } from '@shared/constants/routes';
 
 function App() {
@@ -30,7 +31,7 @@ function App() {
             <Route element={<MainLayout />}>
               <Route path={ROUTES.HOME} element={<Navigate to={ROUTES.DASHBOARD} replace />} />
               <Route path={ROUTES.DASHBOARD} element={<DashboardPage />} />
-              <Route path={ROUTES.TOOLS} element={<div>Tools Page (Coming Soon)</div>} />
+              <Route path={ROUTES.TOOLS} element={<ToolsPage />} />
               <Route path={ROUTES.CHEMICALS} element={<div>Chemicals Page (Coming Soon)</div>} />
               <Route path={ROUTES.KITS} element={<div>Kits Page (Coming Soon)</div>} />
               <Route path={ROUTES.WAREHOUSES} element={<div>Warehouses Page (Coming Soon)</div>} />
