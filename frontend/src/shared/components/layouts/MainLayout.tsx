@@ -64,6 +64,7 @@ export const MainLayout = () => {
       key: 'settings',
       icon: <SettingOutlined />,
       label: 'Settings',
+      onClick: () => navigate(ROUTES.SETTINGS),
     },
     {
       type: 'divider',
@@ -149,7 +150,7 @@ export const MainLayout = () => {
               <Avatar
                 icon={<UserOutlined />}
                 src={user?.avatar}
-                size="default"
+                size={64}
               />
               <Text strong>
                 {user?.first_name} {user?.last_name}

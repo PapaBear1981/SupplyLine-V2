@@ -9,4 +9,5 @@ export const ROUTES = {
   REPORTS: '/reports',
   USERS: '/users',
   PROFILE: '/profile',
+  SETTINGS: '/settings',
 } as const;

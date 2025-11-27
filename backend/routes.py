@@ -40,6 +40,7 @@ from routes_kits import register_kit_routes
 from routes_message_search import register_message_search_routes
 from routes_orders import register_order_routes
 from routes_password_reset import register_password_reset_routes
+from routes_profile import register_profile_routes
 from routes_rbac import register_rbac_routes
 from routes_reports import register_report_routes
 from routes_scanner import register_scanner_routes
@@ -1327,6 +1328,9 @@ def register_routes(app):
 
     # Register user routes
     register_user_routes(app)
+
+    # Register profile routes
+    register_profile_routes(app)
 
     @app.route("/api/checkouts", methods=["GET", "POST"])
     def checkouts_route():
