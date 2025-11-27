@@ -150,7 +150,7 @@ export const MainLayout = () => {
               <Avatar
                 icon={<UserOutlined />}
                 src={user?.avatar}
-                size="default"
+                size={64}
               />
               <Text strong>
                 {user?.first_name} {user?.last_name}

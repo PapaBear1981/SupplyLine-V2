@@ -7,6 +7,7 @@ import { LoginPage } from '@features/auth/pages/LoginPage';
 import { DashboardPage } from '@features/dashboard/pages/DashboardPage';
 import { ToolsPage } from '@features/tools/pages/ToolsPage';
 import { SettingsPage } from '@features/settings/pages/SettingsPage';
+import { ProfilePage } from '@features/profile/pages/ProfilePage';
 import { ThemeProvider, useTheme } from '@features/settings/contexts/ThemeContext';
 import { COLOR_THEMES } from '@features/settings/types/theme';
 import { ROUTES } from '@shared/constants/routes';
@@ -42,7 +43,7 @@ function AppContent() {
               <Route path={ROUTES.WAREHOUSES} element={<div>Warehouses Page (Coming Soon)</div>} />
               <Route path={ROUTES.REPORTS} element={<div>Reports Page (Coming Soon)</div>} />
               <Route path={ROUTES.USERS} element={<div>Users Page (Coming Soon)</div>} />
-              <Route path={ROUTES.PROFILE} element={<div>Profile Page (Coming Soon)</div>} />
+              <Route path={ROUTES.PROFILE} element={<ProfilePage />} />
               <Route path={ROUTES.SETTINGS} element={<SettingsPage />} />
             </Route>
           </Route>
