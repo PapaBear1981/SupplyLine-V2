@@ -1,9 +1,9 @@
 @echo off
 echo ===================================================
-echo    SupplyLine MRO Suite - Development Environment
+echo    SupplyLine MRO Suite - Backend Server
 echo ===================================================
 echo.
-echo Starting development servers...
+echo Starting backend server...
 echo.
 
 REM Store the project root directory
@@ -16,32 +16,24 @@ if %ERRORLEVEL% neq 0 (
     goto :error
 )
 
-REM Check if Node.js is installed
-where node >nul 2>nul
-if %ERRORLEVEL% neq 0 (
-    echo Node.js is not installed or not in PATH. Please install Node.js v14+ and try again.
-    goto :error
-)
-
 REM Create database directory if it doesn't exist
 if not exist "%PROJECT_ROOT%database" (
     echo Creating database directory...
     mkdir "%PROJECT_ROOT%database"
 )
 
-
 echo Starting backend server...
-start cmd /k "cd /d %PROJECT_ROOT%backend && echo Activating virtual environment if it exists... && (if exist venv\Scripts\activate.bat (call venv\Scripts\activate.bat) else (echo No virtual environment found, continuing without it...)) && echo Installing backend dependencies... && pip install -r requirements.txt && echo Starting Flask server... && python run.py"
-
-echo Starting frontend server...
-start cmd /k "cd /d %PROJECT_ROOT%frontend && echo Installing frontend dependencies... && npm install && echo Starting Vite development server... && npm run dev"
+start cmd /k "cd /d %PROJECT_ROOT%backend && echo Activating virtual environment if it exists... && (if exist venv\Scripts\activate.bat (call venv\Scripts\activate.bat) else (echo No virtual environment found, continuing without it...)) && echo Installing backend dependencies... && pip install -r requirements.txt && echo Starting Flask server... && python app.py"
 
 echo.
 echo ===================================================
-echo Development servers are starting in separate windows.
+echo Backend server is starting in a separate window.
 echo.
-echo Frontend will be available at: http://localhost:5173
 echo Backend API will be available at: http://localhost:5000
+echo Health check endpoint: http://localhost:5000/api/health
+echo.
+echo Frontend: Set up your frontend framework separately
+echo Configure CORS_ORIGINS in .env to include your frontend URL
 echo.
 echo Default admin credentials:
 echo - Employee Number: ADMIN001
