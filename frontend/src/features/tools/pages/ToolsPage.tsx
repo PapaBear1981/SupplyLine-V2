@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Typography, Button, Space } from 'antd';
 import { PlusOutlined } from '@ant-design/icons';
 import { ToolsTable } from '../components/ToolsTable';
+import { ToolDrawer } from '../components/ToolDrawer';
 import type { Tool } from '../types';
 
 const { Title } = Typography;
@@ -23,6 +24,11 @@ export const ToolsPage = () => {
   const handleCreate = () => {
     setSelectedTool(null);
     setDrawerMode('create');
+  };
+
+  const handleCloseDrawer = () => {
+    setDrawerMode(null);
+    setSelectedTool(null);
   };
 
   return (
@@ -53,20 +59,12 @@ export const ToolsPage = () => {
 
       <ToolsTable onView={handleView} onEdit={handleEdit} />
 
-      {/* TODO: Add ToolDrawer component here */}
-      {drawerMode && (
-        <div style={{ padding: 16, background: '#f0f0f0', marginTop: 16 }}>
-          <p>
-            Drawer Mode: <strong>{drawerMode}</strong>
-          </p>
-          {selectedTool && (
-            <p>
-              Selected Tool: <strong>{selectedTool.tool_number}</strong> - {selectedTool.description}
-            </p>
-          )}
-          <Button onClick={() => setDrawerMode(null)}>Close</Button>
-        </div>
-      )}
+      <ToolDrawer
+        open={drawerMode !== null}
+        mode={drawerMode || 'view'}
+        toolId={selectedTool?.id}
+        onClose={handleCloseDrawer}
+      />
     </div>
   );
 };
