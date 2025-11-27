@@ -15,7 +15,7 @@ export const LoginPage = () => {
   const handleSubmit = async (values: LoginRequest) => {
     try {
       const result = await login(values).unwrap();
-      dispatch(setCredentials(result));
+      dispatch(setCredentials({ user: result.user, token: result.access_token }));
       message.success('Login successful!');
       navigate(ROUTES.DASHBOARD);
     } catch (error: unknown) {
