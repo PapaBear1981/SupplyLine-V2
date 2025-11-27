@@ -6,15 +6,20 @@ import { ProtectedRoute } from '@features/auth/components/ProtectedRoute';
 import { LoginPage } from '@features/auth/pages/LoginPage';
 import { DashboardPage } from '@features/dashboard/pages/DashboardPage';
 import { ToolsPage } from '@features/tools/pages/ToolsPage';
+import { SettingsPage } from '@features/settings/pages/SettingsPage';
+import { ThemeProvider, useTheme } from '@features/settings/contexts/ThemeContext';
+import { COLOR_THEMES } from '@features/settings/types/theme';
 import { ROUTES } from '@shared/constants/routes';
 
-function App() {
+function AppContent() {
+  const { themeConfig } = useTheme();
+
   return (
     <ConfigProvider
       theme={{
-        algorithm: theme.defaultAlgorithm,
+        algorithm: themeConfig.mode === 'dark' ? theme.darkAlgorithm : theme.defaultAlgorithm,
         token: {
-          colorPrimary: '#1890ff',
+          colorPrimary: COLOR_THEMES[themeConfig.colorTheme].primary,
           borderRadius: 6,
         },
       }}
@@ -38,6 +43,7 @@ function App() {
               <Route path={ROUTES.REPORTS} element={<div>Reports Page (Coming Soon)</div>} />
               <Route path={ROUTES.USERS} element={<div>Users Page (Coming Soon)</div>} />
               <Route path={ROUTES.PROFILE} element={<div>Profile Page (Coming Soon)</div>} />
+              <Route path={ROUTES.SETTINGS} element={<SettingsPage />} />
             </Route>
           </Route>
 
@@ -46,6 +52,14 @@ function App() {
         </Routes>
       </BrowserRouter>
     </ConfigProvider>
+  );
+}
+
+function App() {
+  return (
+    <ThemeProvider>
+      <AppContent />
+    </ThemeProvider>
   );
 }
 

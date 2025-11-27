@@ -64,6 +64,7 @@ export const MainLayout = () => {
       key: 'settings',
       icon: <SettingOutlined />,
       label: 'Settings',
+      onClick: () => navigate(ROUTES.SETTINGS),
     },
     {
       type: 'divider',
