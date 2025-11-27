@@ -71,9 +71,17 @@ docker-compose up --build -d
 
 ### 5. Login
 - Employee Number: `ADMIN001`
-- Password: `admin123`
+- Password: `AdminPass123!`
 
 **⚠️ IMPORTANT: Change default credentials immediately in production!**
+
+**Note:** The default admin password meets the following security requirements:
+- Minimum 12 characters
+- Contains uppercase and lowercase letters
+- Contains numbers
+- Contains special characters
+
+You can customize this by setting `INITIAL_ADMIN_PASSWORD` in your `.env` file before first deployment.
 
 ---
 

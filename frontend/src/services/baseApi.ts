@@ -4,7 +4,8 @@ import type { RootState } from '@app/store';
 export const baseApi = createApi({
   reducerPath: 'api',
   baseQuery: fetchBaseQuery({
-    baseUrl: import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000',
+    // Use empty string for production (proxied by nginx) or explicit URL for development
+    baseUrl: import.meta.env.VITE_API_BASE_URL ?? '',
     prepareHeaders: (headers, { getState }) => {
       // Get token from Redux state or localStorage
       const state = getState() as RootState;
