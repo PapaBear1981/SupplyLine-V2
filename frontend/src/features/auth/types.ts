@@ -1,14 +1,4 @@
-export interface User {
-  id: number;
-  employee_number: string;
-  first_name: string;
-  last_name: string;
-  email: string;
-  role: string;
-  department_id: number | null;
-  is_active: boolean;
-  avatar?: string;
-}
+import type { User as ProfileUser } from '@features/users/types';
 
 export interface LoginRequest {
   employee_number: string;
@@ -16,8 +6,9 @@ export interface LoginRequest {
 }
 
 export interface LoginResponse {
-  access_token: string;
+  access_token?: string;
   user: User;
+  message?: string;
 }
 
 export interface AuthState {
@@ -25,3 +16,5 @@ export interface AuthState {
   token: string | null;
   isAuthenticated: boolean;
 }
+
+export type User = ProfileUser;

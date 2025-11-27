@@ -9,6 +9,7 @@ import { ToolsPage } from '@features/tools/pages/ToolsPage';
 import { ChemicalsPage } from '@features/chemicals/pages/ChemicalsPage';
 import { SettingsPage } from '@features/settings/pages/SettingsPage';
 import { ProfilePage } from '@features/profile/pages/ProfilePage';
+import { UsersPage } from '@features/users/pages/UsersPage';
 import { ThemeProvider, useTheme } from '@features/settings/contexts/ThemeContext';
 import { COLOR_THEMES } from '@features/settings/types/theme';
 import { ROUTES } from '@shared/constants/routes';
@@ -43,7 +44,7 @@ function AppContent() {
               <Route path={ROUTES.KITS} element={<div>Kits Page (Coming Soon)</div>} />
               <Route path={ROUTES.WAREHOUSES} element={<div>Warehouses Page (Coming Soon)</div>} />
               <Route path={ROUTES.REPORTS} element={<div>Reports Page (Coming Soon)</div>} />
-              <Route path={ROUTES.USERS} element={<div>Users Page (Coming Soon)</div>} />
+              <Route path={ROUTES.USERS} element={<UsersPage />} />
               <Route path={ROUTES.PROFILE} element={<ProfilePage />} />
               <Route path={ROUTES.SETTINGS} element={<SettingsPage />} />
             </Route>
