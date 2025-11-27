@@ -100,3 +100,6 @@ backend/static/order_documents/
 .claude/
 supplyline_mro_suite/.codex/
 supplyline_mro_suite/.specify/
+
+# Helper scripts
+push-to-github.bat
