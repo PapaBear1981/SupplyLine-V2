@@ -1,3 +1,4 @@
+import { useEffect, useCallback } from 'react';
 import { Form, Input, InputNumber, Select, DatePicker, Button, Space } from 'antd';
 import type { FormInstance } from 'antd';
 import dayjs from 'dayjs';
@@ -17,7 +18,7 @@ interface ChemicalFormProps {
 export const ChemicalForm = ({ form, initialValues, onSubmit, onCancel, loading }: ChemicalFormProps) => {
   const isEditing = !!initialValues;
 
-  const getInitialFormValues = () => {
+  const getInitialFormValues = useCallback(() => {
     if (!initialValues) return {};
 
     return {
@@ -37,7 +38,12 @@ export const ChemicalForm = ({ form, initialValues, onSubmit, onCancel, loading 
       minimum_stock_level: initialValues.minimum_stock_level || undefined,
       notes: initialValues.notes || undefined,
     };
-  };
+  }, [initialValues]);
+
+  // Update form when initialValues change (e.g., switching between chemicals)
+  useEffect(() => {
+    form.setFieldsValue(getInitialFormValues());
+  }, [initialValues, form, getInitialFormValues]);
 
   const handleFinish = (
     values: ChemicalFormData & {
@@ -143,7 +149,6 @@ export const ChemicalForm = ({ form, initialValues, onSubmit, onCancel, loading 
           <Option value="low_stock">Low Stock</Option>
           <Option value="out_of_stock">Out of Stock</Option>
           <Option value="expired">Expired</Option>
-          <Option value="issued">Issued</Option>
         </Select>
       </Form.Item>
 

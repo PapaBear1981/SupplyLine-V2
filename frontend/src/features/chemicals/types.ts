@@ -2,8 +2,7 @@ export type ChemicalStatus =
   | 'available'
   | 'low_stock'
   | 'out_of_stock'
-  | 'expired'
-  | 'issued';
+  | 'expired';
 
 export interface Chemical {
   id: number;

@@ -37,11 +37,12 @@ export const ChemicalsTable = ({ onView, onEdit }: ChemicalsTableProps) => {
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(50);
   const [searchQuery, setSearchQuery] = useState('');
+  const [committedSearch, setCommittedSearch] = useState('');
 
   const { data, isLoading, isFetching } = useGetChemicalsQuery({
     page,
     per_page: pageSize,
-    q: searchQuery || undefined,
+    q: committedSearch || undefined,
   });
 
   const [deleteChemical] = useDeleteChemicalMutation();
@@ -61,7 +62,6 @@ export const ChemicalsTable = ({ onView, onEdit }: ChemicalsTableProps) => {
       low_stock: 'orange',
       out_of_stock: 'red',
       expired: 'volcano',
-      issued: 'blue',
     };
     return colors[status] || 'default';
   };
@@ -136,7 +136,6 @@ export const ChemicalsTable = ({ onView, onEdit }: ChemicalsTableProps) => {
         { text: 'Low Stock', value: 'low_stock' },
         { text: 'Out of Stock', value: 'out_of_stock' },
         { text: 'Expired', value: 'expired' },
-        { text: 'Issued', value: 'issued' },
       ],
       onFilter: (value, record) => record.status === value,
     },
@@ -196,9 +195,17 @@ export const ChemicalsTable = ({ onView, onEdit }: ChemicalsTableProps) => {
           prefix={<SearchOutlined />}
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
-          onPressEnter={() => setPage(1)}
+          onPressEnter={() => {
+            setCommittedSearch(searchQuery);
+            setPage(1);
+          }}
           style={{ maxWidth: 400 }}
           allowClear
+          onClear={() => {
+            setSearchQuery('');
+            setCommittedSearch('');
+            setPage(1);
+          }}
         />
       </div>
 

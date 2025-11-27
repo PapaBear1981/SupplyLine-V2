@@ -78,7 +78,6 @@ export const ChemicalDrawer = ({
       low_stock: 'orange',
       out_of_stock: 'red',
       expired: 'volcano',
-      issued: 'blue',
     };
     return colors[status] || 'default';
   };
@@ -169,6 +168,10 @@ export const ChemicalDrawer = ({
               Loading chemical details...
             </Title>
           </Space>
+        </div>
+      ) : mode === 'view' && !chemical ? (
+        <div style={{ textAlign: 'center', padding: 48 }}>
+          <Title level={5}>Chemical not found</Title>
         </div>
       ) : mode === 'view' && chemical ? (
         renderDetails()
