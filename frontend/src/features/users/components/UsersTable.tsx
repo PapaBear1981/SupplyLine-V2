@@ -21,6 +21,8 @@ import {
   SearchOutlined,
   StopOutlined,
   UnlockOutlined,
+  LockOutlined,
+  SafetyOutlined,
 } from '@ant-design/icons';
 import dayjs from 'dayjs';
 import {
@@ -34,14 +36,22 @@ import type { User } from '../types';
 
 const { Text } = Typography;
 
+interface AdminActions {
+  onResetPassword?: (user: User) => void;
+  onToggleStatus?: (user: User) => void;
+  onUnlock?: (user: User) => void;
+  onManagePermissions?: (user: User) => void;
+}
+
 interface UsersTableProps {
   onView: (user: User) => void;
   onEdit: (user: User) => void;
+  adminActions?: AdminActions;
 }
 
 type StatusFilter = 'all' | 'active' | 'inactive';
 
-export const UsersTable = ({ onView, onEdit }: UsersTableProps) => {
+export const UsersTable = ({ onView, onEdit, adminActions }: UsersTableProps) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
   const [departmentFilter, setDepartmentFilter] = useState<string | null>(null);
@@ -189,7 +199,7 @@ export const UsersTable = ({ onView, onEdit }: UsersTableProps) => {
       title: 'Actions',
       key: 'actions',
       fixed: 'right',
-      width: 220,
+      width: adminActions ? 280 : 220,
       render: (_, record) => (
         <Space size="small">
           <Tooltip title="View details">
@@ -198,35 +208,79 @@ export const UsersTable = ({ onView, onEdit }: UsersTableProps) => {
           <Tooltip title="Edit user">
             <Button type="text" icon={<EditOutlined />} onClick={() => onEdit(record)} />
           </Tooltip>
-          {record.is_active ? (
-            <Popconfirm
-              title="Deactivate user?"
-              description="User will lose access until reactivated."
-              onConfirm={() => handleDeactivate(record.id)}
-              okButtonProps={{ danger: true }}
-            >
-              <Tooltip title="Deactivate">
-                <Button type="text" danger icon={<StopOutlined />} />
-              </Tooltip>
-            </Popconfirm>
+          {adminActions ? (
+            <>
+              {adminActions.onToggleStatus && (
+                <Tooltip title={record.is_active ? 'Disable user' : 'Enable user'}>
+                  <Button
+                    type="text"
+                    danger={record.is_active}
+                    icon={record.is_active ? <StopOutlined /> : <CheckCircleOutlined />}
+                    onClick={() => adminActions.onToggleStatus!(record)}
+                  />
+                </Tooltip>
+              )}
+              {adminActions.onUnlock && isLocked(record) && (
+                <Tooltip title="Unlock account">
+                  <Button
+                    type="text"
+                    icon={<UnlockOutlined />}
+                    onClick={() => adminActions.onUnlock!(record)}
+                  />
+                </Tooltip>
+              )}
+              {adminActions.onResetPassword && (
+                <Tooltip title="Reset password">
+                  <Button
+                    type="text"
+                    icon={<LockOutlined />}
+                    onClick={() => adminActions.onResetPassword!(record)}
+                  />
+                </Tooltip>
+              )}
+              {adminActions.onManagePermissions && (
+                <Tooltip title="Manage permissions">
+                  <Button
+                    type="text"
+                    icon={<SafetyOutlined />}
+                    onClick={() => adminActions.onManagePermissions!(record)}
+                  />
+                </Tooltip>
+              )}
+            </>
           ) : (
-            <Tooltip title="Activate">
-              <Button
-                type="text"
-                icon={<CheckCircleOutlined />}
-                onClick={() => handleActivate(record.id)}
-              />
-            </Tooltip>
-          )}
-          {isLocked(record) && (
-            <Tooltip title="Unlock account">
-              <Button
-                type="text"
-                icon={<UnlockOutlined />}
-                loading={isUnlocking}
-                onClick={() => handleUnlock(record.id)}
-              />
-            </Tooltip>
+            <>
+              {record.is_active ? (
+                <Popconfirm
+                  title="Deactivate user?"
+                  description="User will lose access until reactivated."
+                  onConfirm={() => handleDeactivate(record.id)}
+                  okButtonProps={{ danger: true }}
+                >
+                  <Tooltip title="Deactivate">
+                    <Button type="text" danger icon={<StopOutlined />} />
+                  </Tooltip>
+                </Popconfirm>
+              ) : (
+                <Tooltip title="Activate">
+                  <Button
+                    type="text"
+                    icon={<CheckCircleOutlined />}
+                    onClick={() => handleActivate(record.id)}
+                  />
+                </Tooltip>
+              )}
+              {isLocked(record) && (
+                <Tooltip title="Unlock account">
+                  <Button
+                    type="text"
+                    icon={<UnlockOutlined />}
+                    loading={isUnlocking}
+                    onClick={() => handleUnlock(record.id)}
+                  />
+                </Tooltip>
+              )}
+            </>
           )}
         </Space>
       ),

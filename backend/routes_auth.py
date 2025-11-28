@@ -171,10 +171,12 @@ def register_auth_routes(app):
             logger.info(f"Successful JWT login for user {user.id} ({user.name})")
 
             # SECURITY: Set tokens in HttpOnly cookies to prevent XSS attacks
-            # Tokens are no longer accessible via JavaScript
+            # Also include access_token in response for frontend localStorage (backward compatibility)
             response = jsonify({
                 "message": "Login successful",
-                "user": user.to_dict(include_roles=True, include_permissions=True)
+                "user": user.to_dict(include_roles=True, include_permissions=True),
+                "access_token": tokens["access_token"],
+                "refresh_token": tokens["refresh_token"]
             })
 
             # Set access token cookie (HttpOnly, Secure, SameSite)

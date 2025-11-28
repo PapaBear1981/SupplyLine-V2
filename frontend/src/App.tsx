@@ -3,6 +3,7 @@ import { ConfigProvider, theme } from 'antd';
 import { MainLayout } from '@shared/components/layouts/MainLayout';
 import { AuthLayout } from '@shared/components/layouts/AuthLayout';
 import { ProtectedRoute } from '@features/auth/components/ProtectedRoute';
+import { AdminRoute } from '@features/auth/components/AdminRoute';
 import { LoginPage } from '@features/auth/pages/LoginPage';
 import { DashboardPage } from '@features/dashboard/pages/DashboardPage';
 import { ToolsPage } from '@features/tools/pages/ToolsPage';
@@ -11,6 +12,7 @@ import { WarehousesPage } from '@features/warehouses/pages/WarehousesPage';
 import { SettingsPage } from '@features/settings/pages/SettingsPage';
 import { ProfilePage } from '@features/profile/pages/ProfilePage';
 import { UsersPage } from '@features/users/pages/UsersPage';
+import { AdminPage } from '@features/admin/pages/AdminPage';
 import { ThemeProvider, useTheme } from '@features/settings/contexts/ThemeContext';
 import { COLOR_THEMES } from '@features/settings/types/theme';
 import { ROUTES } from '@shared/constants/routes';
@@ -48,6 +50,11 @@ function AppContent() {
               <Route path={ROUTES.USERS} element={<UsersPage />} />
               <Route path={ROUTES.PROFILE} element={<ProfilePage />} />
               <Route path={ROUTES.SETTINGS} element={<SettingsPage />} />
+
+              {/* Admin-only routes */}
+              <Route element={<AdminRoute />}>
+                <Route path={ROUTES.ADMIN} element={<AdminPage />} />
+              </Route>
             </Route>
           </Route>
 

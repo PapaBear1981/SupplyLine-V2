@@ -19,6 +19,7 @@ from models import (
     UserActivity,
     db,
 )
+from routes_admin import register_admin_routes
 from routes_announcements import register_announcement_routes
 from routes_attachments import register_attachments_routes
 from routes_auth import register_auth_routes
@@ -189,6 +190,9 @@ def register_routes(app):
 
     # Register announcement routes
     register_announcement_routes(app)
+
+    # Register admin routes
+    register_admin_routes(app)
 
     # Register scanner routes
     register_scanner_routes(app)
