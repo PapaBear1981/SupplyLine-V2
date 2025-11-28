@@ -113,7 +113,7 @@ export const MainLayout = () => {
           theme="dark"
           mode="inline"
           selectedKeys={[location.pathname]}
-          items={getMenuItems()}
+          items={getMenuItems(user?.is_admin || false)}
           onClick={handleMenuClick}
         />
       </Sider>
