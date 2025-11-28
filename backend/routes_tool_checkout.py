@@ -10,7 +10,7 @@ from datetime import datetime, timedelta
 
 from flask import jsonify, request
 
-from auth.jwt_manager import login_required
+from auth.jwt_manager import jwt_required
 from models import (
     AuditLog,
     Checkout,
@@ -34,7 +34,7 @@ def register_tool_checkout_routes(app):
     # Tool Availability Check
     # ============================================
     @app.route("/api/tools/<int:tool_id>/availability", methods=["GET"])
-    @login_required
+    @jwt_required
     def check_tool_availability(tool_id):
         """
         Check if a tool is available for checkout.
@@ -119,7 +119,7 @@ def register_tool_checkout_routes(app):
     # Enhanced Checkout Endpoint
     # ============================================
     @app.route("/api/tool-checkout", methods=["POST"])
-    @login_required
+    @jwt_required
     def create_tool_checkout():
         """
         Create a new tool checkout with enhanced tracking.
@@ -285,7 +285,7 @@ def register_tool_checkout_routes(app):
     # Enhanced Check-In Endpoint
     # ============================================
     @app.route("/api/tool-checkout/<int:checkout_id>/checkin", methods=["POST"])
-    @login_required
+    @jwt_required
     def checkin_tool(checkout_id):
         """
         Check in a tool with enhanced tracking including damage reporting.
@@ -430,7 +430,7 @@ def register_tool_checkout_routes(app):
     # Get Active Checkouts
     # ============================================
     @app.route("/api/tool-checkouts/active", methods=["GET"])
-    @login_required
+    @jwt_required
     def get_active_checkouts():
         """Get all currently active (not returned) checkouts"""
         try:
@@ -492,7 +492,7 @@ def register_tool_checkout_routes(app):
     # Get User's Checkouts
     # ============================================
     @app.route("/api/tool-checkouts/my", methods=["GET"])
-    @login_required
+    @jwt_required
     def get_my_checkouts():
         """Get current user's checkouts"""
         try:
@@ -527,7 +527,7 @@ def register_tool_checkout_routes(app):
     # Get Overdue Checkouts
     # ============================================
     @app.route("/api/tool-checkouts/overdue", methods=["GET"])
-    @login_required
+    @jwt_required
     def get_overdue_tool_checkouts():
         """Get all overdue checkouts"""
         try:
@@ -559,7 +559,7 @@ def register_tool_checkout_routes(app):
     # Get Checkout Details
     # ============================================
     @app.route("/api/tool-checkouts/<int:checkout_id>", methods=["GET"])
-    @login_required
+    @jwt_required
     def get_checkout_details(checkout_id):
         """Get detailed information about a specific checkout"""
         try:
@@ -593,7 +593,7 @@ def register_tool_checkout_routes(app):
     # Get Checkout History for a Tool
     # ============================================
     @app.route("/api/tools/<int:tool_id>/checkout-history", methods=["GET"])
-    @login_required
+    @jwt_required
     def get_tool_checkout_history(tool_id):
         """Get complete checkout history for a tool"""
         try:
@@ -628,7 +628,7 @@ def register_tool_checkout_routes(app):
     # Tool Timeline (Comprehensive History)
     # ============================================
     @app.route("/api/tools/<int:tool_id>/timeline", methods=["GET"])
-    @login_required
+    @jwt_required
     def get_tool_timeline(tool_id):
         """
         Get comprehensive timeline for a tool including all events:
@@ -690,7 +690,7 @@ def register_tool_checkout_routes(app):
     # Checkout Statistics/Dashboard
     # ============================================
     @app.route("/api/tool-checkouts/stats", methods=["GET"])
-    @login_required
+    @jwt_required
     def get_checkout_stats():
         """Get checkout statistics for dashboard"""
         try:
@@ -803,7 +803,7 @@ def register_tool_checkout_routes(app):
     # Search Tools for Quick Checkout
     # ============================================
     @app.route("/api/tool-checkout/search", methods=["GET"])
-    @login_required
+    @jwt_required
     def search_tools_for_checkout():
         """Search for tools available for checkout"""
         try:
@@ -858,7 +858,7 @@ def register_tool_checkout_routes(app):
     # Report Damage on Active Checkout
     # ============================================
     @app.route("/api/tool-checkouts/<int:checkout_id>/report-damage", methods=["POST"])
-    @login_required
+    @jwt_required
     def report_checkout_damage(checkout_id):
         """Report damage on an active checkout without returning the tool"""
         try:
@@ -928,7 +928,7 @@ def register_tool_checkout_routes(app):
     # Extend Checkout Duration
     # ============================================
     @app.route("/api/tool-checkouts/<int:checkout_id>/extend", methods=["POST"])
-    @login_required
+    @jwt_required
     def extend_checkout(checkout_id):
         """Extend the expected return date for a checkout"""
         try:

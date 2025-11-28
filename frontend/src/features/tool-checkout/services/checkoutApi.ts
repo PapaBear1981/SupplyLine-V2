@@ -36,8 +36,9 @@ export const checkoutApi = baseApi.injectEndpoints({
         method: 'POST',
         body,
       }),
-      invalidatesTags: [
-        { type: 'Tool', id: 'LIST' },
+      invalidatesTags: (_result, _error, { tool_id }) => [
+        { type: 'Tool' as const, id: tool_id },
+        { type: 'Tool' as const, id: 'LIST' },
         { type: 'Checkout' as const, id: 'LIST' },
         { type: 'Checkout' as const, id: 'ACTIVE' },
         { type: 'Checkout' as const, id: 'MY' },
@@ -54,8 +55,11 @@ export const checkoutApi = baseApi.injectEndpoints({
         method: 'POST',
         body: data,
       }),
-      invalidatesTags: (_result, _error, { checkoutId }) => [
-        { type: 'Tool', id: 'LIST' },
+      invalidatesTags: (result, _error, { checkoutId }) => [
+        ...(result?.checkout
+          ? [{ type: 'Tool' as const, id: result.checkout.tool_id }]
+          : []),
+        { type: 'Tool' as const, id: 'LIST' },
         { type: 'Checkout' as const, id: checkoutId },
         { type: 'Checkout' as const, id: 'LIST' },
         { type: 'Checkout' as const, id: 'ACTIVE' },
@@ -69,8 +73,8 @@ export const checkoutApi = baseApi.injectEndpoints({
     // Checkout Queries
     // ==========================================
     getActiveCheckouts: builder.query<CheckoutListResponse, CheckoutQueryParams | void>({
-      query: (params) => {
-        const queryParams = params || {};
+      query: (params = {}) => {
+        const queryParams = params;
         return {
           url: '/api/tool-checkouts/active',
           params: {
@@ -95,8 +99,8 @@ export const checkoutApi = baseApi.injectEndpoints({
     }),
 
     getMyCheckouts: builder.query<CheckoutListResponse, CheckoutQueryParams | void>({
-      query: (params) => {
-        const queryParams = params || {};
+      query: (params = {}) => {
+        const queryParams = params;
         return {
           url: '/api/tool-checkouts/my',
           params: {
@@ -119,8 +123,8 @@ export const checkoutApi = baseApi.injectEndpoints({
     }),
 
     getOverdueCheckouts: builder.query<CheckoutListResponse, CheckoutQueryParams | void>({
-      query: (params) => {
-        const queryParams = params || {};
+      query: (params = {}) => {
+        const queryParams = params;
         return {
           url: '/api/tool-checkouts/overdue',
           params: {
@@ -216,10 +220,15 @@ export const checkoutApi = baseApi.injectEndpoints({
         method: 'POST',
         body: data,
       }),
-      invalidatesTags: (_result, _error, { checkoutId }) => [
+      invalidatesTags: (result, _error, { checkoutId }) => [
+        ...(result?.checkout
+          ? [{ type: 'Tool' as const, id: result.checkout.tool_id }]
+          : []),
+        { type: 'Tool' as const, id: 'LIST' },
         { type: 'Checkout' as const, id: checkoutId },
         { type: 'Checkout' as const, id: 'ACTIVE' },
-        { type: 'Tool', id: 'LIST' },
+        { type: 'Checkout' as const, id: 'LIST' },
+        { type: 'Checkout' as const, id: 'STATS' },
       ],
     }),
 
@@ -235,10 +244,15 @@ export const checkoutApi = baseApi.injectEndpoints({
         method: 'POST',
         body: data,
       }),
-      invalidatesTags: (_result, _error, { checkoutId }) => [
+      invalidatesTags: (result, _error, { checkoutId }) => [
+        ...(result?.checkout
+          ? [{ type: 'Tool' as const, id: result.checkout.tool_id }]
+          : []),
         { type: 'Checkout' as const, id: checkoutId },
         { type: 'Checkout' as const, id: 'ACTIVE' },
         { type: 'Checkout' as const, id: 'OVERDUE' },
+        { type: 'Checkout' as const, id: 'LIST' },
+        { type: 'Checkout' as const, id: 'STATS' },
       ],
     }),
   }),
