@@ -101,5 +101,7 @@ backend/static/order_documents/
 supplyline_mro_suite/.codex/
 supplyline_mro_suite/.specify/
 
-# Helper scripts
+# Security - credential files
 push-to-github.bat
+*.pat
+*.token
