@@ -160,17 +160,17 @@ export const ToolHistoryTimeline = ({ toolId }: ToolHistoryTimelineProps) => {
         )}
 
         {/* Additional details from JSON */}
-        {details.checkout_user_name && (
+        {typeof details.checkout_user_name === 'string' && details.checkout_user_name && (
           <Text type="secondary">
-            Checked out to: {details.checkout_user_name as string}
+            Checked out to: {details.checkout_user_name}
           </Text>
         )}
-        {details.work_order && (
+        {typeof details.work_order === 'string' && details.work_order && (
           <div>
-            <Text type="secondary">Work Order: {details.work_order as string}</Text>
+            <Text type="secondary">Work Order: {details.work_order}</Text>
           </div>
         )}
-        {details.damage_severity && (
+        {typeof details.damage_severity === 'string' && details.damage_severity && (
           <div>
             <Tag
               color={
@@ -180,19 +180,19 @@ export const ToolHistoryTimeline = ({ toolId }: ToolHistoryTimelineProps) => {
                   : 'orange'
               }
             >
-              {(details.damage_severity as string).toUpperCase()}
+              {details.damage_severity.toUpperCase()}
             </Tag>
           </div>
         )}
-        {details.damage_description && (
+        {typeof details.damage_description === 'string' && details.damage_description && (
           <div>
-            <Text type="secondary">{details.damage_description as string}</Text>
+            <Text type="secondary">{details.damage_description}</Text>
           </div>
         )}
-        {details.notes && (
+        {typeof details.notes === 'string' && details.notes && (
           <div>
             <Text type="secondary" italic>
-              {details.notes as string}
+              {details.notes}
             </Text>
           </div>
         )}

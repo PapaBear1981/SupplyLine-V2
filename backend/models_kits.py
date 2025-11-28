@@ -52,6 +52,16 @@ class Kit(db.Model):
     updated_at = db.Column(db.DateTime, default=get_current_time, onupdate=get_current_time, nullable=False)
     created_by = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False)
 
+    # Location fields for map display
+    location_address = db.Column(db.String(255), nullable=True)
+    location_city = db.Column(db.String(100), nullable=True)
+    location_state = db.Column(db.String(100), nullable=True)
+    location_zip = db.Column(db.String(20), nullable=True)
+    location_country = db.Column(db.String(100), nullable=True, default="USA")
+    latitude = db.Column(db.Float, nullable=True)
+    longitude = db.Column(db.Float, nullable=True)
+    location_notes = db.Column(db.String(500), nullable=True)  # E.g., "Hangar 3, Bay 2"
+
     # Relationships
     aircraft_type = db.relationship("AircraftType", back_populates="kits")
     creator = db.relationship("User", foreign_keys=[created_by])
@@ -76,7 +86,17 @@ class Kit(db.Model):
             "created_by": self.created_by,
             "creator_name": self.creator.name if self.creator else None,
             "box_count": self.boxes.count() if self.boxes else 0,
-            "item_count": self.items.count() + self.expendables.count() if self.items and self.expendables else 0
+            "item_count": self.items.count() + self.expendables.count() if self.items and self.expendables else 0,
+            # Location fields
+            "location_address": self.location_address,
+            "location_city": self.location_city,
+            "location_state": self.location_state,
+            "location_zip": self.location_zip,
+            "location_country": self.location_country,
+            "latitude": self.latitude,
+            "longitude": self.longitude,
+            "location_notes": self.location_notes,
+            "has_location": self.latitude is not None and self.longitude is not None,
         }
 
         if include_details:
@@ -85,6 +105,24 @@ class Kit(db.Model):
             data["unread_messages"] = self.messages.filter_by(is_read=False).count() if self.messages else 0
 
         return data
+
+    def get_full_address(self):
+        """Get the full formatted address"""
+        parts = []
+        if self.location_address:
+            parts.append(self.location_address)
+        if self.location_city:
+            parts.append(self.location_city)
+        if self.location_state:
+            if self.location_zip:
+                parts.append(f"{self.location_state} {self.location_zip}")
+            else:
+                parts.append(self.location_state)
+        elif self.location_zip:
+            parts.append(self.location_zip)
+        if self.location_country and self.location_country != "USA":
+            parts.append(self.location_country)
+        return ", ".join(parts) if parts else None
 
 
 class KitBox(db.Model):

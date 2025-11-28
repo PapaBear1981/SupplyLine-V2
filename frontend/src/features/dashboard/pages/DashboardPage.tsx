@@ -5,6 +5,7 @@ import {
   InboxOutlined,
   HomeOutlined,
 } from '@ant-design/icons';
+import { KitLocationMap } from '@features/kits';
 
 const { Title } = Typography;
 
@@ -48,6 +49,13 @@ export const DashboardPage = () => {
               prefix={<HomeOutlined />}
             />
           </Card>
+        </Col>
+      </Row>
+
+      {/* Kit Location Map */}
+      <Row gutter={[16, 16]} style={{ marginTop: 16 }}>
+        <Col span={24}>
+          <KitLocationMap height={450} />
         </Col>
       </Row>
     </div>
