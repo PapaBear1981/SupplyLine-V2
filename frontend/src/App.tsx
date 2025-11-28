@@ -13,6 +13,7 @@ import { SettingsPage } from '@features/settings/pages/SettingsPage';
 import { ProfilePage } from '@features/profile/pages/ProfilePage';
 import { UsersPage } from '@features/users/pages/UsersPage';
 import { AdminPage } from '@features/admin/pages/AdminPage';
+import { KitsDashboard, KitDetailView, KitWizard } from '@features/kits';
 import { ThemeProvider, useTheme } from '@features/settings/contexts/ThemeContext';
 import { COLOR_THEMES } from '@features/settings/types/theme';
 import { ROUTES } from '@shared/constants/routes';
@@ -44,7 +45,14 @@ function AppContent() {
               <Route path={ROUTES.DASHBOARD} element={<DashboardPage />} />
               <Route path={ROUTES.TOOLS} element={<ToolsPage />} />
               <Route path={ROUTES.CHEMICALS} element={<ChemicalsPage />} />
-              <Route path={ROUTES.KITS} element={<div>Kits Page (Coming Soon)</div>} />
+
+              {/* Kits Routes */}
+              <Route path={ROUTES.KITS} element={<KitsDashboard />} />
+              <Route path="/kits/new" element={<KitWizard />} />
+              <Route path="/kits/:id" element={<KitDetailView />} />
+              <Route path="/kits/:id/edit" element={<div>Edit Kit (Coming Soon)</div>} />
+              <Route path="/kits/:id/duplicate" element={<div>Duplicate Kit (Coming Soon)</div>} />
+
               <Route path={ROUTES.WAREHOUSES} element={<WarehousesPage />} />
               <Route path={ROUTES.REPORTS} element={<div>Reports Page (Coming Soon)</div>} />
               <Route path={ROUTES.USERS} element={<UsersPage />} />
