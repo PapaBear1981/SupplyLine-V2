@@ -70,7 +70,7 @@ export const InventoryPieChart = ({ title, data, loading = false }: InventoryPie
               <Legend
                 verticalAlign="bottom"
                 height={36}
-                formatter={(value) => <span style={{ fontSize: 12 }}>{value}</span>}
+                formatter={(value: string) => <span style={{ fontSize: 12 }}>{value}</span>}
               />
             </PieChart>
           </ResponsiveContainer>
@@ -164,7 +164,7 @@ export const ActivityChart = ({ title, data, loading = false }: ActivityChartPro
               <Legend
                 verticalAlign="bottom"
                 height={36}
-                formatter={(value) => <span style={{ fontSize: 12 }}>{value}</span>}
+                formatter={(value: string) => <span style={{ fontSize: 12 }}>{value}</span>}
               />
             </AreaChart>
           </ResponsiveContainer>
