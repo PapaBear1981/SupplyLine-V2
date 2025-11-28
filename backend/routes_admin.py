@@ -179,7 +179,7 @@ def register_admin_routes(app):
             db.session.delete(announcement)
             db.session.commit()
 
-            return '', 204
+            return "", 204
         except SQLAlchemyError:
             logger.exception("Error deleting announcement %s", id)
             db.session.rollback()
@@ -244,6 +244,10 @@ def register_admin_routes(app):
 
             if user_id is None or is_active is None:
                 return jsonify({"error": "user_id and is_active are required"}), 400
+
+            # Prevent self-disable
+            if user_id == current_user["user_id"] and not is_active:
+                return jsonify({"error": "Cannot disable your own account"}), 400
 
             user = User.query.get_or_404(user_id)
             user.is_active = is_active
@@ -316,6 +320,12 @@ def register_admin_routes(app):
                 return jsonify({"error": "user_id is required"}), 400
 
             user = User.query.get_or_404(user_id)
+
+            # Prevent admins from removing their own admin privileges
+            if user_id == current_user["user_id"]:
+                admin_role = Role.query.filter_by(name="admin").first()
+                if admin_role and admin_role.id not in role_ids:
+                    return jsonify({"error": "Cannot remove your own admin role"}), 400
 
             # Remove existing roles
             UserRole.query.filter_by(user_id=user_id).delete()
@@ -466,7 +476,7 @@ def register_admin_routes(app):
             db.session.delete(department)
             db.session.commit()
 
-            return '', 204
+            return "", 204
         except SQLAlchemyError:
             logger.exception("Error deleting department %s", id)
             db.session.rollback()
@@ -600,7 +610,7 @@ def register_admin_routes(app):
             db.session.delete(role)
             db.session.commit()
 
-            return '', 204
+            return "", 204
         except SQLAlchemyError:
             logger.exception("Error deleting role %s", id)
             db.session.rollback()

@@ -7,8 +7,8 @@ import {
 } from '@ant-design/icons';
 import { UsersTable } from '@features/users/components/UsersTable';
 import { UserDrawer } from '@features/users/components/UserDrawer';
-import { useGetRolesQuery } from '../services/adminApi';
 import {
+  useGetRolesQuery,
   useResetUserPasswordMutation,
   useToggleUserStatusMutation,
   useUnlockUserMutation,
