@@ -7,6 +7,8 @@ import {
   FileTextOutlined,
   UserOutlined,
   SettingOutlined,
+  ShoppingCartOutlined,
+  FormOutlined,
 } from '@ant-design/icons';
 import type { MenuProps } from 'antd';
 import { ROUTES } from './routes';
@@ -34,6 +36,16 @@ export const getMenuItems = (isAdmin: boolean = false): MenuItem[] => {
       key: ROUTES.KITS,
       icon: <InboxOutlined />,
       label: 'Kits',
+    },
+    {
+      key: '/orders',
+      icon: <ShoppingCartOutlined />,
+      label: 'Orders',
+    },
+    {
+      key: '/requests',
+      icon: <FormOutlined />,
+      label: 'Requests',
     },
     {
       key: ROUTES.WAREHOUSES,
