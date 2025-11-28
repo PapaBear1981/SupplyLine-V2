@@ -73,8 +73,8 @@ export const checkoutApi = baseApi.injectEndpoints({
     // Checkout Queries
     // ==========================================
     getActiveCheckouts: builder.query<CheckoutListResponse, CheckoutQueryParams | void>({
-      query: (params = {}) => {
-        const queryParams = params;
+      query: (params) => {
+        const queryParams = params ?? {};
         return {
           url: '/api/tool-checkouts/active',
           params: {
@@ -99,8 +99,8 @@ export const checkoutApi = baseApi.injectEndpoints({
     }),
 
     getMyCheckouts: builder.query<CheckoutListResponse, CheckoutQueryParams | void>({
-      query: (params = {}) => {
-        const queryParams = params;
+      query: (params) => {
+        const queryParams = params ?? {};
         return {
           url: '/api/tool-checkouts/my',
           params: {
@@ -123,8 +123,8 @@ export const checkoutApi = baseApi.injectEndpoints({
     }),
 
     getOverdueCheckouts: builder.query<CheckoutListResponse, CheckoutQueryParams | void>({
-      query: (params = {}) => {
-        const queryParams = params;
+      query: (params) => {
+        const queryParams = params ?? {};
         return {
           url: '/api/tool-checkouts/overdue',
           params: {
