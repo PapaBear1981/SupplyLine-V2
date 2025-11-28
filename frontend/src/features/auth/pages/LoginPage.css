@@ -1,0 +1,34 @@
+.login-wrapper {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.login-header {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.login-form {
+  margin-top: 6px;
+}
+
+.login-actions {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.login-footnote {
+  text-align: center;
+}
+
+@media (max-width: 576px) {
+  .login-actions {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 4px;
+  }
+}
