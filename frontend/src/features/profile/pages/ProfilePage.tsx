@@ -120,10 +120,10 @@ export const ProfilePage = () => {
               <Space direction="vertical" size="small" style={{ width: '100%' }}>
                 <div>
                   <Title level={3} style={{ marginBottom: 4 }}>
-                    {user.first_name} {user.last_name}
+                    {user.name}
                   </Title>
                   <Space size="small" wrap>
-                    <Tag color="blue">{user.role}</Tag>
+                    <Tag color="blue">{user.is_admin ? 'Admin' : 'User'}</Tag>
                     <Tag color={user.is_active ? 'green' : 'red'}>
                       {user.is_active ? 'Active' : 'Inactive'}
                     </Tag>
@@ -160,11 +160,8 @@ export const ProfilePage = () => {
         {/* Account Information */}
         <Card title="Account Information">
           <Descriptions column={{ xs: 1, sm: 2 }} bordered>
-            <Descriptions.Item label="First Name">
-              {user.first_name}
-            </Descriptions.Item>
-            <Descriptions.Item label="Last Name">
-              {user.last_name}
+            <Descriptions.Item label="Name">
+              {user.name}
             </Descriptions.Item>
             <Descriptions.Item label="Email">
               {user.email}
@@ -173,10 +170,10 @@ export const ProfilePage = () => {
               {user.employee_number}
             </Descriptions.Item>
             <Descriptions.Item label="Role">
-              {user.role}
+              {user.is_admin ? 'Administrator' : 'User'}
             </Descriptions.Item>
-            <Descriptions.Item label="Department ID">
-              {user.department_id || 'N/A'}
+            <Descriptions.Item label="Department">
+              {user.department || 'N/A'}
             </Descriptions.Item>
             <Descriptions.Item label="Account Status">
               <Tag color={user.is_active ? 'success' : 'error'}>
