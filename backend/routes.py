@@ -2529,52 +2529,7 @@ def register_routes(app):
             "status": "Returned" if c.return_date else ("Overdue" if c.expected_return_date and c.expected_return_date < datetime.now() else "Checked Out")
         } for c in checkouts]), 200
 
-    @app.route("/api/checkouts/<int:id>/details", methods=["GET"])
-    def get_checkout_details(id):
-        """Get detailed information about a specific checkout transaction."""
-        checkout = Checkout.query.get_or_404(id)
-
-        # Get tool and user information
-        tool = checkout.tool
-        user = checkout.user
-
-        # Calculate duration if returned
-        duration_days = None
-        if checkout.return_date:
-            duration_days = (checkout.return_date - checkout.checkout_date).days
-
-        # Check if overdue
-        is_overdue = (checkout.return_date is None and
-                     checkout.expected_return_date and
-                     checkout.expected_return_date < datetime.now())
-
-        return jsonify({
-            "id": checkout.id,
-            "tool": {
-                "id": tool.id,
-                "tool_number": tool.tool_number,
-                "serial_number": tool.serial_number,
-                "description": tool.description,
-                "category": tool.category,
-                "location": tool.location
-            } if tool else None,
-            "user": {
-                "id": user.id,
-                "name": user.name,
-                "employee_number": user.employee_number,
-                "department": user.department
-            } if user else None,
-            "checkout_date": checkout.checkout_date.isoformat(),
-            "return_date": checkout.return_date.isoformat() if checkout.return_date else None,
-            "expected_return_date": checkout.expected_return_date.isoformat() if checkout.expected_return_date else None,
-            "condition_at_return": getattr(checkout, "return_condition", None),
-            "returned_by": getattr(checkout, "returned_by", None),
-            "found": getattr(checkout, "found", None),
-            "return_notes": getattr(checkout, "return_notes", None),
-            "duration_days": duration_days,
-            "is_overdue": is_overdue,
-            "status": "Returned" if checkout.return_date else ("Overdue" if is_overdue else "Checked Out")
-        }), 200
+    # Removed duplicate get_checkout_details - now handled by routes_tool_checkout.py
 
     @app.route("/api/tools/<int:id>/service/remove", methods=["POST"])
     @tool_manager_required
