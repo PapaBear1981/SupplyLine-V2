@@ -24,6 +24,7 @@ from routes_announcements import register_announcement_routes
 from routes_attachments import register_attachments_routes
 from routes_auth import register_auth_routes
 from routes_barcode import barcode_bp
+from routes_tool_checkout import register_tool_checkout_routes
 from routes_bulk_import import register_bulk_import_routes
 from routes_calibration import register_calibration_routes
 from routes_channels import register_channels_routes
@@ -227,6 +228,9 @@ def register_routes(app):
 
     # Register item history lookup routes
     register_history_routes(app)
+
+    # Register tool checkout system routes
+    register_tool_checkout_routes(app)
 
     # Register warehouse management routes
     app.register_blueprint(warehouses_bp, url_prefix="/api")

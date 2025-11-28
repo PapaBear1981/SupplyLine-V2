@@ -7,6 +7,7 @@ import {
   FileTextOutlined,
   UserOutlined,
   SettingOutlined,
+  SwapOutlined,
 } from '@ant-design/icons';
 import type { MenuProps } from 'antd';
 import { ROUTES } from './routes';
@@ -19,6 +20,11 @@ export const getMenuItems = (isAdmin: boolean = false): MenuItem[] => {
       key: ROUTES.DASHBOARD,
       icon: <DashboardOutlined />,
       label: 'Dashboard',
+    },
+    {
+      key: ROUTES.TOOL_CHECKOUT,
+      icon: <SwapOutlined />,
+      label: 'Tool Checkout',
     },
     {
       key: ROUTES.TOOLS,

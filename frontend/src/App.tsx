@@ -7,6 +7,7 @@ import { AdminRoute } from '@features/auth/components/AdminRoute';
 import { LoginPage } from '@features/auth/pages/LoginPage';
 import { DashboardPage } from '@features/dashboard/pages/DashboardPage';
 import { ToolsPage } from '@features/tools/pages/ToolsPage';
+import { ToolCheckoutPage } from '@features/tool-checkout';
 import { ChemicalsPage } from '@features/chemicals/pages/ChemicalsPage';
 import { WarehousesPage } from '@features/warehouses/pages/WarehousesPage';
 import { SettingsPage } from '@features/settings/pages/SettingsPage';
@@ -43,6 +44,7 @@ function AppContent() {
             <Route element={<MainLayout />}>
               <Route path={ROUTES.HOME} element={<Navigate to={ROUTES.DASHBOARD} replace />} />
               <Route path={ROUTES.DASHBOARD} element={<DashboardPage />} />
+              <Route path={ROUTES.TOOL_CHECKOUT} element={<ToolCheckoutPage />} />
               <Route path={ROUTES.TOOLS} element={<ToolsPage />} />
               <Route path={ROUTES.CHEMICALS} element={<ChemicalsPage />} />
 

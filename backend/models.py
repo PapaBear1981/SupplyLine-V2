@@ -401,13 +401,196 @@ class SystemSetting(db.Model):
 class Checkout(db.Model):
     __tablename__ = "checkouts"
     id = db.Column(db.Integer, primary_key=True)
-    tool_id = db.Column(db.Integer, db.ForeignKey("tools.id"), nullable=False)
+    tool_id = db.Column(db.Integer, db.ForeignKey("tools.id"), nullable=False, index=True)
+    user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False, index=True)
+    checkout_date = db.Column(db.DateTime, default=get_current_time, index=True)
+    return_date = db.Column(db.DateTime, index=True)
+    expected_return_date = db.Column(db.DateTime, index=True)
+
+    # Enhanced checkout tracking
+    checkout_notes = db.Column(db.String(1000), nullable=True)
+    condition_at_checkout = db.Column(db.String(50), nullable=True)  # New, Good, Fair, Poor
+    work_order = db.Column(db.String(100), nullable=True)  # Reference to work order
+    project = db.Column(db.String(200), nullable=True)  # Project or job reference
+
+    # Enhanced return tracking
+    return_notes = db.Column(db.String(1000), nullable=True)
+    condition_at_return = db.Column(db.String(50), nullable=True)  # New, Good, Fair, Poor, Damaged
+    checked_in_by_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=True)
+
+    # Damage tracking
+    damage_reported = db.Column(db.Boolean, default=False)
+    damage_description = db.Column(db.String(2000), nullable=True)
+    damage_severity = db.Column(db.String(20), nullable=True)  # minor, moderate, severe, unusable
+    damage_reported_date = db.Column(db.DateTime, nullable=True)
+
+    # Audit fields
+    created_at = db.Column(db.DateTime, default=get_current_time)
+    updated_at = db.Column(db.DateTime, default=get_current_time, onupdate=get_current_time)
+
+    # Relationships
+    tool = db.relationship("Tool", backref=db.backref("checkouts", lazy="dynamic"))
+    user = db.relationship("User", foreign_keys=[user_id], backref=db.backref("checkouts", lazy="dynamic"))
+    checked_in_by = db.relationship("User", foreign_keys=[checked_in_by_id])
+
+    def to_dict(self, include_tool=True, include_user=True):
+        """Convert checkout to dictionary"""
+        result = {
+            "id": self.id,
+            "tool_id": self.tool_id,
+            "user_id": self.user_id,
+            "checkout_date": self.checkout_date.isoformat() if self.checkout_date else None,
+            "return_date": self.return_date.isoformat() if self.return_date else None,
+            "expected_return_date": self.expected_return_date.isoformat() if self.expected_return_date else None,
+            "checkout_notes": self.checkout_notes,
+            "condition_at_checkout": self.condition_at_checkout,
+            "work_order": self.work_order,
+            "project": self.project,
+            "return_notes": self.return_notes,
+            "condition_at_return": self.condition_at_return,
+            "checked_in_by_id": self.checked_in_by_id,
+            "damage_reported": self.damage_reported,
+            "damage_description": self.damage_description,
+            "damage_severity": self.damage_severity,
+            "damage_reported_date": self.damage_reported_date.isoformat() if self.damage_reported_date else None,
+            "status": "returned" if self.return_date else "checked_out",
+            "is_overdue": self.is_overdue(),
+            "days_overdue": self.days_overdue(),
+            "created_at": self.created_at.isoformat() if self.created_at else None,
+            "updated_at": self.updated_at.isoformat() if self.updated_at else None,
+        }
+
+        if include_tool and self.tool:
+            result["tool_number"] = self.tool.tool_number
+            result["serial_number"] = self.tool.serial_number
+            result["tool_description"] = self.tool.description
+            result["tool_category"] = self.tool.category
+
+        if include_user and self.user:
+            result["user_name"] = self.user.name
+            result["user_employee_number"] = self.user.employee_number
+            result["user_department"] = self.user.department
+
+        if self.checked_in_by:
+            result["checked_in_by_name"] = self.checked_in_by.name
+
+        return result
+
+    def is_overdue(self):
+        """Check if checkout is overdue"""
+        if self.return_date:
+            return False
+        if not self.expected_return_date:
+            return False
+        return get_current_time() > self.expected_return_date
+
+    def days_overdue(self):
+        """Calculate days overdue (negative if not yet due)"""
+        if self.return_date or not self.expected_return_date:
+            return 0
+        delta = get_current_time() - self.expected_return_date
+        return max(0, delta.days)
+
+
+class ToolHistory(db.Model):
+    """
+    Comprehensive tool history tracking for timeline view.
+    Records all significant events in a tool's lifecycle.
+    """
+    __tablename__ = "tool_history"
+    id = db.Column(db.Integer, primary_key=True)
+    tool_id = db.Column(db.Integer, db.ForeignKey("tools.id"), nullable=False, index=True)
+    event_type = db.Column(db.String(50), nullable=False, index=True)
+    # Event types: checkout, return, damage_reported, damage_resolved, calibration,
+    #              maintenance_start, maintenance_end, repair, status_change,
+    #              location_change, condition_change, created, retired
+
+    event_date = db.Column(db.DateTime, nullable=False, default=get_current_time, index=True)
     user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False)
-    checkout_date = db.Column(db.DateTime, default=get_current_time)
-    return_date = db.Column(db.DateTime)
-    expected_return_date = db.Column(db.DateTime)
-    tool = db.relationship("Tool")
+    description = db.Column(db.String(500), nullable=False)
+    details = db.Column(db.Text, nullable=True)  # JSON string for additional details
+
+    # Related records for cross-referencing
+    related_checkout_id = db.Column(db.Integer, db.ForeignKey("checkouts.id"), nullable=True, index=True)
+    related_calibration_id = db.Column(db.Integer, db.ForeignKey("tool_calibrations.id"), nullable=True)
+    related_service_record_id = db.Column(db.Integer, db.ForeignKey("tool_service_records.id"), nullable=True)
+
+    # Status tracking
+    old_status = db.Column(db.String(50), nullable=True)
+    new_status = db.Column(db.String(50), nullable=True)
+    old_condition = db.Column(db.String(50), nullable=True)
+    new_condition = db.Column(db.String(50), nullable=True)
+
+    created_at = db.Column(db.DateTime, default=get_current_time)
+
+    # Relationships
+    tool = db.relationship("Tool", backref=db.backref("history", lazy="dynamic", order_by="desc(ToolHistory.event_date)"))
     user = db.relationship("User")
+    related_checkout = db.relationship("Checkout", foreign_keys=[related_checkout_id])
+    related_calibration = db.relationship("ToolCalibration", foreign_keys=[related_calibration_id])
+    related_service_record = db.relationship("ToolServiceRecord", foreign_keys=[related_service_record_id])
+
+    def to_dict(self):
+        """Convert to dictionary for API response"""
+        import json
+        details_dict = None
+        if self.details:
+            try:
+                details_dict = json.loads(self.details)
+            except (json.JSONDecodeError, TypeError):
+                details_dict = {"raw": self.details}
+
+        return {
+            "id": self.id,
+            "tool_id": self.tool_id,
+            "event_type": self.event_type,
+            "event_date": self.event_date.isoformat() if self.event_date else None,
+            "user_id": self.user_id,
+            "user_name": self.user.name if self.user else "Unknown",
+            "description": self.description,
+            "details": details_dict,
+            "related_checkout_id": self.related_checkout_id,
+            "related_calibration_id": self.related_calibration_id,
+            "related_service_record_id": self.related_service_record_id,
+            "old_status": self.old_status,
+            "new_status": self.new_status,
+            "old_condition": self.old_condition,
+            "new_condition": self.new_condition,
+            "created_at": self.created_at.isoformat() if self.created_at else None,
+        }
+
+    @staticmethod
+    def create_event(tool_id, event_type, user_id, description, **kwargs):
+        """
+        Factory method to create a tool history event.
+
+        Args:
+            tool_id: ID of the tool
+            event_type: Type of event (checkout, return, damage_reported, etc.)
+            user_id: ID of user performing/triggering the event
+            description: Human-readable description
+            **kwargs: Additional fields (details, related_checkout_id, etc.)
+        """
+        import json
+        details = kwargs.get("details")
+        if details and isinstance(details, dict):
+            details = json.dumps(details)
+
+        return ToolHistory(
+            tool_id=tool_id,
+            event_type=event_type,
+            user_id=user_id,
+            description=description,
+            details=details,
+            related_checkout_id=kwargs.get("related_checkout_id"),
+            related_calibration_id=kwargs.get("related_calibration_id"),
+            related_service_record_id=kwargs.get("related_service_record_id"),
+            old_status=kwargs.get("old_status"),
+            new_status=kwargs.get("new_status"),
+            old_condition=kwargs.get("old_condition"),
+            new_condition=kwargs.get("new_condition"),
+            event_date=kwargs.get("event_date", get_current_time())
+        )
 
 
 class AuditLog(db.Model):
