@@ -15,10 +15,9 @@ from collections import defaultdict
 from datetime import datetime, timedelta
 
 from flask import jsonify, make_response, request
-from flask_jwt_extended import jwt_required
 from sqlalchemy import func, and_, or_
 
-from auth import department_required
+from auth import department_required, jwt_required, admin_required
 from models import (
     Chemical, ChemicalIssuance, Checkout, ProcurementOrder,
     Tool, User, UserActivity, UserRequest, RequestItem, db
