@@ -1,5 +1,5 @@
 // Kit status types
-export type KitStatus = 'active' | 'inactive' | 'maintenance';
+export type KitStatus = 'active' | 'inactive' | 'maintenance' | 'deployed' | 'retired';
 export type BoxType = 'expendable' | 'tooling' | 'consumable' | 'loose' | 'floor';
 export type ItemType = 'tool' | 'chemical' | 'expendable';
 export type ItemStatus = 'available' | 'issued' | 'maintenance' | 'low_stock' | 'out_of_stock';
@@ -36,6 +36,58 @@ export interface Kit {
   boxes?: KitBox[];
   pending_reorders?: number;
   unread_messages?: number;
+  // Location fields
+  location_address?: string | null;
+  location_city?: string | null;
+  location_state?: string | null;
+  location_zip?: string | null;
+  location_country?: string | null;
+  latitude?: number | null;
+  longitude?: number | null;
+  location_notes?: string | null;
+  trailer_number?: string | null;
+  has_location?: boolean;
+}
+
+// Kit Location (for map display)
+export interface KitLocation {
+  id: number;
+  name: string;
+  status: KitStatus;
+  aircraft_type_id: number;
+  aircraft_type_name?: string;
+  description?: string;
+  location_address?: string | null;
+  location_city?: string | null;
+  location_state?: string | null;
+  location_zip?: string | null;
+  location_country?: string | null;
+  latitude: number | null;
+  longitude: number | null;
+  location_notes?: string | null;
+  trailer_number?: string | null;
+  full_address?: string | null;
+  has_location: boolean;
+  box_count?: number;
+  item_count?: number;
+}
+
+export interface KitLocationsResponse {
+  kits: KitLocation[];
+  total: number;
+  with_location: number;
+  without_location: number;
+}
+
+export interface KitLocationFormData {
+  location_address?: string;
+  location_city?: string;
+  location_state?: string;
+  location_zip?: string;
+  location_country?: string;
+  latitude?: number;
+  longitude?: number;
+  location_notes?: string;
 }
 
 // Kit Box

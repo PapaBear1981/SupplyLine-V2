@@ -15,6 +15,7 @@ import { useAppSelector } from '@app/hooks';
 import { useTheme } from '@features/settings/contexts/ThemeContext';
 import { COLOR_THEMES } from '@features/settings/types/theme';
 import { ROUTES } from '@shared/constants/routes';
+import { KitLocationMap } from '@features/kits';
 
 // API hooks
 import { useGetToolsQuery } from '@features/tools/services/toolsApi';
@@ -363,6 +364,13 @@ export const DashboardPage = () => {
             data={activityChartData}
             loading={utilizationLoading}
           />
+        </Col>
+      </Row>
+
+      {/* Kit Location Map */}
+      <Row gutter={[16, 16]} style={{ marginBottom: 24 }}>
+        <Col span={24}>
+          <KitLocationMap height={400} />
         </Col>
       </Row>
 

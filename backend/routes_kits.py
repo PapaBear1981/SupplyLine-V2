@@ -250,6 +250,69 @@ def register_kit_routes(app):
         if "status" in data:
             kit.status = data["status"]
 
+        # Update location fields
+        location_fields = [
+            "location_address", "location_city", "location_state",
+            "location_zip", "location_country", "latitude",
+            "longitude", "location_notes", "trailer_number"
+        ]
+        for field in location_fields:
+            if field in data:
+                setattr(kit, field, data[field])
+
+        # Auto-geocode address if lat/lon not provided but address is
+        logger.info(f"Geocoding check - data lat: {data.get('latitude')}, data lon: {data.get('longitude')}")
+        if (not data.get("latitude") or not data.get("longitude")):
+            logger.info("Geocoding condition met - building address")
+            address_parts = []
+            if kit.location_address:
+                address_parts.append(kit.location_address)
+            if kit.location_city:
+                address_parts.append(kit.location_city)
+            if kit.location_state:
+                address_parts.append(kit.location_state)
+            if kit.location_zip:
+                address_parts.append(kit.location_zip)
+            if kit.location_country:
+                address_parts.append(kit.location_country)
+
+            logger.info(f"Address parts: {address_parts}")
+            if address_parts:
+                full_address = ", ".join(address_parts)
+                logger.info(f"Attempting to geocode: {full_address}")
+                try:
+                    import requests
+                    from urllib.parse import quote
+
+                    # Use Nominatim (OpenStreetMap) geocoding service
+                    encoded_address = quote(full_address)
+                    geocode_url = f"https://nominatim.openstreetmap.org/search?q={encoded_address}&format=json&limit=1"
+
+                    logger.info(f"Geocoding URL: {geocode_url}")
+                    response = requests.get(
+                        geocode_url,
+                        headers={'User-Agent': 'SupplyLine-MRO-Suite/1.0'},
+                        timeout=5
+                    )
+
+                    logger.info(f"Geocoding response status: {response.status_code}")
+                    if response.status_code == 200:
+                        results = response.json()
+                        logger.info(f"Geocoding results: {results}")
+                        if results and len(results) > 0:
+                            kit.latitude = float(results[0]['lat'])
+                            kit.longitude = float(results[0]['lon'])
+                            logger.info(f"Geocoded address '{full_address}' to ({kit.latitude}, {kit.longitude})")
+                    else:
+                        logger.warning(f"Geocoding API returned status {response.status_code}")
+                except Exception as e:
+                    # Don't fail the update if geocoding fails, just log it
+                    logger.warning(f"Geocoding failed for address '{full_address}': {str(e)}")
+                    import traceback
+                    logger.warning(f"Traceback: {traceback.format_exc()}")
+            else:
+                logger.info("No address parts to geocode")
+
         db.session.commit()
 
         # Log action
@@ -338,6 +401,100 @@ def register_kit_routes(app):
 
         logger.info(f"Kit duplicated: {source_kit.name} -> {new_kit.name}")
         return jsonify(new_kit.to_dict(include_details=True)), 201
+
+    # ==================== Kit Locations (for Map) ====================
+
+    @app.route("/api/kits/locations", methods=["GET"])
+    @jwt_required
+    @handle_errors
+    def get_kit_locations():
+        """
+        Get all kit locations for map display.
+        Returns kits with location data (latitude/longitude).
+        """
+        # Optional filters
+        status = request.args.get("status")
+        aircraft_type_id = request.args.get("aircraft_type_id", type=int)
+        with_location_only = request.args.get("with_location_only", "true").lower() == "true"
+
+        query = Kit.query
+
+        if status:
+            query = query.filter_by(status=status)
+        if aircraft_type_id:
+            query = query.filter_by(aircraft_type_id=aircraft_type_id)
+        if with_location_only:
+            query = query.filter(
+                Kit.latitude.isnot(None),
+                Kit.longitude.isnot(None)
+            )
+
+        kits = query.order_by(Kit.name).all()
+
+        # Return location-focused data
+        result = []
+        for kit in kits:
+            result.append({
+                "id": kit.id,
+                "name": kit.name,
+                "status": kit.status,
+                "aircraft_type_id": kit.aircraft_type_id,
+                "aircraft_type_name": kit.aircraft_type.name if kit.aircraft_type else None,
+                "description": kit.description,
+                "location_address": kit.location_address,
+                "location_city": kit.location_city,
+                "location_state": kit.location_state,
+                "location_zip": kit.location_zip,
+                "location_country": kit.location_country,
+                "latitude": kit.latitude,
+                "longitude": kit.longitude,
+                "location_notes": kit.location_notes,
+                "trailer_number": kit.trailer_number,
+                "full_address": kit.get_full_address(),
+                "has_location": kit.latitude is not None and kit.longitude is not None,
+                "box_count": kit.boxes.count() if kit.boxes else 0,
+                "item_count": kit.items.count() + kit.expendables.count() if kit.items and kit.expendables else 0,
+            })
+
+        return jsonify({
+            "kits": result,
+            "total": len(result),
+            "with_location": len([k for k in result if k["has_location"]]),
+            "without_location": len([k for k in result if not k["has_location"]]),
+        }), 200
+
+    @app.route("/api/kits/<int:id>/location", methods=["PUT"])
+    @materials_required
+    @handle_errors
+    def update_kit_location(id):
+        """Update a kit's location information"""
+        kit = Kit.query.get_or_404(id)
+        data = request.get_json() or {}
+
+        # Update location fields
+        location_fields = [
+            "location_address", "location_city", "location_state",
+            "location_zip", "location_country", "latitude",
+            "longitude", "location_notes", "trailer_number"
+        ]
+        for field in location_fields:
+            if field in data:
+                setattr(kit, field, data[field])
+
+        db.session.commit()
+
+        # Log action
+        log = AuditLog(
+            action_type="kit_location_updated",
+            action_details=f"Updated location for kit: {kit.name}"
+        )
+        db.session.add(log)
+        db.session.commit()
+
+        return jsonify({
+            "message": "Kit location updated successfully",
+            "kit": kit.to_dict()
+        }), 200
 
     # ==================== Kit Wizard ====================
 

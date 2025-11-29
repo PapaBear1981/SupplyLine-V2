@@ -57,10 +57,14 @@ const KitsDashboard = () => {
     switch (status) {
       case 'active':
         return 'success';
+      case 'deployed':
+        return 'processing';
       case 'maintenance':
         return 'warning';
       case 'inactive':
         return 'default';
+      case 'retired':
+        return 'error';
       default:
         return 'default';
     }
@@ -91,8 +95,10 @@ const KitsDashboard = () => {
       ),
       filters: [
         { text: 'Active', value: 'active' },
+        { text: 'Deployed', value: 'deployed' },
         { text: 'Maintenance', value: 'maintenance' },
         { text: 'Inactive', value: 'inactive' },
+        { text: 'Retired', value: 'retired' },
       ],
       onFilter: (value, record) => record.status === value,
     },

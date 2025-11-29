@@ -3,6 +3,7 @@ export const ROUTES = {
   LOGIN: '/login',
   DASHBOARD: '/dashboard',
   TOOLS: '/tools',
+  TOOL_CHECKOUT: '/tool-checkout',
   CHEMICALS: '/chemicals',
   KITS: '/kits',
   WAREHOUSES: '/warehouses',

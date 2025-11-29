@@ -21,6 +21,8 @@ import type {
   KitItemsResponse,
   KitExpendablesResponse,
   KitWizardResponse,
+  KitLocationsResponse,
+  KitLocationFormData,
 } from '../types';
 
 export const kitsApi = baseApi.injectEndpoints({
@@ -379,6 +381,33 @@ export const kitsApi = baseApi.injectEndpoints({
       }),
       providesTags: ['Kit'],
     }),
+
+    // ==================== Kit Locations ====================
+    getKitLocations: builder.query<
+      KitLocationsResponse,
+      { aircraft_type_id?: number; status?: string; with_location_only?: boolean } | void
+    >({
+      query: (params) => ({
+        url: '/api/kits/locations',
+        params: params || {},
+      }),
+      providesTags: ['Kit'],
+    }),
+
+    updateKitLocation: builder.mutation<
+      { message: string; kit: { id: number; location_address: string | null; latitude: number | null; longitude: number | null } },
+      { id: number; data: KitLocationFormData }
+    >({
+      query: ({ id, data }) => ({
+        url: `/api/kits/${id}/location`,
+        method: 'PUT',
+        body: data,
+      }),
+      invalidatesTags: (_result, _error, { id }) => [
+        { type: 'Kit', id },
+        { type: 'Kit', id: 'LIST' },
+      ],
+    }),
   }),
 });
 
@@ -429,4 +458,8 @@ export const {
   useGetInventoryReportQuery,
   useGetReorderReportQuery,
   useGetKitUtilizationAnalyticsQuery,
+
+  // Locations
+  useGetKitLocationsQuery,
+  useUpdateKitLocationMutation,
 } = kitsApi;

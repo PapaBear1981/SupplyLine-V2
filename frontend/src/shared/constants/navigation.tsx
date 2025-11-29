@@ -7,6 +7,7 @@ import {
   FileTextOutlined,
   UserOutlined,
   SettingOutlined,
+  SwapOutlined,
   ShoppingCartOutlined,
   FormOutlined,
 } from '@ant-design/icons';
@@ -21,6 +22,11 @@ export const getMenuItems = (isAdmin: boolean = false): MenuItem[] => {
       key: ROUTES.DASHBOARD,
       icon: <DashboardOutlined />,
       label: 'Dashboard',
+    },
+    {
+      key: ROUTES.TOOL_CHECKOUT,
+      icon: <SwapOutlined />,
+      label: 'Tool Checkout',
     },
     {
       key: ROUTES.TOOLS,

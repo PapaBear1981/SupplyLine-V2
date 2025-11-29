@@ -27,6 +27,7 @@ export const baseApi = createApi({
     'Department',
     'Announcement',
     'Role',
+    'Checkout',
     'Order',
     'OrderMessage',
     'OrderAnalytics',
