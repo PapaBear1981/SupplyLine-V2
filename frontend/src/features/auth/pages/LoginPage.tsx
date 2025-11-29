@@ -61,9 +61,20 @@ export const LoginPage = () => {
           ]}
         >
           <Input
-            prefix={<UserOutlined />}
+            prefix={<UserOutlined style={{ color: 'rgba(229, 239, 255, 0.5)' }} />}
             placeholder="e.g. 00421"
             autoFocus
+            style={{
+              background: 'rgba(15, 35, 55, 0.6)',
+              border: '1px solid rgba(94, 165, 255, 0.25)',
+              color: '#f7fbff'
+            }}
+            styles={{
+              input: {
+                background: 'transparent',
+                color: '#f7fbff'
+              }
+            }}
           />
         </Form.Item>
 
@@ -73,22 +84,48 @@ export const LoginPage = () => {
           rules={[{ required: true, message: 'Please input your password!' }]}
         >
           <Input.Password
-            prefix={<LockOutlined />}
+            prefix={<LockOutlined style={{ color: 'rgba(229, 239, 255, 0.5)' }} />}
             placeholder="Enter your password"
+            style={{
+              background: 'rgba(15, 35, 55, 0.6)',
+              border: '1px solid rgba(94, 165, 255, 0.25)',
+              color: '#f7fbff'
+            }}
+            styles={{
+              input: {
+                background: 'transparent',
+                color: '#f7fbff'
+              }
+            }}
           />
         </Form.Item>
 
         <div className="login-actions">
-          <Button type="link" href="mailto:support@supplyline.aero?subject=Password%20reset">
-            Forgot password?
-          </Button>
-          <Button
-            type="link"
-            href="mailto:support@supplyline.aero?subject=Create%20my%20SupplyLine%20account"
-            icon={<ArrowRightOutlined />}
-          >
-            Request account
-          </Button>
+          <div>
+            <Text type="secondary" style={{ fontSize: '13px' }}>
+              Forgot password? Email:{' '}
+            </Text>
+            <Button
+              type="link"
+              href="mailto:support@supplyline.aero?subject=Password%20reset"
+              style={{ padding: 0, height: 'auto', fontSize: '13px' }}
+            >
+              support@supplyline.aero
+            </Button>
+          </div>
+          <div>
+            <Text type="secondary" style={{ fontSize: '13px' }}>
+              Request account:{' '}
+            </Text>
+            <Button
+              type="link"
+              href="mailto:support@supplyline.aero?subject=Create%20my%20SupplyLine%20account"
+              style={{ padding: 0, height: 'auto', fontSize: '13px' }}
+              icon={<ArrowRightOutlined />}
+            >
+              support@supplyline.aero
+            </Button>
+          </div>
         </div>
 
         <Form.Item style={{ marginBottom: 0 }}>

@@ -25,6 +25,42 @@
   text-align: center;
 }
 
+/* Dark themed input fields */
+.login-form .ant-input,
+.login-form .ant-input-affix-wrapper,
+.login-form .ant-input-affix-wrapper input,
+.login-form .ant-input-password {
+  background: rgba(15, 35, 55, 0.6) !important;
+  border: 1px solid rgba(94, 165, 255, 0.25) !important;
+  color: #f7fbff !important;
+}
+
+.login-form .ant-input::placeholder,
+.login-form .ant-input-affix-wrapper input::placeholder {
+  color: rgba(229, 239, 255, 0.4) !important;
+}
+
+.login-form .ant-input-affix-wrapper .anticon,
+.login-form .ant-input-password .anticon {
+  color: rgba(229, 239, 255, 0.5) !important;
+}
+
+.login-form .ant-input:hover,
+.login-form .ant-input-affix-wrapper:hover,
+.login-form .ant-input-password:hover {
+  background: rgba(15, 35, 55, 0.75) !important;
+  border-color: rgba(94, 165, 255, 0.45) !important;
+}
+
+.login-form .ant-input:focus,
+.login-form .ant-input-affix-wrapper:focus,
+.login-form .ant-input-affix-wrapper-focused,
+.login-form .ant-input-password:focus {
+  background: rgba(15, 35, 55, 0.8) !important;
+  border-color: #5ea5ff !important;
+  box-shadow: 0 0 0 2px rgba(94, 165, 255, 0.2) !important;
+}
+
 @media (max-width: 576px) {
   .login-actions {
     flex-direction: column;

@@ -13,7 +13,10 @@
 .auth-hero {
   position: relative;
   flex: 1.1;
-  background-image: url('https://images.unsplash.com/photo-1508617647921-232b2a80df94?auto=format&fit=crop&w=1800&q=80');
+  background: linear-gradient(135deg, #0a1828 0%, #0d2538 25%, #0e3048 50%, #0c2a42 75%, #0a1f35 100%),
+    radial-gradient(circle at 30% 40%, rgba(91, 153, 255, 0.15), transparent 50%),
+    radial-gradient(circle at 70% 60%, rgba(255, 184, 0, 0.1), transparent 40%);
+  background-color: #0b1f31;
   background-size: cover;
   background-position: center;
   overflow: hidden;
@@ -174,16 +177,37 @@
 
 .auth-card .ant-input,
 .auth-card .ant-input-affix-wrapper,
-.auth-card .ant-input-affix-wrapper input {
-  background: rgba(255, 255, 255, 0.04);
-  border-color: rgba(255, 255, 255, 0.12);
-  color: #f7fbff;
+.auth-card .ant-input-affix-wrapper input,
+.auth-card .ant-input-password {
+  background: rgba(15, 35, 55, 0.6) !important;
+  border: 1px solid rgba(94, 165, 255, 0.25) !important;
+  color: #f7fbff !important;
 }
 
+.auth-card .ant-input::placeholder,
+.auth-card .ant-input-affix-wrapper input::placeholder {
+  color: rgba(229, 239, 255, 0.4) !important;
+}
+
+.auth-card .ant-input-affix-wrapper .anticon,
+.auth-card .ant-input-password .anticon {
+  color: rgba(229, 239, 255, 0.5);
+}
+
+.auth-card .ant-input:hover,
 .auth-card .ant-input-affix-wrapper:hover,
-.auth-card .ant-input-affix-wrapper-focused {
+.auth-card .ant-input-password:hover {
+  background: rgba(15, 35, 55, 0.75) !important;
+  border-color: rgba(94, 165, 255, 0.45) !important;
+}
+
+.auth-card .ant-input:focus,
+.auth-card .ant-input-affix-wrapper:focus,
+.auth-card .ant-input-affix-wrapper-focused,
+.auth-card .ant-input-password:focus {
+  background: rgba(15, 35, 55, 0.8) !important;
   border-color: #5ea5ff !important;
-  box-shadow: 0 0 0 2px rgba(94, 165, 255, 0.2);
+  box-shadow: 0 0 0 2px rgba(94, 165, 255, 0.2) !important;
 }
 
 .auth-card .ant-btn-link {
