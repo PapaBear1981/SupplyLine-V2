@@ -60,6 +60,9 @@ python-barcode==0.15.1  # 1D barcodes (CODE128, EAN, etc.)
 # Updated from 3.1.2 to 3.1.5 for security patches
 openpyxl==3.1.5
 
+# HTTP Requests Library (for geocoding)
+requests==2.32.3
+
 # Environment Variables
 python-dotenv==1.0.1
 

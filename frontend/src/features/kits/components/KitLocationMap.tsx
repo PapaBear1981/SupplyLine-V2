@@ -231,10 +231,15 @@ export function KitLocationMap({ height = 400 }: KitLocationMapProps) {
             zoom={defaultZoom}
             style={{ height: '100%', width: '100%' }}
             scrollWheelZoom={true}
+            zoomControl={true}
           >
             <TileLayer
-              attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+              attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
               url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+              maxZoom={19}
+              minZoom={2}
+              subdomains={['a', 'b', 'c']}
+              crossOrigin={true}
             />
             <MapController selectedKit={selectedKit} kits={kitsWithLocation} />
 

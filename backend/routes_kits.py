@@ -260,6 +260,46 @@ def register_kit_routes(app):
             if field in data:
                 setattr(kit, field, data[field])
 
+        # Auto-geocode address if lat/lon not provided but address is
+        if (not data.get("latitude") or not data.get("longitude")):
+            address_parts = []
+            if kit.location_address:
+                address_parts.append(kit.location_address)
+            if kit.location_city:
+                address_parts.append(kit.location_city)
+            if kit.location_state:
+                address_parts.append(kit.location_state)
+            if kit.location_zip:
+                address_parts.append(kit.location_zip)
+            if kit.location_country:
+                address_parts.append(kit.location_country)
+
+            if address_parts:
+                full_address = ", ".join(address_parts)
+                try:
+                    import requests
+                    from urllib.parse import quote
+
+                    # Use Nominatim (OpenStreetMap) geocoding service
+                    encoded_address = quote(full_address)
+                    geocode_url = f"https://nominatim.openstreetmap.org/search?q={encoded_address}&format=json&limit=1"
+
+                    response = requests.get(
+                        geocode_url,
+                        headers={'User-Agent': 'SupplyLine-MRO-Suite/1.0'},
+                        timeout=5
+                    )
+
+                    if response.status_code == 200:
+                        results = response.json()
+                        if results and len(results) > 0:
+                            kit.latitude = float(results[0]['lat'])
+                            kit.longitude = float(results[0]['lon'])
+                            logger.info(f"Geocoded address '{full_address}' to ({kit.latitude}, {kit.longitude})")
+                except Exception as e:
+                    # Don't fail the update if geocoding fails, just log it
+                    logger.warning(f"Geocoding failed for address '{full_address}': {str(e)}")
+
         db.session.commit()
 
         # Log action

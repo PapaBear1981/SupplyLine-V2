@@ -25,6 +25,7 @@ import {
   ExclamationCircleOutlined,
   ToolOutlined,
   WarningOutlined,
+  EnvironmentOutlined,
 } from '@ant-design/icons';
 import {
   useGetKitQuery,
@@ -36,6 +37,7 @@ import type { KitStatus } from '../types';
 import KitBoxManager from '../components/KitBoxManager';
 import KitItemList from '../components/KitItemList';
 import KitIssuanceHistory from '../components/KitIssuanceHistory';
+import EditKitModal from '../components/EditKitModal';
 
 const { Title, Text } = Typography;
 const { TabPane } = Tabs;
@@ -45,8 +47,9 @@ const KitDetailView = () => {
   const navigate = useNavigate();
   const kitId = parseInt(id || '0');
   const [activeTab, setActiveTab] = useState('overview');
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
 
-  const { data: kit, isLoading, error } = useGetKitQuery(kitId);
+  const { data: kit, isLoading, error, refetch } = useGetKitQuery(kitId);
   const { data: alerts } = useGetKitAlertsQuery(kitId);
   const { data: analytics } = useGetKitAnalyticsQuery({ kitId, days: 30 });
   const [deleteKit, { isLoading: isDeleting }] = useDeleteKitMutation();
@@ -76,10 +79,14 @@ const KitDetailView = () => {
     switch (status) {
       case 'active':
         return 'success';
+      case 'deployed':
+        return 'processing';
       case 'maintenance':
         return 'warning';
       case 'inactive':
         return 'default';
+      case 'retired':
+        return 'error';
       default:
         return 'default';
     }
@@ -125,7 +132,7 @@ const KitDetailView = () => {
               <Button icon={<CopyOutlined />} onClick={() => navigate(`/kits/${kit.id}/duplicate`)}>
                 Duplicate
               </Button>
-              <Button icon={<EditOutlined />} onClick={() => navigate(`/kits/${kit.id}/edit`)}>
+              <Button icon={<EditOutlined />} onClick={() => setIsEditModalOpen(true)}>
                 Edit
               </Button>
               <Button
@@ -294,9 +301,65 @@ const KitDetailView = () => {
             <TabPane tab="Analytics" key="analytics">
               <Text>Detailed analytics coming soon...</Text>
             </TabPane>
+
+            <TabPane
+              tab={
+                <span>
+                  <EnvironmentOutlined /> Location
+                </span>
+              }
+              key="location"
+            >
+              <Descriptions bordered column={2}>
+                <Descriptions.Item label="Address" span={2}>
+                  {kit.location_address || 'Not specified'}
+                </Descriptions.Item>
+                <Descriptions.Item label="City">
+                  {kit.location_city || 'Not specified'}
+                </Descriptions.Item>
+                <Descriptions.Item label="State">
+                  {kit.location_state || 'Not specified'}
+                </Descriptions.Item>
+                <Descriptions.Item label="ZIP Code">
+                  {kit.location_zip || 'Not specified'}
+                </Descriptions.Item>
+                <Descriptions.Item label="Country">
+                  {kit.location_country || 'Not specified'}
+                </Descriptions.Item>
+                <Descriptions.Item label="Latitude">
+                  {kit.latitude !== null && kit.latitude !== undefined
+                    ? kit.latitude.toFixed(6)
+                    : 'Not specified'}
+                </Descriptions.Item>
+                <Descriptions.Item label="Longitude">
+                  {kit.longitude !== null && kit.longitude !== undefined
+                    ? kit.longitude.toFixed(6)
+                    : 'Not specified'}
+                </Descriptions.Item>
+                <Descriptions.Item label="Location Notes" span={2}>
+                  {kit.location_notes || 'No notes'}
+                </Descriptions.Item>
+              </Descriptions>
+              {kit.latitude !== null && kit.latitude !== undefined &&
+               kit.longitude !== null && kit.longitude !== undefined && (
+                <div style={{ marginTop: 16 }}>
+                  <Text type="secondary">
+                    Coordinates: {kit.latitude.toFixed(6)}, {kit.longitude.toFixed(6)}
+                  </Text>
+                </div>
+              )}
+            </TabPane>
           </Tabs>
         </Card>
       </Space>
+
+      {/* Edit Kit Modal */}
+      <EditKitModal
+        open={isEditModalOpen}
+        kit={kit}
+        onClose={() => setIsEditModalOpen(false)}
+        onSuccess={() => refetch()}
+      />
     </div>
   );
 };

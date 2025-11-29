@@ -1,5 +1,5 @@
 // Kit status types
-export type KitStatus = 'active' | 'inactive' | 'maintenance';
+export type KitStatus = 'active' | 'inactive' | 'maintenance' | 'deployed' | 'retired';
 export type BoxType = 'expendable' | 'tooling' | 'consumable' | 'loose' | 'floor';
 export type ItemType = 'tool' | 'chemical' | 'expendable';
 export type ItemStatus = 'available' | 'issued' | 'maintenance' | 'low_stock' | 'out_of_stock';
