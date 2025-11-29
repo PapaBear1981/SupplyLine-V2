@@ -380,6 +380,11 @@ export function KitLocationMap({ height = 400 }: KitLocationMapProps) {
                   {selectedKit.latitude.toFixed(6)}, {selectedKit.longitude.toFixed(6)}
                 </Descriptions.Item>
               )}
+              {selectedKit.trailer_number && (
+                <Descriptions.Item label="Trailer Number" span={2}>
+                  {selectedKit.trailer_number}
+                </Descriptions.Item>
+              )}
               {selectedKit.box_count !== undefined && (
                 <Descriptions.Item label="Boxes">
                   {selectedKit.box_count}
