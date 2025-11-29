@@ -234,11 +234,11 @@ export function KitLocationMap({ height = 400 }: KitLocationMapProps) {
             zoomControl={true}
           >
             <TileLayer
-              attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-              url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+              attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>'
+              url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
               maxZoom={19}
               minZoom={2}
-              subdomains={['a', 'b', 'c']}
+              subdomains={['a', 'b', 'c', 'd']}
               crossOrigin={true}
             />
             <MapController selectedKit={selectedKit} kits={kitsWithLocation} />
