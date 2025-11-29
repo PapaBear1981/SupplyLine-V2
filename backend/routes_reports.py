@@ -378,7 +378,7 @@ def register_report_routes(app):
 
             department_data = []
             for dept in department_names:
-                dept_checkouts = Checkout.query.join(User).filter(
+                dept_checkouts = Checkout.query.join(User, Checkout.user_id == User.id).filter(
                     User.department == dept,
                     Checkout.checkout_date >= start_date
                 ).all()
