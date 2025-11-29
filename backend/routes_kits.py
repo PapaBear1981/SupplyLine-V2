@@ -261,7 +261,9 @@ def register_kit_routes(app):
                 setattr(kit, field, data[field])
 
         # Auto-geocode address if lat/lon not provided but address is
+        logger.info(f"Geocoding check - data lat: {data.get('latitude')}, data lon: {data.get('longitude')}")
         if (not data.get("latitude") or not data.get("longitude")):
+            logger.info("Geocoding condition met - building address")
             address_parts = []
             if kit.location_address:
                 address_parts.append(kit.location_address)
@@ -274,8 +276,10 @@ def register_kit_routes(app):
             if kit.location_country:
                 address_parts.append(kit.location_country)
 
+            logger.info(f"Address parts: {address_parts}")
             if address_parts:
                 full_address = ", ".join(address_parts)
+                logger.info(f"Attempting to geocode: {full_address}")
                 try:
                     import requests
                     from urllib.parse import quote
@@ -284,21 +288,30 @@ def register_kit_routes(app):
                     encoded_address = quote(full_address)
                     geocode_url = f"https://nominatim.openstreetmap.org/search?q={encoded_address}&format=json&limit=1"
 
+                    logger.info(f"Geocoding URL: {geocode_url}")
                     response = requests.get(
                         geocode_url,
                         headers={'User-Agent': 'SupplyLine-MRO-Suite/1.0'},
                         timeout=5
                     )
 
+                    logger.info(f"Geocoding response status: {response.status_code}")
                     if response.status_code == 200:
                         results = response.json()
+                        logger.info(f"Geocoding results: {results}")
                         if results and len(results) > 0:
                             kit.latitude = float(results[0]['lat'])
                             kit.longitude = float(results[0]['lon'])
                             logger.info(f"Geocoded address '{full_address}' to ({kit.latitude}, {kit.longitude})")
+                    else:
+                        logger.warning(f"Geocoding API returned status {response.status_code}")
                 except Exception as e:
                     # Don't fail the update if geocoding fails, just log it
                     logger.warning(f"Geocoding failed for address '{full_address}': {str(e)}")
+                    import traceback
+                    logger.warning(f"Traceback: {traceback.format_exc()}")
+            else:
+                logger.info("No address parts to geocode")
 
         db.session.commit()
 
