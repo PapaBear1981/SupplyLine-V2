@@ -628,8 +628,9 @@ def register_report_routes(app):
             # Usage by day
             day_usage = defaultdict(int)
             for i in issuances:
-                day = i.issue_date.strftime("%Y-%m-%d")
-                day_usage[day] += i.quantity
+                if i.issue_date:
+                    day = i.issue_date.strftime("%Y-%m-%d")
+                    day_usage[day] += i.quantity
             usage_by_day = sorted([{"date": k, "quantity": v} for k, v in day_usage.items()], key=lambda x: x["date"])
 
             # Usage by chemical
