@@ -2,6 +2,13 @@
 Routes for Kit Transfer Management
 
 This module provides API endpoints for managing transfers between kits and warehouses.
+
+Policy:
+- All items must have either a serial number or lot number for tracking
+- The combination of part_number + serial/lot must be unique across the system
+- Partial transfers of lot-tracked items create child lots for traceability
+- Serial-tracked items must be transferred as whole items (quantity 1)
+- Expendables can only be transferred kit-to-kit (not from warehouses)
 """
 
 import logging
@@ -13,7 +20,13 @@ from auth import department_required, jwt_required
 from models import AuditLog, Chemical, Tool, Warehouse, db
 from models_kits import Kit, KitBox, KitExpendable, KitItem, KitTransfer
 from utils.error_handler import ValidationError, handle_errors
-from utils.lot_utils import create_child_chemical
+from utils.lot_utils import create_child_chemical, create_child_expendable
+from utils.serial_lot_validation import (
+    SerialLotValidationError,
+    check_lot_number_unique,
+    check_serial_number_unique,
+    validate_serial_lot_required,
+)
 from utils.transaction_helper import record_transaction
 
 
@@ -80,18 +93,33 @@ def register_kit_transfer_routes(app):
             if not dest_warehouse:
                 raise ValidationError("Destination warehouse not found")
 
-        # Validate source item availability
+        # Validate source item availability and tracking
         if from_type == "kit":
             # For expendables, the item_id refers to KitExpendable
             # For tools/chemicals, the item_id refers to KitItem
             source_item = None
             if data["item_type"] == "expendable":
                 source_item = db.session.get(KitExpendable, data["item_id"])
+                if source_item:
+                    # Validate expendable has proper tracking
+                    serial_number = source_item.serial_number
+                    lot_number = source_item.lot_number
+                    try:
+                        validate_serial_lot_required(serial_number, lot_number, "expendable")
+                    except SerialLotValidationError as e:
+                        raise ValidationError(str(e))
+
+                    # Serial-tracked expendables must be transferred as whole items
+                    if source_item.tracking_type == "serial" and quantity != source_item.quantity:
+                        raise ValidationError(
+                            f"Serial-tracked expendables must be transferred as whole items. "
+                            f"Cannot partially transfer serial number '{serial_number}'."
+                        )
             else:
                 source_item = db.session.get(KitItem, data["item_id"])
 
             if not source_item or source_item.kit_id != data["from_location_id"]:
-                raise ValidationError("Source item not found")
+                raise ValidationError("Source item not found in the specified kit")
 
             if source_item.quantity < quantity:
                 raise ValidationError(f"Insufficient quantity. Available: {source_item.quantity}")
@@ -204,6 +232,8 @@ def register_kit_transfer_routes(app):
         source_chemical = None
         child_chemical = None
 
+        child_expendable = None  # Track if we create a child expendable lot
+
         if transfer.from_location_type == "kit":
             if transfer.item_type == "expendable":
                 # For expendables, transfer.item_id is the KitExpendable.id
@@ -216,6 +246,21 @@ def register_kit_transfer_routes(app):
                 if kit_expendable.quantity < quantity:
                     raise ValidationError(f"Insufficient quantity. Available: {kit_expendable.quantity}")
 
+                # Validate that expendable has proper tracking
+                serial_number = kit_expendable.serial_number
+                lot_number = kit_expendable.lot_number
+                try:
+                    validate_serial_lot_required(serial_number, lot_number, "expendable")
+                except SerialLotValidationError as e:
+                    raise ValidationError(str(e))
+
+                # Serial-tracked expendables must be transferred as whole items
+                if kit_expendable.tracking_type == "serial" and quantity != kit_expendable.quantity:
+                    raise ValidationError(
+                        f"Serial-tracked expendables must be transferred as whole items. "
+                        f"Cannot partially transfer serial number '{serial_number}'."
+                    )
+
                 source_item = kit_expendable  # Use kit_expendable for quantity tracking
                 source_item_snapshot = {
                     "part_number": kit_expendable.part_number,
@@ -225,7 +270,9 @@ def register_kit_transfer_routes(app):
                     "serial_number": kit_expendable.serial_number,
                     "lot_number": kit_expendable.lot_number,
                     "tracking_type": kit_expendable.tracking_type,
-                    "item_id": kit_expendable.id
+                    "item_id": kit_expendable.id,
+                    "parent_lot_number": kit_expendable.parent_lot_number,
+                    "lot_sequence": kit_expendable.lot_sequence or 0
                 }
             else:
                 kit_item = KitItem.query.filter_by(
@@ -345,35 +392,98 @@ def register_kit_transfer_routes(app):
                     db.session.flush()
 
             if transfer.item_type == "expendable":
-                # For expendables, create a new KitExpendable in the destination kit
-                # Check if there's already a KitExpendable with the same part/lot/serial in the destination kit
-                existing_expendable = KitExpendable.query.filter_by(
-                    kit_id=transfer.to_location_id,
-                    box_id=dest_box.id,
-                    part_number=source_item_snapshot.get("part_number"),
-                    lot_number=source_item_snapshot.get("lot_number"),
-                    serial_number=source_item_snapshot.get("serial_number")
-                ).first()
+                # For expendables, handle based on tracking type and transfer quantity
+                is_partial_transfer = quantity < source_item.quantity if source_item else False
+                tracking_type = source_item_snapshot.get("tracking_type", "lot")
 
-                if existing_expendable:
-                    # If it already exists with same identifiers, just add to the quantity
-                    existing_expendable.quantity += quantity
-                else:
-                    # Create a new KitExpendable in the destination kit
+                if tracking_type == "serial":
+                    # Serial-tracked items must be transferred whole - create new record in destination
+                    # First check if serial number already exists in destination (should not happen due to validation)
+                    part_number = source_item_snapshot.get("part_number")
+                    serial_number = source_item_snapshot.get("serial_number")
+
+                    try:
+                        check_serial_number_unique(part_number, serial_number, source_item.id, "kit_expendable")
+                    except SerialLotValidationError as e:
+                        raise ValidationError(str(e))
+
+                    # Create new expendable in destination kit
                     new_expendable = KitExpendable(
                         kit_id=transfer.to_location_id,
                         box_id=dest_box.id,
-                        part_number=source_item_snapshot.get("part_number"),
+                        part_number=part_number,
                         description=source_item_snapshot.get("description", ""),
                         quantity=quantity,
                         unit=source_item_snapshot.get("unit", "ea"),
                         location=source_item_snapshot.get("location", ""),
-                        serial_number=source_item_snapshot.get("serial_number"),
-                        lot_number=source_item_snapshot.get("lot_number"),
-                        tracking_type=source_item_snapshot.get("tracking_type", "none"),
+                        serial_number=serial_number,
+                        lot_number=None,
+                        tracking_type="serial",
                         status="available"
                     )
                     db.session.add(new_expendable)
+
+                elif tracking_type == "lot":
+                    # Lot-tracked items - check if partial transfer needs child lot
+                    part_number = source_item_snapshot.get("part_number")
+                    lot_number = source_item_snapshot.get("lot_number")
+
+                    if is_partial_transfer:
+                        # Create a child lot for partial transfer
+                        child_expendable = create_child_expendable(
+                            parent_expendable=source_item,
+                            quantity=quantity,
+                            destination_kit_id=transfer.to_location_id,
+                            destination_box_id=dest_box.id
+                        )
+                        db.session.add(child_expendable)
+                        db.session.flush()
+
+                        # Log the child lot creation
+                        child_log = AuditLog(
+                            action_type="expendable_child_lot_created",
+                            action_details=f"Child lot {child_expendable.lot_number} created from {lot_number}: {quantity} {source_item_snapshot.get('unit', 'ea')}"
+                        )
+                        db.session.add(child_log)
+                    else:
+                        # Full transfer - check for existing in destination first
+                        existing_expendable = KitExpendable.query.filter_by(
+                            kit_id=transfer.to_location_id,
+                            box_id=dest_box.id,
+                            part_number=part_number,
+                            lot_number=lot_number
+                        ).first()
+
+                        if existing_expendable:
+                            # Cannot have duplicate lot numbers in system
+                            raise ValidationError(
+                                f"An expendable with part number '{part_number}' and lot number '{lot_number}' "
+                                f"already exists in kit '{dest_kit.name}'. Cannot transfer duplicate lot numbers."
+                            )
+
+                        # Create new expendable in destination kit
+                        new_expendable = KitExpendable(
+                            kit_id=transfer.to_location_id,
+                            box_id=dest_box.id,
+                            part_number=part_number,
+                            description=source_item_snapshot.get("description", ""),
+                            quantity=quantity,
+                            unit=source_item_snapshot.get("unit", "ea"),
+                            location=source_item_snapshot.get("location", ""),
+                            serial_number=None,
+                            lot_number=lot_number,
+                            tracking_type="lot",
+                            status="available",
+                            parent_lot_number=source_item_snapshot.get("parent_lot_number"),
+                            lot_sequence=source_item_snapshot.get("lot_sequence", 0)
+                        )
+                        db.session.add(new_expendable)
+                else:
+                    # No valid tracking type - this should not happen with new policy
+                    raise ValidationError(
+                        f"Invalid tracking type '{tracking_type}' for expendable. "
+                        f"All expendables must have either a serial number or lot number."
+                    )
             else:
                 actual_item_id = source_item_snapshot.get("item_id", transfer.item_id)
                 if transfer.item_type == "tool":
@@ -444,10 +554,16 @@ def register_kit_transfer_routes(app):
         db.session.commit()
 
         response = transfer.to_dict()
-        response["lot_split"] = bool(child_chemical)
+        response["lot_split"] = bool(child_chemical) or bool(child_expendable)
+
         if child_chemical:
             response["child_chemical"] = child_chemical.to_dict()
             response["parent_lot_number"] = source_chemical.lot_number if source_chemical else None
+
+        if child_expendable:
+            response["child_expendable"] = child_expendable.to_dict()
+            response["parent_lot_number"] = source_item_snapshot.get("lot_number") if source_item_snapshot else None
+            response["message"] = f"Child lot {child_expendable.lot_number} created from parent lot {response['parent_lot_number']} for traceability."
 
         return response
 

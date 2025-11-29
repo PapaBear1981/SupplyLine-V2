@@ -10,6 +10,12 @@ Key features:
 - Transfer expendables between kits
 - Generate barcodes for lot/serial tracking
 - Full audit trail via AuditLog
+
+Policy:
+- All expendables MUST have either a serial number OR a lot number for tracking
+- The combination of part_number + serial/lot must be unique across the system
+- Partial issuances of lot-tracked items create child lots for full traceability
+- Serial-tracked items must be transferred/issued as whole items
 """
 
 import logging
@@ -19,8 +25,16 @@ from flask import Blueprint, current_app, jsonify, request
 
 from auth import department_required, jwt_required
 from models import AuditLog, Expendable, LotNumberSequence, db
-from models_kits import Kit, KitBox, KitItem
+from models_kits import Kit, KitBox, KitExpendable, KitItem
 from utils.error_handler import ValidationError, handle_errors
+from utils.lot_utils import create_child_expendable, get_expendable_lot_lineage
+from utils.serial_lot_validation import (
+    SerialLotValidationError,
+    check_lot_number_unique,
+    check_serial_number_unique,
+    validate_item_tracking,
+    validate_serial_lot_required,
+)
 
 
 logger = logging.getLogger(__name__)
@@ -60,7 +74,7 @@ def add_expendable_to_kit(kit_id):
         - description: Description of the expendable
         - quantity: Quantity to add
         - unit: Unit of measurement (each, oz, ml, ft, etc.)
-        - tracking_type: 'lot' or 'serial'
+        - tracking_type: 'lot' or 'serial' (REQUIRED - all items must be tracked)
 
     Optional fields:
         - lot_number: Lot number (auto-generated if not provided and tracking_type='lot')
@@ -70,6 +84,10 @@ def add_expendable_to_kit(kit_id):
         - category: Category (default: 'General')
         - minimum_stock_level: Minimum stock level for reorder alerts
         - notes: Additional notes
+
+    Policy:
+        - All expendables must have either a lot number or serial number
+        - The combination of part_number + lot/serial must be unique across the system
     """
     kit = Kit.query.get_or_404(kit_id)
     data = request.get_json() or {}
@@ -85,24 +103,45 @@ def add_expendable_to_kit(kit_id):
     if box.kit_id != kit_id:
         raise ValidationError("Box does not belong to this kit")
 
-    # Validate tracking type
+    # Validate tracking type - 'none' is no longer allowed
     tracking_type = data["tracking_type"].lower()
     if tracking_type not in ["lot", "serial"]:
-        raise ValidationError("tracking_type must be 'lot' or 'serial'")
+        raise ValidationError(
+            "tracking_type must be 'lot' or 'serial'. All expendables must be tracked for audit purposes."
+        )
+
+    part_number = data["part_number"].strip()
 
     # Auto-generate lot or serial number if not provided
     if tracking_type == "lot":
         lot_number = data.get("lot_number")
         if not lot_number:
             lot_number = LotNumberSequence.generate_lot_number()
+        else:
+            lot_number = lot_number.strip()
         serial_number = None
+
+        # Validate lot number uniqueness across the system
+        try:
+            check_lot_number_unique(part_number, lot_number)
+        except SerialLotValidationError as e:
+            raise ValidationError(str(e))
+
     else:  # serial
         serial_number = data.get("serial_number")
         if not serial_number:
-            serial_number = generate_serial_number(data["part_number"])
+            serial_number = generate_serial_number(part_number)
+        else:
+            serial_number = serial_number.strip()
         lot_number = None
 
-    logger.info(f"Creating expendable {data['part_number']} with {tracking_type}={lot_number or serial_number}")
+        # Validate serial number uniqueness across the system
+        try:
+            check_serial_number_unique(part_number, serial_number)
+        except SerialLotValidationError as e:
+            raise ValidationError(str(e))
+
+    logger.info(f"Creating expendable {part_number} with {tracking_type}={lot_number or serial_number}")
 
     try:
         # Create expendable (warehouse_id will be forced to None in __init__)
@@ -380,8 +419,13 @@ def transfer_expendable_between_kits():
         - expendable_id: ID of the expendable to transfer
 
     Optional fields:
+        - quantity: Quantity to transfer (for partial transfers of lot-tracked items)
         - location: New location within the destination box
         - notes: Transfer notes
+
+    Policy:
+        - Serial-tracked expendables must be transferred as whole items
+        - Partial transfers of lot-tracked items create child lots for traceability
     """
     data = request.get_json() or {}
 
@@ -412,38 +456,132 @@ def transfer_expendable_between_kits():
     if not from_kit_item:
         raise ValidationError("Expendable not found in source kit")
 
-    # Remove from source kit
-    db.session.delete(from_kit_item)
+    # Validate tracking - all expendables must have serial or lot number
+    try:
+        validate_serial_lot_required(expendable.serial_number, expendable.lot_number, "expendable")
+    except SerialLotValidationError as e:
+        raise ValidationError(str(e))
 
-    # Add to destination kit
-    to_kit_item = KitItem(
-        kit_id=to_kit.id,
-        box_id=to_box.id,
-        item_type="expendable",
-        item_id=expendable.id,
-        part_number=expendable.part_number,
-        serial_number=expendable.serial_number,
-        lot_number=expendable.lot_number,
-        description=expendable.description,
-        quantity=expendable.quantity,
-        location=data.get("location", expendable.location),
-        status="available",
-        added_date=datetime.now(),
-        last_updated=datetime.now()
-    )
+    # Get transfer quantity (default to full quantity)
+    transfer_quantity = data.get("quantity", expendable.quantity)
+    try:
+        transfer_quantity = float(transfer_quantity)
+    except (ValueError, TypeError):
+        raise ValidationError("Quantity must be a valid number")
 
-    db.session.add(to_kit_item)
+    if transfer_quantity <= 0:
+        raise ValidationError("Quantity must be greater than zero")
 
-    # Update expendable location if provided
-    if "location" in data:
-        expendable.location = data["location"]
+    if transfer_quantity > expendable.quantity:
+        raise ValidationError(f"Insufficient quantity. Available: {expendable.quantity}")
+
+    # Determine tracking type
+    tracking_type = "serial" if expendable.serial_number else "lot"
+    tracking_id = expendable.serial_number or expendable.lot_number
+
+    # Serial-tracked items must be transferred as whole items
+    if tracking_type == "serial" and transfer_quantity != expendable.quantity:
+        raise ValidationError(
+            f"Serial-tracked expendables must be transferred as whole items. "
+            f"Cannot partially transfer serial number '{expendable.serial_number}'."
+        )
+
+    is_partial_transfer = transfer_quantity < expendable.quantity
+    child_lot_info = None
+
+    if is_partial_transfer and tracking_type == "lot":
+        # Create a KitExpendable (child lot) in the destination kit
+        # First we need to find or create a KitExpendable record for the source
+        source_kit_exp = KitExpendable.query.filter_by(
+            kit_id=from_kit.id,
+            part_number=expendable.part_number,
+            lot_number=expendable.lot_number
+        ).first()
+
+        if source_kit_exp:
+            # Create child from existing KitExpendable
+            child_expendable = create_child_expendable(
+                parent_expendable=source_kit_exp,
+                quantity=transfer_quantity,
+                destination_kit_id=to_kit.id,
+                destination_box_id=to_box.id
+            )
+            db.session.add(child_expendable)
+
+            # Update source KitItem to reflect reduced quantity
+            from_kit_item.quantity -= transfer_quantity
+            if from_kit_item.quantity <= 0:
+                db.session.delete(from_kit_item)
+
+            child_lot_info = {
+                "child_lot_number": child_expendable.lot_number,
+                "parent_lot_number": expendable.lot_number,
+                "quantity": transfer_quantity
+            }
+
+            # Log child lot creation
+            log_child = AuditLog(
+                action_type="expendable_child_lot_created",
+                action_details=f"Child lot {child_expendable.lot_number} created from {expendable.lot_number} during kit-to-kit transfer: {transfer_quantity} {expendable.unit}"
+            )
+            db.session.add(log_child)
+        else:
+            # No KitExpendable exists, just transfer the Expendable record
+            # This shouldn't happen in normal flow, but handle gracefully
+            raise ValidationError(
+                "Cannot perform partial transfer - source expendable tracking record not found. "
+                "Please transfer the full quantity or add the item to a kit first."
+            )
+    else:
+        # Full transfer - remove from source kit
+        db.session.delete(from_kit_item)
+
+        # Validate uniqueness in destination kit for full transfer
+        existing_in_dest = KitItem.query.filter_by(
+            kit_id=to_kit.id,
+            item_type="expendable",
+            part_number=expendable.part_number
+        ).first()
+
+        if existing_in_dest:
+            if tracking_type == "lot" and existing_in_dest.lot_number == expendable.lot_number:
+                raise ValidationError(
+                    f"An expendable with part number '{expendable.part_number}' and lot number "
+                    f"'{expendable.lot_number}' already exists in kit '{to_kit.name}'."
+                )
+            if tracking_type == "serial" and existing_in_dest.serial_number == expendable.serial_number:
+                raise ValidationError(
+                    f"An expendable with part number '{expendable.part_number}' and serial number "
+                    f"'{expendable.serial_number}' already exists in kit '{to_kit.name}'."
+                )
+
+        # Add to destination kit
+        to_kit_item = KitItem(
+            kit_id=to_kit.id,
+            box_id=to_box.id,
+            item_type="expendable",
+            item_id=expendable.id,
+            part_number=expendable.part_number,
+            serial_number=expendable.serial_number,
+            lot_number=expendable.lot_number,
+            description=expendable.description,
+            quantity=transfer_quantity,
+            location=data.get("location", expendable.location),
+            status="available",
+            added_date=datetime.now(),
+            last_updated=datetime.now()
+        )
+
+        db.session.add(to_kit_item)
+
+        # Update expendable location if provided
+        if "location" in data:
+            expendable.location = data["location"]
 
     # Log action
-    tracking_id = expendable.lot_number or expendable.serial_number
-    tracking_type = "lot" if expendable.lot_number else "serial"
     log = AuditLog(
         action_type="expendable_transferred_between_kits",
-        action_details=f"Transferred expendable {expendable.part_number} ({tracking_type}={tracking_id}) from kit {from_kit.name} to kit {to_kit.name}, box {to_box.box_number}"
+        action_details=f"Transferred expendable {expendable.part_number} ({tracking_type}={tracking_id}) qty {transfer_quantity} from kit {from_kit.name} to kit {to_kit.name}, box {to_box.box_number}"
     )
     db.session.add(log)
 
@@ -451,11 +589,56 @@ def transfer_expendable_between_kits():
 
     logger.info(f"Transferred expendable {expendable.id} from kit {from_kit.id} to kit {to_kit.id}")
 
-    return jsonify({
+    response = {
         "message": "Expendable transferred successfully",
         "expendable": expendable.to_dict(),
         "from_kit": from_kit.name,
         "to_kit": to_kit.name,
-        "to_box": to_box.box_number
-    }), 200
+        "to_box": to_box.box_number,
+        "quantity_transferred": transfer_quantity,
+        "is_partial_transfer": is_partial_transfer
+    }
+
+    if child_lot_info:
+        response["child_lot"] = child_lot_info
+        response["message"] = f"Expendable transferred with child lot {child_lot_info['child_lot_number']} created for traceability."
+
+    return jsonify(response), 200
+
+
+@expendables_bp.route("/expendables/<int:expendable_id>/lineage", methods=["GET"])
+@jwt_required
+@handle_errors
+def get_expendable_lineage(expendable_id):
+    """
+    Get the lot lineage for an expendable (parent and children).
+
+    This endpoint allows users to trace a lot back to its origin or see
+    all child lots that have been created from partial issuances.
+
+    Returns:
+        JSON object with:
+        - current: The expendable's details
+        - parent: Parent lot details (if this is a child lot)
+        - children: List of child lots created from this lot
+        - siblings: Other lots created from the same parent
+    """
+    # First check if it's a KitExpendable
+    kit_expendable = KitExpendable.query.get(expendable_id)
+    if kit_expendable:
+        lineage = get_expendable_lot_lineage(kit_expendable)
+        return jsonify(lineage), 200
+
+    # Then check if it's an Expendable
+    expendable = Expendable.query.get_or_404(expendable_id)
+
+    # Build a simplified lineage response for Expendable model
+    response = {
+        "current": expendable.to_dict(),
+        "parent": None,
+        "children": [],
+        "siblings": []
+    }
+
+    return jsonify(response), 200
 

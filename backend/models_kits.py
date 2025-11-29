@@ -215,21 +215,24 @@ class KitExpendable(db.Model):
     """
     KitExpendable model for manually added expendable items.
     These are not linked to existing inventory records.
-    Expendables can be tracked by EITHER lot number OR serial number (never both).
+    Expendables MUST be tracked by EITHER lot number OR serial number (never both, never neither).
+
+    Policy:
+    - All expendables must have either a serial number or a lot number for traceability
+    - The combination of part_number + serial/lot must be unique across the system
+    - Child lots are created when items are partially issued
     """
     __tablename__ = "kit_expendables"
 
     id = db.Column(db.Integer, primary_key=True)
     kit_id = db.Column(db.Integer, db.ForeignKey("kits.id"), nullable=False)
     box_id = db.Column(db.Integer, db.ForeignKey("kit_boxes.id"), nullable=False)
-    part_number = db.Column(db.String(100), nullable=False)
-    serial_number = db.Column(db.String(100))
-    lot_number = db.Column(db.String(100))
-    # tracking_type reflects how the expendable is tracked. Historically this was limited to
-    # lot/serial, but the workflows (wizard, reorder fulfillment, transfers) frequently create
-    # expendables that are not tracked at all.  To better model that behaviour we allow a
-    # "none" tracking type in addition to the existing options.
-    tracking_type = db.Column(db.String(20), nullable=False, default="none")
+    part_number = db.Column(db.String(100), nullable=False, index=True)
+    serial_number = db.Column(db.String(100), index=True)
+    lot_number = db.Column(db.String(100), index=True)
+    # tracking_type MUST be either 'lot' or 'serial' - 'none' is no longer allowed
+    # All items must be tracked for audit/traceability purposes
+    tracking_type = db.Column(db.String(20), nullable=False, default="lot")
     description = db.Column(db.String(500), nullable=False)
     quantity = db.Column(db.Float, nullable=False, default=0)
     unit = db.Column(db.String(20), nullable=False, default="each")  # each, oz, ml, etc.
@@ -238,6 +241,10 @@ class KitExpendable(db.Model):
     minimum_stock_level = db.Column(db.Float)
     added_date = db.Column(db.DateTime, default=get_current_time, nullable=False)
     last_updated = db.Column(db.DateTime, default=get_current_time, onupdate=get_current_time, nullable=False)
+
+    # Lot lineage tracking for partial issuances
+    parent_lot_number = db.Column(db.String(100), nullable=True)  # Parent lot if this is a child lot
+    lot_sequence = db.Column(db.Integer, nullable=True, default=0)  # Number of child lots created from this
 
     # Relationships
     kit = db.relationship("Kit", back_populates="expendables")
@@ -262,7 +269,9 @@ class KitExpendable(db.Model):
             "minimum_stock_level": self.minimum_stock_level,
             "is_low_stock": self.is_low_stock(),
             "added_date": self.added_date.isoformat() if self.added_date else None,
-            "last_updated": self.last_updated.isoformat() if self.last_updated else None
+            "last_updated": self.last_updated.isoformat() if self.last_updated else None,
+            "parent_lot_number": self.parent_lot_number,
+            "lot_sequence": self.lot_sequence or 0
         }
 
     def is_low_stock(self):
@@ -274,36 +283,52 @@ class KitExpendable(db.Model):
     def validate_tracking(self):
         """
         Validate that appropriate tracking identifiers are present based on tracking_type.
-        Items can have EITHER lot number OR serial number, never both.
+        Items MUST have EITHER lot number OR serial number, never both, never neither.
+
+        Policy: All expendables must be tracked for audit and traceability purposes.
+        'none' tracking type is no longer allowed.
 
         Returns:
             tuple: (is_valid, error_message)
         """
         # Normalise tracking type to ensure comparisons work even if the value was stored in
         # uppercase or contains unexpected whitespace.
-        tracking_type = (self.tracking_type or "none").strip().lower()
+        tracking_type = (self.tracking_type or "lot").strip().lower()
+
+        # 'none' is no longer allowed - migrate to 'lot' with auto-generated lot number
+        if tracking_type == "none":
+            tracking_type = "lot"
+
         self.tracking_type = tracking_type
 
         if tracking_type == "lot":
             if not self.lot_number:
-                return False, "Lot number is required for lot-tracked expendables"
+                return False, "Lot number is required for tracking. All expendables must have either a lot number or serial number."
             if self.serial_number:
-                return False, "Items cannot have both lot number and serial number"
+                return False, "Items cannot have both lot number and serial number. Please use only one tracking method."
         elif tracking_type == "serial":
             if not self.serial_number:
-                return False, "Serial number is required for serial-tracked expendables"
+                return False, "Serial number is required for tracking. All expendables must have either a serial number or lot number."
             if self.lot_number:
-                return False, "Items cannot have both lot number and serial number"
-        elif tracking_type == "none":
-            # If an item is untracked we should not persist lot or serial identifiers.
-            if self.lot_number or self.serial_number:
-                return False, "Tracking identifiers should be omitted when tracking_type is 'none'"
+                return False, "Items cannot have both serial number and lot number. Please use only one tracking method."
         else:
             return False, (
-                f"Invalid tracking_type: {self.tracking_type}. Must be 'lot', 'serial', or 'none'"
+                f"Invalid tracking_type: {self.tracking_type}. Must be 'lot' or 'serial'. All items must be tracked."
             )
 
         return True, None
+
+    def get_tracking_identifier(self):
+        """Get the tracking identifier (lot or serial number) for this expendable."""
+        if self.tracking_type == "serial":
+            return self.serial_number
+        return self.lot_number
+
+    def has_children(self):
+        """Check if this expendable has any child lots."""
+        if not self.lot_number or self.tracking_type != "lot":
+            return False
+        return KitExpendable.query.filter_by(parent_lot_number=self.lot_number).count() > 0
 
 
 class KitIssuance(db.Model):

@@ -20,6 +20,10 @@ from models import (
 )
 from sqlalchemy import text
 from utils.error_handler import ValidationError, handle_errors
+from utils.serial_lot_validation import (
+    SerialLotValidationError,
+    check_lot_number_unique,
+)
 from utils.validation import (
     validate_lot_number_format,
     validate_schema,
@@ -303,14 +307,14 @@ def register_chemical_routes(app):
 
         logger.info(f"Creating chemical with part number: {validated_data.get('part_number')} in warehouse {warehouse.name}")
 
-        # Check if chemical with same part number and lot number already exists
-        existing_chemical = Chemical.query.filter_by(
-            part_number=validated_data["part_number"],
-            lot_number=validated_data["lot_number"]
-        ).first()
-
-        if existing_chemical:
-            raise ValidationError("Chemical with this part number and lot number already exists")
+        # Validate lot number uniqueness across the entire system
+        try:
+            check_lot_number_unique(
+                validated_data["part_number"],
+                validated_data["lot_number"]
+            )
+        except SerialLotValidationError as e:
+            raise ValidationError(str(e))
 
         # Create new chemical - warehouse_id is required
         chemical = Chemical(
@@ -1138,6 +1142,21 @@ def register_chemical_routes(app):
             validated_data = validate_schema(data, "chemical")
 
             logger.info(f"Updating chemical {id} with data: {validated_data}")
+
+            # If part_number or lot_number is being changed, validate uniqueness
+            new_part_number = validated_data.get("part_number", chemical.part_number)
+            new_lot_number = validated_data.get("lot_number", chemical.lot_number)
+
+            if new_part_number != chemical.part_number or new_lot_number != chemical.lot_number:
+                try:
+                    check_lot_number_unique(
+                        new_part_number,
+                        new_lot_number,
+                        exclude_id=chemical.id,
+                        exclude_type="chemical"
+                    )
+                except SerialLotValidationError as e:
+                    raise ValidationError(str(e))
 
             # Update fields
             if "part_number" in validated_data:
