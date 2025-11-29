@@ -166,7 +166,11 @@ export function KitLocationMap({ height = 400 }: KitLocationMapProps) {
       styles={{ body: { padding: 0 } }}
     >
       {/* Filters */}
-      <div style={{ padding: '12px 16px', borderBottom: '1px solid #f0f0f0' }}>
+      <div style={{
+        padding: '12px 16px',
+        borderBottom: `1px solid ${isDarkMode ? '#303030' : '#f0f0f0'}`,
+        backgroundColor: isDarkMode ? '#141414' : '#ffffff'
+      }}>
         <Space wrap>
           <Select
             placeholder="Select Kit"
@@ -229,7 +233,7 @@ export function KitLocationMap({ height = 400 }: KitLocationMapProps) {
             justifyContent: 'center',
             alignItems: 'center',
             height: '100%',
-            backgroundColor: '#fafafa'
+            backgroundColor: isDarkMode ? '#141414' : '#fafafa'
           }}>
             <Empty
               image={<InboxOutlined style={{ fontSize: 48, color: '#d9d9d9' }} />}
@@ -302,7 +306,11 @@ export function KitLocationMap({ height = 400 }: KitLocationMapProps) {
 
       {/* Selected Kit Info Panel */}
       {selectedKit && (
-        <div style={{ padding: 16, borderTop: '1px solid #f0f0f0', backgroundColor: '#fafafa' }}>
+        <div style={{
+          padding: 16,
+          borderTop: `1px solid ${isDarkMode ? '#303030' : '#f0f0f0'}`,
+          backgroundColor: isDarkMode ? '#141414' : '#fafafa'
+        }}>
           <Space direction="vertical" style={{ width: '100%' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <Title level={5} style={{ margin: 0 }}>
@@ -372,8 +380,8 @@ export function KitLocationMap({ height = 400 }: KitLocationMapProps) {
       {locationsData && (
         <div style={{
           padding: '8px 16px',
-          borderTop: '1px solid #f0f0f0',
-          backgroundColor: '#fafafa',
+          borderTop: `1px solid ${isDarkMode ? '#303030' : '#f0f0f0'}`,
+          backgroundColor: isDarkMode ? '#141414' : '#fafafa',
           display: 'flex',
           justifyContent: 'space-between',
           alignItems: 'center'
