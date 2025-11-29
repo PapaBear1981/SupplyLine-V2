@@ -8,6 +8,25 @@ import { useGetKitLocationsQuery, useGetAircraftTypesQuery } from '../services/k
 import { useTheme } from '../../settings/contexts/ThemeContext';
 import type { KitLocation } from '../types';
 
+// Custom styles for dark mode popup
+const popupStyles = document.createElement('style');
+popupStyles.textContent = `
+  .leaflet-popup.dark-mode .leaflet-popup-content-wrapper {
+    background-color: #1f1f1f;
+    color: #ffffff;
+  }
+  .leaflet-popup.dark-mode .leaflet-popup-tip {
+    background-color: #1f1f1f;
+  }
+  .leaflet-popup.dark-mode .ant-typography {
+    color: #ffffff;
+  }
+`;
+if (!document.head.querySelector('#leaflet-dark-popup-styles')) {
+  popupStyles.id = 'leaflet-dark-popup-styles';
+  document.head.appendChild(popupStyles);
+}
+
 const { Text, Title } = Typography;
 
 // Fix for default marker icons in Leaflet with webpack/vite
@@ -275,7 +294,7 @@ export function KitLocationMap({ height = 400 }: KitLocationMapProps) {
                   click: () => setSelectedKitId(kit.id),
                 }}
               >
-                <Popup>
+                <Popup className={isDarkMode ? 'dark-mode' : ''}>
                   <div style={{ minWidth: 200 }}>
                     <Title level={5} style={{ margin: 0, marginBottom: 8 }}>
                       {kit.name}
