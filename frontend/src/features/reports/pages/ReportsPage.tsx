@@ -10,7 +10,7 @@ import {
   FilePdfOutlined,
   FileExcelOutlined,
 } from '@ant-design/icons';
-import dayjs, { Dayjs } from 'dayjs';
+import { Dayjs } from 'dayjs';
 import type { RangePickerProps } from 'antd/es/date-picker';
 
 import { ToolReports } from '../components/ToolReports';
@@ -57,14 +57,14 @@ export function ReportsPage() {
     setCustomDateRange(dates as [Dayjs | null, Dayjs | null]);
   };
 
-  const getDateParams = () => {
+  const getDateParams = (): Record<string, string> => {
     if (customDateRange[0] && customDateRange[1]) {
       return {
         start_date: customDateRange[0].format('YYYY-MM-DD'),
         end_date: customDateRange[1].format('YYYY-MM-DD'),
       };
     }
-    return { timeframe };
+    return { timeframe: timeframe };
   };
 
   const handleExport = async (format: ExportFormat) => {
@@ -239,7 +239,7 @@ export function ReportsPage() {
               value={customDateRange}
               onChange={handleDateRangeChange}
               allowClear
-              disabled={!customDateRange[0] && timeframe !== 'custom' && !(customDateRange[0] && customDateRange[1])}
+              disabled={!(customDateRange[0] || customDateRange[1])}
             />
             <Dropdown
               menu={{ items: exportMenuItems }}

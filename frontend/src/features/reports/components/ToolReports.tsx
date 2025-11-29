@@ -42,7 +42,7 @@ interface ToolReportsProps {
 
 const COLORS = ['#52c41a', '#1890ff', '#faad14', '#ff4d4f', '#722ed1', '#13c2c2'];
 
-export function ToolReports({ timeframe, dateParams, onReportDataChange }: ToolReportsProps) {
+export function ToolReports({ dateParams, onReportDataChange }: ToolReportsProps) {
   const [activeSubTab, setActiveSubTab] = useState('inventory');
 
   const { data: inventoryData, isLoading: inventoryLoading } = useGetToolInventoryReportQuery(dateParams);
@@ -269,7 +269,7 @@ export function ToolReports({ timeframe, dateParams, onReportDataChange }: ToolR
                             cx="50%"
                             cy="50%"
                             labelLine={false}
-                            label={({ name, percent }) => `${name} (${(percent * 100).toFixed(0)}%)`}
+                            label={({ name, percent }) => `${name} (${((percent || 0) * 100).toFixed(0)}%)`}
                             outerRadius={80}
                             fill="#8884d8"
                             dataKey="value"
@@ -541,7 +541,7 @@ export function ToolReports({ timeframe, dateParams, onReportDataChange }: ToolR
                             cx="50%"
                             cy="50%"
                             labelLine={false}
-                            label={({ name, percent }) => `${name} (${(percent * 100).toFixed(0)}%)`}
+                            label={({ name, percent }) => `${name} (${((percent || 0) * 100).toFixed(0)}%)`}
                             outerRadius={80}
                             fill="#8884d8"
                             dataKey="value"
