@@ -1,11 +1,14 @@
-import { Form, Input, Button, message } from 'antd';
-import { UserOutlined, LockOutlined } from '@ant-design/icons';
+import { Form, Input, Button, Typography, Divider, message } from 'antd';
+import { UserOutlined, LockOutlined, ArrowRightOutlined } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 import { useLoginMutation } from '../services/authApi';
 import { useAppDispatch } from '@app/hooks';
 import { setCredentials } from '../slices/authSlice';
 import { ROUTES } from '@shared/constants/routes';
 import type { LoginRequest } from '../types';
+import './LoginPage.css';
+
+const { Title, Text } = Typography;
 
 export const LoginPage = () => {
   const navigate = useNavigate();
@@ -16,7 +19,7 @@ export const LoginPage = () => {
     try {
       const result = await login(values).unwrap();
       dispatch(setCredentials({ user: result.user, token: result.access_token }));
-      message.success('Login successful!');
+      message.success('Welcome back. Launch checklist complete.');
       navigate(ROUTES.DASHBOARD);
     } catch (error: unknown) {
       if (error && typeof error === 'object' && 'status' in error) {
@@ -31,45 +34,120 @@ export const LoginPage = () => {
   };
 
   return (
-    <Form
-      name="login"
-      onFinish={handleSubmit}
-      autoComplete="off"
-      size="large"
-    >
-      <Form.Item
-        name="employee_number"
-        rules={[
-          { required: true, message: 'Please input your employee number!' },
-        ]}
-      >
-        <Input
-          prefix={<UserOutlined />}
-          placeholder="Employee Number"
-          autoFocus
-        />
-      </Form.Item>
+    <div className="login-wrapper">
+      <div className="login-header">
+        <Title level={3} style={{ marginBottom: 6 }}>
+          Welcome back
+        </Title>
+        <Text type="secondary">
+          Continue where you left off—dispatching drops, monitoring hangars, and coordinating crews.
+        </Text>
+      </div>
 
-      <Form.Item
-        name="password"
-        rules={[{ required: true, message: 'Please input your password!' }]}
+      <Form
+        name="login"
+        onFinish={handleSubmit}
+        autoComplete="off"
+        size="large"
+        layout="vertical"
+        requiredMark={false}
+        className="login-form"
       >
-        <Input.Password
-          prefix={<LockOutlined />}
-          placeholder="Password"
-        />
-      </Form.Item>
-
-      <Form.Item>
-        <Button
-          type="primary"
-          htmlType="submit"
-          loading={isLoading}
-          block
+        <Form.Item
+          label="Employee Number"
+          name="employee_number"
+          rules={[
+            { required: true, message: 'Please input your employee number!' },
+          ]}
         >
-          Log In
-        </Button>
-      </Form.Item>
-    </Form>
+          <Input
+            prefix={<UserOutlined style={{ color: 'rgba(229, 239, 255, 0.5)' }} />}
+            placeholder="e.g. 00421"
+            autoFocus
+            style={{
+              background: 'rgba(15, 35, 55, 0.6)',
+              border: '1px solid rgba(94, 165, 255, 0.25)',
+              color: '#f7fbff'
+            }}
+            styles={{
+              input: {
+                background: 'transparent',
+                color: '#f7fbff'
+              }
+            }}
+          />
+        </Form.Item>
+
+        <Form.Item
+          label="Password"
+          name="password"
+          rules={[{ required: true, message: 'Please input your password!' }]}
+        >
+          <Input.Password
+            prefix={<LockOutlined style={{ color: 'rgba(229, 239, 255, 0.5)' }} />}
+            placeholder="Enter your password"
+            style={{
+              background: 'rgba(15, 35, 55, 0.6)',
+              border: '1px solid rgba(94, 165, 255, 0.25)',
+              color: '#f7fbff'
+            }}
+            styles={{
+              input: {
+                background: 'transparent',
+                color: '#f7fbff'
+              }
+            }}
+          />
+        </Form.Item>
+
+        <div className="login-actions">
+          <div>
+            <Text type="secondary" style={{ fontSize: '13px' }}>
+              Forgot password? Email:{' '}
+            </Text>
+            <Button
+              type="link"
+              href="mailto:support@supplyline.aero?subject=Password%20reset"
+              style={{ padding: 0, height: 'auto', fontSize: '13px' }}
+            >
+              support@supplyline.aero
+            </Button>
+          </div>
+          <div>
+            <Text type="secondary" style={{ fontSize: '13px' }}>
+              Request account:{' '}
+            </Text>
+            <Button
+              type="link"
+              href="mailto:support@supplyline.aero?subject=Create%20my%20SupplyLine%20account"
+              style={{ padding: 0, height: 'auto', fontSize: '13px' }}
+              icon={<ArrowRightOutlined />}
+            >
+              support@supplyline.aero
+            </Button>
+          </div>
+        </div>
+
+        <Form.Item style={{ marginBottom: 0 }}>
+          <Button
+            type="primary"
+            htmlType="submit"
+            loading={isLoading}
+            block
+          >
+            Log In
+          </Button>
+        </Form.Item>
+      </Form>
+
+      <Divider plain style={{ marginTop: 22, marginBottom: 10 }}>
+        Flightline insight at a glance
+      </Divider>
+      <div className="login-footnote">
+        <Text type="secondary">
+          Stay ahead of supply gaps with kit readiness alerts, mission timelines, and maintenance holds surfaced instantly on login.
+        </Text>
+      </div>
+    </div>
   );
 };
