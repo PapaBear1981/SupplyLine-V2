@@ -60,7 +60,7 @@ def register_report_routes(app):
     # ========================================================================
 
     @app.route("/api/reports/export/pdf", methods=["POST"])
-    @jwt_required()
+    @jwt_required
     def export_report_pdf():
         """Export report as PDF."""
         try:
@@ -85,7 +85,7 @@ def register_report_routes(app):
             return jsonify({"error": "Failed to generate PDF"}), 500
 
     @app.route("/api/reports/export/excel", methods=["POST"])
-    @jwt_required()
+    @jwt_required
     def export_report_excel():
         """Export report as Excel."""
         try:
@@ -114,7 +114,7 @@ def register_report_routes(app):
     # ========================================================================
 
     @app.route("/api/reports/tools/inventory", methods=["GET"])
-    @jwt_required()
+    @jwt_required
     def tool_inventory_report():
         """Generate comprehensive tool inventory report with statistics."""
         try:
@@ -196,7 +196,7 @@ def register_report_routes(app):
             return jsonify({"error": "Failed to generate tool inventory report"}), 500
 
     @app.route("/api/reports/tools/checkouts", methods=["GET"])
-    @jwt_required()
+    @jwt_required
     def checkout_history_report():
         """Generate checkout history report with trends."""
         try:
@@ -298,7 +298,7 @@ def register_report_routes(app):
             return jsonify({"error": "Failed to generate checkout history report"}), 500
 
     @app.route("/api/reports/tools/calibration", methods=["GET"])
-    @jwt_required()
+    @jwt_required
     def calibration_report():
         """Generate calibration status report."""
         try:
@@ -366,7 +366,7 @@ def register_report_routes(app):
             return jsonify({"error": "Failed to generate calibration report"}), 500
 
     @app.route("/api/reports/tools/department-usage", methods=["GET"])
-    @jwt_required()
+    @jwt_required
     def department_usage_report():
         """Generate department usage report."""
         try:
@@ -440,7 +440,7 @@ def register_report_routes(app):
     # ========================================================================
 
     @app.route("/api/reports/chemicals/inventory", methods=["GET"])
-    @jwt_required()
+    @jwt_required
     def chemical_inventory_report():
         """Generate chemical inventory report with statistics."""
         try:
@@ -519,7 +519,7 @@ def register_report_routes(app):
             return jsonify({"error": "Failed to generate chemical inventory report"}), 500
 
     @app.route("/api/reports/chemicals/expiration", methods=["GET"])
-    @jwt_required()
+    @jwt_required
     def chemical_expiration_report():
         """Generate chemical expiration report."""
         try:
@@ -587,7 +587,7 @@ def register_report_routes(app):
             return jsonify({"error": "Failed to generate chemical expiration report"}), 500
 
     @app.route("/api/reports/chemicals/usage", methods=["GET"])
-    @jwt_required()
+    @jwt_required
     def chemical_usage_report():
         """Generate chemical usage report."""
         try:
@@ -655,7 +655,7 @@ def register_report_routes(app):
             return jsonify({"error": "Failed to generate chemical usage report"}), 500
 
     @app.route("/api/reports/chemicals/waste", methods=["GET"])
-    @jwt_required()
+    @jwt_required
     def chemical_waste_report():
         """Generate chemical waste report (expired/disposed chemicals)."""
         try:
@@ -723,7 +723,7 @@ def register_report_routes(app):
     # ========================================================================
 
     @app.route("/api/reports/kits/inventory", methods=["GET"])
-    @jwt_required()
+    @jwt_required
     def kit_inventory_report():
         """Generate kit inventory report."""
         try:
@@ -801,7 +801,7 @@ def register_report_routes(app):
             return jsonify({"error": "Failed to generate kit inventory report"}), 500
 
     @app.route("/api/reports/kits/issuances", methods=["GET"])
-    @jwt_required()
+    @jwt_required
     def kit_issuance_report():
         """Generate kit issuance report."""
         try:
@@ -881,7 +881,7 @@ def register_report_routes(app):
             return jsonify({"error": "Failed to generate kit issuance report"}), 500
 
     @app.route("/api/reports/kits/transfers", methods=["GET"])
-    @jwt_required()
+    @jwt_required
     def kit_transfer_report():
         """Generate kit transfer report."""
         try:
@@ -939,7 +939,7 @@ def register_report_routes(app):
             return jsonify({"error": "Failed to generate kit transfer report"}), 500
 
     @app.route("/api/reports/kits/reorders", methods=["GET"])
-    @jwt_required()
+    @jwt_required
     def kit_reorder_report():
         """Generate kit reorder request report."""
         try:
@@ -1031,7 +1031,7 @@ def register_report_routes(app):
     # ========================================================================
 
     @app.route("/api/reports/orders/procurement", methods=["GET"])
-    @jwt_required()
+    @jwt_required
     def procurement_order_report():
         """Generate procurement order report."""
         try:
@@ -1140,7 +1140,7 @@ def register_report_routes(app):
             return jsonify({"error": "Failed to generate procurement order report"}), 500
 
     @app.route("/api/reports/orders/requests", methods=["GET"])
-    @jwt_required()
+    @jwt_required
     def user_request_report():
         """Generate user request report."""
         try:
@@ -1239,7 +1239,7 @@ def register_report_routes(app):
     # ========================================================================
 
     @app.route("/api/reports/admin/user-activity", methods=["GET"])
-    @jwt_required()
+    @jwt_required
     def user_activity_report():
         """Generate user activity report."""
         try:
@@ -1316,7 +1316,7 @@ def register_report_routes(app):
             return jsonify({"error": "Failed to generate user activity report"}), 500
 
     @app.route("/api/reports/admin/system-stats", methods=["GET"])
-    @jwt_required()
+    @jwt_required
     def system_stats_report():
         """Generate comprehensive system statistics report."""
         try:
@@ -1393,7 +1393,7 @@ def register_report_routes(app):
             return jsonify({"error": "Failed to generate system stats report"}), 500
 
     @app.route("/api/reports/admin/audit-log", methods=["GET"])
-    @jwt_required()
+    @jwt_required
     def audit_log_report():
         """Generate audit log report."""
         try:
@@ -1473,19 +1473,19 @@ def register_report_routes(app):
     # ========================================================================
 
     @app.route("/api/reports/tools", methods=["GET"])
-    @jwt_required()
+    @jwt_required
     def legacy_tool_inventory_report():
         """Legacy tool inventory report endpoint."""
         return tool_inventory_report()
 
     @app.route("/api/reports/checkouts", methods=["GET"])
-    @jwt_required()
+    @jwt_required
     def legacy_checkout_history_report():
         """Legacy checkout history report endpoint."""
         return checkout_history_report()
 
     @app.route("/api/reports/departments", methods=["GET"])
-    @jwt_required()
+    @jwt_required
     def legacy_department_usage_report():
         """Legacy department usage report endpoint."""
         return department_usage_report()
