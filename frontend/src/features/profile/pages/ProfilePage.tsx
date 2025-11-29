@@ -176,7 +176,11 @@ export const ProfilePage = () => {
               {user.department || 'N/A'}
             </Descriptions.Item>
             <Descriptions.Item label="Roles">
-              {user.roles?.map((role) => role.name).join(', ') || 'N/A'}
+              <Space size="small" wrap>
+                {user.roles?.map((role) => (
+                  <Tag key={role.id} color="blue">{role.name}</Tag>
+                )) || 'N/A'}
+              </Space>
             </Descriptions.Item>
             <Descriptions.Item label="Account Status">
               <Tag color={user.is_active ? 'success' : 'error'}>
