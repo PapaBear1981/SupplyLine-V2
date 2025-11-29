@@ -1,4 +1,5 @@
 from datetime import datetime, timedelta
+import logging
 
 from flask_sqlalchemy import SQLAlchemy
 from sqlalchemy.ext.associationproxy import association_proxy
@@ -596,9 +597,37 @@ class ToolHistory(db.Model):
 class AuditLog(db.Model):
     __tablename__ = "audit_log"
     id = db.Column(db.Integer, primary_key=True)
-    action_type = db.Column(db.String, nullable=False)
-    action_details = db.Column(db.String)
+    user_id = db.Column(db.Integer, db.ForeignKey("users.id"))
+    action = db.Column(db.String, nullable=False)
+    resource_type = db.Column(db.String)
+    resource_id = db.Column(db.Integer)
+    details = db.Column(db.JSON)
+    ip_address = db.Column(db.String)
     timestamp = db.Column(db.DateTime, default=get_current_time)
+
+    # Deprecated fields (for backwards compatibility)
+    action_type = db.Column(db.String)
+    action_details = db.Column(db.String)
+
+    @staticmethod
+    def log(user_id, action, resource_type=None, resource_id=None, details=None, ip_address=None):
+        """Create an audit log entry"""
+        try:
+            log_entry = AuditLog(
+                user_id=user_id,
+                action=action,
+                resource_type=resource_type,
+                resource_id=resource_id,
+                details=details,
+                ip_address=ip_address
+            )
+            db.session.add(log_entry)
+            db.session.commit()
+        except Exception as e:
+            # Log the error but don't fail the main operation
+            logger = logging.getLogger(__name__)
+            logger.error(f"Failed to create audit log: {e}")
+            db.session.rollback()
 
 
 class UserActivity(db.Model):
