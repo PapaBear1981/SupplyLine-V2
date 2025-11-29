@@ -25,7 +25,7 @@ export const EditProfileModal = ({ open, onClose, user }: EditProfileModalProps)
     }
   }, [open, user, form]);
 
-  const handleSubmit = async (values: { first_name: string; last_name: string; email: string }) => {
+  const handleSubmit = async (values: { name: string; email: string }) => {
     try {
       const updatedUser = await updateProfile(values).unwrap();
 
@@ -37,8 +37,9 @@ export const EditProfileModal = ({ open, onClose, user }: EditProfileModalProps)
 
       message.success('Profile updated successfully!');
       onClose();
-    } catch (error: any) {
-      message.error(error?.data?.message || 'Failed to update profile');
+    } catch (error: unknown) {
+      const err = error as { data?: { message?: string } };
+      message.error(err?.data?.message || 'Failed to update profile');
     }
   };
 
@@ -64,32 +65,20 @@ export const EditProfileModal = ({ open, onClose, user }: EditProfileModalProps)
         autoComplete="off"
       >
         <Form.Item
-          label="First Name"
-          name="first_name"
+          label="Name"
+          name="name"
           rules={[
-            { required: true, message: 'Please enter your first name' },
-            { min: 2, message: 'First name must be at least 2 characters' },
+            { required: true, message: 'Please enter your name' },
+            { min: 2, message: 'Name must be at least 2 characters' },
           ]}
         >
-          <Input placeholder="Enter your first name" />
-        </Form.Item>
-
-        <Form.Item
-          label="Last Name"
-          name="last_name"
-          rules={[
-            { required: true, message: 'Please enter your last name' },
-            { min: 2, message: 'Last name must be at least 2 characters' },
-          ]}
-        >
-          <Input placeholder="Enter your last name" />
+          <Input placeholder="Enter your name" />
         </Form.Item>
 
         <Form.Item
           label="Email"
           name="email"
           rules={[
-            { required: true, message: 'Please enter your email' },
             { type: 'email', message: 'Please enter a valid email address' },
           ]}
         >

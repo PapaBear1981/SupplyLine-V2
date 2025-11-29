@@ -15,6 +15,14 @@ import { ProfilePage } from '@features/profile/pages/ProfilePage';
 import { UsersPage } from '@features/users/pages/UsersPage';
 import { AdminPage } from '@features/admin/pages/AdminPage';
 import { KitsDashboard, KitDetailView, KitWizard } from '@features/kits';
+import {
+  OrdersDashboard,
+  OrderDetailView,
+  OrderCreationForm,
+  RequestsDashboard,
+  RequestDetailView,
+  RequestCreationForm,
+} from '@features/orders';
 import { ThemeProvider, useTheme } from '@features/settings/contexts/ThemeContext';
 import { COLOR_THEMES } from '@features/settings/types/theme';
 import { ROUTES } from '@shared/constants/routes';
@@ -54,6 +62,16 @@ function AppContent() {
               <Route path="/kits/:id" element={<KitDetailView />} />
               <Route path="/kits/:id/edit" element={<div>Edit Kit (Coming Soon)</div>} />
               <Route path="/kits/:id/duplicate" element={<div>Duplicate Kit (Coming Soon)</div>} />
+
+              {/* Orders Routes */}
+              <Route path="/orders" element={<OrdersDashboard />} />
+              <Route path="/orders/new" element={<OrderCreationForm />} />
+              <Route path="/orders/:orderId" element={<OrderDetailView />} />
+
+              {/* Requests Routes */}
+              <Route path="/requests" element={<RequestsDashboard />} />
+              <Route path="/requests/new" element={<RequestCreationForm />} />
+              <Route path="/requests/:requestId" element={<RequestDetailView />} />
 
               <Route path={ROUTES.WAREHOUSES} element={<WarehousesPage />} />
               <Route path={ROUTES.REPORTS} element={<div>Reports Page (Coming Soon)</div>} />

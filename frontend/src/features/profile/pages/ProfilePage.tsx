@@ -123,7 +123,10 @@ export const ProfilePage = () => {
                     {user.name}
                   </Title>
                   <Space size="small" wrap>
-                    <Tag color="blue">{user.is_admin ? 'Admin' : 'User'}</Tag>
+                    {user.roles?.map((role) => (
+                      <Tag key={role.id} color="blue">{role.name}</Tag>
+                    ))}
+                    {user.is_admin && <Tag color="gold">Admin</Tag>}
                     <Tag color={user.is_active ? 'green' : 'red'}>
                       {user.is_active ? 'Active' : 'Inactive'}
                     </Tag>
@@ -164,20 +167,25 @@ export const ProfilePage = () => {
               {user.name}
             </Descriptions.Item>
             <Descriptions.Item label="Email">
-              {user.email}
+              {user.email || 'N/A'}
             </Descriptions.Item>
             <Descriptions.Item label="Employee Number">
               {user.employee_number}
             </Descriptions.Item>
-            <Descriptions.Item label="Role">
-              {user.is_admin ? 'Administrator' : 'User'}
-            </Descriptions.Item>
             <Descriptions.Item label="Department">
               {user.department || 'N/A'}
+            </Descriptions.Item>
+            <Descriptions.Item label="Roles">
+              {user.roles?.map((role) => role.name).join(', ') || 'N/A'}
             </Descriptions.Item>
             <Descriptions.Item label="Account Status">
               <Tag color={user.is_active ? 'success' : 'error'}>
                 {user.is_active ? 'Active' : 'Inactive'}
+              </Tag>
+            </Descriptions.Item>
+            <Descriptions.Item label="Admin">
+              <Tag color={user.is_admin ? 'gold' : 'default'}>
+                {user.is_admin ? 'Yes' : 'No'}
               </Tag>
             </Descriptions.Item>
             <Descriptions.Item label="User ID">
