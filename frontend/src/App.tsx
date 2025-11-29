@@ -22,6 +22,7 @@ import {
   RequestDetailView,
   RequestCreationForm,
 } from '@features/orders';
+import { ReportsPage } from '@features/reports';
 import { ThemeProvider, useTheme } from '@features/settings/contexts/ThemeContext';
 import { COLOR_THEMES } from '@features/settings/types/theme';
 import { ROUTES } from '@shared/constants/routes';
@@ -72,7 +73,7 @@ function AppContent() {
               <Route path="/requests/:requestId" element={<RequestDetailView />} />
 
               <Route path={ROUTES.WAREHOUSES} element={<WarehousesPage />} />
-              <Route path={ROUTES.REPORTS} element={<div>Reports Page (Coming Soon)</div>} />
+              <Route path={ROUTES.REPORTS} element={<ReportsPage />} />
               <Route path={ROUTES.USERS} element={<UsersPage />} />
               <Route path={ROUTES.PROFILE} element={<ProfilePage />} />
               <Route path={ROUTES.SETTINGS} element={<SettingsPage />} />
