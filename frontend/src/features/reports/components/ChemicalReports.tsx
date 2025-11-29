@@ -45,7 +45,7 @@ interface ChemicalReportsProps {
 
 const COLORS = ['#52c41a', '#faad14', '#ff4d4f', '#8c8c8c', '#1890ff', '#722ed1'];
 
-export function ChemicalReports({ timeframe, dateParams, onReportDataChange }: ChemicalReportsProps) {
+export function ChemicalReports({ dateParams, onReportDataChange }: ChemicalReportsProps) {
   const [activeSubTab, setActiveSubTab] = useState('inventory');
 
   const { data: inventoryData, isLoading: inventoryLoading } = useGetChemicalInventoryReportQuery(dateParams);
@@ -642,7 +642,7 @@ export function ChemicalReports({ timeframe, dateParams, onReportDataChange }: C
                             outerRadius={80}
                             paddingAngle={5}
                             dataKey="value"
-                            label={({ name, percent }) => `${name} (${(percent * 100).toFixed(0)}%)`}
+                            label={({ name, percent }) => `${name} (${((percent || 0) * 100).toFixed(0)}%)`}
                           >
                             {wasteData.summary.wasteByReason.map((_, index) => (
                               <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />

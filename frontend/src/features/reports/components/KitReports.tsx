@@ -49,7 +49,7 @@ interface KitReportsProps {
 
 const COLORS = ['#1890ff', '#52c41a', '#faad14', '#ff4d4f', '#722ed1', '#13c2c2'];
 
-export function KitReports({ timeframe, dateParams, onReportDataChange }: KitReportsProps) {
+export function KitReports({ dateParams, onReportDataChange }: KitReportsProps) {
   const [activeSubTab, setActiveSubTab] = useState('inventory');
 
   const { data: inventoryData, isLoading: inventoryLoading } = useGetKitInventoryReportQuery(dateParams);
@@ -349,7 +349,7 @@ export function KitReports({ timeframe, dateParams, onReportDataChange }: KitRep
                         cx="50%"
                         cy="50%"
                         labelLine={false}
-                        label={({ name, percent }) => `${name} (${(percent * 100).toFixed(0)}%)`}
+                        label={({ name, percent }) => `${name} (${((percent || 0) * 100).toFixed(0)}%)`}
                         outerRadius={80}
                         fill="#8884d8"
                         dataKey="value"

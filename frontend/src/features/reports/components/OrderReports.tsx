@@ -6,7 +6,6 @@ import {
   ClockCircleOutlined,
   CheckCircleOutlined,
   TruckOutlined,
-  DollarOutlined,
 } from '@ant-design/icons';
 import {
   PieChart,
@@ -45,7 +44,7 @@ interface OrderReportsProps {
 
 const COLORS = ['#1890ff', '#52c41a', '#faad14', '#ff4d4f', '#722ed1', '#13c2c2', '#eb2f96', '#8c8c8c'];
 
-export function OrderReports({ timeframe, dateParams, onReportDataChange }: OrderReportsProps) {
+export function OrderReports({ dateParams, onReportDataChange }: OrderReportsProps) {
   const [activeSubTab, setActiveSubTab] = useState('procurement');
 
   const { data: procurementData, isLoading: procurementLoading } = useGetProcurementOrderReportQuery(dateParams);

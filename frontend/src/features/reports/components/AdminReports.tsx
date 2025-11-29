@@ -49,7 +49,7 @@ interface AdminReportsProps {
 
 const COLORS = ['#1890ff', '#52c41a', '#faad14', '#ff4d4f', '#722ed1', '#13c2c2', '#eb2f96', '#8c8c8c'];
 
-export function AdminReports({ timeframe, dateParams, onReportDataChange }: AdminReportsProps) {
+export function AdminReports({ dateParams, onReportDataChange }: AdminReportsProps) {
   const [activeSubTab, setActiveSubTab] = useState('system');
 
   const { data: activityData, isLoading: activityLoading } = useGetUserActivityReportQuery(dateParams);
@@ -199,7 +199,7 @@ export function AdminReports({ timeframe, dateParams, onReportDataChange }: Admi
                             outerRadius={70}
                             paddingAngle={3}
                             dataKey="value"
-                            label={({ name, percent }) => `${name} (${(percent * 100).toFixed(0)}%)`}
+                            label={({ name, percent }) => `${name} (${((percent || 0) * 100).toFixed(0)}%)`}
                           >
                             {systemData.users.byDepartment.map((_, index) => (
                               <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
