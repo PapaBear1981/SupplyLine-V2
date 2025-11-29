@@ -61,6 +61,7 @@ class Kit(db.Model):
     latitude = db.Column(db.Float, nullable=True)
     longitude = db.Column(db.Float, nullable=True)
     location_notes = db.Column(db.String(500), nullable=True)  # E.g., "Hangar 3, Bay 2"
+    trailer_number = db.Column(db.String(100), nullable=True)  # Trailer number for kits assigned to trailers
 
     # Relationships
     aircraft_type = db.relationship("AircraftType", back_populates="kits")
@@ -96,6 +97,7 @@ class Kit(db.Model):
             "latitude": self.latitude,
             "longitude": self.longitude,
             "location_notes": self.location_notes,
+            "trailer_number": self.trailer_number,
             "has_location": self.latitude is not None and self.longitude is not None,
         }
 

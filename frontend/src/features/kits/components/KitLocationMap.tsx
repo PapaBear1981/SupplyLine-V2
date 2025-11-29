@@ -310,6 +310,11 @@ export function KitLocationMap({ height = 400 }: KitLocationMapProps) {
                         {kit.full_address || kit.location_address || 'No address'}
                       </Text>
                     </div>
+                    {kit.trailer_number && (
+                      <div style={{ marginTop: 4 }}>
+                        <Text strong style={{ fontSize: 12 }}>Trailer: {kit.trailer_number}</Text>
+                      </div>
+                    )}
                     {kit.description && (
                       <div style={{ marginTop: 4 }}>
                         <Text style={{ fontSize: 12 }}>{kit.description}</Text>

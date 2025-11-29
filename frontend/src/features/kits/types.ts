@@ -45,6 +45,7 @@ export interface Kit {
   latitude?: number | null;
   longitude?: number | null;
   location_notes?: string | null;
+  trailer_number?: string | null;
   has_location?: boolean;
 }
 
@@ -64,6 +65,7 @@ export interface KitLocation {
   latitude: number | null;
   longitude: number | null;
   location_notes?: string | null;
+  trailer_number?: string | null;
   full_address?: string | null;
   has_location: boolean;
   box_count?: number;

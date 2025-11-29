@@ -32,6 +32,7 @@ export function EditKitModal({ open, kit, onClose, onSuccess }: EditKitModalProp
         latitude: kit.latitude,
         longitude: kit.longitude,
         location_notes: kit.location_notes,
+        trailer_number: kit.trailer_number,
       });
     }
   }, [kit, open, form]);
@@ -159,6 +160,11 @@ export function EditKitModal({ open, kit, onClose, onSuccess }: EditKitModalProp
           <Col span={12}>
             <Form.Item label="Country" name="location_country">
               <Input placeholder="Country" />
+            </Form.Item>
+          </Col>
+          <Col span={12}>
+            <Form.Item label="Trailer Number" name="trailer_number">
+              <Input placeholder="Trailer number" />
             </Form.Item>
           </Col>
         </Row>

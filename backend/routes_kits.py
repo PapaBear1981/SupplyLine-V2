@@ -254,7 +254,7 @@ def register_kit_routes(app):
         location_fields = [
             "location_address", "location_city", "location_state",
             "location_zip", "location_country", "latitude",
-            "longitude", "location_notes"
+            "longitude", "location_notes", "trailer_number"
         ]
         for field in location_fields:
             if field in data:
@@ -449,6 +449,7 @@ def register_kit_routes(app):
                 "latitude": kit.latitude,
                 "longitude": kit.longitude,
                 "location_notes": kit.location_notes,
+                "trailer_number": kit.trailer_number,
                 "full_address": kit.get_full_address(),
                 "has_location": kit.latitude is not None and kit.longitude is not None,
                 "box_count": kit.boxes.count() if kit.boxes else 0,
@@ -474,7 +475,7 @@ def register_kit_routes(app):
         location_fields = [
             "location_address", "location_city", "location_state",
             "location_zip", "location_country", "latitude",
-            "longitude", "location_notes"
+            "longitude", "location_notes", "trailer_number"
         ]
         for field in location_fields:
             if field in data:

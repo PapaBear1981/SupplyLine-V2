@@ -336,6 +336,9 @@ const KitDetailView = () => {
                     ? kit.longitude.toFixed(6)
                     : 'Not specified'}
                 </Descriptions.Item>
+                <Descriptions.Item label="Trailer Number" span={2}>
+                  {kit.trailer_number || 'Not specified'}
+                </Descriptions.Item>
                 <Descriptions.Item label="Location Notes" span={2}>
                   {kit.location_notes || 'No notes'}
                 </Descriptions.Item>
