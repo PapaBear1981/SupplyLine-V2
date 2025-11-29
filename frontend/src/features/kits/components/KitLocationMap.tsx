@@ -5,6 +5,7 @@ import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { useGetKitLocationsQuery, useGetAircraftTypesQuery } from '../services/kitsApi';
+import { useTheme } from '../../settings/contexts/ThemeContext';
 import type { KitLocation } from '../types';
 
 const { Text, Title } = Typography;
@@ -88,6 +89,9 @@ export function KitLocationMap({ height = 400 }: KitLocationMapProps) {
   const [aircraftTypeFilter, setAircraftTypeFilter] = useState<number | undefined>(undefined);
   const [statusFilter, setStatusFilter] = useState<string | undefined>(undefined);
 
+  const { themeConfig } = useTheme();
+  const isDarkMode = themeConfig.mode === 'dark';
+
   const { data: locationsData, isLoading, refetch } = useGetKitLocationsQuery({
     aircraft_type_id: aircraftTypeFilter,
     status: statusFilter,
@@ -95,6 +99,20 @@ export function KitLocationMap({ height = 400 }: KitLocationMapProps) {
   });
 
   const { data: aircraftTypes } = useGetAircraftTypesQuery({});
+
+  // Tile layer configuration based on theme
+  const tileConfig = useMemo(() => {
+    if (isDarkMode) {
+      return {
+        url: 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',
+        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>',
+      };
+    }
+    return {
+      url: 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
+      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+    };
+  }, [isDarkMode]);
 
   const kitsWithLocation = useMemo(() => {
     if (!locationsData?.kits) return [];
@@ -234,8 +252,9 @@ export function KitLocationMap({ height = 400 }: KitLocationMapProps) {
             zoomControl={true}
           >
             <TileLayer
-              attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>'
-              url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
+              key={isDarkMode ? 'dark' : 'light'}
+              attribution={tileConfig.attribution}
+              url={tileConfig.url}
               maxZoom={19}
               minZoom={2}
               subdomains={['a', 'b', 'c', 'd']}
