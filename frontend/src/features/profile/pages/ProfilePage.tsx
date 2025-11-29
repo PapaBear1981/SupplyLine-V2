@@ -120,10 +120,12 @@ export const ProfilePage = () => {
               <Space direction="vertical" size="small" style={{ width: '100%' }}>
                 <div>
                   <Title level={3} style={{ marginBottom: 4 }}>
-                    {user.first_name} {user.last_name}
+                    {user.name}
                   </Title>
                   <Space size="small" wrap>
-                    <Tag color="blue">{user.role}</Tag>
+                    {user.roles?.map(role => (
+                      <Tag key={role.id} color="blue">{role.name}</Tag>
+                    ))}
                     <Tag color={user.is_active ? 'green' : 'red'}>
                       {user.is_active ? 'Active' : 'Inactive'}
                     </Tag>
@@ -160,11 +162,8 @@ export const ProfilePage = () => {
         {/* Account Information */}
         <Card title="Account Information">
           <Descriptions column={{ xs: 1, sm: 2 }} bordered>
-            <Descriptions.Item label="First Name">
-              {user.first_name}
-            </Descriptions.Item>
-            <Descriptions.Item label="Last Name">
-              {user.last_name}
+            <Descriptions.Item label="Name">
+              {user.name}
             </Descriptions.Item>
             <Descriptions.Item label="Email">
               {user.email}
@@ -172,11 +171,15 @@ export const ProfilePage = () => {
             <Descriptions.Item label="Employee Number">
               {user.employee_number}
             </Descriptions.Item>
-            <Descriptions.Item label="Role">
-              {user.role}
+            <Descriptions.Item label="Roles">
+              <Space size="small" wrap>
+                {user.roles?.map(role => (
+                  <Tag key={role.id} color="blue">{role.name}</Tag>
+                )) || 'N/A'}
+              </Space>
             </Descriptions.Item>
-            <Descriptions.Item label="Department ID">
-              {user.department_id || 'N/A'}
+            <Descriptions.Item label="Department">
+              {user.department || 'N/A'}
             </Descriptions.Item>
             <Descriptions.Item label="Account Status">
               <Tag color={user.is_active ? 'success' : 'error'}>
