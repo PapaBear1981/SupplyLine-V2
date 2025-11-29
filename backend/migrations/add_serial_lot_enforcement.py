@@ -141,10 +141,10 @@ def run_migration():
             print(f"\nFound {len(untracked_items)} untracked kit_expendables that need lot numbers...")
             lot_counter = 1
 
-            # Get the current max lot sequence from lot_number_sequence table if it exists
-            cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='lot_number_sequence'")
+            # Get the current max lot sequence from lot_number_sequences table if it exists
+            cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='lot_number_sequences'")
             if cursor.fetchone():
-                cursor.execute("SELECT MAX(sequence_counter) FROM lot_number_sequence")
+                cursor.execute("SELECT MAX(sequence_counter) FROM lot_number_sequences")
                 result = cursor.fetchone()
                 if result and result[0]:
                     lot_counter = result[0] + 1
@@ -188,6 +188,15 @@ def run_migration():
                     lot_counter += 1
 
                 print(f"Updated {len(untracked_expendables)} expendables with lot numbers")
+
+        # Update the sequence counter to prevent collisions with subsequently generated lot numbers
+        if untracked_items or (untracked_expendables if 'lot_number' in exp_columns and 'serial_number' in exp_columns else []):
+            print(f"\nUpdating lot number sequence counter to {lot_counter}...")
+            cursor.execute("""
+                INSERT OR REPLACE INTO lot_number_sequences (date, sequence_counter, last_generated_at)
+                VALUES (?, ?, datetime('now'))
+            """, (datetime.now().strftime("%Y%m%d"), lot_counter))
+            print(f"Sequence counter updated to {lot_counter}")
 
         # Commit the changes
         conn.commit()

@@ -32,7 +32,6 @@ from utils.serial_lot_validation import (
     SerialLotValidationError,
     check_lot_number_unique,
     check_serial_number_unique,
-    validate_item_tracking,
     validate_serial_lot_required,
 )
 

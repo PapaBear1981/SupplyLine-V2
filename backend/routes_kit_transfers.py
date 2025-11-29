@@ -23,7 +23,6 @@ from utils.error_handler import ValidationError, handle_errors
 from utils.lot_utils import create_child_chemical, create_child_expendable
 from utils.serial_lot_validation import (
     SerialLotValidationError,
-    check_lot_number_unique,
     check_serial_number_unique,
     validate_serial_lot_required,
 )
@@ -356,6 +355,9 @@ def register_kit_transfer_routes(app):
                 else:
                     tool.warehouse_id = None
 
+        # Capture original quantity before decrementing for partial transfer detection
+        original_source_quantity = source_item.quantity if source_item else 0
+
         if transfer.from_location_type == "kit" and source_item:
             source_item.quantity -= quantity
             if transfer.item_type == "expendable":
@@ -393,7 +395,7 @@ def register_kit_transfer_routes(app):
 
             if transfer.item_type == "expendable":
                 # For expendables, handle based on tracking type and transfer quantity
-                is_partial_transfer = quantity < source_item.quantity if source_item else False
+                is_partial_transfer = quantity < original_source_quantity if source_item else False
                 tracking_type = source_item_snapshot.get("tracking_type", "lot")
 
                 if tracking_type == "serial":

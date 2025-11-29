@@ -34,7 +34,7 @@ class SerialLotValidationError(ValidationError):
 
 
 def validate_serial_lot_required(serial_number: Optional[str], lot_number: Optional[str],
-                                  item_type: str = "item") -> Tuple[bool, str]:
+                                  item_type: str = "item") -> Tuple[bool, Optional[str]]:
     """
     Validate that an item has either a serial number or lot number (but not both).
 
@@ -44,7 +44,7 @@ def validate_serial_lot_required(serial_number: Optional[str], lot_number: Optio
         item_type: Type of item for error messages (tool, chemical, expendable)
 
     Returns:
-        Tuple of (is_valid, error_message)
+        Tuple of (is_valid, error_message or None)
 
     Raises:
         SerialLotValidationError: If validation fails
