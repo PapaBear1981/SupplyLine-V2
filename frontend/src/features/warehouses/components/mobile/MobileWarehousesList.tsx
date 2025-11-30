@@ -67,7 +67,7 @@ export const MobileWarehousesList = () => {
   const [updateWarehouse, { isLoading: isUpdating }] = useUpdateWarehouseMutation();
   const [deleteWarehouse] = useDeleteWarehouseMutation();
 
-  const warehouses = warehousesData?.warehouses || [];
+  const warehouses = useMemo(() => warehousesData?.warehouses || [], [warehousesData?.warehouses]);
   const hasMore = warehousesData ? page < warehousesData.pagination.pages : false;
 
   // Filter warehouses by search query

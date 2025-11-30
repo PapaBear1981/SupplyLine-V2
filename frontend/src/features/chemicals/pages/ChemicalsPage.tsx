@@ -12,15 +12,15 @@ const { Title } = Typography;
 
 export const ChemicalsPage = () => {
   const isMobile = useIsMobile();
+  const [selectedChemical, setSelectedChemical] = useState<Chemical | null>(null);
+  const [drawerMode, setDrawerMode] = useState<'view' | 'edit' | 'create' | null>(null);
+  const [issuanceModalOpen, setIssuanceModalOpen] = useState(false);
+  const [chemicalToIssue, setChemicalToIssue] = useState<Chemical | null>(null);
 
   // Render mobile version if on mobile device
   if (isMobile) {
     return <MobileChemicalsList />;
   }
-  const [selectedChemical, setSelectedChemical] = useState<Chemical | null>(null);
-  const [drawerMode, setDrawerMode] = useState<'view' | 'edit' | 'create' | null>(null);
-  const [issuanceModalOpen, setIssuanceModalOpen] = useState(false);
-  const [chemicalToIssue, setChemicalToIssue] = useState<Chemical | null>(null);
 
   const handleView = (chemical: Chemical) => {
     setSelectedChemical(chemical);

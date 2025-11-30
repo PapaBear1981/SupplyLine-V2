@@ -32,19 +32,17 @@ const { Title, Text } = Typography;
 
 export const ProfilePage = () => {
   const isMobile = useIsMobile();
+  const dispatch = useAppDispatch();
+  const user = useAppSelector((state) => state.auth.user);
+  const token = useAppSelector((state) => state.auth.token);
+  const [uploadAvatar, { isLoading: isUploading }] = useUploadAvatarMutation();
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [isPasswordModalOpen, setIsPasswordModalOpen] = useState(false);
 
   // Render mobile version if on mobile device
   if (isMobile) {
     return <MobileProfile />;
   }
-
-  const dispatch = useAppDispatch();
-  const user = useAppSelector((state) => state.auth.user);
-  const token = useAppSelector((state) => state.auth.token);
-  const [uploadAvatar, { isLoading: isUploading }] = useUploadAvatarMutation();
-
-  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
-  const [isPasswordModalOpen, setIsPasswordModalOpen] = useState(false);
 
   const uploadProps: UploadProps = {
     name: 'avatar',

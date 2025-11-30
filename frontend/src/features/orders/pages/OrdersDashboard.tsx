@@ -39,11 +39,6 @@ const { Option } = Select;
 export const OrdersDashboard: React.FC = () => {
   const navigate = useNavigate();
   const isMobile = useIsMobile();
-
-  // Render mobile version if on mobile device
-  if (isMobile) {
-    return <MobileOrdersList />;
-  }
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<OrderStatus[]>([]);
   const [priorityFilter, setPriorityFilter] = useState<OrderPriority[]>([]);
@@ -59,6 +54,11 @@ export const OrdersDashboard: React.FC = () => {
 
   const { data: orders = [], isLoading, refetch } = useGetOrdersQuery(queryParams);
   const { data: analytics } = useGetOrderAnalyticsQuery();
+
+  // Render mobile version if on mobile device
+  if (isMobile) {
+    return <MobileOrdersList />;
+  }
 
   const handleCreateOrder = () => {
     navigate('/orders/new');

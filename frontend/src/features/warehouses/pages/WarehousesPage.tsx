@@ -11,14 +11,13 @@ const { Title } = Typography;
 
 export const WarehousesPage = () => {
   const isMobile = useIsMobile();
+  const [selectedWarehouse, setSelectedWarehouse] = useState<Warehouse | null>(null);
+  const [drawerMode, setDrawerMode] = useState<'view' | 'edit' | 'create' | null>(null);
 
   // Render mobile version if on mobile device
   if (isMobile) {
     return <MobileWarehousesList />;
   }
-
-  const [selectedWarehouse, setSelectedWarehouse] = useState<Warehouse | null>(null);
-  const [drawerMode, setDrawerMode] = useState<'view' | 'edit' | 'create' | null>(null);
 
   const handleView = (warehouse: Warehouse) => {
     setSelectedWarehouse(warehouse);

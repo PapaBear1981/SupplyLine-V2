@@ -35,11 +35,6 @@ dayjs.extend(relativeTime);
 export const RequestsDashboard: React.FC = () => {
   const navigate = useNavigate();
   const isMobile = useIsMobile();
-
-  // Render mobile version if on mobile device
-  if (isMobile) {
-    return <MobileRequestsList />;
-  }
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<RequestStatus[]>([]);
   const [priorityFilter, setPriorityFilter] = useState<RequestPriority[]>([]);
@@ -52,6 +47,11 @@ export const RequestsDashboard: React.FC = () => {
 
   const { data: requests = [], isLoading, refetch } = useGetRequestsQuery(queryParams);
   const { data: analytics } = useGetRequestAnalyticsQuery();
+
+  // Render mobile version if on mobile device
+  if (isMobile) {
+    return <MobileRequestsList />;
+  }
 
   const columns: ColumnsType<UserRequest> = [
     {

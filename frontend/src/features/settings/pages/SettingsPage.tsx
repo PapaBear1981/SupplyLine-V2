@@ -11,14 +11,13 @@ const { useToken } = theme;
 
 export const SettingsPage = () => {
   const isMobile = useIsMobile();
+  const { themeConfig, setThemeMode, setColorTheme } = useTheme();
+  const { token } = useToken();
 
   // Render mobile version if on mobile device
   if (isMobile) {
     return <MobileSettings />;
   }
-
-  const { themeConfig, setThemeMode, setColorTheme } = useTheme();
-  const { token } = useToken();
 
   return (
     <div style={{ maxWidth: 1200, margin: '0 auto' }}>

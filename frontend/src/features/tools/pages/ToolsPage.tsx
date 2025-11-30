@@ -11,13 +11,13 @@ const { Title } = Typography;
 
 export const ToolsPage = () => {
   const isMobile = useIsMobile();
+  const [selectedTool, setSelectedTool] = useState<Tool | null>(null);
+  const [drawerMode, setDrawerMode] = useState<'view' | 'edit' | 'create' | null>(null);
 
   // Render mobile version if on mobile device
   if (isMobile) {
     return <MobileToolsList />;
   }
-  const [selectedTool, setSelectedTool] = useState<Tool | null>(null);
-  const [drawerMode, setDrawerMode] = useState<'view' | 'edit' | 'create' | null>(null);
 
   const handleView = (tool: Tool) => {
     setSelectedTool(tool);

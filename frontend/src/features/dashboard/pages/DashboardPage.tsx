@@ -46,11 +46,6 @@ import styles from '../styles/Dashboard.module.scss';
 
 export const DashboardPage = () => {
   const isMobile = useIsMobile();
-
-  // Render mobile version if on mobile device
-  if (isMobile) {
-    return <MobileDashboard />;
-  }
   const navigate = useNavigate();
   const user = useAppSelector((state) => state.auth.user);
   const { themeConfig } = useTheme();
@@ -239,6 +234,11 @@ export const DashboardPage = () => {
   };
 
   const isLoading = toolsLoading || chemicalsLoading || kitsLoading || warehousesLoading;
+
+  // Render mobile version if on mobile device
+  if (isMobile) {
+    return <MobileDashboard />;
+  }
 
   if (isLoading && !toolsData && !chemicalsData) {
     return (

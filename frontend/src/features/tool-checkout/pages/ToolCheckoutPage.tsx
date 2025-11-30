@@ -32,17 +32,17 @@ const { Title, Text } = Typography;
 
 export const ToolCheckoutPage = () => {
   const isMobile = useIsMobile();
-
-  // Render mobile version if on mobile device
-  if (isMobile) {
-    return <MobileToolCheckout />;
-  }
   const [activeTab, setActiveTab] = useState('active');
   const [checkoutModalOpen, setCheckoutModalOpen] = useState(false);
   const [checkinModalOpen, setCheckinModalOpen] = useState(false);
   const [selectedCheckout, setSelectedCheckout] = useState<ToolCheckout | null>(null);
 
   const { data: stats, isLoading: statsLoading } = useGetCheckoutStatsQuery();
+
+  // Render mobile version if on mobile device
+  if (isMobile) {
+    return <MobileToolCheckout />;
+  }
 
   const handleCheckin = (checkout: ToolCheckout) => {
     setSelectedCheckout(checkout);
