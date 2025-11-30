@@ -19,6 +19,7 @@ import {
   EditOutlined,
   DeleteOutlined,
   LockOutlined,
+  KeyOutlined,
 } from '@ant-design/icons';
 import {
   useGetRolesQuery,
@@ -26,6 +27,7 @@ import {
   useUpdateRoleMutation,
   useDeleteRoleMutation,
 } from '../services/adminApi';
+import { RolePermissionEditor } from './RolePermissionEditor';
 import type { UserRole } from '../types';
 
 const { TextArea } = Input;
@@ -33,7 +35,9 @@ const { Text } = Typography;
 
 export const RoleManagement = () => {
   const [modalOpen, setModalOpen] = useState(false);
+  const [permissionEditorOpen, setPermissionEditorOpen] = useState(false);
   const [editingRole, setEditingRole] = useState<UserRole | null>(null);
+  const [selectedRoleForPermissions, setSelectedRoleForPermissions] = useState<UserRole | null>(null);
   const [form] = Form.useForm();
 
   const { data: roles = [], isLoading, error } = useGetRolesQuery();
@@ -79,6 +83,11 @@ export const RoleManagement = () => {
     }
   };
 
+  const handleEditPermissions = (role: UserRole) => {
+    setSelectedRoleForPermissions(role);
+    setPermissionEditorOpen(true);
+  };
+
   const columns: TableProps<UserRole>['columns'] = [
     {
       title: 'Role Name',
@@ -107,6 +116,13 @@ export const RoleManagement = () => {
       key: 'actions',
       render: (_, record) => (
         <Space size="small">
+          <Tooltip title="Edit Permissions">
+            <Button
+              type="text"
+              icon={<KeyOutlined />}
+              onClick={() => handleEditPermissions(record)}
+            />
+          </Tooltip>
           <Tooltip title={record.is_system_role ? 'System roles cannot be edited' : 'Edit'}>
             <Button
               type="text"
@@ -200,6 +216,17 @@ export const RoleManagement = () => {
           </Form.Item>
         </Form>
       </Modal>
+
+      <RolePermissionEditor
+        roleId={selectedRoleForPermissions?.id || null}
+        roleName={selectedRoleForPermissions?.name || ''}
+        isSystemRole={selectedRoleForPermissions?.is_system_role}
+        open={permissionEditorOpen}
+        onClose={() => {
+          setPermissionEditorOpen(false);
+          setSelectedRoleForPermissions(null);
+        }}
+      />
     </div>
   );
 };

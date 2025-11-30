@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import { useLoginMutation } from '../services/authApi';
 import { useAppDispatch } from '@app/hooks';
 import { setCredentials } from '../slices/authSlice';
+import { socketService } from '@services/socket';
 import { ROUTES } from '@shared/constants/routes';
 import type { LoginRequest } from '../types';
 import './LoginPage.css';
@@ -19,6 +20,15 @@ export const LoginPage = () => {
     try {
       const result = await login(values).unwrap();
       dispatch(setCredentials({ user: result.user, token: result.access_token }));
+
+      // Establish WebSocket connection for real-time features
+      try {
+        socketService.connect(result.access_token);
+      } catch (socketError) {
+        console.warn('WebSocket connection failed:', socketError);
+        // Don't block login if WebSocket fails
+      }
+
       message.success('Welcome back. Launch checklist complete.');
       navigate(ROUTES.DASHBOARD);
     } catch (error: unknown) {

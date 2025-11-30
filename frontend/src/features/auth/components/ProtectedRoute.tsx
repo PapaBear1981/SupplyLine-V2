@@ -5,6 +5,7 @@ import { ROUTES } from '@shared/constants/routes';
 import { Spin } from 'antd';
 import { useGetCurrentUserQuery } from '../services/authApi';
 import { setCredentials, logout } from '../slices/authSlice';
+import { socketService } from '@services/socket';
 
 export const ProtectedRoute = () => {
   const dispatch = useAppDispatch();
@@ -22,6 +23,17 @@ export const ProtectedRoute = () => {
     }
   }, [currentUser, token, user, dispatch]);
 
+  // Establish WebSocket connection when authenticated (handles page refresh)
+  useEffect(() => {
+    if (isAuthenticated && token && user && !socketService.isConnected()) {
+      try {
+        socketService.connect(token);
+      } catch (err) {
+        console.warn('Failed to establish WebSocket connection:', err);
+      }
+    }
+  }, [isAuthenticated, token, user]);
+
   // Handle authentication errors - only logout on 401/403
   useEffect(() => {
     if (isError && error) {
@@ -29,6 +41,7 @@ export const ProtectedRoute = () => {
       if ('status' in error) {
         // Only logout on actual authentication errors (401, 403)
         if (error.status === 401 || error.status === 403) {
+          socketService.disconnect();
           dispatch(logout());
         }
       }

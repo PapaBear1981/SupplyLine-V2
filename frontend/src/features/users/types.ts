@@ -4,6 +4,37 @@ export interface UserRole {
   description?: string;
   is_system_role?: boolean;
   created_at?: string | null;
+  permissions?: Permission[];
+}
+
+export interface Permission {
+  id: number;
+  name: string;
+  description: string;
+  category: string;
+  created_at?: string | null;
+}
+
+export interface UserPermission {
+  id: number;
+  user_id: number;
+  permission_id: number;
+  permission_name: string;
+  permission_description?: string;
+  permission_category?: string;
+  grant_type: 'grant' | 'deny';
+  granted_by: number;
+  granter_name?: string;
+  reason?: string | null;
+  expires_at?: string | null;
+  is_active: boolean;
+  created_at?: string | null;
+}
+
+export interface PermissionCategory {
+  name: string;
+  permissions: Permission[];
+  count: number;
 }
 
 export interface User {
@@ -23,6 +54,9 @@ export interface User {
   account_locked_until?: string | null;
   last_failed_login?: string | null;
   roles?: UserRole[];
+  permissions?: string[];  // Effective permissions
+  role_permissions?: string[];  // Role-based permissions only
+  user_permissions?: UserPermission[];  // User-specific grants/denies
 }
 
 export interface Department {

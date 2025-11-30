@@ -4,6 +4,8 @@ import { MainLayout } from '@shared/components/layouts/MainLayout';
 import { AuthLayout } from '@shared/components/layouts/AuthLayout';
 import { ProtectedRoute } from '@features/auth/components/ProtectedRoute';
 import { AdminRoute } from '@features/auth/components/AdminRoute';
+// PageGuard available for route protection: import { PageGuard } from '@features/auth/components/PageGuard';
+import { PermissionProvider } from '@features/auth/context/PermissionContext';
 import { LoginPage } from '@features/auth/pages/LoginPage';
 import { DashboardPage } from '@features/dashboard/pages/DashboardPage';
 import { ToolsPage } from '@features/tools/pages/ToolsPage';
@@ -98,7 +100,9 @@ function AppContent() {
 function App() {
   return (
     <ThemeProvider>
-      <AppContent />
+      <PermissionProvider>
+        <AppContent />
+      </PermissionProvider>
     </ThemeProvider>
   );
 }

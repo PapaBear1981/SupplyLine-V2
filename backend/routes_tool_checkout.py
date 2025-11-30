@@ -10,7 +10,7 @@ from datetime import datetime, timedelta
 
 from flask import jsonify, request
 
-from auth.jwt_manager import jwt_required
+from auth.jwt_manager import jwt_required, permission_required
 from models import (
     AuditLog,
     Checkout,
@@ -120,7 +120,7 @@ def register_tool_checkout_routes(app):
     # Enhanced Checkout Endpoint
     # ============================================
     @app.route("/api/tool-checkout", methods=["POST"])
-    @jwt_required
+    @permission_required("checkout.create")
     def create_tool_checkout():
         """
         Create a new tool checkout with enhanced tracking.
@@ -295,7 +295,7 @@ def register_tool_checkout_routes(app):
     # Enhanced Check-In Endpoint
     # ============================================
     @app.route("/api/tool-checkout/<int:checkout_id>/checkin", methods=["POST"])
-    @jwt_required
+    @permission_required("checkout.return")
     def checkin_tool(checkout_id):
         """
         Check in a tool with enhanced tracking including damage reporting.
@@ -450,7 +450,7 @@ def register_tool_checkout_routes(app):
     # Get Active Checkouts
     # ============================================
     @app.route("/api/tool-checkouts/active", methods=["GET"])
-    @jwt_required
+    @permission_required("checkout.view")
     def get_active_checkouts():
         """Get all currently active (not returned) checkouts"""
         try:
@@ -547,7 +547,7 @@ def register_tool_checkout_routes(app):
     # Get Overdue Checkouts
     # ============================================
     @app.route("/api/tool-checkouts/overdue", methods=["GET"])
-    @jwt_required
+    @permission_required("checkout.view")
     def get_overdue_tool_checkouts():
         """Get all overdue checkouts"""
         try:

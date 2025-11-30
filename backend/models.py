@@ -256,15 +256,12 @@ class User(db.Model):
         return any(role.name == role_name for role in self.roles)
 
     def has_permission(self, permission_name):
-        """Check if user has a specific permission through any of their roles"""
-        for role in self.roles:
-            for permission in role.permissions:
-                if permission.name == permission_name:
-                    return True
-        return False
+        """Check if user has a specific permission (considering role-based and user-specific permissions)"""
+        effective_permissions = self.get_effective_permissions()
+        return permission_name in effective_permissions
 
     def get_permissions(self):
-        """Get all permissions for this user from all roles"""
+        """Get all role-based permissions for this user (without user-specific overrides)"""
         # Use explicit SQL query to avoid lazy loading issues
         # This ensures permissions are loaded even in different contexts (e.g., CI)
         from sqlalchemy import select
@@ -282,6 +279,75 @@ class User(db.Model):
 
         result = db.session.execute(stmt)
         return [row[0] for row in result]
+
+    def get_effective_permissions(self):
+        """
+        Get all effective permissions for this user, including user-specific grants/denies.
+        User-specific denies take precedence over role-based grants.
+        User-specific grants add permissions not available from roles.
+        """
+        from sqlalchemy import select
+
+        # Start with role-based permissions
+        permissions = set(self.get_permissions())
+
+        # Get user-specific permission overrides
+        stmt = select(
+            Permission.name,
+            UserPermission.grant_type,
+            UserPermission.expires_at
+        ).join(
+            Permission, UserPermission.permission_id == Permission.id
+        ).where(
+            UserPermission.user_id == self.id
+        )
+
+        result = db.session.execute(stmt)
+        current_time = get_current_time()
+
+        for perm_name, grant_type, expires_at in result:
+            # Skip expired permissions
+            if expires_at is not None and current_time >= expires_at:
+                continue
+
+            if grant_type == "grant":
+                permissions.add(perm_name)
+            elif grant_type == "deny":
+                permissions.discard(perm_name)
+
+        return list(permissions)
+
+    def get_user_specific_permissions(self):
+        """Get user-specific permission grants and denies (not from roles)"""
+        from sqlalchemy import select
+
+        stmt = select(
+            UserPermission.id,
+            Permission.name,
+            Permission.description,
+            Permission.category,
+            UserPermission.grant_type,
+            UserPermission.reason,
+            UserPermission.expires_at,
+            UserPermission.created_at
+        ).join(
+            Permission, UserPermission.permission_id == Permission.id
+        ).where(
+            UserPermission.user_id == self.id
+        )
+
+        result = db.session.execute(stmt)
+        return [{
+            "id": row[0],
+            "permission_name": row[1],
+            "permission_description": row[2],
+            "permission_category": row[3],
+            "grant_type": row[4],
+            "reason": row[5],
+            "expires_at": row[6].isoformat() if row[6] else None,
+            "created_at": row[7].isoformat() if row[7] else None,
+            "is_active": row[6] is None or get_current_time() < row[6]
+        } for row in result]
 
     def add_role(self, role):
         """Add a role to this user"""
@@ -335,7 +401,7 @@ class User(db.Model):
         delta = self.account_locked_until - get_current_time()
         return delta.total_seconds()
 
-    def to_dict(self, include_roles=False, include_permissions=False, include_lockout_info=False):
+    def to_dict(self, include_roles=False, include_permissions=False, include_lockout_info=False, include_user_permissions=False):
         result = {
             "id": self.id,
             "name": self.name,
@@ -354,7 +420,14 @@ class User(db.Model):
             result["roles"] = [role.to_dict() for role in self.roles]
 
         if include_permissions:
-            result["permissions"] = self.get_permissions()
+            # Return effective permissions (role-based + user-specific)
+            result["permissions"] = self.get_effective_permissions()
+            # Also include role-based permissions for reference
+            result["role_permissions"] = self.get_permissions()
+
+        if include_user_permissions:
+            # Include user-specific permission overrides
+            result["user_permissions"] = self.get_user_specific_permissions()
 
         if include_lockout_info:
             result.update({
@@ -1635,6 +1708,61 @@ class UserRole(db.Model):
 
     # Ensure uniqueness of user-role pairs
     __table_args__ = (db.UniqueConstraint("user_id", "role_id", name="_user_role_uc"),)
+
+
+class UserPermission(db.Model):
+    """
+    User-specific permission grants or denies.
+    These override role-based permissions for fine-grained access control.
+    - 'grant' adds a permission the user doesn't have from roles
+    - 'deny' removes a permission even if the user has it from roles
+    """
+    __tablename__ = "user_permissions"
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False)
+    permission_id = db.Column(db.Integer, db.ForeignKey("permissions.id"), nullable=False)
+    grant_type = db.Column(db.String(10), nullable=False)  # 'grant' or 'deny'
+    granted_by = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False)
+    reason = db.Column(db.String(500), nullable=True)
+    expires_at = db.Column(db.DateTime, nullable=True)
+    created_at = db.Column(db.DateTime, default=get_current_time)
+    updated_at = db.Column(db.DateTime, default=get_current_time, onupdate=get_current_time)
+
+    # Relationships
+    user = db.relationship("User", foreign_keys=[user_id], backref=db.backref("user_permissions", cascade="all, delete-orphan"))
+    permission = db.relationship("Permission", backref=db.backref("user_permissions", cascade="all, delete-orphan"))
+    granter = db.relationship("User", foreign_keys=[granted_by])
+
+    # Ensure uniqueness of user-permission pairs
+    __table_args__ = (db.UniqueConstraint("user_id", "permission_id", name="_user_permission_uc"),)
+
+    def is_active(self):
+        """Check if this user permission is still active (not expired)"""
+        if self.expires_at is None:
+            return True
+        return get_current_time() < self.expires_at
+
+    def to_dict(self, include_permission=False, include_granter=False):
+        result = {
+            "id": self.id,
+            "user_id": self.user_id,
+            "permission_id": self.permission_id,
+            "grant_type": self.grant_type,
+            "granted_by": self.granted_by,
+            "reason": self.reason,
+            "expires_at": self.expires_at.isoformat() if self.expires_at else None,
+            "is_active": self.is_active(),
+            "created_at": self.created_at.isoformat() if self.created_at else None,
+            "updated_at": self.updated_at.isoformat() if self.updated_at else None
+        }
+
+        if include_permission:
+            result["permission"] = self.permission.to_dict() if self.permission else None
+
+        if include_granter:
+            result["granter_name"] = self.granter.name if self.granter else None
+
+        return result
 
 
 class Announcement(db.Model):

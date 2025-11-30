@@ -18,7 +18,7 @@ services:
       - JWT_SECRET_KEY=${JWT_SECRET_KEY}
       - INITIAL_ADMIN_PASSWORD=${INITIAL_ADMIN_PASSWORD:-admin123}
       - SESSION_COOKIE_SECURE=${SESSION_COOKIE_SECURE:-False}
-      - CORS_ORIGINS=${CORS_ORIGINS:-http://localhost:3000,http://localhost:5173,http://localhost:80}
+      - CORS_ORIGINS=${CORS_ORIGINS:-http://localhost,http://localhost:3000,http://localhost:5173,http://localhost:80}
       - PYTHONDONTWRITEBYTECODE=1
       - PYTHONUNBUFFERED=1
       - TZ=UTC

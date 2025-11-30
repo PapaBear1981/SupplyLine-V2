@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { Outlet, useNavigate, useLocation } from 'react-router-dom';
 import {
   Layout,
@@ -20,6 +20,7 @@ import type { MenuProps } from 'antd';
 import { useAppDispatch, useAppSelector } from '@app/hooks';
 import { logout } from '@features/auth/slices/authSlice';
 import { useLogoutMutation } from '@features/auth/services/authApi';
+import { socketService } from '@services/socket';
 import { getMenuItems } from '@shared/constants/navigation';
 import { ROUTES } from '@shared/constants/routes';
 
@@ -33,6 +34,13 @@ export const MainLayout = () => {
   const dispatch = useAppDispatch();
   const user = useAppSelector((state) => state.auth.user);
   const [logoutApi] = useLogoutMutation();
+
+  // Memoize menu items based on user permissions
+  const menuItems = useMemo(() => {
+    const isAdmin = user?.is_admin || false;
+    const permissions = user?.permissions || [];
+    return getMenuItems(isAdmin, permissions);
+  }, [user?.is_admin, user?.permissions]);
 
   const {
     token: { colorBgContainer, borderRadiusLG },
@@ -48,6 +56,8 @@ export const MainLayout = () => {
     } catch {
       // Ignore logout errors - still clear local state
     } finally {
+      // Disconnect WebSocket before clearing auth state
+      socketService.disconnect();
       dispatch(logout());
       navigate(ROUTES.LOGIN);
     }
@@ -113,7 +123,7 @@ export const MainLayout = () => {
           theme="dark"
           mode="inline"
           selectedKeys={[location.pathname]}
-          items={getMenuItems(user?.is_admin || false)}
+          items={menuItems}
           onClick={handleMenuClick}
         />
       </Sider>
