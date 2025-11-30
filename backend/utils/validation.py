@@ -197,18 +197,20 @@ USER_SCHEMA = {
 
 CHEMICAL_ISSUANCE_SCHEMA = {
     "required": ["quantity", "hangar", "user_id"],
-    "optional": ["purpose"],
+    "optional": ["purpose", "work_order"],
     "types": {
         "quantity": int,  # Integer only - no decimal quantities
         "hangar": str,
         "user_id": int,
-        "purpose": str
+        "purpose": str,
+        "work_order": str
     },
     "constraints": {
         "quantity": {"min": 1},  # Minimum 1 whole unit
         "hangar": {"max_length": 100},
         "user_id": {"min": 1},
-        "purpose": {"max_length": 500}
+        "purpose": {"max_length": 500},
+        "work_order": {"max_length": 100}
     }
 }
 
