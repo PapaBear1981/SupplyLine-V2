@@ -4,11 +4,19 @@ import { PlusOutlined } from '@ant-design/icons';
 import { ChemicalsTable } from '../components/ChemicalsTable';
 import { ChemicalDrawer } from '../components/ChemicalDrawer';
 import { ChemicalIssuanceModal } from '../components/ChemicalIssuanceModal';
+import { MobileChemicalsList } from '../components/mobile';
+import { useIsMobile } from '@shared/hooks/useMobile';
 import type { Chemical } from '../types';
 
 const { Title } = Typography;
 
 export const ChemicalsPage = () => {
+  const isMobile = useIsMobile();
+
+  // Render mobile version if on mobile device
+  if (isMobile) {
+    return <MobileChemicalsList />;
+  }
   const [selectedChemical, setSelectedChemical] = useState<Chemical | null>(null);
   const [drawerMode, setDrawerMode] = useState<'view' | 'edit' | 'create' | null>(null);
   const [issuanceModalOpen, setIssuanceModalOpen] = useState(false);

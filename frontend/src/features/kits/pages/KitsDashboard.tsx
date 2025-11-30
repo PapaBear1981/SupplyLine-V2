@@ -25,12 +25,15 @@ import {
 import type { ColumnsType } from 'antd/es/table';
 import { useGetKitsQuery, useGetAircraftTypesQuery } from '../services/kitsApi';
 import type { Kit, KitStatus } from '../types';
+import { useIsMobile } from '@shared/hooks/useMobile';
+import { MobileKitsList } from '../components/mobile';
 
 const { Title } = Typography;
 const { Option } = Select;
 
 const KitsDashboard = () => {
   const navigate = useNavigate();
+  const isMobile = useIsMobile();
   const [statusFilter, setStatusFilter] = useState<KitStatus | undefined>();
   const [aircraftTypeFilter, setAircraftTypeFilter] = useState<number | undefined>();
   const [searchQuery, setSearchQuery] = useState('');
@@ -41,6 +44,11 @@ const KitsDashboard = () => {
   });
 
   const { data: aircraftTypes = [] } = useGetAircraftTypesQuery({});
+
+  // Render mobile version
+  if (isMobile) {
+    return <MobileKitsList />;
+  }
 
   // Filter kits by search query
   const filteredKits = kits.filter((kit) =>

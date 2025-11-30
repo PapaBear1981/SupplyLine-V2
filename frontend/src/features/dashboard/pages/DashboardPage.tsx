@@ -16,6 +16,7 @@ import { useTheme } from '@features/settings/contexts/ThemeContext';
 import { COLOR_THEMES } from '@features/settings/types/theme';
 import { ROUTES } from '@shared/constants/routes';
 import { KitLocationMap } from '@features/kits';
+import { useIsMobile } from '@shared/hooks/useMobile';
 
 // API hooks
 import { useGetToolsQuery } from '@features/tools/services/toolsApi';
@@ -35,6 +36,7 @@ import {
   QuickActions,
   AnnouncementsPanel,
 } from '../components';
+import { MobileDashboard } from '../components/mobile';
 
 // Types
 import type { DashboardAlert } from '../types';
@@ -43,6 +45,12 @@ import type { DashboardAlert } from '../types';
 import styles from '../styles/Dashboard.module.scss';
 
 export const DashboardPage = () => {
+  const isMobile = useIsMobile();
+
+  // Render mobile version if on mobile device
+  if (isMobile) {
+    return <MobileDashboard />;
+  }
   const navigate = useNavigate();
   const user = useAppSelector((state) => state.auth.user);
   const { themeConfig } = useTheme();

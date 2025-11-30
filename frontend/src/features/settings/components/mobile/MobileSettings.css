@@ -1,0 +1,139 @@
+.mobile-settings {
+  padding-bottom: 20px;
+}
+
+/* Header */
+.settings-header {
+  padding: 20px 16px;
+  background: var(--adm-color-background);
+}
+
+.settings-header h2 {
+  font-size: 24px;
+  font-weight: 600;
+  margin: 0 0 8px 0;
+  color: var(--adm-color-text);
+}
+
+.settings-header p {
+  font-size: 14px;
+  margin: 0;
+  color: var(--adm-color-text-secondary);
+}
+
+/* Settings Card */
+.settings-card {
+  margin-bottom: 12px;
+}
+
+/* List Items */
+.list-item-title {
+  font-size: 15px;
+  font-weight: 500;
+  color: var(--adm-color-text);
+}
+
+/* Color Theme Section */
+.color-theme-section {
+  padding: 12px 0;
+}
+
+.section-description {
+  font-size: 14px;
+  color: var(--adm-color-text-secondary);
+  margin: 0 0 16px 0;
+  padding: 0 12px;
+}
+
+.color-theme-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 16px;
+  padding: 0 12px;
+}
+
+.color-theme-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 16px;
+  border-radius: 12px;
+  border: 2px solid transparent;
+  background: var(--adm-color-fill-content);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.color-theme-item:active {
+  transform: scale(0.98);
+}
+
+.color-theme-item.selected {
+  border-color: var(--adm-color-primary);
+  background: var(--adm-color-primary-fade);
+}
+
+.color-circle {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.color-name {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--adm-color-text);
+  text-align: center;
+}
+
+/* Preview Section */
+.preview-section {
+  padding: 12px;
+}
+
+.preview-info {
+  margin-bottom: 12px;
+}
+
+.preview-label {
+  font-size: 13px;
+  color: var(--adm-color-text-secondary);
+  display: block;
+  margin-bottom: 4px;
+}
+
+.preview-divider {
+  height: 1px;
+  background: var(--adm-color-border);
+  margin: 16px 0;
+}
+
+.color-preview-box {
+  border-radius: 8px;
+  padding: 20px;
+  color: white;
+  margin-top: 12px;
+}
+
+.preview-box-content {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.preview-box-title {
+  font-size: 16px;
+  font-weight: 600;
+  color: white;
+}
+
+.preview-box-text {
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.9);
+  line-height: 1.5;
+}

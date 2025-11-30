@@ -27,7 +27,8 @@ import {
 import dayjs from 'dayjs';
 import relativeTime from 'dayjs/plugin/relativeTime';
 import { useGetOrdersQuery, useGetOrderAnalyticsQuery } from '../services/ordersApi';
-import { StatusBadge, PriorityBadge, ItemTypeBadge } from '../components';
+import { StatusBadge, PriorityBadge, ItemTypeBadge, MobileOrdersList } from '../components';
+import { useIsMobile } from '@shared/hooks/useMobile';
 import type { ProcurementOrder, OrderStatus, OrderPriority, OrderType } from '../types';
 import type { ColumnsType } from 'antd/es/table';
 
@@ -37,6 +38,12 @@ const { Option } = Select;
 
 export const OrdersDashboard: React.FC = () => {
   const navigate = useNavigate();
+  const isMobile = useIsMobile();
+
+  // Render mobile version if on mobile device
+  if (isMobile) {
+    return <MobileOrdersList />;
+  }
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<OrderStatus[]>([]);
   const [priorityFilter, setPriorityFilter] = useState<OrderPriority[]>([]);

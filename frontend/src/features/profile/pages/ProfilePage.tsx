@@ -25,10 +25,19 @@ import { setCredentials } from '@features/auth/slices/authSlice';
 import { useUploadAvatarMutation } from '../services/profileApi';
 import { EditProfileModal } from '../components/EditProfileModal';
 import { ChangePasswordModal } from '../components/ChangePasswordModal';
+import { MobileProfile } from '../components/mobile';
+import { useIsMobile } from '@shared/hooks/useMobile';
 
 const { Title, Text } = Typography;
 
 export const ProfilePage = () => {
+  const isMobile = useIsMobile();
+
+  // Render mobile version if on mobile device
+  if (isMobile) {
+    return <MobileProfile />;
+  }
+
   const dispatch = useAppDispatch();
   const user = useAppSelector((state) => state.auth.user);
   const token = useAppSelector((state) => state.auth.token);

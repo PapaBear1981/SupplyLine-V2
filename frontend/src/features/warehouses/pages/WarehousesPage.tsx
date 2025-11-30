@@ -3,11 +3,20 @@ import { Typography, Button, Space } from 'antd';
 import { PlusOutlined } from '@ant-design/icons';
 import { WarehousesTable } from '../components/WarehousesTable';
 import { WarehouseDrawer } from '../components/WarehouseDrawer';
+import { MobileWarehousesList } from '../components/mobile';
+import { useIsMobile } from '@shared/hooks/useMobile';
 import type { Warehouse } from '../types';
 
 const { Title } = Typography;
 
 export const WarehousesPage = () => {
+  const isMobile = useIsMobile();
+
+  // Render mobile version if on mobile device
+  if (isMobile) {
+    return <MobileWarehousesList />;
+  }
+
   const [selectedWarehouse, setSelectedWarehouse] = useState<Warehouse | null>(null);
   const [drawerMode, setDrawerMode] = useState<'view' | 'edit' | 'create' | null>(null);
 

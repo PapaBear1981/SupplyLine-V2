@@ -3,11 +3,19 @@ import { Typography, Button, Space } from 'antd';
 import { PlusOutlined } from '@ant-design/icons';
 import { ToolsTable } from '../components/ToolsTable';
 import { ToolDrawer } from '../components/ToolDrawer';
+import { MobileToolsList } from '../components/mobile';
+import { useIsMobile } from '@shared/hooks/useMobile';
 import type { Tool } from '../types';
 
 const { Title } = Typography;
 
 export const ToolsPage = () => {
+  const isMobile = useIsMobile();
+
+  // Render mobile version if on mobile device
+  if (isMobile) {
+    return <MobileToolsList />;
+  }
   const [selectedTool, setSelectedTool] = useState<Tool | null>(null);
   const [drawerMode, setDrawerMode] = useState<'view' | 'edit' | 'create' | null>(null);
 

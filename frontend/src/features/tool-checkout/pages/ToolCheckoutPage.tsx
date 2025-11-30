@@ -24,11 +24,19 @@ import { ActiveCheckoutsTable } from '../components/ActiveCheckoutsTable';
 import { MyCheckoutsTable } from '../components/MyCheckoutsTable';
 import { OverdueCheckoutsTable } from '../components/OverdueCheckoutsTable';
 import { CheckinModal } from '../components/CheckinModal';
+import { MobileToolCheckout } from '../components/mobile';
+import { useIsMobile } from '@shared/hooks/useMobile';
 import type { ToolCheckout } from '../types';
 
 const { Title, Text } = Typography;
 
 export const ToolCheckoutPage = () => {
+  const isMobile = useIsMobile();
+
+  // Render mobile version if on mobile device
+  if (isMobile) {
+    return <MobileToolCheckout />;
+  }
   const [activeTab, setActiveTab] = useState('active');
   const [checkoutModalOpen, setCheckoutModalOpen] = useState(false);
   const [checkinModalOpen, setCheckinModalOpen] = useState(false);
