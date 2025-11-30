@@ -114,9 +114,14 @@ export const MobileLoginForm = () => {
               type={showPassword ? 'text' : 'password'}
               autoComplete="off"
             />
-            <div className="password-toggle" onClick={() => setShowPassword(!showPassword)}>
+            <button
+              type="button"
+              className="password-toggle"
+              onClick={() => setShowPassword(!showPassword)}
+              aria-label={showPassword ? 'Hide password' : 'Show password'}
+            >
               {showPassword ? <EyeOutline /> : <EyeInvisibleOutline />}
-            </div>
+            </button>
           </div>
         </Form.Item>
       </Form>

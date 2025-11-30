@@ -162,7 +162,7 @@ export const MobileChemicalsList = () => {
         location: values.location || undefined,
         category: values.category || undefined,
         status: values.status || 'available',
-        warehouse_id: values.warehouse_id || 0,
+        warehouse_id: values.warehouse_id || undefined,
         expiration_date: values.expiration_date ? dayjs(values.expiration_date).format('YYYY-MM-DD') : undefined,
         minimum_stock_level: values.minimum_stock_level || undefined,
         notes: values.notes || undefined,
