@@ -75,3 +75,33 @@ export interface ChemicalsQueryParams {
   category?: string;
   archived?: boolean;
 }
+
+export interface ChemicalIssuanceFormData {
+  quantity: number;
+  hangar: string;
+  user_id: number;
+  purpose?: string;
+  work_order?: string;
+  notes?: string;
+}
+
+export interface ChemicalIssuance {
+  id: number;
+  chemical_id: number;
+  user_id: number;
+  quantity: number;
+  hangar: string;
+  purpose?: string;
+  issue_date: string;
+}
+
+export interface ChemicalIssuanceResponse {
+  chemical: Chemical;
+  issuance: ChemicalIssuance;
+  child_chemical?: Chemical;
+  auto_reorder_request?: {
+    id: number;
+    request_number: string;
+  };
+  message?: string;
+}

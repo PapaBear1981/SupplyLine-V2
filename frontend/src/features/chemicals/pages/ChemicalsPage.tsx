@@ -3,6 +3,7 @@ import { Typography, Button, Space } from 'antd';
 import { PlusOutlined } from '@ant-design/icons';
 import { ChemicalsTable } from '../components/ChemicalsTable';
 import { ChemicalDrawer } from '../components/ChemicalDrawer';
+import { ChemicalIssuanceModal } from '../components/ChemicalIssuanceModal';
 import type { Chemical } from '../types';
 
 const { Title } = Typography;
@@ -10,6 +11,8 @@ const { Title } = Typography;
 export const ChemicalsPage = () => {
   const [selectedChemical, setSelectedChemical] = useState<Chemical | null>(null);
   const [drawerMode, setDrawerMode] = useState<'view' | 'edit' | 'create' | null>(null);
+  const [issuanceModalOpen, setIssuanceModalOpen] = useState(false);
+  const [chemicalToIssue, setChemicalToIssue] = useState<Chemical | null>(null);
 
   const handleView = (chemical: Chemical) => {
     setSelectedChemical(chemical);
@@ -29,6 +32,16 @@ export const ChemicalsPage = () => {
   const handleCloseDrawer = () => {
     setDrawerMode(null);
     setSelectedChemical(null);
+  };
+
+  const handleIssue = (chemical: Chemical) => {
+    setChemicalToIssue(chemical);
+    setIssuanceModalOpen(true);
+  };
+
+  const handleCloseIssuanceModal = () => {
+    setIssuanceModalOpen(false);
+    setChemicalToIssue(null);
   };
 
   return (
@@ -53,7 +66,7 @@ export const ChemicalsPage = () => {
         </Space>
       </div>
 
-      <ChemicalsTable onView={handleView} onEdit={handleEdit} />
+      <ChemicalsTable onView={handleView} onEdit={handleEdit} onIssue={handleIssue} />
 
       <ChemicalDrawer
         open={drawerMode !== null}
@@ -61,6 +74,12 @@ export const ChemicalsPage = () => {
         chemicalId={selectedChemical?.id}
         onClose={handleCloseDrawer}
         onSuccess={() => setSelectedChemical(null)}
+      />
+
+      <ChemicalIssuanceModal
+        open={issuanceModalOpen}
+        chemical={chemicalToIssue}
+        onClose={handleCloseIssuanceModal}
       />
     </div>
   );

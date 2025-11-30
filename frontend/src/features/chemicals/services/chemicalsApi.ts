@@ -2,6 +2,8 @@ import { baseApi } from '@services/baseApi';
 import type {
   Chemical,
   ChemicalFormData,
+  ChemicalIssuanceFormData,
+  ChemicalIssuanceResponse,
   ChemicalsListResponse,
   ChemicalsQueryParams,
 } from '../types';
@@ -72,6 +74,21 @@ export const chemicalsApi = baseApi.injectEndpoints({
       }),
       invalidatesTags: [{ type: 'Chemical', id: 'LIST' }],
     }),
+
+    issueChemical: builder.mutation<
+      ChemicalIssuanceResponse,
+      { id: number; data: ChemicalIssuanceFormData }
+    >({
+      query: ({ id, data }) => ({
+        url: `/api/chemicals/${id}/issue`,
+        method: 'POST',
+        body: data,
+      }),
+      invalidatesTags: (_result, _error, { id }) => [
+        { type: 'Chemical', id },
+        { type: 'Chemical', id: 'LIST' },
+      ],
+    }),
   }),
 });
 
@@ -81,4 +98,5 @@ export const {
   useCreateChemicalMutation,
   useUpdateChemicalMutation,
   useDeleteChemicalMutation,
+  useIssueChemicalMutation,
 } = chemicalsApi;

@@ -18,6 +18,7 @@ import {
   EyeOutlined,
   SearchOutlined,
   ExclamationCircleOutlined,
+  ExportOutlined,
 } from '@ant-design/icons';
 import dayjs from 'dayjs';
 import {
@@ -31,9 +32,10 @@ const { Text } = Typography;
 interface ChemicalsTableProps {
   onView: (chemical: Chemical) => void;
   onEdit: (chemical: Chemical) => void;
+  onIssue: (chemical: Chemical) => void;
 }
 
-export const ChemicalsTable = ({ onView, onEdit }: ChemicalsTableProps) => {
+export const ChemicalsTable = ({ onView, onEdit, onIssue }: ChemicalsTableProps) => {
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(50);
   const [searchQuery, setSearchQuery] = useState('');
@@ -160,30 +162,41 @@ export const ChemicalsTable = ({ onView, onEdit }: ChemicalsTableProps) => {
       title: 'Actions',
       key: 'actions',
       fixed: 'right',
-      width: 170,
-      render: (_, record) => (
-        <Space size="small">
-          <Tooltip title="View Details">
-            <Button type="text" icon={<EyeOutlined />} onClick={() => onView(record)} />
-          </Tooltip>
-          <Tooltip title="Edit">
-            <Button type="text" icon={<EditOutlined />} onClick={() => onEdit(record)} />
-          </Tooltip>
-          <Popconfirm
-            title="Delete chemical?"
-            description="This action cannot be undone."
-            onConfirm={() => handleDelete(record.id)}
-            okText="Yes"
-            cancelText="No"
-            okButtonProps={{ danger: true }}
-            icon={<ExclamationCircleOutlined style={{ color: 'red' }} />}
-          >
-            <Tooltip title="Delete">
-              <Button type="text" danger icon={<DeleteOutlined />} />
+      width: 200,
+      render: (_, record) => {
+        const canIssue = record.status !== 'expired' && record.quantity > 0;
+        return (
+          <Space size="small">
+            <Tooltip title="View Details">
+              <Button type="text" icon={<EyeOutlined />} onClick={() => onView(record)} />
             </Tooltip>
-          </Popconfirm>
-        </Space>
-      ),
+            <Tooltip title={canIssue ? 'Issue' : 'Cannot issue (expired or out of stock)'}>
+              <Button
+                type="text"
+                icon={<ExportOutlined />}
+                onClick={() => onIssue(record)}
+                disabled={!canIssue}
+              />
+            </Tooltip>
+            <Tooltip title="Edit">
+              <Button type="text" icon={<EditOutlined />} onClick={() => onEdit(record)} />
+            </Tooltip>
+            <Popconfirm
+              title="Delete chemical?"
+              description="This action cannot be undone."
+              onConfirm={() => handleDelete(record.id)}
+              okText="Yes"
+              cancelText="No"
+              okButtonProps={{ danger: true }}
+              icon={<ExclamationCircleOutlined style={{ color: 'red' }} />}
+            >
+              <Tooltip title="Delete">
+                <Button type="text" danger icon={<DeleteOutlined />} />
+              </Tooltip>
+            </Popconfirm>
+          </Space>
+        );
+      },
     },
   ];
 
