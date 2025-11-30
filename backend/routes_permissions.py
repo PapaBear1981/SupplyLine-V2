@@ -378,7 +378,7 @@ def register_permission_routes(app):
         Get a matrix of all roles and their permissions.
         Useful for the permission overview dashboard.
         """
-        from models import Role, RolePermission
+        from models import Role
 
         roles = Role.query.order_by(Role.name).all()
         permissions = Permission.query.order_by(Permission.category, Permission.name).all()

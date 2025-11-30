@@ -310,9 +310,9 @@ class User(db.Model):
             if expires_at is not None and current_time >= expires_at:
                 continue
 
-            if grant_type == 'grant':
+            if grant_type == "grant":
                 permissions.add(perm_name)
-            elif grant_type == 'deny':
+            elif grant_type == "deny":
                 permissions.discard(perm_name)
 
         return list(permissions)

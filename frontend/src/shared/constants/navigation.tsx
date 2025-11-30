@@ -127,7 +127,7 @@ export const getMenuItems = (isAdmin: boolean = false, permissions: string[] = [
       })
       .map((item) => {
         // Remove permission-related fields and return as MenuItem
-        const { permission, adminOnly, children, ...menuItem } = item;
+        const { permission: _permission, adminOnly: _adminOnly, children, ...menuItem } = item;
         if (children) {
           return {
             ...menuItem,

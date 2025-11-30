@@ -8,7 +8,7 @@ from datetime import datetime
 from flask import Blueprint, jsonify, request
 from sqlalchemy import or_
 
-from auth.jwt_manager import jwt_required, permission_required
+from auth.jwt_manager import permission_required
 from models import Chemical, Tool, User, Warehouse, db
 
 

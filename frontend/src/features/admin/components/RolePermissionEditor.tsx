@@ -98,19 +98,31 @@ export const RolePermissionEditor: React.FC<RolePermissionEditorProps> = ({
     return treeData.map((category) => category.key);
   }, [treeData]);
 
-  // Initialize checked keys when role data loads
+  // Compute expanded keys based on search value (derived state, no effect needed)
+  const computedExpandedKeys = useMemo(() => {
+    if (searchValue) {
+      return filteredTreeData.map((c) => c.key);
+    }
+    return expandedKeys;
+  }, [searchValue, filteredTreeData, expandedKeys]);
+
+  // Initialize checked keys when role permissions load from API
+  // This is a legitimate use case for syncing external data to local state
   useEffect(() => {
     if (roleWithPermissions?.permissions) {
       const permIds = roleWithPermissions.permissions.map((p: Permission) => `perm-${p.id}`);
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setCheckedKeys(permIds);
     }
   }, [roleWithPermissions]);
 
-  // Expand all categories initially and when searching
+  // Expand all categories when searching
   useEffect(() => {
     if (searchValue) {
       const matchingCategories = filteredTreeData.map((c) => c.key);
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setExpandedKeys(matchingCategories);
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setAutoExpandParent(true);
     }
   }, [searchValue, filteredTreeData]);

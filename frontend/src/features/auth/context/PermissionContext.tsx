@@ -76,6 +76,7 @@ export const PermissionProvider: React.FC<{ children: React.ReactNode }> = ({ ch
   return <PermissionContext.Provider value={value}>{children}</PermissionContext.Provider>;
 };
 
+// eslint-disable-next-line react-refresh/only-export-components
 export const usePermissionContext = (): PermissionContextValue => {
   const context = useContext(PermissionContext);
   if (context === undefined) {
