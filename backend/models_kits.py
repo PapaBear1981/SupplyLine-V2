@@ -45,6 +45,8 @@ class Kit(db.Model):
 
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(100), nullable=False, unique=True)
+    # Version field for optimistic locking (concurrent update detection)
+    version = db.Column(db.Integer, nullable=False, default=1, server_default="1")
     aircraft_type_id = db.Column(db.Integer, db.ForeignKey("aircraft_types.id"), nullable=False)
     description = db.Column(db.String(500))
     status = db.Column(db.String(20), nullable=False, default="active")  # active, inactive, maintenance
@@ -77,6 +79,7 @@ class Kit(db.Model):
         """Convert model to dictionary"""
         data = {
             "id": self.id,
+            "version": self.version,  # For optimistic locking
             "name": self.name,
             "aircraft_type_id": self.aircraft_type_id,
             "aircraft_type_name": self.aircraft_type.name if self.aircraft_type else None,

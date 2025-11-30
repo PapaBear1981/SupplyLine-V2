@@ -554,3 +554,54 @@ def test_kit(db_session, test_user):
     db_session.add(kit)
     db_session.commit()
     return kit
+
+
+# ==================== Optimistic Locking Test Fixtures ====================
+
+@pytest.fixture
+def admin_auth_header(client, admin_user, jwt_manager):
+    """Alias for auth_headers - admin authentication header"""
+    with client.application.app_context():
+        tokens = jwt_manager.generate_tokens(admin_user)
+    access_token = tokens["access_token"]
+    return {"Authorization": f"Bearer {access_token}"}
+
+
+@pytest.fixture
+def test_chemical(db_session, admin_user, test_warehouse):
+    """Create test chemical for optimistic locking tests"""
+    chemical = Chemical(
+        part_number="LOCK-C001",
+        lot_number="LOT001",
+        description="Locking Test Chemical",
+        manufacturer="Test Manufacturer",
+        quantity=100,
+        unit="ml",
+        location="Test Location",
+        category="Testing",
+        status="available",
+        warehouse_id=test_warehouse.id,
+        version=1,  # Ensure version is set
+    )
+    db_session.add(chemical)
+    db_session.commit()
+    return chemical
+
+
+@pytest.fixture
+def test_tool(db_session, admin_user, test_warehouse):
+    """Create test tool for optimistic locking tests"""
+    tool = Tool(
+        tool_number="LOCK-T001",
+        serial_number="SN-LOCK001",
+        description="Locking Test Tool",
+        condition="Good",
+        location="Test Location",
+        category="Testing",
+        warehouse_id=test_warehouse.id,
+        status="available",
+        version=1,  # Ensure version is set
+    )
+    db_session.add(tool)
+    db_session.commit()
+    return tool

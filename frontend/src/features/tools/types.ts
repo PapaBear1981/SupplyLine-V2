@@ -5,6 +5,7 @@ export type CalibrationStatus = 'current' | 'due_soon' | 'overdue' | 'not_applic
 // Main Tool interface
 export interface Tool {
   id: number;
+  version: number; // For optimistic locking (concurrent update detection)
   tool_number: string;
   serial_number: string;
   lot_number?: string | null;
@@ -44,6 +45,7 @@ export interface ToolFormData {
   status?: ToolStatus;
   status_reason?: string;
   warehouse_id?: number;
+  version?: number; // For optimistic locking - include when updating
 
   // Calibration fields
   requires_calibration?: boolean;

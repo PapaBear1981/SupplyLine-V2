@@ -46,6 +46,62 @@ class RateLimitError(SupplyLineError):
     """Raised when rate limit is exceeded"""
 
 
+class ConflictError(SupplyLineError):
+    """
+    Raised when a concurrent update conflict is detected.
+
+    This typically occurs when two users try to update the same resource
+    simultaneously, and the second update would overwrite the first.
+
+    Attributes:
+        message: Human-readable description of the conflict
+        current_version: The current version of the resource
+        provided_version: The version provided in the request
+        resource_type: The type of resource (e.g., "Chemical")
+        resource_id: The ID of the resource
+        current_data: Optional current state of the resource
+    """
+
+    def __init__(
+        self,
+        message: str,
+        current_version: int | None = None,
+        provided_version: int | None = None,
+        resource_type: str | None = None,
+        resource_id: int | None = None,
+        current_data: dict | None = None,
+    ):
+        super().__init__(message)
+        self.message = message
+        self.current_version = current_version
+        self.provided_version = provided_version
+        self.resource_type = resource_type
+        self.resource_id = resource_id
+        self.current_data = current_data
+
+    def to_dict(self) -> dict[str, Any]:
+        """Convert to dictionary for JSON response."""
+        result: dict[str, Any] = {
+            "error": self.message,
+            "error_code": "version_conflict",
+            "conflict_details": {
+                "current_version": self.current_version,
+                "provided_version": self.provided_version,
+            },
+        }
+        if self.resource_type:
+            result["conflict_details"]["resource_type"] = self.resource_type
+        if self.resource_id:
+            result["conflict_details"]["resource_id"] = self.resource_id
+        if self.current_data:
+            result["current_data"] = self.current_data
+        result["hint"] = (
+            "The resource was modified by another user. "
+            "Please refresh and try again."
+        )
+        return result
+
+
 def handle_errors(f):
     """Enhanced decorator for comprehensive error handling with context and transaction management"""
     @wraps(f)
@@ -146,6 +202,29 @@ def handle_errors(f):
                 reference=error_reference,
                 error=e
             )
+
+        except ConflictError as e:
+            duration = (time.time() - start_time) * 1000
+            error_reference = _generate_error_reference()
+            logger.info(
+                f"Conflict error in {f.__name__}",
+                extra={
+                    **context,
+                    "operation": f.__name__,
+                    "error_type": "ConflictError",
+                    "error_message": str(e),
+                    "duration_ms": round(duration, 2),
+                    "error_reference": error_reference,
+                    "resource_type": getattr(e, "resource_type", None),
+                    "resource_id": getattr(e, "resource_id", None),
+                    "current_version": getattr(e, "current_version", None),
+                    "provided_version": getattr(e, "provided_version", None),
+                }
+            )
+            # Use the ConflictError's to_dict for rich error response
+            response_data = e.to_dict() if hasattr(e, "to_dict") else {"error": str(e)}
+            response_data["reference"] = error_reference
+            return jsonify(response_data), 409
 
         except RateLimitError as e:
             duration = (time.time() - start_time) * 1000

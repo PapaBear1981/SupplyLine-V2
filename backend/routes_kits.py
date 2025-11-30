@@ -22,7 +22,7 @@ from models_kits import (
     KitReorderRequest,
     KitTransfer,
 )
-from utils.error_handler import ValidationError, handle_errors
+from utils.error_handler import ConflictError, ValidationError, handle_errors
 
 
 logger = logging.getLogger(__name__)
@@ -258,6 +258,28 @@ def register_kit_routes(app):
         data = request.get_json() or {}
         current_user_id = request.current_user.get("user_id")
 
+        # Check version for optimistic locking (concurrent update detection)
+        provided_version = data.get("version")
+        if provided_version is not None:
+            try:
+                provided_version = int(provided_version)
+            except (TypeError, ValueError):
+                raise ValidationError("Invalid version format. Version must be an integer.")
+
+            if provided_version != kit.version:
+                raise ConflictError(
+                    message=(
+                        f"This kit has been modified by another user. "
+                        f"Your version ({provided_version}) is outdated. "
+                        f"Current version is {kit.version}."
+                    ),
+                    current_version=kit.version,
+                    provided_version=provided_version,
+                    resource_type="Kit",
+                    resource_id=kit.id,
+                    current_data=kit.to_dict(),
+                )
+
         # Update fields
         if "name" in data and data["name"] != kit.name:
             # Check if new name already exists
@@ -335,6 +357,9 @@ def register_kit_routes(app):
                     logger.warning(f"Traceback: {traceback.format_exc()}")
             else:
                 logger.info("No address parts to geocode")
+
+        # Increment version for optimistic locking
+        kit.version = (kit.version or 0) + 1
 
         db.session.commit()
 

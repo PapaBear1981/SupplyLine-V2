@@ -17,6 +17,79 @@ The API uses JWT (JSON Web Token) authentication. Include the token in the Autho
 Authorization: Bearer <your-jwt-token>
 ```
 
+## Optimistic Locking (Concurrent Update Handling)
+
+The API implements optimistic locking to prevent data loss when multiple users try to update the same resource simultaneously.
+
+### How It Works
+
+1. Each resource (Chemical, Tool, Kit, etc.) includes a `version` field
+2. When fetching a resource, the response includes the current version
+3. When updating, include the `version` in your request
+4. If the version doesn't match (another user updated it), you get a 409 Conflict
+
+### Example Update Flow
+
+```json
+// 1. GET /api/chemicals/123
+{
+  "id": 123,
+  "version": 5,
+  "part_number": "CHEM-001",
+  "quantity": 100
+}
+
+// 2. PUT /api/chemicals/123 - Include the version
+{
+  "quantity": 75,
+  "version": 5
+}
+
+// 3. Success response - version is incremented
+{
+  "id": 123,
+  "version": 6,
+  "quantity": 75
+}
+```
+
+### Conflict Response (409)
+
+When a conflict is detected, you receive a 409 response with details:
+
+```json
+{
+  "error": "This chemical has been modified by another user...",
+  "error_code": "version_conflict",
+  "conflict_details": {
+    "current_version": 6,
+    "provided_version": 5,
+    "resource_type": "Chemical",
+    "resource_id": 123
+  },
+  "current_data": {
+    "id": 123,
+    "version": 6,
+    "quantity": 90
+  },
+  "hint": "The resource was modified by another user. Please refresh and try again."
+}
+```
+
+### Supported Resources
+
+The following resources support optimistic locking:
+- **Chemicals** (`/api/chemicals/{id}`)
+- **Tools** (`/api/tools/{id}`)
+- **Kits** (`/api/kits/{id}`)
+- **Warehouses** (`/api/warehouses/{id}`)
+- **Procurement Orders** (`/api/orders/{id}`)
+- **User Requests** (`/api/requests/{id}`)
+
+### Backwards Compatibility
+
+For backwards compatibility, updates without a `version` field will succeed (with a warning logged). However, including the version is recommended to prevent lost updates.
+
 ## API Modules
 
 The backend is organized into the following route modules:

@@ -44,6 +44,8 @@ class Tool(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     tool_number = db.Column(db.String, nullable=False)
     serial_number = db.Column(db.String, nullable=False)
+    # Version field for optimistic locking (concurrent update detection)
+    version = db.Column(db.Integer, nullable=False, default=1, server_default="1")
     lot_number = db.Column(db.String(100), nullable=True)  # For consumable tools tracked by lot
     description = db.Column(db.String)
     condition = db.Column(db.String)
@@ -67,6 +69,7 @@ class Tool(db.Model):
     def to_dict(self):
         return {
             "id": self.id,
+            "version": self.version,  # For optimistic locking
             "tool_number": self.tool_number,
             "serial_number": self.serial_number,
             "lot_number": self.lot_number,
@@ -699,6 +702,8 @@ class ProcurementOrder(db.Model):
     __tablename__ = "procurement_orders"
 
     id = db.Column(db.Integer, primary_key=True)
+    # Version field for optimistic locking (concurrent update detection)
+    version = db.Column(db.Integer, nullable=False, default=1, server_default="1")
     order_number = db.Column(db.String(20), unique=True, nullable=True, index=True)  # ORD-00001
     title = db.Column(db.String(200), nullable=False)
     order_type = db.Column(db.String(50), nullable=False, default="tool")
@@ -770,6 +775,7 @@ class ProcurementOrder(db.Model):
 
         data = {
             "id": self.id,
+            "version": self.version,  # For optimistic locking
             "order_number": self.order_number,
             "title": self.title,
             "order_type": self.order_type,
@@ -874,6 +880,8 @@ class UserRequest(db.Model):
     __tablename__ = "user_requests"
 
     id = db.Column(db.Integer, primary_key=True)
+    # Version field for optimistic locking (concurrent update detection)
+    version = db.Column(db.Integer, nullable=False, default=1, server_default="1")
     request_number = db.Column(db.String(20), unique=True, nullable=True, index=True)  # REQ-00001
     title = db.Column(db.String(200), nullable=False)
     description = db.Column(db.String(4000), nullable=True)
@@ -978,6 +986,7 @@ class UserRequest(db.Model):
 
         data = {
             "id": self.id,
+            "version": self.version,  # For optimistic locking
             "request_number": self.request_number,
             "title": self.title,
             "description": self.description,
@@ -1226,6 +1235,8 @@ class Chemical(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     part_number = db.Column(db.String, nullable=False)
     lot_number = db.Column(db.String, nullable=False)
+    # Version field for optimistic locking (concurrent update detection)
+    version = db.Column(db.Integer, nullable=False, default=1, server_default="1")
     description = db.Column(db.String)
     manufacturer = db.Column(db.String)
     quantity = db.Column(db.Integer, nullable=False, default=0)  # Integer only - no decimal quantities
@@ -1272,6 +1283,7 @@ class Chemical(db.Model):
     def to_dict(self):
         result = {
             "id": self.id,
+            "version": self.version,  # For optimistic locking
             "part_number": self.part_number,
             "lot_number": self.lot_number,
             "description": self.description,
@@ -1856,6 +1868,8 @@ class Warehouse(db.Model):
     __tablename__ = "warehouses"
 
     id = db.Column(db.Integer, primary_key=True)
+    # Version field for optimistic locking (concurrent update detection)
+    version = db.Column(db.Integer, nullable=False, default=1, server_default="1")
     name = db.Column(db.String(200), nullable=False, unique=True, index=True)
     address = db.Column(db.String(500), nullable=True)
     city = db.Column(db.String(100), nullable=True)
@@ -1883,6 +1897,7 @@ class Warehouse(db.Model):
         """Convert warehouse to dictionary representation."""
         result = {
             "id": self.id,
+            "version": self.version,  # For optimistic locking
             "name": self.name,
             "address": self.address,
             "city": self.city,

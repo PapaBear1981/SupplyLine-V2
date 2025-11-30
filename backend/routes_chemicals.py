@@ -19,7 +19,7 @@ from models import (
     db,
 )
 from sqlalchemy import text
-from utils.error_handler import ValidationError, handle_errors
+from utils.error_handler import ConflictError, ValidationError, handle_errors
 from utils.serial_lot_validation import (
     SerialLotValidationError,
     check_lot_number_unique,
@@ -1211,6 +1211,28 @@ def register_chemical_routes(app):
             # Update chemical
             data = request.get_json() or {}
 
+            # Check version for optimistic locking (concurrent update detection)
+            provided_version = data.get("version")
+            if provided_version is not None:
+                try:
+                    provided_version = int(provided_version)
+                except (TypeError, ValueError):
+                    raise ValidationError("Invalid version format. Version must be an integer.")
+
+                if provided_version != chemical.version:
+                    raise ConflictError(
+                        message=(
+                            f"This chemical has been modified by another user. "
+                            f"Your version ({provided_version}) is outdated. "
+                            f"Current version is {chemical.version}."
+                        ),
+                        current_version=chemical.version,
+                        provided_version=provided_version,
+                        resource_type="Chemical",
+                        resource_id=chemical.id,
+                        current_data=chemical.to_dict(),
+                    )
+
             # Validate and sanitize input using schema
             validated_data = validate_schema(data, "chemical")
 
@@ -1259,6 +1281,9 @@ def register_chemical_routes(app):
 
             # Update reorder status based on new values
             chemical.update_reorder_status()
+
+            # Increment version for optimistic locking
+            chemical.version = (chemical.version or 0) + 1
 
             db.session.commit()
 

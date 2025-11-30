@@ -22,6 +22,7 @@ export interface AircraftType {
 // Kit
 export interface Kit {
   id: number;
+  version: number; // For optimistic locking (concurrent update detection)
   name: string;
   aircraft_type_id: number;
   aircraft_type_name?: string;

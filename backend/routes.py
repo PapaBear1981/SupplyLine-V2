@@ -52,7 +52,7 @@ from routes_transfers import transfers_bp
 from routes_user_requests import register_user_request_routes
 from routes_users import register_user_routes
 from routes_warehouses import warehouses_bp
-from utils.error_handler import ValidationError, handle_errors, log_security_event
+from utils.error_handler import ConflictError, ValidationError, handle_errors, log_security_event
 from utils.file_validation import FileValidationError, validate_image_upload
 from utils.password_reset_security import get_password_reset_tracker
 from utils.rate_limiter import rate_limit
@@ -1182,6 +1182,28 @@ def register_routes(app):
             "request_content_type": request.content_type
         })
 
+        # Check version for optimistic locking (concurrent update detection)
+        provided_version = data.get("version")
+        if provided_version is not None:
+            try:
+                provided_version = int(provided_version)
+            except (TypeError, ValueError):
+                return jsonify({"error": "Invalid version format. Version must be an integer."}), 400
+
+            if provided_version != tool.version:
+                raise ConflictError(
+                    message=(
+                        f"This tool has been modified by another user. "
+                        f"Your version ({provided_version}) is outdated. "
+                        f"Current version is {tool.version}."
+                    ),
+                    current_version=tool.version,
+                    provided_version=provided_version,
+                    resource_type="Tool",
+                    resource_id=tool.id,
+                    current_data=tool.to_dict(),
+                )
+
         # Update fields
         if "tool_number" in data or "serial_number" in data:
             # If either tool_number or serial_number is being updated, we need to check for duplicates
@@ -1234,6 +1256,9 @@ def register_routes(app):
                 # Update calibration status based on new next_calibration_date
                 if hasattr(tool, "update_calibration_status"):
                     tool.update_calibration_status()
+
+        # Increment version for optimistic locking
+        tool.version = (tool.version or 0) + 1
 
         db.session.commit()
 

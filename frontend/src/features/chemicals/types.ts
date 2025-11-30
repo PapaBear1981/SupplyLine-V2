@@ -6,6 +6,7 @@ export type ChemicalStatus =
 
 export interface Chemical {
   id: number;
+  version: number; // For optimistic locking (concurrent update detection)
   part_number: string;
   lot_number: string;
   description?: string | null;
@@ -53,6 +54,7 @@ export interface ChemicalFormData {
   expiration_date?: string;
   minimum_stock_level?: number;
   notes?: string;
+  version?: number; // For optimistic locking - include when updating
 }
 
 export interface ChemicalsListResponse {
