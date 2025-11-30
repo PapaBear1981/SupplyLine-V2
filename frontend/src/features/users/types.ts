@@ -23,6 +23,7 @@ export interface User {
   account_locked_until?: string | null;
   last_failed_login?: string | null;
   roles?: UserRole[];
+  is_totp_enabled?: boolean;
 }
 
 export interface Department {

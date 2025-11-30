@@ -76,3 +76,7 @@ ruff==0.14.2
 
 # Static Type Checking
 pyright==1.1.390
+
+# TOTP Two-Factor Authentication
+pyotp==2.9.0  # Generate and verify TOTP codes
+qrcode[pil]==8.0  # Generate QR codes for authenticator apps

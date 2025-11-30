@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { Form, Input, Button, Typography, Divider, message } from 'antd';
 import { UserOutlined, LockOutlined, ArrowRightOutlined } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
@@ -6,6 +7,7 @@ import { useAppDispatch } from '@app/hooks';
 import { setCredentials } from '../slices/authSlice';
 import { ROUTES } from '@shared/constants/routes';
 import type { LoginRequest } from '../types';
+import { TotpVerificationForm } from '../components/TotpVerificationForm';
 import './LoginPage.css';
 
 const { Title, Text } = Typography;
@@ -15,9 +17,22 @@ export const LoginPage = () => {
   const dispatch = useAppDispatch();
   const [login, { isLoading }] = useLoginMutation();
 
+  // State for TOTP verification step
+  const [showTotpVerification, setShowTotpVerification] = useState(false);
+  const [pendingEmployeeNumber, setPendingEmployeeNumber] = useState<string>('');
+
   const handleSubmit = async (values: LoginRequest) => {
     try {
       const result = await login(values).unwrap();
+
+      // Check if TOTP verification is required
+      if (result.requires_totp && result.employee_number) {
+        setPendingEmployeeNumber(result.employee_number);
+        setShowTotpVerification(true);
+        return;
+      }
+
+      // Normal login flow (no TOTP)
       dispatch(setCredentials({ user: result.user, token: result.access_token }));
       message.success('Welcome back. Launch checklist complete.');
       navigate(ROUTES.DASHBOARD);
@@ -32,6 +47,21 @@ export const LoginPage = () => {
       }
     }
   };
+
+  const handleTotpBack = () => {
+    setShowTotpVerification(false);
+    setPendingEmployeeNumber('');
+  };
+
+  // Show TOTP verification form if required
+  if (showTotpVerification) {
+    return (
+      <TotpVerificationForm
+        employeeNumber={pendingEmployeeNumber}
+        onBack={handleTotpBack}
+      />
+    );
+  }
 
   return (
     <div className="login-wrapper">

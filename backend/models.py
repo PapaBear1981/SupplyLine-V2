@@ -150,6 +150,10 @@ class User(db.Model):
     account_locked_until = db.Column(db.DateTime, nullable=True)
     last_failed_login = db.Column(db.DateTime, nullable=True)
 
+    # TOTP Two-Factor Authentication fields
+    totp_secret = db.Column(db.String(32), nullable=True)  # Base32 encoded secret
+    is_totp_enabled = db.Column(db.Boolean, default=False)
+
     # Relationships
     roles = association_proxy("user_roles", "role")
     password_histories = db.relationship(
@@ -347,7 +351,8 @@ class User(db.Model):
             "created_at": self.created_at.isoformat() if self.created_at else None,
             "avatar": self.avatar,
             "force_password_change": self.force_password_change,
-            "password_changed_at": self.password_changed_at.isoformat() if self.password_changed_at else None
+            "password_changed_at": self.password_changed_at.isoformat() if self.password_changed_at else None,
+            "is_totp_enabled": self.is_totp_enabled
         }
 
         if include_roles:

@@ -43,6 +43,7 @@ from routes_message_search import register_message_search_routes
 from routes_orders import register_order_routes
 from routes_password_reset import register_password_reset_routes
 from routes_profile import register_profile_routes
+from routes_totp import register_totp_routes
 from routes_rbac import register_rbac_routes
 from routes_reports import register_report_routes
 from routes_scanner import register_scanner_routes
@@ -204,6 +205,9 @@ def register_routes(app):
 
     # Register JWT authentication routes
     register_auth_routes(app)
+
+    # Register TOTP two-factor authentication routes
+    register_totp_routes(app)
 
     # Register password reset routes
     register_password_reset_routes(app)

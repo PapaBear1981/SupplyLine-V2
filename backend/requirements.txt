@@ -160,3 +160,9 @@ requests==2.32.3
     # via -r requirements.in
 urllib3==2.5.0
     # via requests
+
+# TOTP Two-Factor Authentication
+pyotp==2.9.0
+    # via -r requirements.in
+qrcode==8.0
+    # via -r requirements.in
