@@ -12,7 +12,6 @@ import logging
 import os
 from datetime import datetime
 
-import utils as password_utils
 from flask import Blueprint, current_app, jsonify, request
 from werkzeug.utils import secure_filename
 
@@ -24,11 +23,11 @@ logger = logging.getLogger(__name__)
 # Create blueprint
 profile_bp = Blueprint("profile", __name__)
 
-ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif'}
+ALLOWED_EXTENSIONS = {"png", "jpg", "jpeg", "gif"}
 MAX_FILE_SIZE = 2 * 1024 * 1024  # 2MB
 
 def allowed_file(filename):
-    return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
+    return "." in filename and filename.rsplit(".", 1)[1].lower() in ALLOWED_EXTENSIONS
 
 def register_profile_routes(app):
     """Register profile routes"""
@@ -250,12 +249,12 @@ def upload_avatar():
             return jsonify({"error": "User not found"}), 404
 
         # Check if file is in request
-        if 'avatar' not in request.files:
+        if "avatar" not in request.files:
             return jsonify({"error": "No file provided"}), 400
 
-        file = request.files['avatar']
+        file = request.files["avatar"]
 
-        if file.filename == '':
+        if file.filename == "":
             return jsonify({"error": "No file selected"}), 400
 
         if not allowed_file(file.filename):
@@ -275,7 +274,7 @@ def upload_avatar():
         filename = f"avatar_{user_id}_{timestamp}_{filename}"
 
         # Ensure upload directory exists
-        upload_dir = os.path.join(current_app.root_path, 'static', 'uploads', 'avatars')
+        upload_dir = os.path.join(current_app.root_path, "static", "uploads", "avatars")
         os.makedirs(upload_dir, exist_ok=True)
 
         # Save file
@@ -287,7 +286,7 @@ def upload_avatar():
 
         # Delete old avatar if exists
         if user.avatar:
-            old_filepath = os.path.join(current_app.root_path, user.avatar.lstrip('/'))
+            old_filepath = os.path.join(current_app.root_path, user.avatar.lstrip("/"))
             if os.path.exists(old_filepath):
                 try:
                     os.remove(old_filepath)

@@ -30,7 +30,7 @@ from models import (
     UserRequest,
     db,
 )
-from models_kits import KitIssuance, KitReorderRequest, KitTransfer
+from models_kits import Kit, KitIssuance, KitReorderRequest, KitTransfer
 from utils.export_utils import generate_excel_report, generate_pdf_report
 
 
@@ -135,9 +135,9 @@ def register_report_routes(app):
                 query = query.filter(Tool.location.ilike(f"%{location}%"))
 
             # Get checkout status
-            checked_out_tool_ids = set(
+            checked_out_tool_ids = {
                 c.tool_id for c in Checkout.query.filter(Checkout.return_date.is_(None)).all()
-            )
+            }
 
             if status:
                 if status == "available":
@@ -620,7 +620,7 @@ def register_report_routes(app):
 
             # Summary
             total_used = sum(i.quantity for i in issuances)
-            unique_chemicals = len(set(i.chemical_id for i in issuances))
+            unique_chemicals = len({i.chemical_id for i in issuances})
 
             # Top users
             user_usage = defaultdict(int)

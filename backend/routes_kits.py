@@ -303,8 +303,9 @@ def register_kit_routes(app):
                 full_address = ", ".join(address_parts)
                 logger.info(f"Attempting to geocode: {full_address}")
                 try:
-                    import requests
                     from urllib.parse import quote
+
+                    import requests
 
                     # Use Nominatim (OpenStreetMap) geocoding service
                     encoded_address = quote(full_address)
@@ -313,7 +314,7 @@ def register_kit_routes(app):
                     logger.info(f"Geocoding URL: {geocode_url}")
                     response = requests.get(
                         geocode_url,
-                        headers={'User-Agent': 'SupplyLine-MRO-Suite/1.0'},
+                        headers={"User-Agent": "SupplyLine-MRO-Suite/1.0"},
                         timeout=5
                     )
 
@@ -322,8 +323,8 @@ def register_kit_routes(app):
                         results = response.json()
                         logger.info(f"Geocoding results: {results}")
                         if results and len(results) > 0:
-                            kit.latitude = float(results[0]['lat'])
-                            kit.longitude = float(results[0]['lon'])
+                            kit.latitude = float(results[0]["lat"])
+                            kit.longitude = float(results[0]["lon"])
                             logger.info(f"Geocoded address '{full_address}' to ({kit.latitude}, {kit.longitude})")
                     else:
                         logger.warning(f"Geocoding API returned status {response.status_code}")

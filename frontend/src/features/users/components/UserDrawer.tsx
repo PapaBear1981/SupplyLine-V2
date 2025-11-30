@@ -58,10 +58,14 @@ export const UserDrawer = ({
   const [unlockUser, { isLoading: isUnlocking }] = useUnlockUserMutation();
 
   useEffect(() => {
-    setMode(initialMode);
-    if (initialMode === 'create') {
-      form.resetFields();
-    }
+    // Update mode asynchronously to avoid cascading renders
+    const timer = setTimeout(() => {
+      setMode(initialMode);
+      if (initialMode === 'create') {
+        form.resetFields();
+      }
+    }, 0);
+    return () => clearTimeout(timer);
   }, [initialMode, form]);
 
   useEffect(() => {

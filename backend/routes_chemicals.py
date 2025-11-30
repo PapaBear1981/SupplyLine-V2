@@ -361,8 +361,8 @@ def register_chemical_routes(app):
             resource_type="chemical",
             resource_id=chemical.id,
             details={
-                "part_number": validated_data['part_number'],
-                "lot_number": validated_data['lot_number'],
+                "part_number": validated_data["part_number"],
+                "lot_number": validated_data["lot_number"],
                 "warehouse_id": data["warehouse_id"]
             },
             ip_address=request.remote_addr
@@ -1141,6 +1141,7 @@ def register_chemical_routes(app):
 
     # Get, update, or delete a specific chemical
     @app.route("/api/chemicals/<int:id>", methods=["GET", "PUT", "DELETE"])
+    @materials_manager_required
     @handle_errors
     def chemical_detail_route(id):
         current_user_id = request.current_user.get("user_id")
@@ -1176,7 +1177,7 @@ def register_chemical_routes(app):
                                 "reason": "expired",
                                 "auto_archived": True
                             },
-                            ip_address=request.remote_addr if hasattr(request, 'remote_addr') else None
+                            ip_address=request.remote_addr if hasattr(request, "remote_addr") else None
                         )
 
                         # Update reorder status for expired chemicals
@@ -1347,7 +1348,7 @@ def register_chemical_routes(app):
                     "part_number": chemical.part_number,
                     "lot_number": chemical.lot_number,
                     "archived_by": user_name,
-                    "reason": data.get('reason')
+                    "reason": data.get("reason")
                 },
                 ip_address=request.remote_addr
             )

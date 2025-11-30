@@ -152,12 +152,12 @@ def register_kit_transfer_routes(app):
             resource_type="kit_transfer",
             resource_id=transfer.id,
             details={
-                "item_type": data['item_type'],
+                "item_type": data["item_type"],
                 "item_id": transfer_item_id,
                 "from_type": from_type,
-                "from_location_id": data['from_location_id'],
+                "from_location_id": data["from_location_id"],
                 "to_type": to_type,
-                "to_location_id": data['to_location_id'],
+                "to_location_id": data["to_location_id"],
                 "quantity": quantity
             },
             ip_address=request.remote_addr
@@ -456,7 +456,7 @@ def register_kit_transfer_routes(app):
                 "from_type": transfer.from_location_type,
                 "to_type": transfer.to_location_type
             },
-            ip_address=request.remote_addr if hasattr(request, 'remote_addr') else None
+            ip_address=request.remote_addr if hasattr(request, "remote_addr") else None
         )
         db.session.commit()
 

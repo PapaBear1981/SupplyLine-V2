@@ -64,7 +64,11 @@ export const QuickCheckoutModal = ({ open, onClose }: QuickCheckoutModalProps) =
       }, 300);
       return () => clearTimeout(timer);
     } else {
-      setSearchResults([]);
+      // Clear results asynchronously to avoid cascading renders
+      const timer = setTimeout(() => {
+        setSearchResults([]);
+      }, 0);
+      return () => clearTimeout(timer);
     }
   }, [searchTerm, searchTools]);
 
