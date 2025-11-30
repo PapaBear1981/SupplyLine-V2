@@ -14,6 +14,7 @@ import {
   Spin,
   message,
   Divider,
+  theme,
 } from 'antd';
 import {
   SearchOutlined,
@@ -28,6 +29,7 @@ import {
   useCreateCheckoutMutation,
   useLazyCheckToolAvailabilityQuery,
 } from '../services/checkoutApi';
+import { useGetUsersQuery } from '../../users/services/usersApi';
 import type { ToolSearchResult, ToolCondition } from '../types';
 
 const { Text, Title } = Typography;
@@ -45,6 +47,7 @@ const conditionOptions: { value: ToolCondition; label: string }[] = [
 ];
 
 export const QuickCheckoutModal = ({ open, onClose }: QuickCheckoutModalProps) => {
+  const { token } = theme.useToken();
   const [form] = Form.useForm();
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedTool, setSelectedTool] = useState<ToolSearchResult | null>(null);
@@ -54,6 +57,7 @@ export const QuickCheckoutModal = ({ open, onClose }: QuickCheckoutModalProps) =
   const [checkAvailability, { data: availability, isLoading: checkingAvailability }] =
     useLazyCheckToolAvailabilityQuery();
   const [createCheckout, { isLoading: submitting }] = useCreateCheckoutMutation();
+  const { data: usersData, isLoading: loadingUsers } = useGetUsersQuery();
 
   // Debounced search
   useEffect(() => {
@@ -107,6 +111,7 @@ export const QuickCheckoutModal = ({ open, onClose }: QuickCheckoutModalProps) =
         condition_at_checkout: values.condition_at_checkout as ToolCondition | undefined,
         work_order: values.work_order as string | undefined,
         project: values.project as string | undefined,
+        user_id: values.user_id as number | undefined,
       }).unwrap();
 
       message.success(`Tool ${selectedTool.tool_number} checked out successfully`);
@@ -130,9 +135,9 @@ export const QuickCheckoutModal = ({ open, onClose }: QuickCheckoutModalProps) =
   }, [form, onClose]);
 
   const getStatusColor = (available: boolean, status: string) => {
-    if (available) return 'success';
-    if (status === 'checked_out') return 'warning';
-    return 'error';
+    if (available) return token.colorSuccess;
+    if (status === 'checked_out') return token.colorWarning;
+    return token.colorError;
   };
 
   return (
@@ -180,31 +185,31 @@ export const QuickCheckoutModal = ({ open, onClose }: QuickCheckoutModalProps) =
                     cursor: tool.available ? 'pointer' : 'not-allowed',
                     opacity: tool.available ? 1 : 0.6,
                     padding: '12px 16px',
-                    borderRadius: 8,
+                    borderRadius: token.borderRadius,
                     marginBottom: 8,
-                    border: '1px solid #d9d9d9',
+                    border: `1px solid ${token.colorBorder}`,
                     transition: 'all 0.2s',
                   }}
                   onMouseEnter={(e) => {
                     if (tool.available) {
-                      e.currentTarget.style.backgroundColor = '#f5f5f5';
-                      e.currentTarget.style.borderColor = '#1890ff';
+                      e.currentTarget.style.backgroundColor = token.colorFillAlter;
+                      e.currentTarget.style.borderColor = token.colorPrimary;
                     }
                   }}
                   onMouseLeave={(e) => {
                     e.currentTarget.style.backgroundColor = 'transparent';
-                    e.currentTarget.style.borderColor = '#d9d9d9';
+                    e.currentTarget.style.borderColor = token.colorBorder;
                   }}
                 >
                   <List.Item.Meta
                     avatar={
                       tool.available ? (
                         <CheckCircleOutlined
-                          style={{ fontSize: 24, color: '#52c41a' }}
+                          style={{ fontSize: 24, color: token.colorSuccess }}
                         />
                       ) : (
                         <CloseCircleOutlined
-                          style={{ fontSize: 24, color: '#ff4d4f' }}
+                          style={{ fontSize: 24, color: token.colorError }}
                         />
                       )
                     }
@@ -268,9 +273,9 @@ export const QuickCheckoutModal = ({ open, onClose }: QuickCheckoutModalProps) =
           {/* Selected Tool Info */}
           <div
             style={{
-              background: '#f5f5f5',
+              background: token.colorFillAlter,
               padding: 16,
-              borderRadius: 8,
+              borderRadius: token.borderRadius,
               marginBottom: 24,
             }}
           >
@@ -350,6 +355,23 @@ export const QuickCheckoutModal = ({ open, onClose }: QuickCheckoutModalProps) =
               }}
             >
               <Divider>Checkout Details</Divider>
+
+              <Form.Item label="Checked Out To" name="user_id">
+                <Select
+                  placeholder="Select user (defaults to you)"
+                  loading={loadingUsers}
+                  showSearch
+                  optionFilterProp="children"
+                  filterOption={(input, option) =>
+                    (option?.label ?? '').toLowerCase().includes(input.toLowerCase())
+                  }
+                  options={usersData?.users.map((user) => ({
+                    value: user.id,
+                    label: `${user.first_name} ${user.last_name}`,
+                  }))}
+                  allowClear
+                />
+              </Form.Item>
 
               <Form.Item
                 label="Expected Return Date"

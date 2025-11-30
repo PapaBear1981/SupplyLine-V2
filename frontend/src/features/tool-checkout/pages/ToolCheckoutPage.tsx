@@ -9,6 +9,7 @@ import {
   Space,
   Tabs,
   Badge,
+  theme,
 } from 'antd';
 import {
   SwapOutlined,
@@ -29,6 +30,7 @@ import type { ToolCheckout } from '../types';
 const { Title, Text } = Typography;
 
 export const ToolCheckoutPage = () => {
+  const { token } = theme.useToken();
   const [activeTab, setActiveTab] = useState('active');
   const [checkoutModalOpen, setCheckoutModalOpen] = useState(false);
   const [checkinModalOpen, setCheckinModalOpen] = useState(false);
@@ -83,7 +85,7 @@ export const ToolCheckoutPage = () => {
           {stats && stats.overdue_checkouts > 0 && (
             <Badge
               count={stats.overdue_checkouts}
-              style={{ marginLeft: 8, backgroundColor: '#ff4d4f' }}
+              style={{ marginLeft: 8, backgroundColor: token.colorError }}
               overflowCount={999}
             />
           )}
@@ -132,7 +134,7 @@ export const ToolCheckoutPage = () => {
               title="Active Checkouts"
               value={stats?.active_checkouts || 0}
               prefix={<SwapOutlined />}
-              valueStyle={{ color: '#1890ff' }}
+              valueStyle={{ color: token.colorPrimary }}
             />
           </Card>
         </Col>
@@ -143,7 +145,7 @@ export const ToolCheckoutPage = () => {
               value={stats?.overdue_checkouts || 0}
               prefix={<WarningOutlined />}
               valueStyle={{
-                color: stats?.overdue_checkouts ? '#ff4d4f' : '#52c41a',
+                color: stats?.overdue_checkouts ? token.colorError : token.colorSuccess,
               }}
             />
           </Card>
@@ -163,7 +165,7 @@ export const ToolCheckoutPage = () => {
               title="Today's Returns"
               value={stats?.returns_today || 0}
               prefix={<HistoryOutlined />}
-              valueStyle={{ color: '#52c41a' }}
+              valueStyle={{ color: token.colorSuccess }}
             />
           </Card>
         </Col>
@@ -183,7 +185,7 @@ export const ToolCheckoutPage = () => {
                       justifyContent: 'space-between',
                       padding: '8px 0',
                       borderBottom:
-                        index < 4 ? '1px solid #f0f0f0' : 'none',
+                        index < 4 ? `1px solid ${token.colorBorderSecondary}` : 'none',
                     }}
                   >
                     <Text>
@@ -191,7 +193,7 @@ export const ToolCheckoutPage = () => {
                     </Text>
                     <Badge
                       count={tool.checkout_count}
-                      style={{ backgroundColor: '#1890ff' }}
+                      style={{ backgroundColor: token.colorPrimary }}
                     />
                   </div>
                 ))}
@@ -213,7 +215,7 @@ export const ToolCheckoutPage = () => {
                       justifyContent: 'space-between',
                       padding: '8px 0',
                       borderBottom:
-                        index < 4 ? '1px solid #f0f0f0' : 'none',
+                        index < 4 ? `1px solid ${token.colorBorderSecondary}` : 'none',
                     }}
                   >
                     <Text>
@@ -224,7 +226,7 @@ export const ToolCheckoutPage = () => {
                     </Text>
                     <Badge
                       count={user.checkout_count}
-                      style={{ backgroundColor: '#52c41a' }}
+                      style={{ backgroundColor: token.colorSuccess }}
                     />
                   </div>
                 ))}
