@@ -18,6 +18,7 @@ from werkzeug.utils import secure_filename
 from auth.jwt_manager import jwt_required as login_required
 from models import AuditLog, User, UserActivity, db
 
+
 logger = logging.getLogger(__name__)
 
 # Create blueprint

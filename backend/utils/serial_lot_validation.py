@@ -13,7 +13,6 @@ Policy:
 
 import logging
 import string
-from typing import Optional, Tuple
 
 from utils.error_handler import ValidationError
 
@@ -24,8 +23,8 @@ logger = logging.getLogger(__name__)
 class SerialLotValidationError(ValidationError):
     """Custom exception for serial/lot validation errors with detailed context."""
 
-    def __init__(self, message: str, item_type: str = None, location: str = None,
-                 part_number: str = None, serial_number: str = None, lot_number: str = None):
+    def __init__(self, message: str, item_type: str | None = None, location: str | None = None,
+                 part_number: str | None = None, serial_number: str | None = None, lot_number: str | None = None):
         super().__init__(message)
         self.item_type = item_type
         self.location = location
@@ -34,8 +33,8 @@ class SerialLotValidationError(ValidationError):
         self.lot_number = lot_number
 
 
-def validate_serial_lot_required(serial_number: Optional[str], lot_number: Optional[str],
-                                  item_type: str = "item") -> Tuple[bool, Optional[str]]:
+def validate_serial_lot_required(serial_number: str | None, lot_number: str | None,
+                                  item_type: str = "item") -> tuple[bool, str | None]:
     """
     Validate that an item has either a serial number or lot number (but not both).
 
@@ -75,8 +74,8 @@ def validate_serial_lot_required(serial_number: Optional[str], lot_number: Optio
 
 
 def check_serial_number_unique(part_number: str, serial_number: str,
-                                exclude_id: Optional[int] = None,
-                                exclude_type: Optional[str] = None) -> bool:
+                                exclude_id: int | None = None,
+                                exclude_type: str | None = None) -> bool:
     """
     Check if a serial number is unique for a given part number across all inventory types.
 
@@ -89,7 +88,7 @@ def check_serial_number_unique(part_number: str, serial_number: str,
     Returns:
         True if unique, raises SerialLotValidationError if duplicate found
     """
-    from models import Tool, Expendable
+    from models import Expendable, Tool
     from models_kits import KitExpendable, KitItem
 
     if not serial_number or not serial_number.strip():
@@ -176,8 +175,8 @@ def check_serial_number_unique(part_number: str, serial_number: str,
 
 
 def check_lot_number_unique(part_number: str, lot_number: str,
-                            exclude_id: Optional[int] = None,
-                            exclude_type: Optional[str] = None) -> bool:
+                            exclude_id: int | None = None,
+                            exclude_type: str | None = None) -> bool:
     """
     Check if a lot number is unique for a given part number across all inventory types.
 
@@ -276,10 +275,10 @@ def check_lot_number_unique(part_number: str, lot_number: str,
     return True
 
 
-def validate_item_tracking(part_number: str, serial_number: Optional[str], lot_number: Optional[str],
+def validate_item_tracking(part_number: str, serial_number: str | None, lot_number: str | None,
                            item_type: str = "item",
-                           exclude_id: Optional[int] = None,
-                           exclude_type: Optional[str] = None) -> bool:
+                           exclude_id: int | None = None,
+                           exclude_type: str | None = None) -> bool:
     """
     Complete validation of item tracking - ensures serial/lot is required and unique.
 
@@ -310,7 +309,7 @@ def validate_item_tracking(part_number: str, serial_number: Optional[str], lot_n
     return True
 
 
-def get_tracking_type(serial_number: Optional[str], lot_number: Optional[str]) -> str:
+def get_tracking_type(serial_number: str | None, lot_number: str | None) -> str:
     """
     Determine the tracking type based on which identifier is provided.
 
@@ -361,9 +360,9 @@ def validate_transfer_tracking(from_item, to_location_type: str, to_location_id:
         SerialLotValidationError: If transfer would violate tracking policy
     """
     # Determine tracking identifiers from the source item
-    serial_number = getattr(from_item, 'serial_number', None)
-    lot_number = getattr(from_item, 'lot_number', None)
-    part_number = getattr(from_item, 'part_number', None) or getattr(from_item, 'tool_number', None)
+    serial_number = getattr(from_item, "serial_number", None)
+    lot_number = getattr(from_item, "lot_number", None)
+    part_number = getattr(from_item, "part_number", None) or getattr(from_item, "tool_number", None)
 
     if not part_number:
         raise SerialLotValidationError(

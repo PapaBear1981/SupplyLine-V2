@@ -11,6 +11,7 @@ import utils as password_utils
 from auth import admin_required
 from models import Announcement, AuditLog, Department, Role, User, UserRole, db
 
+
 logger = logging.getLogger(__name__)
 
 

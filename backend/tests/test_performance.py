@@ -316,9 +316,9 @@ class TestAPIResponseTimes:
         assert elapsed < 2.0, f"Tools list endpoint took {elapsed:.2f}s, expected < 2s"
 
         data = response.get_json()
-        # API returns paginated response with 'tools' key
-        if isinstance(data, dict) and 'tools' in data:
-            assert data.get('pagination', {}).get('total', 0) >= 200
+        # API returns paginated response with 'tools' key and pagination info at top level
+        if isinstance(data, dict) and "tools" in data:
+            assert data.get("total", 0) >= 200
         else:
             assert len(data) >= 200
 

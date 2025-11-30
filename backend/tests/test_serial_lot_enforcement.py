@@ -466,15 +466,13 @@ class TestCreateChildChemical:
 
     def test_invalid_quantity_zero_fails(self, app, db_session, parent_chemical, test_warehouse):
         """Creating child with zero quantity fails."""
-        with pytest.raises(ValueError) as exc_info:
+        with pytest.raises(ValueError, match="greater than 0"):
             create_child_chemical(parent_chemical, 0, test_warehouse.id)
-        assert "greater than 0" in str(exc_info.value)
 
     def test_invalid_quantity_exceeds_available_fails(self, app, db_session, parent_chemical, test_warehouse):
         """Creating child with more quantity than available fails."""
-        with pytest.raises(ValueError) as exc_info:
+        with pytest.raises(ValueError, match="Cannot transfer"):
             create_child_chemical(parent_chemical, 150, test_warehouse.id)
-        assert "Cannot transfer" in str(exc_info.value)
 
     def test_parent_depleted_status(self, app, db_session, parent_chemical, test_warehouse):
         """Parent status changes to depleted when quantity reaches 0."""
@@ -587,14 +585,13 @@ class TestCreateChildExpendable:
         db_session.add(serial_expendable)
         db_session.commit()
 
-        with pytest.raises(ValueError) as exc_info:
+        with pytest.raises(ValueError, match="Cannot split serial-tracked"):
             create_child_expendable(
                 parent_expendable=serial_expendable,
                 quantity=1,
                 destination_kit_id=kit.id,
                 destination_box_id=box.id
             )
-        assert "Cannot split serial-tracked" in str(exc_info.value)
 
 
 class TestLotLineage:
