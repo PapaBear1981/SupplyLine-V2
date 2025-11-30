@@ -12,6 +12,7 @@ import type {
   AdminStats,
   Department,
   UserRole,
+  OnlineUsersResponse,
 } from '../types';
 
 export const adminApi = baseApi.injectEndpoints({
@@ -20,6 +21,11 @@ export const adminApi = baseApi.injectEndpoints({
     getAdminStats: builder.query<AdminStats, void>({
       query: () => '/api/admin/stats',
       providesTags: ['User', 'Department'],
+    }),
+
+    // Online Users (available to all authenticated users)
+    getOnlineUsers: builder.query<OnlineUsersResponse, void>({
+      query: () => '/api/users/online',
     }),
 
     // Announcements
@@ -147,6 +153,7 @@ export const adminApi = baseApi.injectEndpoints({
 
 export const {
   useGetAdminStatsQuery,
+  useGetOnlineUsersQuery,
   useGetAnnouncementsQuery,
   useCreateAnnouncementMutation,
   useUpdateAnnouncementMutation,

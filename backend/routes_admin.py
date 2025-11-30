@@ -9,7 +9,9 @@ from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 
 import utils as password_utils
 from auth import admin_required
+from auth.jwt_manager import jwt_required
 from models import Announcement, AuditLog, Department, Role, User, UserRole, db
+from models_messaging import UserPresence
 
 logger = logging.getLogger(__name__)
 
@@ -42,17 +44,43 @@ def register_admin_routes(app):
             ).count()
             total_roles = Role.query.count()
 
+            # Count online users (users with active WebSocket connection)
+            online_users = UserPresence.query.filter_by(is_online=True).count()
+
             return jsonify({
                 "total_users": total_users,
                 "active_users": active_users,
                 "locked_users": locked_users,
                 "total_departments": total_departments,
                 "active_announcements": active_announcements,
-                "total_roles": total_roles
+                "total_roles": total_roles,
+                "online_users": online_users
             })
         except SQLAlchemyError:
             logger.exception("Error fetching admin stats")
             return jsonify({"error": "Failed to fetch admin statistics"}), 500
+
+    # Online Users Count (for any authenticated user)
+    @app.route("/api/users/online", methods=["GET"])
+    @jwt_required
+    def get_online_users():
+        """Get count of currently online users via WebSocket connection."""
+        try:
+            online_count = UserPresence.query.filter_by(is_online=True).count()
+            online_users = UserPresence.query.filter_by(is_online=True).all()
+
+            return jsonify({
+                "online_count": online_count,
+                "online_users": [
+                    {
+                        "user_id": p.user_id,
+                        "last_activity": p.last_activity.isoformat() if p.last_activity else None
+                    } for p in online_users
+                ]
+            })
+        except SQLAlchemyError:
+            logger.exception("Error fetching online users")
+            return jsonify({"error": "Failed to fetch online users"}), 500
 
     # Announcements Management (Admin)
     @app.route("/api/admin/announcements", methods=["GET"])

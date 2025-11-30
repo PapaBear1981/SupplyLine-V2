@@ -20,6 +20,7 @@ import type { MenuProps } from 'antd';
 import { useAppDispatch, useAppSelector } from '@app/hooks';
 import { logout } from '@features/auth/slices/authSlice';
 import { useLogoutMutation } from '@features/auth/services/authApi';
+import { socketService } from '@services/socket';
 import { getMenuItems } from '@shared/constants/navigation';
 import { ROUTES } from '@shared/constants/routes';
 
@@ -55,6 +56,8 @@ export const MainLayout = () => {
     } catch {
       // Ignore logout errors - still clear local state
     } finally {
+      // Disconnect WebSocket before clearing auth state
+      socketService.disconnect();
       dispatch(logout());
       navigate(ROUTES.LOGIN);
     }

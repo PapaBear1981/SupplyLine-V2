@@ -22,7 +22,7 @@ import { useGetToolsQuery } from '@features/tools/services/toolsApi';
 import { useGetChemicalsQuery } from '@features/chemicals/services/chemicalsApi';
 import { useGetKitsQuery, useGetRecentKitActivityQuery, useGetKitUtilizationAnalyticsQuery, useGetReorderReportQuery } from '@features/kits/services/kitsApi';
 import { useGetWarehousesQuery } from '@features/warehouses/services/warehousesApi';
-import { useGetAdminStatsQuery, useGetAnnouncementsQuery } from '@features/admin/services/adminApi';
+import { useGetAnnouncementsQuery, useGetOnlineUsersQuery } from '@features/admin/services/adminApi';
 
 // Components
 import {
@@ -53,7 +53,7 @@ export const DashboardPage = () => {
   const { data: chemicalsData, isLoading: chemicalsLoading, refetch: refetchChemicals } = useGetChemicalsQuery({ per_page: 1000 });
   const { data: kitsData, isLoading: kitsLoading, refetch: refetchKits } = useGetKitsQuery();
   const { data: warehousesData, isLoading: warehousesLoading } = useGetWarehousesQuery();
-  const { data: adminStats } = useGetAdminStatsQuery();
+  const { data: onlineUsersData } = useGetOnlineUsersQuery(undefined, { pollingInterval: 30000 }); // Poll every 30 seconds
   const { data: announcements, isLoading: announcementsLoading } = useGetAnnouncementsQuery();
   const { data: recentActivity, isLoading: activityLoading, refetch: refetchActivity } = useGetRecentKitActivityQuery({ limit: 10 });
   const { data: utilizationData, isLoading: utilizationLoading } = useGetKitUtilizationAnalyticsQuery({ days: 14 });
@@ -246,7 +246,7 @@ export const DashboardPage = () => {
       <div className={styles.welcomeSection}>
         <WelcomeCard
           user={user}
-          activeUsersCount={adminStats?.active_users || 0}
+          onlineUsersCount={onlineUsersData?.online_count || 0}
           primaryColor={primaryColor}
         />
       </div>

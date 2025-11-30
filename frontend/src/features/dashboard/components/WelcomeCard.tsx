@@ -8,11 +8,11 @@ const { Text } = Typography;
 
 interface WelcomeCardProps {
   user: User | null;
-  activeUsersCount: number;
+  onlineUsersCount: number;
   primaryColor?: string;
 }
 
-export const WelcomeCard = ({ user, activeUsersCount, primaryColor = '#1890ff' }: WelcomeCardProps) => {
+export const WelcomeCard = ({ user, onlineUsersCount, primaryColor = '#1890ff' }: WelcomeCardProps) => {
   const getGreeting = () => {
     const hour = dayjs().hour();
     if (hour < 12) return 'Good morning';
@@ -40,7 +40,7 @@ export const WelcomeCard = ({ user, activeUsersCount, primaryColor = '#1890ff' }
         </div>
         <div className={styles.welcomeMeta}>
           <div className={styles.metaItem}>
-            <span className={styles.metaValue}>{activeUsersCount}</span>
+            <span className={styles.metaValue}>{onlineUsersCount}</span>
             <span className={styles.metaLabel}>Users Online</span>
           </div>
           <div className={styles.metaItem}>

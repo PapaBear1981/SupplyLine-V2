@@ -64,6 +64,15 @@ export interface AdminStats {
   total_departments: number;
   active_announcements: number;
   total_roles: number;
+  online_users: number;
+}
+
+export interface OnlineUsersResponse {
+  online_count: number;
+  online_users: {
+    user_id: number;
+    last_activity: string | null;
+  }[];
 }
 
 export type { User, Department, UserRole };

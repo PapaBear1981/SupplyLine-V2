@@ -163,28 +163,8 @@ def register_rbac_routes(app):
 
         return jsonify({"message": "Role deleted successfully"})
 
-    # Get all permissions
-    @app.route("/api/permissions", methods=["GET"])
-    @permission_required("role.manage")
-    def get_permissions():
-        permissions = Permission.query.all()
-        return jsonify([permission.to_dict() for permission in permissions])
-
-    # Get permissions by category
-    @app.route("/api/permissions/categories", methods=["GET"])
-    @permission_required("role.manage")
-    def get_permissions_by_category():
-        permissions = Permission.query.all()
-
-        # Group permissions by category
-        categories = {}
-        for permission in permissions:
-            category = permission.category or "Uncategorized"
-            if category not in categories:
-                categories[category] = []
-            categories[category].append(permission.to_dict())
-
-        return jsonify(categories)
+    # NOTE: /api/permissions and /api/permissions/categories are defined in routes_permissions.py
+    # to return format expected by frontend
 
     # Get user roles
     @app.route("/api/users/<int:user_id>/roles", methods=["GET"])
