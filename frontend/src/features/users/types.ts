@@ -57,6 +57,7 @@ export interface User {
   permissions?: string[];  // Effective permissions
   role_permissions?: string[];  // Role-based permissions only
   user_permissions?: UserPermission[];  // User-specific grants/denies
+  is_totp_enabled?: boolean;
 }
 
 export interface Department {

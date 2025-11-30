@@ -12,12 +12,16 @@ import {
   message,
   Tag,
   Spin,
+  Alert,
 } from 'antd';
 import {
   UserOutlined,
   EditOutlined,
   LockOutlined,
   UploadOutlined,
+  SafetyCertificateOutlined,
+  CheckCircleOutlined,
+  CloseCircleOutlined,
 } from '@ant-design/icons';
 import type { UploadProps } from 'antd';
 import { useAppSelector, useAppDispatch } from '@app/hooks';
@@ -27,6 +31,8 @@ import { EditProfileModal } from '../components/EditProfileModal';
 import { ChangePasswordModal } from '../components/ChangePasswordModal';
 import { MobileProfile } from '../components/mobile';
 import { useIsMobile } from '@shared/hooks/useMobile';
+import { TotpSetupModal } from '../components/TotpSetupModal';
+import { TotpDisableModal } from '../components/TotpDisableModal';
 
 const { Title, Text } = Typography;
 
@@ -38,6 +44,8 @@ export const ProfilePage = () => {
   const [uploadAvatar, { isLoading: isUploading }] = useUploadAvatarMutation();
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isPasswordModalOpen, setIsPasswordModalOpen] = useState(false);
+  const [isTotpSetupModalOpen, setIsTotpSetupModalOpen] = useState(false);
+  const [isTotpDisableModalOpen, setIsTotpDisableModalOpen] = useState(false);
 
   // Render mobile version if on mobile device
   if (isMobile) {
@@ -204,6 +212,75 @@ export const ProfilePage = () => {
             </Descriptions.Item>
           </Descriptions>
         </Card>
+
+        {/* Security Settings - Two-Factor Authentication */}
+        <Card
+          title={
+            <Space>
+              <SafetyCertificateOutlined />
+              Security Settings
+            </Space>
+          }
+        >
+          <Space direction="vertical" size="middle" style={{ width: '100%' }}>
+            <Row justify="space-between" align="middle">
+              <Col>
+                <Space direction="vertical" size={0}>
+                  <Text strong>Two-Factor Authentication (2FA)</Text>
+                  <Text type="secondary">
+                    Add an extra layer of security to your account using an authenticator app
+                  </Text>
+                </Space>
+              </Col>
+              <Col>
+                {user.is_totp_enabled ? (
+                  <Space>
+                    <Tag icon={<CheckCircleOutlined />} color="success">
+                      Enabled
+                    </Tag>
+                    <Button
+                      danger
+                      onClick={() => setIsTotpDisableModalOpen(true)}
+                    >
+                      Disable 2FA
+                    </Button>
+                  </Space>
+                ) : (
+                  <Space>
+                    <Tag icon={<CloseCircleOutlined />} color="default">
+                      Not Enabled
+                    </Tag>
+                    <Button
+                      type="primary"
+                      icon={<SafetyCertificateOutlined />}
+                      onClick={() => setIsTotpSetupModalOpen(true)}
+                    >
+                      Enable 2FA
+                    </Button>
+                  </Space>
+                )}
+              </Col>
+            </Row>
+
+            {!user.is_totp_enabled && (
+              <Alert
+                message="Recommended: Enable Two-Factor Authentication"
+                description="Two-factor authentication adds an extra layer of security to your account. When enabled, you'll need to enter a code from your authenticator app in addition to your password when logging in."
+                type="info"
+                showIcon
+              />
+            )}
+
+            {user.is_totp_enabled && (
+              <Alert
+                message="Two-Factor Authentication is Active"
+                description="Your account is protected with 2FA. You'll need to enter a code from your authenticator app each time you log in."
+                type="success"
+                showIcon
+              />
+            )}
+          </Space>
+        </Card>
       </Space>
 
       {/* Modals */}
@@ -215,6 +292,14 @@ export const ProfilePage = () => {
       <ChangePasswordModal
         open={isPasswordModalOpen}
         onClose={() => setIsPasswordModalOpen(false)}
+      />
+      <TotpSetupModal
+        open={isTotpSetupModalOpen}
+        onClose={() => setIsTotpSetupModalOpen(false)}
+      />
+      <TotpDisableModal
+        open={isTotpDisableModalOpen}
+        onClose={() => setIsTotpDisableModalOpen(false)}
       />
     </div>
   );

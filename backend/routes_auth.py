@@ -113,6 +113,27 @@ def register_auth_routes(app):
             # Successful login - reset failed attempts
             user.reset_failed_login_attempts()
 
+            # Check if TOTP 2FA is enabled
+            if hasattr(user, "is_totp_enabled") and user.is_totp_enabled:
+                # Don't issue tokens yet - require TOTP verification
+                logger.info(f"TOTP required for user {user.id}")
+
+                activity = UserActivity(
+                    user_id=user.id,
+                    activity_type="login_pending_totp",
+                    description="Login pending TOTP verification",
+                    ip_address=request.remote_addr
+                )
+                db.session.add(activity)
+                db.session.commit()
+
+                return jsonify({
+                    "message": "Two-factor authentication required",
+                    "code": "TOTP_REQUIRED",
+                    "requires_totp": True,
+                    "employee_number": user.employee_number
+                }), 200
+
             # Enforce password expiry policy (90 days)
             if hasattr(user, "is_password_expired") and user.is_password_expired():
                 user.force_password_change = True
