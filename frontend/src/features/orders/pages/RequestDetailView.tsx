@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
   Card,
@@ -78,7 +78,7 @@ export const RequestDetailView: React.FC = () => {
       await updateRequest({ requestId: Number(requestId), updates: values }).unwrap();
       message.success('Request updated successfully');
       setIsEditModalVisible(false);
-    } catch (error) {
+    } catch {
       message.error('Failed to update request');
     }
   };
@@ -94,7 +94,7 @@ export const RequestDetailView: React.FC = () => {
             data: { items: [{ item_id: itemId }] },
           }).unwrap();
           message.success('Item marked as ordered');
-        } catch (error) {
+        } catch {
           message.error('Failed to mark item as ordered');
         }
       },
@@ -112,7 +112,7 @@ export const RequestDetailView: React.FC = () => {
             data: { item_ids: [itemId] },
           }).unwrap();
           message.success('Item marked as received');
-        } catch (error) {
+        } catch {
           message.error('Failed to mark item as received');
         }
       },

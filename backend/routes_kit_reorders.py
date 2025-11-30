@@ -31,6 +31,7 @@ def register_kit_reorder_routes(app):
     def create_reorder_request(kit_id):
         """Create a reorder request for a kit (supports both JSON and multipart/form-data for image uploads)"""
         kit = Kit.query.get_or_404(kit_id)
+        current_user_id = request.current_user.get("user_id")
 
         # Check if this is a multipart request (with image) or JSON
         if request.content_type and "multipart/form-data" in request.content_type:
@@ -102,14 +103,20 @@ def register_kit_reorder_routes(app):
         db.session.commit()
 
         # Log action
-        log_details = f"Reorder requested for kit {kit.name}: {reorder.part_number}. Request #{user_request.request_number} created."
-        if image_path:
-            log_details += " (with image)"
-        log = AuditLog(
-            action_type="kit_reorder_requested",
-            action_details=log_details
+        AuditLog.log(
+            user_id=current_user_id,
+            action="kit_reorder_requested",
+            resource_type="kit_reorder",
+            resource_id=reorder.id,
+            details={
+                "kit_id": kit.id,
+                "kit_name": kit.name,
+                "part_number": reorder.part_number,
+                "request_number": user_request.request_number,
+                "has_image": image_path is not None
+            },
+            ip_address=request.remote_addr
         )
-        db.session.add(log)
         db.session.commit()
 
         logger.info("Reorder request created", extra={"reorder_id": reorder.id, "request_number": user_request.request_number})
@@ -158,6 +165,7 @@ def register_kit_reorder_routes(app):
     @handle_errors
     def approve_reorder_request(id):
         """Approve a reorder request and create procurement order"""
+        current_user_id = request.current_user.get("user_id")
         reorder = KitReorderRequest.query.get_or_404(id)
 
         if reorder.status != "pending":
@@ -208,11 +216,18 @@ def register_kit_reorder_routes(app):
         db.session.commit()
 
         # Log action
-        log = AuditLog(
-            action_type="kit_reorder_approved",
-            action_details=f"Reorder request approved and ordered: ID {reorder.id}, ProcurementOrder ID {procurement_order.id}"
+        AuditLog.log(
+            user_id=current_user_id,
+            action="kit_reorder_approved",
+            resource_type="kit_reorder",
+            resource_id=reorder.id,
+            details={
+                "procurement_order_id": procurement_order.id,
+                "kit_id": reorder.kit_id,
+                "part_number": reorder.part_number
+            },
+            ip_address=request.remote_addr
         )
-        db.session.add(log)
         db.session.commit()
 
         logger.info("Created procurement order on approval", extra={
@@ -227,6 +242,7 @@ def register_kit_reorder_routes(app):
     @handle_errors
     def mark_reorder_ordered(id):
         """Mark a reorder request as ordered"""
+        current_user_id = request.current_user.get("user_id")
         reorder = KitReorderRequest.query.get_or_404(id)
 
         if reorder.status not in ["pending", "approved"]:
@@ -275,11 +291,18 @@ def register_kit_reorder_routes(app):
         db.session.commit()
 
         # Log action
-        log = AuditLog(
-            action_type="kit_reorder_ordered",
-            action_details=f"Reorder request marked as ordered: ID {reorder.id}, ProcurementOrder ID {procurement_order.id}"
+        AuditLog.log(
+            user_id=current_user_id,
+            action="kit_reorder_ordered",
+            resource_type="kit_reorder",
+            resource_id=reorder.id,
+            details={
+                "procurement_order_id": procurement_order.id,
+                "kit_id": reorder.kit_id,
+                "part_number": reorder.part_number
+            },
+            ip_address=request.remote_addr
         )
-        db.session.add(log)
         db.session.commit()
 
         logger.info("Created procurement order for kit reorder", extra={
@@ -294,6 +317,7 @@ def register_kit_reorder_routes(app):
     @handle_errors
     def fulfill_reorder_request(id):
         """Mark a reorder request as fulfilled"""
+        current_user_id = request.current_user.get("user_id")
         reorder = KitReorderRequest.query.get_or_404(id)
 
         logger.info("Fulfilling reorder request", extra={
@@ -357,11 +381,18 @@ def register_kit_reorder_routes(app):
                 })
 
                 # Log action
-                log = AuditLog(
-                    action_type="expendable_quantity_updated_via_reorder",
-                    action_details=f"Updated expendable {existing_expendable.part_number} quantity by {reorder.quantity_requested} via reorder request {reorder.id}"
+                AuditLog.log(
+                    user_id=current_user_id,
+                    action="expendable_quantity_updated_via_reorder",
+                    resource_type="expendable",
+                    resource_id=existing_expendable.id,
+                    details={
+                        "part_number": existing_expendable.part_number,
+                        "quantity_added": reorder.quantity_requested,
+                        "reorder_id": reorder.id
+                    },
+                    ip_address=request.remote_addr
                 )
-                db.session.add(log)
             else:
                 # Create new expendable with auto-generated lot number
                 from models import Expendable, LotNumberSequence
@@ -411,11 +442,20 @@ def register_kit_reorder_routes(app):
                 db.session.add(kit_item)
 
                 # Log action
-                log = AuditLog(
-                    action_type="expendable_added_via_reorder",
-                    action_details=f"Added expendable {expendable.part_number} (lot={lot_number}) to kit {reorder.kit.name} via reorder request {reorder.id}"
+                AuditLog.log(
+                    user_id=current_user_id,
+                    action="expendable_added_via_reorder",
+                    resource_type="expendable",
+                    resource_id=expendable.id,
+                    details={
+                        "part_number": expendable.part_number,
+                        "lot_number": lot_number,
+                        "kit_id": reorder.kit_id,
+                        "kit_name": reorder.kit.name,
+                        "reorder_id": reorder.id
+                    },
+                    ip_address=request.remote_addr
                 )
-                db.session.add(log)
 
                 logger.info("Created expendable and kit item for reorder", extra={
                     "expendable_id": expendable.id,
@@ -668,11 +708,19 @@ def register_kit_reorder_routes(app):
         db.session.commit()
 
         # Log action
-        log = AuditLog(
-            action_type="kit_reorder_fulfilled",
-            action_details=f"Reorder request fulfilled: ID {reorder.id}, added to box {box.box_number}"
+        AuditLog.log(
+            user_id=current_user_id,
+            action="kit_reorder_fulfilled",
+            resource_type="kit_reorder",
+            resource_id=reorder.id,
+            details={
+                "kit_id": reorder.kit_id,
+                "box_id": box.id,
+                "box_number": box.box_number,
+                "item_type": reorder.item_type
+            },
+            ip_address=request.remote_addr
         )
-        db.session.add(log)
         db.session.commit()
 
         return jsonify(reorder.to_dict()), 200
@@ -682,6 +730,7 @@ def register_kit_reorder_routes(app):
     @handle_errors
     def cancel_reorder_request(id):
         """Cancel a reorder request"""
+        current_user_id = request.current_user.get("user_id")
         reorder = KitReorderRequest.query.get_or_404(id)
 
         if reorder.status in ["fulfilled", "cancelled"]:
@@ -700,11 +749,17 @@ def register_kit_reorder_routes(app):
         db.session.commit()
 
         # Log action
-        log = AuditLog(
-            action_type="kit_reorder_cancelled",
-            action_details=f"Reorder request cancelled: ID {reorder.id}"
+        AuditLog.log(
+            user_id=current_user_id,
+            action="kit_reorder_cancelled",
+            resource_type="kit_reorder",
+            resource_id=reorder.id,
+            details={
+                "kit_id": reorder.kit_id,
+                "part_number": reorder.part_number
+            },
+            ip_address=request.remote_addr
         )
-        db.session.add(log)
         db.session.commit()
 
         return jsonify(reorder.to_dict()), 200

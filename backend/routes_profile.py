@@ -11,23 +11,23 @@ This module provides endpoints for user profile management including:
 import logging
 import os
 from datetime import datetime
-from flask import Blueprint, jsonify, request, current_app
+
+from flask import Blueprint, current_app, jsonify, request
 from werkzeug.utils import secure_filename
+
 from auth.jwt_manager import jwt_required as login_required
-from models import User, UserActivity, AuditLog, db
-import utils as password_utils
-from utils.error_handler import handle_errors
+from models import AuditLog, User, UserActivity, db
 
 logger = logging.getLogger(__name__)
 
 # Create blueprint
 profile_bp = Blueprint("profile", __name__)
 
-ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif'}
+ALLOWED_EXTENSIONS = {"png", "jpg", "jpeg", "gif"}
 MAX_FILE_SIZE = 2 * 1024 * 1024  # 2MB
 
 def allowed_file(filename):
-    return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
+    return "." in filename and filename.rsplit(".", 1)[1].lower() in ALLOWED_EXTENSIONS
 
 def register_profile_routes(app):
     """Register profile routes"""
@@ -66,7 +66,7 @@ def get_profile():
         return jsonify(profile_data), 200
 
     except Exception as e:
-        logger.error(f"Error getting profile: {str(e)}")
+        logger.error(f"Error getting profile: {e!s}")
         return jsonify({"error": "Failed to get profile"}), 500
 
 
@@ -83,6 +83,7 @@ def update_profile():
             return jsonify({"error": "User not found"}), 404
 
         data = request.get_json() or {}
+        current_user_id = request.current_user.get("user_id")
 
         # Update fields
         first_name = data.get("first_name", "").strip()
@@ -118,11 +119,17 @@ def update_profile():
         )
         db.session.add(activity)
 
-        audit_log = AuditLog(
-            action_type="profile_update",
-            action_details=f"User {user.id} ({user.name}) updated profile"
+        AuditLog.log(
+            user_id=current_user_id,
+            action="profile_update",
+            resource_type="user",
+            resource_id=user.id,
+            details={
+                "user_name": user.name,
+                "email": user.email
+            },
+            ip_address=request.remote_addr
         )
-        db.session.add(audit_log)
         db.session.commit()
 
         logger.info(f"Profile updated for user {user.id}")
@@ -142,7 +149,7 @@ def update_profile():
         }), 200
 
     except Exception as e:
-        logger.error(f"Error updating profile: {str(e)}")
+        logger.error(f"Error updating profile: {e!s}")
         db.session.rollback()
         return jsonify({"error": "Failed to update profile"}), 500
 
@@ -160,6 +167,7 @@ def change_password():
             return jsonify({"error": "User not found"}), 404
 
         data = request.get_json() or {}
+        current_user_id = request.current_user.get("user_id")
         current_password = data.get("current_password", "").strip()
         new_password = data.get("new_password", "").strip()
         confirm_password = data.get("confirm_password", "").strip()
@@ -206,11 +214,16 @@ def change_password():
         )
         db.session.add(activity)
 
-        audit_log = AuditLog(
-            action_type="password_change",
-            action_details=f"User {user.id} ({user.name}) changed password"
+        AuditLog.log(
+            user_id=current_user_id,
+            action="password_change",
+            resource_type="user",
+            resource_id=user.id,
+            details={
+                "user_name": user.name
+            },
+            ip_address=request.remote_addr
         )
-        db.session.add(audit_log)
         db.session.commit()
 
         logger.info(f"Password changed for user {user.id}")
@@ -218,7 +231,7 @@ def change_password():
         return jsonify({"message": "Password changed successfully"}), 200
 
     except Exception as e:
-        logger.error(f"Error changing password: {str(e)}")
+        logger.error(f"Error changing password: {e!s}")
         db.session.rollback()
         return jsonify({"error": "Failed to change password"}), 500
 
@@ -236,12 +249,12 @@ def upload_avatar():
             return jsonify({"error": "User not found"}), 404
 
         # Check if file is in request
-        if 'avatar' not in request.files:
+        if "avatar" not in request.files:
             return jsonify({"error": "No file provided"}), 400
 
-        file = request.files['avatar']
+        file = request.files["avatar"]
 
-        if file.filename == '':
+        if file.filename == "":
             return jsonify({"error": "No file selected"}), 400
 
         if not allowed_file(file.filename):
@@ -261,7 +274,7 @@ def upload_avatar():
         filename = f"avatar_{user_id}_{timestamp}_{filename}"
 
         # Ensure upload directory exists
-        upload_dir = os.path.join(current_app.root_path, 'static', 'uploads', 'avatars')
+        upload_dir = os.path.join(current_app.root_path, "static", "uploads", "avatars")
         os.makedirs(upload_dir, exist_ok=True)
 
         # Save file
@@ -273,12 +286,12 @@ def upload_avatar():
 
         # Delete old avatar if exists
         if user.avatar:
-            old_filepath = os.path.join(current_app.root_path, user.avatar.lstrip('/'))
+            old_filepath = os.path.join(current_app.root_path, user.avatar.lstrip("/"))
             if os.path.exists(old_filepath):
                 try:
                     os.remove(old_filepath)
                 except Exception as e:
-                    logger.warning(f"Failed to delete old avatar: {str(e)}")
+                    logger.warning(f"Failed to delete old avatar: {e!s}")
 
         user.avatar = avatar_url
         db.session.commit()
@@ -298,6 +311,6 @@ def upload_avatar():
         return jsonify({"avatar_url": avatar_url}), 200
 
     except Exception as e:
-        logger.error(f"Error uploading avatar: {str(e)}")
+        logger.error(f"Error uploading avatar: {e!s}")
         db.session.rollback()
         return jsonify({"error": "Failed to upload avatar"}), 500

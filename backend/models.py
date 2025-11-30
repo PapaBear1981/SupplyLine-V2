@@ -1,3 +1,4 @@
+import logging
 from datetime import datetime, timedelta
 
 from flask_sqlalchemy import SQLAlchemy
@@ -596,34 +597,54 @@ class ToolHistory(db.Model):
 class AuditLog(db.Model):
     __tablename__ = "audit_log"
     id = db.Column(db.Integer, primary_key=True)
-    user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=True)
-    action = db.Column(db.String, nullable=False)  # Legacy column - populated from action_type
-    action_type = db.Column(db.String, nullable=True)  # New column
-    action_details = db.Column(db.String)
-    resource_type = db.Column(db.String, nullable=True)
-    resource_id = db.Column(db.Integer, nullable=True)
-    details = db.Column(db.JSON, nullable=True)
-    ip_address = db.Column(db.String, nullable=True)
+    user_id = db.Column(db.Integer, db.ForeignKey("users.id"))
+    action = db.Column(db.String, nullable=False)
+    resource_type = db.Column(db.String)
+    resource_id = db.Column(db.Integer)
+    details = db.Column(db.JSON)
+    ip_address = db.Column(db.String)
     timestamp = db.Column(db.DateTime, default=get_current_time)
 
-    def __init__(self, action_type=None, action_details=None, user_id=None,
+    # Deprecated fields (for backwards compatibility with old code)
+    action_type = db.Column(db.String)
+    action_details = db.Column(db.String)
+
+    def __init__(self, action=None, action_type=None, action_details=None, user_id=None,
                  resource_type=None, resource_id=None, details=None, ip_address=None, **kwargs):
         """Initialize AuditLog with backward compatibility.
 
-        The 'action' column is required by the database schema but we want to use
-        'action_type' in the code. This constructor automatically populates 'action'
-        from 'action_type' if not explicitly provided.
+        Supports both old-style (action_type, action_details) and new-style (action, details) creation.
         """
         super().__init__(**kwargs)
-        self.action_type = action_type
+        # Support both old and new field names
+        self.action = action or action_type or "unknown"
+        self.action_type = action_type or action
         self.action_details = action_details
         self.user_id = user_id
         self.resource_type = resource_type
         self.resource_id = resource_id
         self.details = details
         self.ip_address = ip_address
-        # Populate legacy 'action' column from action_type
-        self.action = action_type or "unknown"
+
+    @staticmethod
+    def log(user_id, action, resource_type=None, resource_id=None, details=None, ip_address=None):
+        """Create an audit log entry"""
+        try:
+            log_entry = AuditLog(
+                user_id=user_id,
+                action=action,
+                resource_type=resource_type,
+                resource_id=resource_id,
+                details=details,
+                ip_address=ip_address
+            )
+            db.session.add(log_entry)
+            db.session.commit()
+        except Exception as e:
+            # Log the error but don't fail the main operation
+            logger = logging.getLogger(__name__)
+            logger.error(f"Failed to create audit log: {e}")
+            db.session.rollback()
 
 
 class UserActivity(db.Model):

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Card, Form, Input, Select, Button, Space, message, Typography, Table, Modal, InputNumber } from 'antd';
 import { ArrowLeftOutlined, SaveOutlined, PlusOutlined, DeleteOutlined } from '@ant-design/icons';
@@ -38,7 +38,7 @@ export const RequestCreationForm: React.FC = () => {
       const result = await createRequest({ ...values, items }).unwrap();
       message.success('Request created successfully');
       navigate(`/requests/${result.id}`);
-    } catch (error) {
+    } catch {
       message.error('Failed to create request');
     }
   };

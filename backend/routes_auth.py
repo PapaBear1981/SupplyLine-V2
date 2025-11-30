@@ -125,11 +125,14 @@ def register_auth_routes(app):
                 )
                 db.session.add(activity)
 
-                audit_log = AuditLog(
-                    action_type="password_expired",
-                    action_details=f"User {user.id} ({user.name}) password expired"
+                AuditLog.log(
+                    user_id=user.id,
+                    action="password_expired",
+                    resource_type="user",
+                    resource_id=user.id,
+                    details={"name": user.name},
+                    ip_address=request.remote_addr
                 )
-                db.session.add(audit_log)
                 db.session.commit()
 
                 return jsonify({
@@ -161,11 +164,14 @@ def register_auth_routes(app):
             )
             db.session.add(activity)
 
-            audit_log = AuditLog(
-                action_type="user_login",
-                action_details=f"User {user.id} ({user.name}) logged in with JWT"
+            # Use AuditLog.log() method to ensure all required fields are set
+            AuditLog.log(
+                user_id=user.id,
+                action="user_login",
+                resource_type="auth",
+                details={"name": user.name, "employee_number": user.employee_number},
+                ip_address=request.remote_addr
             )
-            db.session.add(audit_log)
             db.session.commit()
 
             logger.info(f"Successful JWT login for user {user.id} ({user.name})")
@@ -292,11 +298,13 @@ def register_auth_routes(app):
             )
             db.session.add(activity)
 
-            audit_log = AuditLog(
-                action_type="user_logout",
-                action_details=f'User {user_id} ({user_payload["user_name"]}) logged out'
+            AuditLog.log(
+                user_id=user_id,
+                action="user_logout",
+                resource_type="auth",
+                details={"name": user_payload["user_name"]},
+                ip_address=request.remote_addr
             )
-            db.session.add(audit_log)
             db.session.commit()
 
             logger.info(f"User {user_id} logged out successfully")
@@ -475,11 +483,14 @@ def register_auth_routes(app):
             )
             db.session.add(activity)
 
-            audit_log = AuditLog(
-                action_type="password_change",
-                action_details=f"User {user.id} ({user.name}) changed password (forced)"
+            AuditLog.log(
+                user_id=user.id,
+                action="password_change",
+                resource_type="user",
+                resource_id=user.id,
+                details={"name": user.name, "forced": True},
+                ip_address=request.remote_addr
             )
-            db.session.add(audit_log)
             db.session.commit()
 
             logger.info(f"User {user.id} successfully changed password (forced)")

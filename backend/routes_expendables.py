@@ -65,7 +65,7 @@ def generate_serial_number(part_number):
 @handle_errors
 def add_expendable_to_kit(kit_id):
     """
-    Add a new expendable directly to a kit.
+        Add a new expendable directly to a kit.
 
     Required fields:
         - box_id: ID of the box within the kit
@@ -88,6 +88,7 @@ def add_expendable_to_kit(kit_id):
         - All expendables must have either a lot number or serial number
         - The combination of part_number + lot/serial must be unique across the system
     """
+    current_user_id = request.current_user.get("user_id")
     kit = Kit.query.get_or_404(kit_id)
     data = request.get_json() or {}
 
@@ -182,11 +183,22 @@ def add_expendable_to_kit(kit_id):
         db.session.add(kit_item)
 
         # Log action
-        log = AuditLog(
-            action_type="expendable_added_to_kit",
-            action_details=f"Added expendable {expendable.part_number} ({tracking_type}={lot_number or serial_number}) to kit {kit.name}, box {box.box_number}"
+        AuditLog.log(
+            user_id=current_user_id,
+            action="expendable_added_to_kit",
+            resource_type="expendable",
+            resource_id=expendable.id,
+            details={
+                "part_number": expendable.part_number,
+                "tracking_type": tracking_type,
+                "tracking_value": lot_number or serial_number,
+                "kit_id": kit.id,
+                "kit_name": kit.name,
+                "box_id": box.id,
+                "box_number": box.box_number
+            },
+            ip_address=request.remote_addr
         )
-        db.session.add(log)
 
         db.session.commit()
 
@@ -212,7 +224,7 @@ def add_expendable_to_kit(kit_id):
 @handle_errors
 def update_expendable(kit_id, expendable_id):
     """
-    Update an expendable in a kit.
+        Update an expendable in a kit.
 
     Updatable fields:
         - quantity: Update quantity
@@ -221,6 +233,7 @@ def update_expendable(kit_id, expendable_id):
         - minimum_stock_level: Update minimum stock level
         - notes: Update notes
     """
+    current_user_id = request.current_user.get("user_id")
     kit = Kit.query.get_or_404(kit_id)
     expendable = Expendable.query.get_or_404(expendable_id)
 
@@ -260,11 +273,18 @@ def update_expendable(kit_id, expendable_id):
     kit_item.last_updated = datetime.now()
 
     # Log action
-    log = AuditLog(
-        action_type="expendable_updated",
-        action_details=f"Updated expendable {expendable.part_number} in kit {kit.name}"
+    AuditLog.log(
+        user_id=current_user_id,
+        action="expendable_updated",
+        resource_type="expendable",
+        resource_id=expendable.id,
+        details={
+            "part_number": expendable.part_number,
+            "kit_id": kit.id,
+            "kit_name": kit.name
+        },
+        ip_address=request.remote_addr
     )
-    db.session.add(log)
 
     db.session.commit()
 
@@ -280,9 +300,10 @@ def update_expendable(kit_id, expendable_id):
 @handle_errors
 def remove_expendable_from_kit(kit_id, expendable_id):
     """
-    Remove an expendable from a kit.
+        Remove an expendable from a kit.
     This deletes both the KitItem and the Expendable record.
     """
+    current_user_id = request.current_user.get("user_id")
     kit = Kit.query.get_or_404(kit_id)
     expendable = Expendable.query.get_or_404(expendable_id)
 
@@ -297,11 +318,18 @@ def remove_expendable_from_kit(kit_id, expendable_id):
         raise ValidationError("Expendable not found in this kit")
 
     # Log action before deletion
-    log = AuditLog(
-        action_type="expendable_removed_from_kit",
-        action_details=f"Removed expendable {expendable.part_number} from kit {kit.name}"
+    AuditLog.log(
+        user_id=current_user_id,
+        action="expendable_removed_from_kit",
+        resource_type="expendable",
+        resource_id=expendable.id,
+        details={
+            "part_number": expendable.part_number,
+            "kit_id": kit.id,
+            "kit_name": kit.name
+        },
+        ip_address=request.remote_addr
     )
-    db.session.add(log)
 
     # Delete KitItem and Expendable
     db.session.delete(kit_item)
@@ -409,7 +437,7 @@ def get_expendable_barcode(expendable_id):
 @handle_errors
 def transfer_expendable_between_kits():
     """
-    Transfer an expendable from one kit to another.
+        Transfer an expendable from one kit to another.
 
     Required fields:
         - from_kit_id: Source kit ID
@@ -426,6 +454,7 @@ def transfer_expendable_between_kits():
         - Serial-tracked expendables must be transferred as whole items
         - Partial transfers of lot-tracked items create child lots for traceability
     """
+    current_user_id = request.current_user.get("user_id")
     data = request.get_json() or {}
 
     # Validate required fields
@@ -578,11 +607,27 @@ def transfer_expendable_between_kits():
             expendable.location = data["location"]
 
     # Log action
-    log = AuditLog(
-        action_type="expendable_transferred_between_kits",
-        action_details=f"Transferred expendable {expendable.part_number} ({tracking_type}={tracking_id}) qty {transfer_quantity} from kit {from_kit.name} to kit {to_kit.name}, box {to_box.box_number}"
+    tracking_id = expendable.lot_number or expendable.serial_number
+    tracking_type = "lot" if expendable.lot_number else "serial"
+    AuditLog.log(
+        user_id=current_user_id,
+        action="expendable_transferred_between_kits",
+        resource_type="expendable",
+        resource_id=expendable.id,
+        details={
+            "part_number": expendable.part_number,
+            "tracking_type": tracking_type,
+            "tracking_value": tracking_id,
+            "from_kit_id": from_kit.id,
+            "from_kit_name": from_kit.name,
+            "to_kit_id": to_kit.id,
+            "to_kit_name": to_kit.name,
+            "to_box_id": to_box.id,
+            "to_box_number": to_box.box_number,
+            "quantity_transferred": transfer_quantity
+        },
+        ip_address=request.remote_addr
     )
-    db.session.add(log)
 
     db.session.commit()
 

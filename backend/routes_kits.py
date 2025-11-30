@@ -12,7 +12,16 @@ from sqlalchemy import and_, or_
 
 from auth import admin_required, department_required, jwt_required
 from models import AuditLog, Chemical, Tool, Warehouse, WarehouseTransfer, db
-from models_kits import AircraftType, Kit, KitBox, KitExpendable, KitIssuance, KitItem, KitReorderRequest, KitTransfer
+from models_kits import (
+    AircraftType,
+    Kit,
+    KitBox,
+    KitExpendable,
+    KitIssuance,
+    KitItem,
+    KitReorderRequest,
+    KitTransfer,
+)
 from utils.error_handler import ValidationError, handle_errors
 
 
@@ -48,6 +57,7 @@ def register_kit_routes(app):
     def create_aircraft_type():
         """Create a new aircraft type (admin only)"""
         data = request.get_json() or {}
+        current_user_id = request.current_user.get("user_id")
 
         # Validate required fields
         if not data.get("name"):
@@ -69,12 +79,14 @@ def register_kit_routes(app):
         db.session.commit()
 
         # Log action
-        log = AuditLog(
-            action_type="aircraft_type_created",
-            action_details=f"Created aircraft type: {aircraft_type.name}"
+        AuditLog.log(
+            user_id=current_user_id,
+            action="aircraft_type_created",
+            resource_type="aircraft_type",
+            resource_id=aircraft_type.id,
+            details={"name": aircraft_type.name},
+            ip_address=request.remote_addr
         )
-        db.session.add(log)
-        db.session.commit()
 
         logger.info(f"Aircraft type created: {aircraft_type.name}")
         return jsonify(aircraft_type.to_dict()), 201
@@ -86,6 +98,7 @@ def register_kit_routes(app):
         """Update an aircraft type (admin only)"""
         aircraft_type = AircraftType.query.get_or_404(id)
         data = request.get_json() or {}
+        current_user_id = request.current_user.get("user_id")
 
         # Update fields
         if "name" in data and data["name"] != aircraft_type.name:
@@ -104,12 +117,14 @@ def register_kit_routes(app):
         db.session.commit()
 
         # Log action
-        log = AuditLog(
-            action_type="aircraft_type_updated",
-            action_details=f"Updated aircraft type: {aircraft_type.name}"
+        AuditLog.log(
+            user_id=current_user_id,
+            action="aircraft_type_updated",
+            resource_type="aircraft_type",
+            resource_id=aircraft_type.id,
+            details={"name": aircraft_type.name},
+            ip_address=request.remote_addr
         )
-        db.session.add(log)
-        db.session.commit()
 
         return jsonify(aircraft_type.to_dict()), 200
 
@@ -119,6 +134,7 @@ def register_kit_routes(app):
     def deactivate_aircraft_type(id):
         """Deactivate an aircraft type (admin only)"""
         aircraft_type = AircraftType.query.get_or_404(id)
+        current_user_id = request.current_user.get("user_id")
 
         # Check if any active kits use this type
         active_kits = Kit.query.filter_by(aircraft_type_id=id, status="active").count()
@@ -129,12 +145,14 @@ def register_kit_routes(app):
         db.session.commit()
 
         # Log action
-        log = AuditLog(
-            action_type="aircraft_type_deactivated",
-            action_details=f"Deactivated aircraft type: {aircraft_type.name}"
+        AuditLog.log(
+            user_id=current_user_id,
+            action="aircraft_type_deactivated",
+            resource_type="aircraft_type",
+            resource_id=aircraft_type.id,
+            details={"name": aircraft_type.name},
+            ip_address=request.remote_addr
         )
-        db.session.add(log)
-        db.session.commit()
 
         result = aircraft_type.to_dict()
         result["message"] = "Aircraft type deactivated successfully"
@@ -175,6 +193,7 @@ def register_kit_routes(app):
     def create_kit():
         """Create a new kit"""
         data = request.get_json() or {}
+        current_user_id = request.current_user.get("user_id")
 
         # Validate required fields
         if not data.get("name"):
@@ -218,12 +237,14 @@ def register_kit_routes(app):
         db.session.commit()
 
         # Log action
-        log = AuditLog(
-            action_type="kit_created",
-            action_details=f"Created kit: {kit.name}"
+        AuditLog.log(
+            user_id=current_user_id,
+            action="kit_created",
+            resource_type="kit",
+            resource_id=kit.id,
+            details={"name": kit.name},
+            ip_address=request.remote_addr
         )
-        db.session.add(log)
-        db.session.commit()
 
         logger.info(f"Kit created: {kit.name}")
         return jsonify(kit.to_dict(include_details=True)), 201
@@ -235,6 +256,7 @@ def register_kit_routes(app):
         """Update a kit"""
         kit = Kit.query.get_or_404(id)
         data = request.get_json() or {}
+        current_user_id = request.current_user.get("user_id")
 
         # Update fields
         if "name" in data and data["name"] != kit.name:
@@ -281,8 +303,9 @@ def register_kit_routes(app):
                 full_address = ", ".join(address_parts)
                 logger.info(f"Attempting to geocode: {full_address}")
                 try:
-                    import requests
                     from urllib.parse import quote
+
+                    import requests
 
                     # Use Nominatim (OpenStreetMap) geocoding service
                     encoded_address = quote(full_address)
@@ -291,7 +314,7 @@ def register_kit_routes(app):
                     logger.info(f"Geocoding URL: {geocode_url}")
                     response = requests.get(
                         geocode_url,
-                        headers={'User-Agent': 'SupplyLine-MRO-Suite/1.0'},
+                        headers={"User-Agent": "SupplyLine-MRO-Suite/1.0"},
                         timeout=5
                     )
 
@@ -300,14 +323,14 @@ def register_kit_routes(app):
                         results = response.json()
                         logger.info(f"Geocoding results: {results}")
                         if results and len(results) > 0:
-                            kit.latitude = float(results[0]['lat'])
-                            kit.longitude = float(results[0]['lon'])
+                            kit.latitude = float(results[0]["lat"])
+                            kit.longitude = float(results[0]["lon"])
                             logger.info(f"Geocoded address '{full_address}' to ({kit.latitude}, {kit.longitude})")
                     else:
                         logger.warning(f"Geocoding API returned status {response.status_code}")
                 except Exception as e:
                     # Don't fail the update if geocoding fails, just log it
-                    logger.warning(f"Geocoding failed for address '{full_address}': {str(e)}")
+                    logger.warning(f"Geocoding failed for address '{full_address}': {e!s}")
                     import traceback
                     logger.warning(f"Traceback: {traceback.format_exc()}")
             else:
@@ -316,12 +339,14 @@ def register_kit_routes(app):
         db.session.commit()
 
         # Log action
-        log = AuditLog(
-            action_type="kit_updated",
-            action_details=f"Updated kit: {kit.name}"
+        AuditLog.log(
+            user_id=current_user_id,
+            action="kit_updated",
+            resource_type="kit",
+            resource_id=kit.id,
+            details={"name": kit.name},
+            ip_address=request.remote_addr
         )
-        db.session.add(log)
-        db.session.commit()
 
         return jsonify(kit.to_dict(include_details=True)), 200
 
@@ -331,6 +356,7 @@ def register_kit_routes(app):
     def delete_kit(id):
         """Delete a kit (soft delete by setting status to inactive)"""
         kit = Kit.query.get_or_404(id)
+        current_user_id = request.current_user.get("user_id")
 
         # Check if kit has active items
         active_items = kit.items.filter_by(status="available").count()
@@ -341,12 +367,14 @@ def register_kit_routes(app):
         db.session.commit()
 
         # Log action
-        log = AuditLog(
-            action_type="kit_deleted",
-            action_details=f"Deleted kit: {kit.name}"
+        AuditLog.log(
+            user_id=current_user_id,
+            action="kit_deleted",
+            resource_type="kit",
+            resource_id=kit.id,
+            details={"name": kit.name},
+            ip_address=request.remote_addr
         )
-        db.session.add(log)
-        db.session.commit()
 
         return jsonify({"message": "Kit deleted successfully"}), 200
 
@@ -357,6 +385,7 @@ def register_kit_routes(app):
         """Duplicate a kit as a template"""
         source_kit = Kit.query.get_or_404(id)
         data = request.get_json() or {}
+        current_user_id = request.current_user.get("user_id")
 
         # Validate new kit name
         if not data.get("name"):
@@ -392,12 +421,14 @@ def register_kit_routes(app):
         db.session.commit()
 
         # Log action
-        log = AuditLog(
-            action_type="kit_duplicated",
-            action_details=f"Duplicated kit {source_kit.name} to {new_kit.name}"
+        AuditLog.log(
+            user_id=current_user_id,
+            action="kit_duplicated",
+            resource_type="kit",
+            resource_id=new_kit.id,
+            details={"source_kit": source_kit.name, "new_kit": new_kit.name},
+            ip_address=request.remote_addr
         )
-        db.session.add(log)
-        db.session.commit()
 
         logger.info(f"Kit duplicated: {source_kit.name} -> {new_kit.name}")
         return jsonify(new_kit.to_dict(include_details=True)), 201
@@ -470,6 +501,7 @@ def register_kit_routes(app):
         """Update a kit's location information"""
         kit = Kit.query.get_or_404(id)
         data = request.get_json() or {}
+        current_user_id = request.current_user.get("user_id")
 
         # Update location fields
         location_fields = [
@@ -484,12 +516,14 @@ def register_kit_routes(app):
         db.session.commit()
 
         # Log action
-        log = AuditLog(
-            action_type="kit_location_updated",
-            action_details=f"Updated location for kit: {kit.name}"
+        AuditLog.log(
+            user_id=current_user_id,
+            action="kit_location_updated",
+            resource_type="kit",
+            resource_id=kit.id,
+            details={"name": kit.name},
+            ip_address=request.remote_addr
         )
-        db.session.add(log)
-        db.session.commit()
 
         return jsonify({
             "message": "Kit location updated successfully",
@@ -555,6 +589,8 @@ def register_kit_routes(app):
             if not data.get("name") or not data.get("aircraft_type_id"):
                 raise ValidationError("Missing required fields")
 
+            current_user_id = request.current_user.get("user_id")
+
             # Create kit
             kit = Kit(
                 name=data["name"],
@@ -581,12 +617,14 @@ def register_kit_routes(app):
             db.session.commit()
 
             # Log action
-            log = AuditLog(
-                action_type="kit_created_wizard",
-                action_details=f"Created kit via wizard: {kit.name}"
+            AuditLog.log(
+                user_id=current_user_id,
+                action="kit_created_wizard",
+                resource_type="kit",
+                resource_id=kit.id,
+                details={"name": kit.name},
+                ip_address=request.remote_addr
             )
-            db.session.add(log)
-            db.session.commit()
 
             return jsonify({
                 "step": 4,
@@ -614,6 +652,7 @@ def register_kit_routes(app):
         """Add a box to a kit"""
         kit = Kit.query.get_or_404(kit_id)
         data = request.get_json() or {}
+        current_user_id = request.current_user.get("user_id")
 
         # Validate required fields
         if not data.get("box_number"):
@@ -638,12 +677,14 @@ def register_kit_routes(app):
         db.session.commit()
 
         # Log action
-        log = AuditLog(
-            action_type="kit_box_added",
-            action_details=f"Added box {box.box_number} to kit {kit.name}"
+        AuditLog.log(
+            user_id=current_user_id,
+            action="kit_box_added",
+            resource_type="kit_box",
+            resource_id=box.id,
+            details={"box_number": box.box_number, "kit_name": kit.name, "kit_id": kit.id},
+            ip_address=request.remote_addr
         )
-        db.session.add(log)
-        db.session.commit()
 
         return jsonify(box.to_dict()), 201
 
@@ -784,6 +825,7 @@ def register_kit_routes(app):
         """Add an item to a kit (transfer from warehouse)"""
         kit = Kit.query.get_or_404(kit_id)
         data = request.get_json() or {}
+        current_user_id = request.current_user.get("user_id")
 
         # Validate required fields
         if not data.get("box_id"):
@@ -876,12 +918,14 @@ def register_kit_routes(app):
         db.session.commit()
 
         # Log action
-        log = AuditLog(
-            action_type="kit_item_added",
-            action_details=f'Transferred {data["item_type"]} from warehouse {warehouse.name} to kit {kit.name}'
+        AuditLog.log(
+            user_id=current_user_id,
+            action="kit_item_added",
+            resource_type="kit_item",
+            resource_id=kit_item.id,
+            details={"item_type": data["item_type"], "warehouse_name": warehouse.name, "kit_name": kit.name, "kit_id": kit.id},
+            ip_address=request.remote_addr
         )
-        db.session.add(log)
-        db.session.commit()
 
         return jsonify(kit_item.to_dict()), 201
 
@@ -969,6 +1013,7 @@ def register_kit_routes(app):
         """Manually add an expendable to a kit"""
         kit = Kit.query.get_or_404(kit_id)
         data = request.get_json() or {}
+        current_user_id = request.current_user.get("user_id")
 
         # Validate required fields
         if not data.get("box_id"):
@@ -1065,12 +1110,14 @@ def register_kit_routes(app):
         db.session.commit()
 
         # Log action
-        log = AuditLog(
-            action_type="kit_expendable_added",
-            action_details=f"Added expendable {expendable.part_number} to kit {kit.name}"
+        AuditLog.log(
+            user_id=current_user_id,
+            action="kit_expendable_added",
+            resource_type="kit_expendable",
+            resource_id=expendable.id,
+            details={"part_number": expendable.part_number, "kit_name": kit.name, "kit_id": kit.id},
+            ip_address=request.remote_addr
         )
-        db.session.add(log)
-        db.session.commit()
 
         return jsonify(expendable.to_dict()), 201
 
@@ -1118,6 +1165,7 @@ def register_kit_routes(app):
 
         kit = Kit.query.get_or_404(kit_id)
         data = request.get_json() or {}
+        current_user_id = request.current_user.get("user_id")
 
         # Validate required fields
         if not data.get("item_type"):
@@ -1262,12 +1310,14 @@ def register_kit_routes(app):
         db.session.commit()
 
         # Log action
-        log = AuditLog(
-            action_type="kit_item_issued",
-            action_details=f'Issued {quantity} {data["item_type"]} from kit {kit.name}'
+        AuditLog.log(
+            user_id=current_user_id,
+            action="kit_item_issued",
+            resource_type="kit_issuance",
+            resource_id=issuance.id,
+            details={"quantity": quantity, "item_type": data["item_type"], "kit_name": kit.name, "kit_id": kit.id},
+            ip_address=request.remote_addr
         )
-        db.session.add(log)
-        db.session.commit()
 
         return jsonify(issuance.to_dict()), 201
 

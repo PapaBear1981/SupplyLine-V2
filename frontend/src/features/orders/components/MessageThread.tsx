@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import {
   Card,
   List,
@@ -61,7 +61,7 @@ export const MessageThread: React.FC<MessageThreadProps> = ({
       form.resetFields();
       setReplyToId(null);
       antdMessage.success('Message sent successfully');
-    } catch (error) {
+    } catch {
       antdMessage.error('Failed to send message');
     } finally {
       setSending(false);
@@ -73,7 +73,7 @@ export const MessageThread: React.FC<MessageThreadProps> = ({
       try {
         await onMarkAsRead(messageId);
         antdMessage.success('Message marked as read');
-      } catch (error) {
+      } catch {
         antdMessage.error('Failed to mark message as read');
       }
     }

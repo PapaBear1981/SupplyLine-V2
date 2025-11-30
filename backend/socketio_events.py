@@ -7,10 +7,10 @@ from datetime import UTC, datetime
 from functools import wraps
 
 from flask import request
-from flask_jwt_extended import decode_token
 from flask_socketio import emit, join_room, leave_room
 from jwt.exceptions import ExpiredSignatureError, InvalidTokenError
 
+from auth.jwt_manager import JWTManager
 from models import db
 from models_kits import KitMessage
 from models_messaging import ChannelMember, ChannelMessage, MessageReaction, UserPresence
@@ -33,8 +33,12 @@ def authenticated_only(f):
             return None
 
         try:
-            decoded_token = decode_token(token)
-            user_id = decoded_token.get("sub")
+            decoded_token = JWTManager.verify_token(token, token_type="access")
+            if not decoded_token:
+                emit("error", {"message": "Invalid token"})
+                return None
+
+            user_id = decoded_token.get("user_id")
             if not user_id:
                 emit("error", {"message": "Invalid token"})
                 return None
@@ -66,9 +70,12 @@ def handle_connect():
         return False  # Reject connection
 
     try:
-        decoded_token = decode_token(token)
-        user_id = decoded_token.get("sub")
+        decoded_token = JWTManager.verify_token(token, token_type="access")
+        if not decoded_token:
+            logger.warning("WebSocket connection with invalid token")
+            return False
 
+        user_id = decoded_token.get("user_id")
         if not user_id:
             logger.warning("WebSocket connection with invalid token")
             return False
@@ -121,8 +128,8 @@ def handle_disconnect():
         return
 
     try:
-        decoded_token = decode_token(token)
-        user_id = decoded_token.get("sub")
+        decoded_token = JWTManager.verify_token(token, token_type="access")
+        user_id = decoded_token.get("user_id") if decoded_token else None
 
         if user_id:
             presence = UserPresence.query.filter_by(user_id=user_id).first()

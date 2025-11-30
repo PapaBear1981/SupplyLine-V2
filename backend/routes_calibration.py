@@ -190,6 +190,7 @@ def register_calibration_routes(app):
 
         # Get and validate data from request
         data = request.get_json() or {}
+        current_user_id = request.current_user.get("user_id")
 
         # Validate using calibration schema
         validated_data = validate_schema(data, "calibration")
@@ -243,11 +244,14 @@ def register_calibration_routes(app):
                     db.session.add(calibration_standard)
 
         # Create audit log
-        log = AuditLog(
-            action_type="tool_calibration",
-            action_details=f'User {request.current_user.get("user_name", "Unknown")} (ID: {request.current_user["user_id"]}) calibrated tool {tool.tool_number} (ID: {id})'
+        AuditLog.log(
+            user_id=current_user_id,
+            action="tool_calibration",
+            resource_type="tool",
+            resource_id=id,
+            details={"tool_number": tool.tool_number, "status": validated_data["calibration_status"]},
+            ip_address=request.remote_addr
         )
-        db.session.add(log)
 
         # Create user activity
         activity = UserActivity(
@@ -328,6 +332,8 @@ def register_calibration_routes(app):
     @tool_manager_required
     def add_calibration_standard():
         try:
+            current_user_id = request.current_user.get("user_id")
+
             # Get data from request
             data = request.get_json() or {}
 
@@ -372,11 +378,14 @@ def register_calibration_routes(app):
             db.session.commit()
 
             # Create audit log
-            log = AuditLog(
-                action_type="add_calibration_standard",
-                action_details=f'User {request.current_user.get("user_name", "Unknown")} (ID: {request.current_user["user_id"]}) added calibration standard {standard.name} (ID: {standard.id})'
+            AuditLog.log(
+                user_id=current_user_id,
+                action="add_calibration_standard",
+                resource_type="calibration_standard",
+                resource_id=standard.id,
+                details={"name": standard.name, "standard_number": standard.standard_number},
+                ip_address=request.remote_addr
             )
-            db.session.add(log)
 
             # Create user activity
             activity = UserActivity(
@@ -442,6 +451,8 @@ def register_calibration_routes(app):
     @tool_manager_required
     def update_calibration_standard(id):
         try:
+            current_user_id = request.current_user.get("user_id")
+
             standard = CalibrationStandard.query.get_or_404(id)
 
             # Get data from request
@@ -486,12 +497,14 @@ def register_calibration_routes(app):
             db.session.commit()
 
             # Create audit log
-            log = AuditLog(
-                action_type="update_calibration_standard",
-                action_details=f'User {request.current_user.get("user_name", "Unknown")} (ID: {request.current_user["user_id"]}) updated calibration standard {standard.name} (ID: {id})'
+            AuditLog.log(
+                user_id=current_user_id,
+                action="update_calibration_standard",
+                resource_type="calibration_standard",
+                resource_id=id,
+                details={"name": standard.name, "standard_number": standard.standard_number},
+                ip_address=request.remote_addr
             )
-            db.session.add(log)
-            db.session.commit()
 
             return jsonify({
                 "message": "Calibration standard updated successfully",
@@ -511,6 +524,8 @@ def register_calibration_routes(app):
     @tool_manager_required
     def upload_calibration_certificate(calibration_id):
         try:
+            current_user_id = request.current_user.get("user_id")
+
             calibration = ToolCalibration.query.get_or_404(calibration_id)
 
             if "certificate" not in request.files:
@@ -551,14 +566,14 @@ def register_calibration_routes(app):
             calibration.calibration_certificate_file = safe_filename
 
             user_info = getattr(request, "current_user", {}) or {}
-            log = AuditLog(
-                action_type="upload_calibration_certificate",
-                action_details=(
-                    f"User {user_info.get('user_name', 'Unknown')} (ID: {user_info.get('user_id')}) "
-                    f"uploaded certificate for calibration {calibration_id}"
-                )
+            AuditLog.log(
+                user_id=current_user_id,
+                action="upload_calibration_certificate",
+                resource_type="calibration",
+                resource_id=calibration_id,
+                details={"filename": safe_filename},
+                ip_address=request.remote_addr
             )
-            db.session.add(log)
 
             activity = UserActivity(
                 user_id=user_info.get("user_id"),

@@ -127,6 +127,7 @@ def register_announcement_routes(app):
         try:
             # Get data from request
             data = request.get_json() or {}
+            current_user_id = request.current_user.get("user_id")
 
             # Validate required fields
             required_fields = ["title", "content", "priority"]
@@ -157,11 +158,14 @@ def register_announcement_routes(app):
             db.session.commit()
 
             # Create audit log
-            log = AuditLog(
-                action_type="create_announcement",
-                action_details=f'User {request.current_user.get("user_name", "Unknown")} (ID: {request.current_user["user_id"]}) created announcement "{announcement.title}" (ID: {announcement.id})'
+            AuditLog.log(
+                user_id=current_user_id,
+                action="create_announcement",
+                resource_type="announcement",
+                resource_id=announcement.id,
+                details={"title": announcement.title},
+                ip_address=request.remote_addr
             )
-            db.session.add(log)
 
             # Create user activity
             activity = UserActivity(
@@ -190,6 +194,7 @@ def register_announcement_routes(app):
 
             # Get data from request
             data = request.get_json() or {}
+            current_user_id = request.current_user.get("user_id")
 
             # Update fields if provided
             if "title" in data:
@@ -215,11 +220,14 @@ def register_announcement_routes(app):
             db.session.commit()
 
             # Create audit log
-            log = AuditLog(
-                action_type="update_announcement",
-                action_details=f'User {request.current_user.get("user_name", "Unknown")} (ID: {request.current_user["user_id"]}) updated announcement "{announcement.title}" (ID: {announcement.id})'
+            AuditLog.log(
+                user_id=current_user_id,
+                action="update_announcement",
+                resource_type="announcement",
+                resource_id=announcement.id,
+                details={"title": announcement.title},
+                ip_address=request.remote_addr
             )
-            db.session.add(log)
 
             # Create user activity
             activity = UserActivity(
@@ -243,6 +251,8 @@ def register_announcement_routes(app):
     @admin_required
     def delete_announcement(id):
         try:
+            current_user_id = request.current_user.get("user_id")
+
             # Get the announcement
             announcement = Announcement.query.get_or_404(id)
 
@@ -257,11 +267,14 @@ def register_announcement_routes(app):
             db.session.delete(announcement)
 
             # Create audit log
-            log = AuditLog(
-                action_type="delete_announcement",
-                action_details=f'User {request.current_user.get("user_name", "Unknown")} (ID: {request.current_user["user_id"]}) deleted announcement "{announcement_title}" (ID: {announcement_id})'
+            AuditLog.log(
+                user_id=current_user_id,
+                action="delete_announcement",
+                resource_type="announcement",
+                resource_id=announcement_id,
+                details={"title": announcement_title},
+                ip_address=request.remote_addr
             )
-            db.session.add(log)
 
             # Create user activity
             activity = UserActivity(

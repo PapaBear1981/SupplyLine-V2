@@ -64,6 +64,28 @@ const STATUS_COLORS: Record<string, string> = {
   retired: '#ff4d4f',
 };
 
+// Distinct colors for aircraft types
+const AIRCRAFT_TYPE_COLORS = [
+  '#1890ff', // Blue
+  '#52c41a', // Green
+  '#faad14', // Orange
+  '#722ed1', // Purple
+  '#eb2f96', // Pink
+  '#13c2c2', // Cyan
+  '#fa541c', // Red-Orange
+  '#2f54eb', // Geek Blue
+  '#a0d911', // Lime
+  '#fa8c16', // Gold
+  '#f5222d', // Red
+  '#597ef7', // Light Blue
+];
+
+// Get color for aircraft type based on its ID
+const getAircraftTypeColor = (aircraftTypeId: number | undefined): string => {
+  if (!aircraftTypeId) return '#8c8c8c'; // Gray for unknown
+  return AIRCRAFT_TYPE_COLORS[(aircraftTypeId - 1) % AIRCRAFT_TYPE_COLORS.length];
+};
+
 const STATUS_LABELS: Record<string, string> = {
   active: 'Active',
   deployed: 'Deployed',
@@ -289,9 +311,11 @@ export function KitLocationMap({ height = 400 }: KitLocationMapProps) {
               <Marker
                 key={kit.id}
                 position={[kit.latitude!, kit.longitude!]}
-                icon={createColoredIcon(STATUS_COLORS[kit.status] || '#1890ff')}
+                icon={createColoredIcon(getAircraftTypeColor(kit.aircraft_type_id))}
                 eventHandlers={{
                   click: () => setSelectedKitId(kit.id),
+                  mouseover: (e) => e.target.openPopup(),
+                  mouseout: (e) => e.target.closePopup(),
                 }}
               >
                 <Popup className={isDarkMode ? 'dark-mode' : ''}>
@@ -303,7 +327,7 @@ export function KitLocationMap({ height = 400 }: KitLocationMapProps) {
                       {STATUS_LABELS[kit.status] || kit.status}
                     </Tag>
                     {kit.aircraft_type_name && (
-                      <Tag color="blue">{kit.aircraft_type_name}</Tag>
+                      <Tag color={getAircraftTypeColor(kit.aircraft_type_id)}>{kit.aircraft_type_name}</Tag>
                     )}
                     <div style={{ marginTop: 8 }}>
                       <Text type="secondary" style={{ fontSize: 12 }}>
@@ -346,7 +370,7 @@ export function KitLocationMap({ height = 400 }: KitLocationMapProps) {
                   {STATUS_LABELS[selectedKit.status] || selectedKit.status}
                 </Tag>
                 {selectedKit.aircraft_type_name && (
-                  <Tag color="blue">{selectedKit.aircraft_type_name}</Tag>
+                  <Tag color={getAircraftTypeColor(selectedKit.aircraft_type_id)}>{selectedKit.aircraft_type_name}</Tag>
                 )}
               </Space>
             </div>

@@ -30,7 +30,7 @@ logger = logging.getLogger(__name__)
 def register_tool_checkout_routes(app):
     """Register all tool checkout related routes"""
 
-    # ============================================
+        # ============================================
     # Tool Availability Check
     # ============================================
     @app.route("/api/tools/<int:tool_id>/availability", methods=["GET"])
@@ -127,6 +127,7 @@ def register_tool_checkout_routes(app):
         """
         try:
             data = request.get_json() or {}
+            current_user_id = request.current_user.get("user_id")
             user_payload = request.current_user
 
             # Required fields
@@ -252,11 +253,19 @@ def register_tool_checkout_routes(app):
                 logger.warning(f"Failed to record checkout transaction: {e}")
 
             # Add audit log
-            audit_log = AuditLog(
-                action_type="tool_checkout",
-                action_details=f"Tool {tool.tool_number} (ID: {tool_id}) checked out to {checkout_user.name} (ID: {checkout_user_id})"
+            AuditLog.log(
+                user_id=current_user_id,
+                action="tool_checkout",
+                resource_type="tool",
+                resource_id=tool_id,
+                details={
+                    "tool_number": tool.tool_number,
+                    "checkout_user_id": checkout_user_id,
+                    "checkout_user_name": checkout_user.name,
+                    "checkout_id": checkout.id
+                },
+                ip_address=request.remote_addr
             )
-            db.session.add(audit_log)
 
             # Add user activity
             activity = UserActivity(
@@ -292,6 +301,7 @@ def register_tool_checkout_routes(app):
         """
         try:
             data = request.get_json() or {}
+            current_user_id = request.current_user.get("user_id")
             user_payload = request.current_user
             current_user_id = user_payload.get("user_id")
 
@@ -396,11 +406,20 @@ def register_tool_checkout_routes(app):
                 logger.warning(f"Failed to record return transaction: {e}")
 
             # Add audit log
-            audit_log = AuditLog(
-                action_type="tool_return",
-                action_details=f"Tool {tool.tool_number} (ID: {tool.id}) returned. Condition: {condition_at_return or 'Not specified'}. Damage: {damage_reported}"
+            AuditLog.log(
+                user_id=current_user_id,
+                action="tool_return",
+                resource_type="tool",
+                resource_id=tool.id,
+                details={
+                    "tool_number": tool.tool_number,
+                    "checkout_id": checkout_id,
+                    "condition_at_return": condition_at_return,
+                    "damage_reported": damage_reported,
+                    "damage_severity": damage_severity if damage_reported else None
+                },
+                ip_address=request.remote_addr
             )
-            db.session.add(audit_log)
 
             # Add user activity
             activity = UserActivity(
@@ -732,7 +751,7 @@ def register_tool_checkout_routes(app):
 
             # Damage reports this month
             damage_reports = Checkout.query.filter(
-                Checkout.damage_reported == True,
+                Checkout.damage_reported,
                 Checkout.damage_reported_date >= thirty_days_ago
             ).count()
 
@@ -863,6 +882,7 @@ def register_tool_checkout_routes(app):
         """Report damage on an active checkout without returning the tool"""
         try:
             data = request.get_json() or {}
+            current_user_id = request.current_user.get("user_id")
             user_payload = request.current_user
             current_user_id = user_payload.get("user_id")
 
@@ -906,11 +926,19 @@ def register_tool_checkout_routes(app):
             db.session.add(history_entry)
 
             # Add audit log
-            audit_log = AuditLog(
-                action_type="damage_reported",
-                action_details=f"Damage reported on tool {tool.tool_number} during checkout {checkout_id}: {damage_description}"
+            AuditLog.log(
+                user_id=current_user_id,
+                action="damage_reported",
+                resource_type="tool",
+                resource_id=tool.id,
+                details={
+                    "tool_number": tool.tool_number,
+                    "checkout_id": checkout_id,
+                    "damage_description": damage_description,
+                    "damage_severity": damage_severity
+                },
+                ip_address=request.remote_addr
             )
-            db.session.add(audit_log)
 
             db.session.commit()
 

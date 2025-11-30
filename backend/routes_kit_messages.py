@@ -28,6 +28,7 @@ def register_kit_message_routes(app):
         """Send a message related to a kit"""
         kit = Kit.query.get_or_404(kit_id)
         data = request.get_json() or {}
+        current_user_id = request.current_user.get("user_id")
 
         # Validate required fields
         if not data.get("subject"):
@@ -52,12 +53,14 @@ def register_kit_message_routes(app):
         db.session.commit()
 
         # Log action
-        log = AuditLog(
-            action_type="kit_message_sent",
-            action_details=f"Message sent for kit {kit.name}: {message.subject}"
+        AuditLog.log(
+            user_id=current_user_id,
+            action="kit_message_sent",
+            resource_type="kit_message",
+            resource_id=message.id,
+            details={"kit_name": kit.name, "subject": message.subject, "kit_id": kit_id},
+            ip_address=request.remote_addr
         )
-        db.session.add(log)
-        db.session.commit()
 
         logger.info(f"Message sent: ID {message.id}")
         return jsonify(message.to_dict()), 201
@@ -165,6 +168,7 @@ def register_kit_message_routes(app):
         """Reply to a message"""
         parent_message = KitMessage.query.get_or_404(id)
         data = request.get_json() or {}
+        current_user_id = request.current_user.get("user_id")
 
         # Validate required fields
         if not data.get("message"):
@@ -193,12 +197,14 @@ def register_kit_message_routes(app):
         db.session.commit()
 
         # Log action
-        log = AuditLog(
-            action_type="kit_message_reply",
-            action_details=f"Reply sent to message ID {id}"
+        AuditLog.log(
+            user_id=current_user_id,
+            action="kit_message_reply",
+            resource_type="kit_message",
+            resource_id=reply.id,
+            details={"parent_message_id": id},
+            ip_address=request.remote_addr
         )
-        db.session.add(log)
-        db.session.commit()
 
         return jsonify(reply.to_dict()), 201
 
