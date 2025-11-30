@@ -11,7 +11,8 @@ export interface MobileState {
   height: number;
 }
 
-function getSnapshot(): MobileState {
+// Calculate state from current window dimensions
+function calculateState(): MobileState {
   if (typeof window === 'undefined') {
     return {
       isMobile: false,
@@ -24,14 +25,33 @@ function getSnapshot(): MobileState {
 
   const width = window.innerWidth;
   const height = window.innerHeight;
+  const isMobile = width < MOBILE_BREAKPOINT;
+  const isTablet = width >= MOBILE_BREAKPOINT && width < TABLET_BREAKPOINT;
+  const isDesktop = width >= TABLET_BREAKPOINT;
 
-  return {
-    isMobile: width < MOBILE_BREAKPOINT,
-    isTablet: width >= MOBILE_BREAKPOINT && width < TABLET_BREAKPOINT,
-    isDesktop: width >= TABLET_BREAKPOINT,
-    width,
-    height,
-  };
+  return { isMobile, isTablet, isDesktop, width, height };
+}
+
+// Cache the current state to avoid creating new objects on every call
+let cachedState: MobileState = calculateState();
+
+function updateCachedState(): void {
+  const newState = calculateState();
+
+  // Only create new object if values actually changed
+  if (
+    cachedState.width !== newState.width ||
+    cachedState.height !== newState.height ||
+    cachedState.isMobile !== newState.isMobile ||
+    cachedState.isTablet !== newState.isTablet ||
+    cachedState.isDesktop !== newState.isDesktop
+  ) {
+    cachedState = newState;
+  }
+}
+
+function getSnapshot(): MobileState {
+  return cachedState;
 }
 
 function getServerSnapshot(): MobileState {
@@ -45,17 +65,22 @@ function getServerSnapshot(): MobileState {
 }
 
 function subscribe(callback: () => void): () => void {
+  const handleChange = () => {
+    updateCachedState();
+    callback();
+  };
+
   const mobileQuery = window.matchMedia(`(max-width: ${MOBILE_BREAKPOINT - 1}px)`);
   const tabletQuery = window.matchMedia(`(min-width: ${MOBILE_BREAKPOINT}px) and (max-width: ${TABLET_BREAKPOINT - 1}px)`);
 
-  mobileQuery.addEventListener('change', callback);
-  tabletQuery.addEventListener('change', callback);
-  window.addEventListener('resize', callback);
+  mobileQuery.addEventListener('change', handleChange);
+  tabletQuery.addEventListener('change', handleChange);
+  window.addEventListener('resize', handleChange);
 
   return () => {
-    mobileQuery.removeEventListener('change', callback);
-    tabletQuery.removeEventListener('change', callback);
-    window.removeEventListener('resize', callback);
+    mobileQuery.removeEventListener('change', handleChange);
+    tabletQuery.removeEventListener('change', handleChange);
+    window.removeEventListener('resize', handleChange);
   };
 }
 
