@@ -80,7 +80,7 @@ export const UsersTable = ({ onView, onEdit, adminActions }: UsersTableProps) =>
     try {
       await deleteUser(id).unwrap();
       message.success('User deactivated');
-    } catch (err) {
+    } catch {
       message.error('Failed to deactivate user');
     }
   };
@@ -89,7 +89,7 @@ export const UsersTable = ({ onView, onEdit, adminActions }: UsersTableProps) =>
     try {
       await updateUser({ id, data: { is_active: true } }).unwrap();
       message.success('User activated');
-    } catch (err) {
+    } catch {
       message.error('Failed to activate user');
     }
   };
@@ -98,7 +98,7 @@ export const UsersTable = ({ onView, onEdit, adminActions }: UsersTableProps) =>
     try {
       await unlockUser(id).unwrap();
       message.success('Account unlocked');
-    } catch (err) {
+    } catch {
       message.error('Failed to unlock account');
     }
   };

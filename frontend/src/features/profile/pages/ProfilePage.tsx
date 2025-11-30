@@ -71,9 +71,9 @@ export const ProfilePage = () => {
 
         message.success('Avatar updated successfully!');
         onSuccess?.(null);
-      } catch (error) {
+      } catch {
         message.error('Failed to upload avatar');
-        onError?.(error as Error);
+        onError?.(new Error('Failed to upload avatar'));
       }
     },
   };

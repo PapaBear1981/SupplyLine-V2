@@ -77,7 +77,7 @@ export const AnnouncementManagement = () => {
     try {
       await deleteAnnouncement(id).unwrap();
       message.success('Announcement deleted successfully');
-    } catch (error) {
+    } catch {
       message.error('Failed to delete announcement');
     }
   };
@@ -99,7 +99,7 @@ export const AnnouncementManagement = () => {
       }
       setModalOpen(false);
       form.resetFields();
-    } catch (error) {
+    } catch {
       message.error(`Failed to ${editingAnnouncement ? 'update' : 'create'} announcement`);
     }
   };

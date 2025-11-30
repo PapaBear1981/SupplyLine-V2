@@ -63,7 +63,7 @@ export const UserManagement = () => {
         is_active: !user.is_active,
       }).unwrap();
       message.success(`User ${user.is_active ? 'disabled' : 'enabled'} successfully`);
-    } catch (error) {
+    } catch {
       message.error('Failed to update user status');
     }
   };
@@ -72,7 +72,7 @@ export const UserManagement = () => {
     try {
       await unlockUser(user.id).unwrap();
       message.success('User account unlocked successfully');
-    } catch (error) {
+    } catch {
       message.error('Failed to unlock user account');
     }
   };
@@ -96,7 +96,7 @@ export const UserManagement = () => {
       message.success('Password reset successfully');
       setResetPasswordModalOpen(false);
       resetPasswordForm.resetFields();
-    } catch (error) {
+    } catch {
       message.error('Failed to reset password');
     }
   };
@@ -111,7 +111,7 @@ export const UserManagement = () => {
       message.success('Permissions updated successfully');
       setPermissionsModalOpen(false);
       permissionsForm.resetFields();
-    } catch (error) {
+    } catch {
       message.error('Failed to update permissions');
     }
   };

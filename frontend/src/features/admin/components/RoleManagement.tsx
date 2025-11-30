@@ -57,7 +57,7 @@ export const RoleManagement = () => {
     try {
       await deleteRole(id).unwrap();
       message.success('Role deleted successfully');
-    } catch (error) {
+    } catch {
       message.error('Failed to delete role');
     }
   };
@@ -74,7 +74,7 @@ export const RoleManagement = () => {
       }
       setModalOpen(false);
       form.resetFields();
-    } catch (error) {
+    } catch {
       message.error(`Failed to ${editingRole ? 'update' : 'create'} role`);
     }
   };

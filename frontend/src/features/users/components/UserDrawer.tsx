@@ -118,7 +118,7 @@ export const UserDrawer = ({
       onSuccess?.();
       onClose();
       form.resetFields();
-    } catch (err) {
+    } catch {
       message.error('Failed to save user. Please try again.');
     }
   };
@@ -129,7 +129,7 @@ export const UserDrawer = ({
       await unlockUser(userId).unwrap();
       message.success('Account unlocked');
       onSuccess?.();
-    } catch (err) {
+    } catch {
       message.error('Failed to unlock account');
     }
   };

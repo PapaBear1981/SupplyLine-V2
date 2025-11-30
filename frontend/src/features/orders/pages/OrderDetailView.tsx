@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
   Card,
@@ -77,7 +77,7 @@ export const OrderDetailView: React.FC = () => {
       await updateOrder({ orderId: Number(orderId), updates: values }).unwrap();
       message.success('Order updated successfully');
       setIsEditModalVisible(false);
-    } catch (error) {
+    } catch {
       message.error('Failed to update order');
     }
   };
@@ -91,7 +91,7 @@ export const OrderDetailView: React.FC = () => {
       message.success('Order marked as ordered');
       setIsOrderModalVisible(false);
       orderForm.resetFields();
-    } catch (error) {
+    } catch {
       message.error('Failed to mark order as ordered');
     }
   };
@@ -104,7 +104,7 @@ export const OrderDetailView: React.FC = () => {
         try {
           await markAsDelivered({ orderId: Number(orderId) }).unwrap();
           message.success('Order marked as delivered');
-        } catch (error) {
+        } catch {
           message.error('Failed to mark order as delivered');
         }
       },
