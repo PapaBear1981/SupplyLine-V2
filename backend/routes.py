@@ -24,7 +24,6 @@ from routes_announcements import register_announcement_routes
 from routes_attachments import register_attachments_routes
 from routes_auth import register_auth_routes
 from routes_barcode import barcode_bp
-from routes_tool_checkout import register_tool_checkout_routes
 from routes_bulk_import import register_bulk_import_routes
 from routes_calibration import register_calibration_routes
 from routes_channels import register_channels_routes
@@ -47,6 +46,7 @@ from routes_rbac import register_rbac_routes
 from routes_reports import register_report_routes
 from routes_scanner import register_scanner_routes
 from routes_security import register_security_routes
+from routes_tool_checkout import register_tool_checkout_routes
 from routes_transfers import transfers_bp
 from routes_user_requests import register_user_request_routes
 from routes_users import register_user_routes
@@ -1642,7 +1642,7 @@ def register_routes(app):
                     user_id=current_user_id,
                     action="return_tool",
                     resource_type="tool",
-                    resource_id=tool_id,
+                    resource_id=c.tool_id,
                     details={
                         "tool_number": tool.tool_number,
                         "condition": condition,

@@ -202,7 +202,8 @@ def user_detail_route(id):
 @permission_required("user.manage")
 def unlock_user_account(id):
     """Unlock a user account that has been locked due to failed login attempts."""
-        # Get the user
+    current_user_id = request.current_user.get("user_id")
+    # Get the user
     user = User.query.get_or_404(id)
 
     # Check if the account is actually locked

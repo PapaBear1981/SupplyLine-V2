@@ -751,7 +751,7 @@ def register_tool_checkout_routes(app):
 
             # Damage reports this month
             damage_reports = Checkout.query.filter(
-                Checkout.damage_reported == True,
+                Checkout.damage_reported,
                 Checkout.damage_reported_date >= thirty_days_ago
             ).count()
 

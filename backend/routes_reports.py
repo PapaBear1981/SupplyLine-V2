@@ -15,17 +15,22 @@ from collections import defaultdict
 from datetime import datetime, timedelta
 
 from flask import jsonify, make_response, request
-from sqlalchemy import func, and_, or_
+from sqlalchemy import and_, func, or_
 
-from auth import department_required, jwt_required, admin_required
+from auth import department_required, jwt_required
 from models import (
-    Chemical, ChemicalIssuance, Checkout, ProcurementOrder,
-    Tool, User, UserActivity, UserRequest, RequestItem, db
+    Chemical,
+    ChemicalIssuance,
+    Checkout,
+    ProcurementOrder,
+    RequestItem,
+    Tool,
+    User,
+    UserActivity,
+    UserRequest,
+    db,
 )
-from models_kits import (
-    AircraftType, Kit, KitBox, KitExpendable, KitIssuance,
-    KitItem, KitReorderRequest, KitTransfer
-)
+from models_kits import KitIssuance, KitReorderRequest, KitTransfer
 from utils.export_utils import generate_excel_report, generate_pdf_report
 
 

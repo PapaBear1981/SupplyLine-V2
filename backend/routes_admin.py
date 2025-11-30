@@ -4,12 +4,12 @@ Admin-specific routes for managing users, departments, announcements, and roles
 import logging
 from datetime import UTC, datetime
 
+import utils as password_utils
 from flask import jsonify, request
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 
-from auth import admin_required, jwt_required
+from auth import admin_required
 from models import Announcement, AuditLog, Department, Role, User, UserRole, db
-import utils as password_utils
 
 logger = logging.getLogger(__name__)
 

@@ -242,6 +242,7 @@ def register_kit_reorder_routes(app):
     @handle_errors
     def mark_reorder_ordered(id):
         """Mark a reorder request as ordered"""
+        current_user_id = request.current_user.get("user_id")
         reorder = KitReorderRequest.query.get_or_404(id)
 
         if reorder.status not in ["pending", "approved"]:
@@ -316,6 +317,7 @@ def register_kit_reorder_routes(app):
     @handle_errors
     def fulfill_reorder_request(id):
         """Mark a reorder request as fulfilled"""
+        current_user_id = request.current_user.get("user_id")
         reorder = KitReorderRequest.query.get_or_404(id)
 
         logger.info("Fulfilling reorder request", extra={
@@ -728,6 +730,7 @@ def register_kit_reorder_routes(app):
     @handle_errors
     def cancel_reorder_request(id):
         """Cancel a reorder request"""
+        current_user_id = request.current_user.get("user_id")
         reorder = KitReorderRequest.query.get_or_404(id)
 
         if reorder.status in ["fulfilled", "cancelled"]:

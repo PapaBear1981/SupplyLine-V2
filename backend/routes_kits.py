@@ -12,7 +12,16 @@ from sqlalchemy import and_, or_
 
 from auth import admin_required, department_required, jwt_required
 from models import AuditLog, Chemical, Tool, Warehouse, WarehouseTransfer, db
-from models_kits import AircraftType, Kit, KitBox, KitExpendable, KitIssuance, KitItem, KitReorderRequest, KitTransfer
+from models_kits import (
+    AircraftType,
+    Kit,
+    KitBox,
+    KitExpendable,
+    KitIssuance,
+    KitItem,
+    KitReorderRequest,
+    KitTransfer,
+)
 from utils.error_handler import ValidationError, handle_errors
 
 
@@ -320,7 +329,7 @@ def register_kit_routes(app):
                         logger.warning(f"Geocoding API returned status {response.status_code}")
                 except Exception as e:
                     # Don't fail the update if geocoding fails, just log it
-                    logger.warning(f"Geocoding failed for address '{full_address}': {str(e)}")
+                    logger.warning(f"Geocoding failed for address '{full_address}': {e!s}")
                     import traceback
                     logger.warning(f"Traceback: {traceback.format_exc()}")
             else:

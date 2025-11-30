@@ -11,12 +11,13 @@ This module provides endpoints for user profile management including:
 import logging
 import os
 from datetime import datetime
-from flask import Blueprint, jsonify, request, current_app
-from werkzeug.utils import secure_filename
-from auth.jwt_manager import jwt_required as login_required
-from models import User, UserActivity, AuditLog, db
+
 import utils as password_utils
-from utils.error_handler import handle_errors
+from flask import Blueprint, current_app, jsonify, request
+from werkzeug.utils import secure_filename
+
+from auth.jwt_manager import jwt_required as login_required
+from models import AuditLog, User, UserActivity, db
 
 logger = logging.getLogger(__name__)
 
@@ -66,7 +67,7 @@ def get_profile():
         return jsonify(profile_data), 200
 
     except Exception as e:
-        logger.error(f"Error getting profile: {str(e)}")
+        logger.error(f"Error getting profile: {e!s}")
         return jsonify({"error": "Failed to get profile"}), 500
 
 
@@ -149,7 +150,7 @@ def update_profile():
         }), 200
 
     except Exception as e:
-        logger.error(f"Error updating profile: {str(e)}")
+        logger.error(f"Error updating profile: {e!s}")
         db.session.rollback()
         return jsonify({"error": "Failed to update profile"}), 500
 
@@ -231,7 +232,7 @@ def change_password():
         return jsonify({"message": "Password changed successfully"}), 200
 
     except Exception as e:
-        logger.error(f"Error changing password: {str(e)}")
+        logger.error(f"Error changing password: {e!s}")
         db.session.rollback()
         return jsonify({"error": "Failed to change password"}), 500
 
@@ -291,7 +292,7 @@ def upload_avatar():
                 try:
                     os.remove(old_filepath)
                 except Exception as e:
-                    logger.warning(f"Failed to delete old avatar: {str(e)}")
+                    logger.warning(f"Failed to delete old avatar: {e!s}")
 
         user.avatar = avatar_url
         db.session.commit()
@@ -311,6 +312,6 @@ def upload_avatar():
         return jsonify({"avatar_url": avatar_url}), 200
 
     except Exception as e:
-        logger.error(f"Error uploading avatar: {str(e)}")
+        logger.error(f"Error uploading avatar: {e!s}")
         db.session.rollback()
         return jsonify({"error": "Failed to upload avatar"}), 500
