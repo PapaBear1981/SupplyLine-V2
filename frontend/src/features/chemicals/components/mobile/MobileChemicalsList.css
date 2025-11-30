@@ -192,3 +192,119 @@ html.adm-theme-dark .detail-actions,
 .adm-theme-dark .detail-actions {
   border-color: #424242;
 }
+
+/* Issue Popup */
+.issue-popup {
+  padding: 16px;
+  padding-bottom: 32px;
+}
+
+.issue-chemical-info {
+  background: var(--adm-color-fill-content);
+  border-radius: 12px;
+  padding: 12px 16px;
+  margin-bottom: 16px;
+}
+
+.issue-info-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--adm-border-color);
+}
+
+.issue-info-row:last-child {
+  border-bottom: none;
+}
+
+.issue-info-row.highlight {
+  background: rgba(82, 196, 26, 0.1);
+  margin: 8px -16px;
+  padding: 12px 16px;
+  border-radius: 8px;
+  border-bottom: none;
+}
+
+.issue-info-label {
+  font-size: 14px;
+  color: var(--adm-color-text-secondary);
+}
+
+.issue-info-value {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--adm-color-text);
+}
+
+.issue-info-row.highlight .issue-info-value {
+  color: #52c41a;
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.issue-warning {
+  margin-bottom: 16px;
+  border-radius: 8px;
+}
+
+.issue-form {
+  margin-top: 8px;
+}
+
+.issue-button {
+  font-weight: 600;
+}
+
+.issue-button svg {
+  margin-right: 8px;
+}
+
+.issue-button-disabled {
+  opacity: 0.6;
+}
+
+/* Swipe hint for issuing */
+.chemical-item-tags .adm-tag svg {
+  margin-right: 2px;
+}
+
+/* Stepper styling for quantity */
+.issue-form .adm-stepper {
+  width: 100%;
+  justify-content: space-between;
+}
+
+.issue-form .adm-stepper-input {
+  flex: 1;
+  text-align: center;
+  font-size: 18px;
+  font-weight: 600;
+}
+
+.issue-form .adm-stepper-minus,
+.issue-form .adm-stepper-plus {
+  width: 40px;
+  height: 40px;
+}
+
+/* Dark mode for issue popup */
+html.adm-theme-dark .issue-popup,
+.adm-theme-dark .issue-popup {
+  background-color: #1f1f1f;
+}
+
+html.adm-theme-dark .issue-chemical-info,
+.adm-theme-dark .issue-chemical-info {
+  background: #333;
+}
+
+html.adm-theme-dark .issue-info-row,
+.adm-theme-dark .issue-info-row {
+  border-color: #424242;
+}
+
+html.adm-theme-dark .issue-info-row.highlight,
+.adm-theme-dark .issue-info-row.highlight {
+  background: rgba(82, 196, 26, 0.15);
+}
