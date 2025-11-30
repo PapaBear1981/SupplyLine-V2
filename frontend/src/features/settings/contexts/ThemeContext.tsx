@@ -32,8 +32,9 @@ export const ThemeProvider = ({ children }: ThemeProviderProps) => {
   useEffect(() => {
     localStorage.setItem(THEME_STORAGE_KEY, JSON.stringify(themeConfig));
 
-    const primaryColor = COLOR_THEMES[themeConfig.colorTheme].primary;
+    const { primary: primaryColor, secondary: secondaryColor } = COLOR_THEMES[themeConfig.colorTheme];
     document.documentElement.style.setProperty('--adm-color-primary', primaryColor);
+    document.documentElement.style.setProperty('--adm-color-secondary', secondaryColor);
 
     // Apply dark mode class to document for antd-mobile theming
     if (themeConfig.mode === 'dark') {

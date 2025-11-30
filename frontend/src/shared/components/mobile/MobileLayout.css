@@ -60,7 +60,7 @@
   gap: 12px;
   padding: 20px 16px;
   border-bottom: 1px solid var(--adm-border-color);
-  background: linear-gradient(135deg, var(--adm-color-primary) 0%, #667eea 100%);
+  background: linear-gradient(135deg, var(--adm-color-primary) 0%, var(--adm-color-secondary) 100%);
   color: white;
 }
 
@@ -122,12 +122,13 @@
 :root {
   --adm-color-primary: #1677ff;
   --adm-color-primary-rgb: 22, 119, 255;
+  --adm-color-secondary: #667eea;
 }
 
 /* Support both html.adm-theme-dark and .adm-theme-dark ancestor */
 html.adm-theme-dark .mobile-menu-header,
 .adm-theme-dark .mobile-menu-header {
-  background: linear-gradient(135deg, #1677ff 0%, #4f46e5 100%);
+  background: linear-gradient(135deg, var(--adm-color-primary) 0%, var(--adm-color-secondary) 100%);
 }
 
 html.adm-theme-dark .mobile-layout,
