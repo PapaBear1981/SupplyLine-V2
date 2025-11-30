@@ -304,6 +304,10 @@ def register_chemical_routes(app):
         if not data.get("warehouse_id"):
             raise ValidationError("warehouse_id is required for all chemicals")
 
+        # Validate location is required
+        if not data.get("location") or not data.get("location").strip():
+            raise ValidationError("location is required for all chemicals (e.g., shelf, bin)")
+
         # Validate warehouse exists and is active using validation function
         warehouse = validate_warehouse_id(data["warehouse_id"])
 
@@ -324,7 +328,7 @@ def register_chemical_routes(app):
         except SerialLotValidationError as e:
             raise ValidationError(str(e))
 
-        # Create new chemical - warehouse_id is required
+        # Create new chemical - warehouse_id and location are required
         chemical = Chemical(
             part_number=validated_data["part_number"],
             lot_number=validated_data["lot_number"],
@@ -332,7 +336,7 @@ def register_chemical_routes(app):
             manufacturer=validated_data.get("manufacturer", ""),
             quantity=validated_data["quantity"],
             unit=validated_data["unit"],
-            location=validated_data.get("location", ""),
+            location=validated_data["location"],  # Required field
             category=validated_data.get("category", "General"),
             status=validated_data.get("status", "available"),
             warehouse_id=data["warehouse_id"],  # Required field

@@ -1315,7 +1315,7 @@ class Chemical(db.Model):
     manufacturer = db.Column(db.String)
     quantity = db.Column(db.Integer, nullable=False, default=0)  # Integer only - no decimal quantities
     unit = db.Column(db.String, nullable=False, default="each")  # each, oz, ml, etc.
-    location = db.Column(db.String)
+    location = db.Column(db.String, nullable=False)  # Required shelf/bin location within warehouse
     category = db.Column(db.String, nullable=True, default="General")  # Sealant, Paint, Adhesive, etc.
     status = db.Column(db.String, nullable=False, default="available")  # available, low_stock, out_of_stock, expired
     warehouse_id = db.Column(db.Integer, db.ForeignKey("warehouses.id"), nullable=True, index=True)

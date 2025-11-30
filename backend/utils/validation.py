@@ -140,8 +140,8 @@ TOOL_SCHEMA = {
 }
 
 CHEMICAL_SCHEMA = {
-    "required": ["part_number", "lot_number", "quantity", "unit"],
-    "optional": ["description", "manufacturer", "location", "expiration_date", "msds_url", "category", "status", "minimum_stock_level", "notes", "warehouse_id"],
+    "required": ["part_number", "lot_number", "quantity", "unit", "location"],
+    "optional": ["description", "manufacturer", "expiration_date", "msds_url", "category", "status", "minimum_stock_level", "notes", "warehouse_id"],
     "types": {
         "part_number": str,
         "lot_number": str,
