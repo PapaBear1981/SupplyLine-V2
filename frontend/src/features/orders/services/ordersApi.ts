@@ -9,6 +9,8 @@ import type {
   OrdersListParams,
   OrderAnalytics,
   CreateOrderMessageRequest,
+  RequestItem,
+  UpdateRequestItemRequest,
 } from '../types';
 
 export const ordersApi = baseApi.injectEndpoints({
@@ -170,6 +172,49 @@ export const ordersApi = baseApi.injectEndpoints({
     }),
 
     // ========================================================================
+    // Request Items linked to Orders
+    // ========================================================================
+
+    getOrderRequestItems: builder.query<RequestItem[], number>({
+      query: (orderId) => `/api/orders/${orderId}/request-items`,
+      providesTags: (_result, _error, orderId) => [
+        { type: 'OrderRequestItems', id: orderId },
+      ],
+    }),
+
+    markOrderRequestItemsReceived: builder.mutation<
+      { message: string; items: RequestItem[] },
+      { orderId: number; itemIds: number[] }
+    >({
+      query: ({ orderId, itemIds }) => ({
+        url: `/api/orders/${orderId}/request-items/mark-received`,
+        method: 'POST',
+        body: { item_ids: itemIds },
+      }),
+      invalidatesTags: (_result, _error, { orderId }) => [
+        { type: 'OrderRequestItems', id: orderId },
+        { type: 'Order', id: orderId },
+        { type: 'Request', id: 'LIST' },
+      ],
+    }),
+
+    updateOrderRequestItem: builder.mutation<
+      RequestItem,
+      { orderId: number; itemId: number; updates: UpdateRequestItemRequest }
+    >({
+      query: ({ orderId, itemId, updates }) => ({
+        url: `/api/orders/${orderId}/request-items/${itemId}`,
+        method: 'PUT',
+        body: updates,
+      }),
+      invalidatesTags: (_result, _error, { orderId }) => [
+        { type: 'OrderRequestItems', id: orderId },
+        { type: 'Order', id: orderId },
+        { type: 'Request', id: 'LIST' },
+      ],
+    }),
+
+    // ========================================================================
     // Analytics
     // ========================================================================
 
@@ -196,6 +241,9 @@ export const {
   useCreateOrderMessageMutation,
   useReplyToOrderMessageMutation,
   useMarkOrderMessageAsReadMutation,
+  useGetOrderRequestItemsQuery,
+  useMarkOrderRequestItemsReceivedMutation,
+  useUpdateOrderRequestItemMutation,
   useGetOrderAnalyticsQuery,
   useLazyGetOrdersQuery,
   useGetLateOrdersQuery,

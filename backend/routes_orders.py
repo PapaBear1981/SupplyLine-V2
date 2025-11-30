@@ -15,8 +15,10 @@ from models import (
     AuditLog,
     ProcurementOrder,
     ProcurementOrderMessage,
+    RequestItem,
     User,
     UserActivity,
+    UserRequest,
     db,
     get_current_time,
 )
@@ -822,3 +824,139 @@ def register_order_routes(app):
             db.session.commit()
 
         return jsonify(message.to_dict())
+
+    @app.route("/api/orders/<int:order_id>/request-items", methods=["GET"])
+    @orders_permission
+    @handle_errors
+    def get_order_request_items(order_id):
+        """Get request items linked to this procurement order."""
+        order = ProcurementOrder.query.get_or_404(order_id)
+
+        # Get all request items linked to this order
+        items = RequestItem.query.filter_by(procurement_order_id=order_id).all()
+
+        return jsonify([item.to_dict(include_request=True) for item in items])
+
+    @app.route("/api/orders/<int:order_id>/request-items/mark-received", methods=["POST"])
+    @orders_permission
+    @handle_errors
+    def mark_order_request_items_received(order_id):
+        """Mark request items linked to this order as received."""
+        order = ProcurementOrder.query.get_or_404(order_id)
+
+        data = request.get_json() or {}
+        item_ids = data.get("item_ids", [])
+
+        if not item_ids:
+            raise ValidationError("At least one item_id is required")
+
+        current_user_id = request.current_user.get("user_id")
+        items_updated = []
+
+        for item_id in item_ids:
+            item = RequestItem.query.filter_by(
+                id=item_id,
+                procurement_order_id=order_id
+            ).first()
+
+            if not item:
+                continue
+
+            if item.status in ("received", "cancelled"):
+                continue
+
+            item.status = "received"
+            item.received_date = get_current_time()
+            if not item.received_quantity:
+                item.received_quantity = item.quantity
+            items_updated.append(item)
+
+            # Update the parent request status
+            if item.request:
+                item.request.update_status_from_items()
+
+        if not items_updated:
+            raise ValidationError("No items were updated. Items may already be received or cancelled.")
+
+        # Log the action
+        AuditLog.log(
+            user_id=current_user_id,
+            action="request_items_received",
+            resource_type="procurement_order",
+            resource_id=order.id,
+            details={
+                "order_number": order.order_number,
+                "items_marked_received": [i.id for i in items_updated]
+            },
+            ip_address=request.remote_addr
+        )
+
+        db.session.commit()
+
+        return jsonify({
+            "message": f"{len(items_updated)} item(s) marked as received",
+            "items": [item.to_dict(include_request=True) for item in items_updated]
+        })
+
+    @app.route("/api/orders/<int:order_id>/request-items/<int:item_id>", methods=["PUT"])
+    @orders_permission
+    @handle_errors
+    def update_order_request_item(order_id, item_id):
+        """Update a request item linked to this order (vendor, tracking, status, etc.)."""
+        order = ProcurementOrder.query.get_or_404(order_id)
+
+        item = RequestItem.query.filter_by(
+            id=item_id,
+            procurement_order_id=order_id
+        ).first()
+
+        if not item:
+            return jsonify({"error": "Item not found or not linked to this order"}), 404
+
+        data = request.get_json() or {}
+
+        # Update allowed fields
+        if "vendor" in data:
+            item.vendor = data["vendor"].strip() if data["vendor"] else None
+
+        if "tracking_number" in data:
+            item.tracking_number = data["tracking_number"].strip() if data["tracking_number"] else None
+
+        if "status" in data:
+            valid_statuses = {"pending", "ordered", "shipped", "received", "cancelled"}
+            if data["status"] not in valid_statuses:
+                raise ValidationError(f"Invalid status. Must be one of: {', '.join(sorted(valid_statuses))}")
+            item.status = data["status"]
+
+            # Set dates based on status
+            if data["status"] == "received" and not item.received_date:
+                item.received_date = get_current_time()
+                if not item.received_quantity:
+                    item.received_quantity = item.quantity
+
+        if "expected_delivery_date" in data:
+            if data["expected_delivery_date"]:
+                try:
+                    normalized = data["expected_delivery_date"].replace("Z", "+00:00")
+                    dt_value = datetime.fromisoformat(normalized)
+                    if dt_value.tzinfo:
+                        dt_value = dt_value.astimezone(timezone.utc).replace(tzinfo=None)
+                    item.expected_delivery_date = dt_value
+                except ValueError:
+                    raise ValidationError("Invalid expected_delivery_date format")
+            else:
+                item.expected_delivery_date = None
+
+        if "order_notes" in data:
+            item.order_notes = data["order_notes"].strip() if data["order_notes"] else None
+
+        if "received_quantity" in data:
+            item.received_quantity = data["received_quantity"]
+
+        # Update the parent request status
+        if item.request:
+            item.request.update_status_from_items()
+
+        db.session.commit()
+
+        return jsonify(item.to_dict(include_request=True))
