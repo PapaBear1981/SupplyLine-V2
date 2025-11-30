@@ -12,6 +12,7 @@ Policy:
 """
 
 import logging
+import string
 from typing import Optional, Tuple
 
 from utils.error_handler import ValidationError
@@ -88,7 +89,7 @@ def check_serial_number_unique(part_number: str, serial_number: str,
     Returns:
         True if unique, raises SerialLotValidationError if duplicate found
     """
-    from models import Tool, Expendable, db
+    from models import Tool, Expendable
     from models_kits import KitExpendable, KitItem
 
     if not serial_number or not serial_number.strip():
@@ -189,7 +190,7 @@ def check_lot_number_unique(part_number: str, lot_number: str,
     Returns:
         True if unique, raises SerialLotValidationError if duplicate found
     """
-    from models import Chemical, Expendable, db
+    from models import Chemical, Expendable
     from models_kits import KitExpendable, KitItem
 
     if not lot_number or not lot_number.strip():
@@ -385,8 +386,6 @@ def generate_child_lot_suffix(sequence: int) -> str:
     Returns:
         The suffix string
     """
-    import string
-
     suffix = ""
     num = sequence
 

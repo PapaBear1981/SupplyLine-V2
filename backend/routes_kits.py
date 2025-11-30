@@ -1045,18 +1045,6 @@ def register_kit_routes(app):
         if not is_valid:
             raise ValidationError(error_msg)
 
-        # Validate serial number uniqueness if serial tracking
-        if expendable.tracking_type == "serial" and expendable.serial_number:
-            from utils.transaction_helper import validate_serial_number_uniqueness
-            is_unique, error_msg = validate_serial_number_uniqueness(
-                expendable.part_number,
-                expendable.serial_number,
-                "expendable",
-                exclude_id=None
-            )
-            if not is_unique:
-                raise ValidationError(error_msg)
-
         db.session.add(expendable)
         db.session.flush()  # Flush to get the expendable ID
 

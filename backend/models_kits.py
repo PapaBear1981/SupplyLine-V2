@@ -257,6 +257,7 @@ class KitExpendable(db.Model):
             "kit_id": self.kit_id,
             "box_id": self.box_id,
             "box_number": self.box.box_number if self.box else None,
+            "item_type": "expendable",  # Always 'expendable' for KitExpendable items
             "part_number": self.part_number,
             "serial_number": self.serial_number,
             "lot_number": self.lot_number,
@@ -271,7 +272,8 @@ class KitExpendable(db.Model):
             "added_date": self.added_date.isoformat() if self.added_date else None,
             "last_updated": self.last_updated.isoformat() if self.last_updated else None,
             "parent_lot_number": self.parent_lot_number,
-            "lot_sequence": self.lot_sequence or 0
+            "lot_sequence": self.lot_sequence or 0,
+            "source": "expendable"  # Indicates this came from kit_expendables table
         }
 
     def is_low_stock(self):

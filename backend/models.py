@@ -596,9 +596,34 @@ class ToolHistory(db.Model):
 class AuditLog(db.Model):
     __tablename__ = "audit_log"
     id = db.Column(db.Integer, primary_key=True)
-    action_type = db.Column(db.String, nullable=False)
+    user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=True)
+    action = db.Column(db.String, nullable=False)  # Legacy column - populated from action_type
+    action_type = db.Column(db.String, nullable=True)  # New column
     action_details = db.Column(db.String)
+    resource_type = db.Column(db.String, nullable=True)
+    resource_id = db.Column(db.Integer, nullable=True)
+    details = db.Column(db.JSON, nullable=True)
+    ip_address = db.Column(db.String, nullable=True)
     timestamp = db.Column(db.DateTime, default=get_current_time)
+
+    def __init__(self, action_type=None, action_details=None, user_id=None,
+                 resource_type=None, resource_id=None, details=None, ip_address=None, **kwargs):
+        """Initialize AuditLog with backward compatibility.
+
+        The 'action' column is required by the database schema but we want to use
+        'action_type' in the code. This constructor automatically populates 'action'
+        from 'action_type' if not explicitly provided.
+        """
+        super().__init__(**kwargs)
+        self.action_type = action_type
+        self.action_details = action_details
+        self.user_id = user_id
+        self.resource_type = resource_type
+        self.resource_id = resource_id
+        self.details = details
+        self.ip_address = ip_address
+        # Populate legacy 'action' column from action_type
+        self.action = action_type or "unknown"
 
 
 class UserActivity(db.Model):
