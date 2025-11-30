@@ -27,6 +27,33 @@ if (!document.head.querySelector('#leaflet-dark-popup-styles')) {
   document.head.appendChild(popupStyles);
 }
 
+// Map surface tweaks for readability in dark mode
+const mapStyles = document.createElement('style');
+mapStyles.textContent = `
+  .leaflet-layer.kit-map-dark-tiles {
+    filter: brightness(1.35) contrast(0.95) saturate(1.05);
+    transition: filter 0.3s ease;
+  }
+  .leaflet-container.kit-map-container-dark {
+    background-color: #0f1824;
+  }
+  .leaflet-container.kit-map-container-dark .leaflet-bar {
+    background-color: rgba(24, 32, 46, 0.9);
+    border-color: #24334a;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.35);
+  }
+  .leaflet-container.kit-map-container-dark .leaflet-bar a {
+    color: #f5f7fb;
+  }
+  .leaflet-container.kit-map-container-dark .leaflet-bar a:hover {
+    background-color: rgba(54, 72, 98, 0.85);
+  }
+`;
+if (!document.head.querySelector('#kit-map-styles')) {
+  mapStyles.id = 'kit-map-styles';
+  document.head.appendChild(mapStyles);
+}
+
 const { Text, Title } = Typography;
 
 // Fix for default marker icons in Leaflet with webpack/vite
@@ -132,6 +159,8 @@ export function KitLocationMap({ height = 400 }: KitLocationMapProps) {
 
   const { themeConfig } = useTheme();
   const isDarkMode = themeConfig.mode === 'dark';
+  const tileLayerClassName = isDarkMode ? 'kit-map-dark-tiles' : undefined;
+  const mapContainerClassName = isDarkMode ? 'kit-map-container-dark' : '';
 
   const { data: locationsData, isLoading, refetch } = useGetKitLocationsQuery({
     aircraft_type_id: aircraftTypeFilter,
@@ -210,7 +239,7 @@ export function KitLocationMap({ height = 400 }: KitLocationMapProps) {
       <div style={{
         padding: '12px 16px',
         borderBottom: `1px solid ${isDarkMode ? '#303030' : '#f0f0f0'}`,
-        backgroundColor: isDarkMode ? '#141414' : '#ffffff'
+        backgroundColor: isDarkMode ? '#111827' : '#ffffff'
       }}>
         <Space wrap>
           <Select
@@ -274,7 +303,7 @@ export function KitLocationMap({ height = 400 }: KitLocationMapProps) {
             justifyContent: 'center',
             alignItems: 'center',
             height: '100%',
-            backgroundColor: isDarkMode ? '#141414' : '#fafafa'
+            backgroundColor: isDarkMode ? '#0f1824' : '#fafafa'
           }}>
             <Empty
               image={<InboxOutlined style={{ fontSize: 48, color: '#d9d9d9' }} />}
@@ -295,6 +324,7 @@ export function KitLocationMap({ height = 400 }: KitLocationMapProps) {
             style={{ height: '100%', width: '100%' }}
             scrollWheelZoom={true}
             zoomControl={true}
+            className={mapContainerClassName}
           >
             <TileLayer
               key={isDarkMode ? 'dark' : 'light'}
@@ -304,6 +334,7 @@ export function KitLocationMap({ height = 400 }: KitLocationMapProps) {
               minZoom={2}
               subdomains={['a', 'b', 'c', 'd']}
               crossOrigin={true}
+              className={tileLayerClassName}
             />
             <MapController selectedKit={selectedKit} kits={kitsWithLocation} />
 
