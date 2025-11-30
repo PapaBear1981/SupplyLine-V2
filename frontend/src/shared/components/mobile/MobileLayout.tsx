@@ -211,6 +211,7 @@ export const MobileLayout = () => {
       <div className="mobile-layout-header">
         <SafeArea position="top" />
         <NavBar
+          backIcon={shouldShowBack() ? undefined : null}
           onBack={shouldShowBack() ? () => navigate(-1) : undefined}
           className="mobile-navbar"
         >
