@@ -25,6 +25,8 @@ import { MyCheckoutsTable } from '../components/MyCheckoutsTable';
 import { OverdueCheckoutsTable } from '../components/OverdueCheckoutsTable';
 import { CheckinModal } from '../components/CheckinModal';
 import type { ToolCheckout } from '../types';
+import { useIsMobile } from '@shared/hooks/useIsMobile';
+import { MobilePage } from '@shared/components/mobile/MobilePage';
 
 const { Title, Text } = Typography;
 
@@ -33,6 +35,7 @@ export const ToolCheckoutPage = () => {
   const [checkoutModalOpen, setCheckoutModalOpen] = useState(false);
   const [checkinModalOpen, setCheckinModalOpen] = useState(false);
   const [selectedCheckout, setSelectedCheckout] = useState<ToolCheckout | null>(null);
+  const isMobile = useIsMobile();
 
   const { data: stats, isLoading: statsLoading } = useGetCheckoutStatsQuery();
 
@@ -93,42 +96,11 @@ export const ToolCheckoutPage = () => {
     },
   ];
 
-  return (
-    <div>
-      {/* Header */}
-      <div
-        style={{
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          marginBottom: 24,
-          flexWrap: 'wrap',
-          gap: 16,
-        }}
-      >
-        <div>
-          <Title level={2} style={{ margin: 0 }}>
-            Tool Checkout
-          </Title>
-          <Text type="secondary">
-            Check out and return tools, view checkout history
-          </Text>
-        </div>
-        <Button
-          type="primary"
-          size="large"
-          icon={<PlusOutlined />}
-          onClick={() => setCheckoutModalOpen(true)}
-        >
-          Quick Checkout
-        </Button>
-      </div>
-
-      {/* Statistics Cards */}
-      <Row gutter={[16, 16]} style={{ marginBottom: 24 }}>
-        <Col xs={12} sm={6}>
-          <Card loading={statsLoading}>
-            <Statistic
+  const statsContent = (
+    <Row gutter={[16, 16]} style={{ marginBottom: 24 }}>
+      <Col xs={12} sm={6}>
+        <Card loading={statsLoading}>
+          <Statistic
               title="Active Checkouts"
               value={stats?.active_checkouts || 0}
               prefix={<SwapOutlined />}
@@ -168,12 +140,13 @@ export const ToolCheckoutPage = () => {
           </Card>
         </Col>
       </Row>
+  );
 
-      {/* Additional Stats Row */}
-      <Row gutter={[16, 16]} style={{ marginBottom: 24 }}>
-        <Col xs={24} md={12}>
-          <Card title="Most Active Tools (30 days)" loading={statsLoading}>
-            {stats?.popular_tools && stats.popular_tools.length > 0 ? (
+  const insightsContent = (
+    <Row gutter={[16, 16]} style={{ marginBottom: 24 }}>
+      <Col xs={24} md={12}>
+        <Card title="Most Active Tools (30 days)" loading={statsLoading}>
+          {stats?.popular_tools && stats.popular_tools.length > 0 ? (
               <Space direction="vertical" style={{ width: '100%' }}>
                 {stats.popular_tools.slice(0, 5).map((tool, index) => (
                   <div
@@ -235,24 +208,95 @@ export const ToolCheckoutPage = () => {
           </Card>
         </Col>
       </Row>
+  );
 
-      {/* Checkout Tables */}
-      <Card>
-        <Tabs
-          activeKey={activeTab}
-          onChange={setActiveTab}
-          items={tabItems}
-          size="large"
+  const tables = (
+    <Card>
+      <Tabs
+        activeKey={activeTab}
+        onChange={setActiveTab}
+        items={tabItems}
+        size={isMobile ? 'small' : 'large'}
+      />
+    </Card>
+  );
+
+  const pageBody = (
+    <>
+      {statsContent}
+      {insightsContent}
+      {tables}
+    </>
+  );
+
+  if (isMobile) {
+    return (
+      <MobilePage
+        title="Tool Checkout"
+        subtitle="Perform quick checkouts, returns, and monitor queues"
+        actions={[
+          {
+            key: 'checkout',
+            node: (
+              <Button type="primary" icon={<PlusOutlined />} onClick={() => setCheckoutModalOpen(true)}>
+                Quick Checkout
+              </Button>
+            ),
+          },
+        ]}
+      >
+        {pageBody}
+
+        <QuickCheckoutModal
+          open={checkoutModalOpen}
+          onClose={() => setCheckoutModalOpen(false)}
         />
-      </Card>
+        <CheckinModal
+          open={checkinModalOpen}
+          checkout={selectedCheckout}
+          onClose={handleCheckinClose}
+        />
+      </MobilePage>
+    );
+  }
 
-      {/* Quick Checkout Modal */}
+  return (
+    <div>
+      <div
+        style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          marginBottom: 24,
+          flexWrap: 'wrap',
+          gap: 16,
+        }}
+      >
+        <div>
+          <Title level={2} style={{ margin: 0 }}>
+            Tool Checkout
+          </Title>
+          <Text type="secondary">
+            Check out and return tools, view checkout history
+          </Text>
+        </div>
+        <Button
+          type="primary"
+          size="large"
+          icon={<PlusOutlined />}
+          onClick={() => setCheckoutModalOpen(true)}
+        >
+          Quick Checkout
+        </Button>
+      </div>
+
+      {pageBody}
+
       <QuickCheckoutModal
         open={checkoutModalOpen}
         onClose={() => setCheckoutModalOpen(false)}
       />
 
-      {/* Check-in Modal */}
       <CheckinModal
         open={checkinModalOpen}
         checkout={selectedCheckout}

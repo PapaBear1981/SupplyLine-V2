@@ -1,0 +1,159 @@
+.mobileDashboard {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 8px;
+  background: radial-gradient(circle at 10% 10%, rgba(70, 146, 255, 0.1), transparent 25%),
+    radial-gradient(circle at 80% 0%, rgba(255, 193, 79, 0.12), transparent 20%),
+    linear-gradient(135deg, #0f172a 0%, #0b1c35 50%, #0a1a32 100%);
+  min-height: calc(100vh - 120px);
+}
+
+.heroCard {
+  background: linear-gradient(135deg, #0d1b2a 0%, #0b2840 50%, #0a2d47 100%);
+  color: #f6fbff;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow: 0 18px 30px rgba(0, 0, 0, 0.35);
+}
+
+.heroTitle {
+  margin: 4px 0;
+  color: #f6fbff !important;
+}
+
+.heroCopy {
+  color: rgba(238, 244, 255, 0.82);
+}
+
+.heroActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.heroTags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.quickCard {
+  background: #0f1f35;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.quickGrid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.quickTile {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 12px 8px;
+  background: linear-gradient(160deg, rgba(255, 255, 255, 0.06), rgba(255, 255, 255, 0.02));
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 12px;
+  color: #e5edff;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  transition: all 0.2s ease;
+}
+
+.quickTile:hover,
+.quickTile:focus {
+  transform: translateY(-2px);
+  border-color: rgba(93, 162, 255, 0.5);
+}
+
+.quickTile:active {
+  transform: translateY(0);
+}
+
+.tileIcon {
+  font-size: 18px;
+}
+
+.tileLabel {
+  font-size: 13px;
+}
+
+.statRow {
+  margin-top: 4px;
+}
+
+.statCard {
+  background: #0f1f35;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 12px;
+  box-shadow: 0 12px 26px rgba(0, 0, 0, 0.35);
+  cursor: pointer;
+}
+
+.statIcon {
+  width: 36px;
+  height: 36px;
+  border-radius: 12px;
+  display: grid;
+  place-items: center;
+  color: #0c1627;
+  margin-bottom: 6px;
+}
+
+.blue {
+  background: linear-gradient(135deg, #7ab6ff, #4a8df9);
+}
+
+.purple {
+  background: linear-gradient(135deg, #b394ff, #7f63ff);
+}
+
+.green {
+  background: linear-gradient(135deg, #7ee0aa, #41c982);
+}
+
+.alertCard,
+.activityCard,
+.announcementsCard {
+  background: #0f1f35;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.alertItem {
+  cursor: pointer;
+  transition: background 0.2s ease;
+}
+
+.alertItem:hover {
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.alertIcon {
+  background: rgba(255, 193, 79, 0.15);
+  color: #ffc34f;
+}
+
+.activityItem {
+  border-radius: 10px;
+  padding: 10px 0;
+}
+
+@media (max-width: 480px) {
+  .mobileDashboard {
+    padding: 6px;
+  }
+
+  .quickGrid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .statRow .ant-col-8 {
+    flex: 0 0 50%;
+    max-width: 50%;
+  }
+}

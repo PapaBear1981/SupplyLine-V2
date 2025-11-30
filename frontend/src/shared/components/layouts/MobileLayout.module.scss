@@ -1,0 +1,158 @@
+.mobileShell {
+  min-height: 100vh;
+  background: linear-gradient(180deg, #0b1a2c 0%, #0b2236 40%, #0c2b45 100%);
+  color: #f0f4ff;
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 14px;
+  background: rgba(10, 21, 39, 0.9);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  backdrop-filter: blur(6px);
+}
+
+.brandBlock {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.brandTitle {
+  color: #f0f4ff;
+  font-size: 16px;
+}
+
+.statusTag {
+  border-radius: 10px;
+  height: 24px;
+  padding: 0 8px;
+  line-height: 22px;
+}
+
+.iconButton {
+  color: #f0f4ff;
+}
+
+.avatar {
+  cursor: pointer;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.35);
+}
+
+.content {
+  padding: 8px;
+  padding-bottom: 72px;
+}
+
+.contentInner {
+  max-width: 1100px;
+  margin: 0 auto;
+}
+
+.bottomNav {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  background: rgba(10, 21, 39, 0.95);
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  padding: 8px 6px;
+  gap: 6px;
+  z-index: 12;
+  backdrop-filter: blur(8px);
+}
+
+.navButton {
+  background: none;
+  color: #c8d6ff;
+  border: 1px solid transparent;
+  border-radius: 12px;
+  padding: 8px 4px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+}
+
+.navButton svg {
+  font-size: 18px;
+}
+
+.navButton span {
+  font-size: 12px;
+}
+
+.active {
+  background: linear-gradient(135deg, #4a8df9, #7ab6ff);
+  color: #0a1326;
+  border-color: rgba(255, 255, 255, 0.18);
+  box-shadow: 0 12px 18px rgba(0, 0, 0, 0.35);
+}
+
+.drawer {
+  background: #0c1c30;
+}
+
+.drawerSubtitle {
+  color: rgba(224, 236, 255, 0.7);
+  font-size: 12px;
+}
+
+.drawerSection {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.drawerGrid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.drawerTile {
+  background: linear-gradient(160deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.02));
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 14px;
+  padding: 12px 8px;
+  color: #e5edff;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  align-items: flex-start;
+  transition: all 0.2s ease;
+}
+
+.drawerTile:hover,
+.drawerTile:focus {
+  border-color: rgba(93, 162, 255, 0.5);
+  transform: translateY(-1px);
+}
+
+.tileIcon {
+  font-size: 18px;
+}
+
+.tileLabel {
+  font-weight: 600;
+  font-size: 13px;
+}
+
+.drawerActions {
+  width: 100%;
+}
+
+@media (max-width: 480px) {
+  .drawerGrid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}

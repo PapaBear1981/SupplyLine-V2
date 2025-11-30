@@ -4,12 +4,15 @@ import { PlusOutlined } from '@ant-design/icons';
 import { WarehousesTable } from '../components/WarehousesTable';
 import { WarehouseDrawer } from '../components/WarehouseDrawer';
 import type { Warehouse } from '../types';
+import { useIsMobile } from '@shared/hooks/useIsMobile';
+import { MobilePage } from '@shared/components/mobile/MobilePage';
 
 const { Title } = Typography;
 
 export const WarehousesPage = () => {
   const [selectedWarehouse, setSelectedWarehouse] = useState<Warehouse | null>(null);
   const [drawerMode, setDrawerMode] = useState<'view' | 'edit' | 'create' | null>(null);
+  const isMobile = useIsMobile();
 
   const handleView = (warehouse: Warehouse) => {
     setSelectedWarehouse(warehouse);
@@ -30,6 +33,39 @@ export const WarehousesPage = () => {
     setDrawerMode(null);
     setSelectedWarehouse(null);
   };
+
+  const table = (
+    <WarehousesTable onView={handleView} onEdit={handleEdit} />
+  );
+
+  if (isMobile) {
+    return (
+      <MobilePage
+        title="Warehouses"
+        subtitle="Check locations, capacities, and contacts while on site"
+        actions={[
+          {
+            key: 'add',
+            node: (
+              <Button type="primary" icon={<PlusOutlined />} onClick={handleCreate}>
+                Add Warehouse
+              </Button>
+            ),
+          },
+        ]}
+      >
+        {table}
+
+        <WarehouseDrawer
+          open={drawerMode !== null}
+          mode={drawerMode || 'view'}
+          warehouseId={selectedWarehouse?.id}
+          onClose={handleCloseDrawer}
+          onSuccess={() => setSelectedWarehouse(null)}
+        />
+      </MobilePage>
+    );
+  }
 
   return (
     <div>
@@ -53,7 +89,7 @@ export const WarehousesPage = () => {
         </Space>
       </div>
 
-      <WarehousesTable onView={handleView} onEdit={handleEdit} />
+      {table}
 
       <WarehouseDrawer
         open={drawerMode !== null}

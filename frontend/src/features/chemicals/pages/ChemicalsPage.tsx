@@ -5,6 +5,8 @@ import { ChemicalsTable } from '../components/ChemicalsTable';
 import { ChemicalDrawer } from '../components/ChemicalDrawer';
 import { ChemicalIssuanceModal } from '../components/ChemicalIssuanceModal';
 import type { Chemical } from '../types';
+import { useIsMobile } from '@shared/hooks/useIsMobile';
+import { MobilePage } from '@shared/components/mobile/MobilePage';
 
 const { Title } = Typography;
 
@@ -13,6 +15,7 @@ export const ChemicalsPage = () => {
   const [drawerMode, setDrawerMode] = useState<'view' | 'edit' | 'create' | null>(null);
   const [issuanceModalOpen, setIssuanceModalOpen] = useState(false);
   const [chemicalToIssue, setChemicalToIssue] = useState<Chemical | null>(null);
+  const isMobile = useIsMobile();
 
   const handleView = (chemical: Chemical) => {
     setSelectedChemical(chemical);
@@ -44,6 +47,45 @@ export const ChemicalsPage = () => {
     setChemicalToIssue(null);
   };
 
+  const table = (
+    <ChemicalsTable onView={handleView} onEdit={handleEdit} onIssue={handleIssue} />
+  );
+
+  if (isMobile) {
+    return (
+      <MobilePage
+        title="Chemicals"
+        subtitle="View inventory, issue items, and update records on the go"
+        actions={[
+          {
+            key: 'add',
+            node: (
+              <Button type="primary" icon={<PlusOutlined />} onClick={handleCreate}>
+                Add Chemical
+              </Button>
+            ),
+          },
+        ]}
+      >
+        {table}
+
+        <ChemicalDrawer
+          open={drawerMode !== null}
+          mode={drawerMode || 'view'}
+          chemicalId={selectedChemical?.id}
+          onClose={handleCloseDrawer}
+          onSuccess={() => setSelectedChemical(null)}
+        />
+
+        <ChemicalIssuanceModal
+          open={issuanceModalOpen}
+          chemical={chemicalToIssue}
+          onClose={handleCloseIssuanceModal}
+        />
+      </MobilePage>
+    );
+  }
+
   return (
     <div>
       <div
@@ -66,7 +108,7 @@ export const ChemicalsPage = () => {
         </Space>
       </div>
 
-      <ChemicalsTable onView={handleView} onEdit={handleEdit} onIssue={handleIssue} />
+      {table}
 
       <ChemicalDrawer
         open={drawerMode !== null}

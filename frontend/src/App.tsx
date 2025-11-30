@@ -27,9 +27,12 @@ import { ReportsPage } from '@features/reports';
 import { ThemeProvider, useTheme } from '@features/settings/contexts/ThemeContext';
 import { COLOR_THEMES } from '@features/settings/types/theme';
 import { ROUTES } from '@shared/constants/routes';
+import { MobileDashboardPage } from '@features/dashboard/pages/MobileDashboardPage';
+import { useIsMobile } from '@shared/hooks/useIsMobile';
 
 function AppContent() {
   const { themeConfig } = useTheme();
+  const isMobile = useIsMobile();
 
   return (
     <ConfigProvider
@@ -52,7 +55,10 @@ function AppContent() {
           <Route element={<ProtectedRoute />}>
             <Route element={<MainLayout />}>
               <Route path={ROUTES.HOME} element={<Navigate to={ROUTES.DASHBOARD} replace />} />
-              <Route path={ROUTES.DASHBOARD} element={<DashboardPage />} />
+              <Route
+                path={ROUTES.DASHBOARD}
+                element={isMobile ? <MobileDashboardPage /> : <DashboardPage />}
+              />
               <Route path={ROUTES.TOOL_CHECKOUT} element={<ToolCheckoutPage />} />
               <Route path={ROUTES.TOOLS} element={<ToolsPage />} />
               <Route path={ROUTES.CHEMICALS} element={<ChemicalsPage />} />

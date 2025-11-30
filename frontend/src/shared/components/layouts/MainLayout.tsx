@@ -22,6 +22,8 @@ import { logout } from '@features/auth/slices/authSlice';
 import { useLogoutMutation } from '@features/auth/services/authApi';
 import { getMenuItems } from '@shared/constants/navigation';
 import { ROUTES } from '@shared/constants/routes';
+import { useIsMobile } from '@shared/hooks/useIsMobile';
+import { MobileLayout } from './MobileLayout';
 
 const { Header, Sider, Content } = Layout;
 const { Text } = Typography;
@@ -33,6 +35,7 @@ export const MainLayout = () => {
   const dispatch = useAppDispatch();
   const user = useAppSelector((state) => state.auth.user);
   const [logoutApi] = useLogoutMutation();
+  const isMobile = useIsMobile();
 
   const {
     token: { colorBgContainer, borderRadiusLG },
@@ -77,6 +80,10 @@ export const MainLayout = () => {
       danger: true,
     },
   ];
+
+  if (isMobile) {
+    return <MobileLayout />;
+  }
 
   return (
     <Layout style={{ minHeight: '100vh' }}>
