@@ -122,8 +122,15 @@ export const UserDrawer = ({
       onSuccess?.();
       onClose();
       form.resetFields();
-    } catch {
-      message.error('Failed to save user. Please try again.');
+    } catch (err: unknown) {
+      const error = err as { data?: { error?: string; details?: string[] } };
+      const errorMessage = error?.data?.error || 'Failed to save user. Please try again.';
+      const details = error?.data?.details;
+      if (details && details.length > 0) {
+        message.error(`${errorMessage}: ${details.join(', ')}`);
+      } else {
+        message.error(errorMessage);
+      }
     }
   };
 
