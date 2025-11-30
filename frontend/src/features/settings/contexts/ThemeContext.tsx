@@ -30,6 +30,15 @@ export const ThemeProvider = ({ children }: ThemeProviderProps) => {
 
   useEffect(() => {
     localStorage.setItem(THEME_STORAGE_KEY, JSON.stringify(themeConfig));
+
+    // Apply dark mode class to document for antd-mobile theming
+    if (themeConfig.mode === 'dark') {
+      document.documentElement.classList.add('adm-theme-dark');
+      document.documentElement.setAttribute('data-prefers-color-scheme', 'dark');
+    } else {
+      document.documentElement.classList.remove('adm-theme-dark');
+      document.documentElement.setAttribute('data-prefers-color-scheme', 'light');
+    }
   }, [themeConfig]);
 
   const setThemeMode = (mode: ThemeMode) => {

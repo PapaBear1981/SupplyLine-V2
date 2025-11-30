@@ -136,17 +136,20 @@
   text-align: center;
 }
 
-/* Dark Mode */
+/* Dark Mode - Support both html.adm-theme-dark and .adm-theme-dark ancestor */
+html.adm-theme-dark .mobile-login-form .adm-input,
 .adm-theme-dark .mobile-login-form .adm-input {
   background: #262626;
   border-color: #404040;
 }
 
+html.adm-theme-dark .mobile-login-form .adm-input:focus-within,
 .adm-theme-dark .mobile-login-form .adm-input:focus-within {
   border-color: var(--adm-color-primary);
   box-shadow: 0 0 0 3px rgba(22, 119, 255, 0.15);
 }
 
+html.adm-theme-dark .mobile-login-info,
 .adm-theme-dark .mobile-login-info {
   background: #262626;
   border-color: #404040;

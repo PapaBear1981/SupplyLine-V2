@@ -202,20 +202,35 @@
   font-size: 14px;
 }
 
-/* Dark Mode */
+/* Dark Mode - Support both html.adm-theme-dark and .adm-theme-dark ancestor */
+html.adm-theme-dark .mobile-welcome,
 .adm-theme-dark .mobile-welcome {
   background: linear-gradient(135deg, #1a365d 0%, #2d3748 100%);
 }
 
+html.adm-theme-dark .mobile-dashboard,
+.adm-theme-dark .mobile-dashboard {
+  background-color: #141414;
+}
+
+html.adm-theme-dark .stat-card,
 .adm-theme-dark .stat-card,
+html.adm-theme-dark .activity-card,
 .adm-theme-dark .activity-card {
   background: #262626;
 }
 
+html.adm-theme-dark .alert-stat-item,
 .adm-theme-dark .alert-stat-item,
+html.adm-theme-dark .quick-action,
 .adm-theme-dark .quick-action {
   background: #262626;
   border-color: #404040;
+}
+
+html.adm-theme-dark .section-title,
+.adm-theme-dark .section-title {
+  color: rgba(255, 255, 255, 0.85);
 }
 
 /* Animations */

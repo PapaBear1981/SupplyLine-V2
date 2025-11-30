@@ -163,21 +163,26 @@
   border-radius: 4px;
 }
 
-/* Dark Mode */
+/* Dark Mode - Support both html.adm-theme-dark and .adm-theme-dark ancestor */
+html.adm-theme-dark .mobile-reports,
 .adm-theme-dark .mobile-reports {
-  background: #1a1a1a;
+  background: #141414;
 }
 
+html.adm-theme-dark .mobile-reports-stat-card,
 .adm-theme-dark .mobile-reports-stat-card,
+html.adm-theme-dark .mobile-reports-card,
 .adm-theme-dark .mobile-reports-card {
   background: #262626;
 }
 
+html.adm-theme-dark .mobile-reports .adm-tabs-header,
 .adm-theme-dark .mobile-reports .adm-tabs-header {
-  background: #1a1a1a;
+  background: #141414;
   border-bottom-color: #404040;
 }
 
+html.adm-theme-dark .mobile-reports-card .adm-list,
 .adm-theme-dark .mobile-reports-card .adm-list {
   --border-inner: 1px solid #404040;
 }

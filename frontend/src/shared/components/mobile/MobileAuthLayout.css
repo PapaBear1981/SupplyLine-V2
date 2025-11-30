@@ -43,15 +43,18 @@
   color: var(--adm-color-text-secondary);
 }
 
-/* Dark mode support */
+/* Dark mode support - Support both html.adm-theme-dark and .adm-theme-dark ancestor */
+html.adm-theme-dark .mobile-auth-layout,
 .adm-theme-dark .mobile-auth-layout {
   background: linear-gradient(180deg, #1a365d 0%, #2d3748 100%);
 }
 
+html.adm-theme-dark .mobile-auth-content,
 .adm-theme-dark .mobile-auth-content {
-  background-color: #1a1a1a;
+  background-color: #141414;
 }
 
+html.adm-theme-dark .mobile-auth-footer,
 .adm-theme-dark .mobile-auth-footer {
-  background-color: #1a1a1a;
+  background-color: #141414;
 }

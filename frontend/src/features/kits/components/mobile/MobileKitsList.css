@@ -169,11 +169,34 @@
   color: var(--adm-color-text-secondary);
 }
 
-/* Dark mode */
+/* Dark mode - Support both html.adm-theme-dark and .adm-theme-dark ancestor */
+html.adm-theme-dark .search-bar-container,
 .adm-theme-dark .search-bar-container {
-  background: #1a1a1a;
+  background: #141414;
 }
 
+html.adm-theme-dark .filter-button,
 .adm-theme-dark .filter-button {
   background: #333;
+}
+
+html.adm-theme-dark .mobile-kits-list,
+.adm-theme-dark .mobile-kits-list {
+  background-color: #141414;
+}
+
+html.adm-theme-dark .filter-popup,
+.adm-theme-dark .filter-popup,
+html.adm-theme-dark .detail-popup,
+.adm-theme-dark .detail-popup,
+html.adm-theme-dark .form-popup,
+.adm-theme-dark .form-popup {
+  background-color: #1f1f1f;
+}
+
+html.adm-theme-dark .detail-header,
+.adm-theme-dark .detail-header,
+html.adm-theme-dark .detail-actions,
+.adm-theme-dark .detail-actions {
+  border-color: #424242;
 }

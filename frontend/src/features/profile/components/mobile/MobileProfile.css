@@ -120,3 +120,28 @@
 .popup-content .adm-form-footer {
   margin-top: auto;
 }
+
+/* Dark mode - Support both html.adm-theme-dark and .adm-theme-dark ancestor */
+html.adm-theme-dark .mobile-profile,
+.adm-theme-dark .mobile-profile {
+  background-color: #141414;
+}
+
+html.adm-theme-dark .profile-header-card,
+.adm-theme-dark .profile-header-card,
+html.adm-theme-dark .quick-actions-card,
+.adm-theme-dark .quick-actions-card,
+html.adm-theme-dark .info-card,
+.adm-theme-dark .info-card {
+  background-color: #1f1f1f;
+}
+
+html.adm-theme-dark .popup-content,
+.adm-theme-dark .popup-content {
+  background-color: #1f1f1f;
+}
+
+html.adm-theme-dark .popup-header,
+.adm-theme-dark .popup-header {
+  border-color: #424242;
+}

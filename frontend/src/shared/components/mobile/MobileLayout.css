@@ -124,24 +124,41 @@
   --adm-color-primary-rgb: 22, 119, 255;
 }
 
+/* Support both html.adm-theme-dark and .adm-theme-dark ancestor */
+html.adm-theme-dark .mobile-menu-header,
 .adm-theme-dark .mobile-menu-header {
   background: linear-gradient(135deg, #1677ff 0%, #4f46e5 100%);
 }
 
+html.adm-theme-dark .mobile-layout,
 .adm-theme-dark .mobile-layout {
-  background-color: #1a1a1a;
+  background-color: #141414;
 }
 
+html.adm-theme-dark .mobile-layout-header,
 .adm-theme-dark .mobile-layout-header,
+html.adm-theme-dark .mobile-layout-footer,
 .adm-theme-dark .mobile-layout-footer {
-  background-color: #1a1a1a;
-  border-color: #333;
+  background-color: #141414;
+  border-color: #424242;
 }
 
+html.adm-theme-dark .mobile-navbar,
 .adm-theme-dark .mobile-navbar {
-  border-color: #333;
+  border-color: #424242;
 }
 
+html.adm-theme-dark .mobile-tabbar,
 .adm-theme-dark .mobile-tabbar {
-  background-color: #1a1a1a;
+  background-color: #141414;
+}
+
+html.adm-theme-dark .mobile-menu-popup,
+.adm-theme-dark .mobile-menu-popup {
+  background-color: #1f1f1f;
+}
+
+html.adm-theme-dark .logout-section,
+.adm-theme-dark .logout-section {
+  border-top-color: #424242;
 }

@@ -137,3 +137,34 @@
   color: rgba(255, 255, 255, 0.9);
   line-height: 1.5;
 }
+
+/* Dark mode - Support both html.adm-theme-dark and .adm-theme-dark ancestor */
+html.adm-theme-dark .mobile-settings,
+.adm-theme-dark .mobile-settings {
+  background-color: #141414;
+}
+
+html.adm-theme-dark .settings-header,
+.adm-theme-dark .settings-header {
+  background-color: #141414;
+}
+
+html.adm-theme-dark .settings-card,
+.adm-theme-dark .settings-card {
+  background-color: #1f1f1f;
+}
+
+html.adm-theme-dark .color-theme-item,
+.adm-theme-dark .color-theme-item {
+  background-color: #262626;
+}
+
+html.adm-theme-dark .color-theme-item.selected,
+.adm-theme-dark .color-theme-item.selected {
+  background-color: rgba(22, 119, 255, 0.15);
+}
+
+html.adm-theme-dark .preview-divider,
+.adm-theme-dark .preview-divider {
+  background-color: #424242;
+}

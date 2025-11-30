@@ -181,11 +181,23 @@
   color: var(--adm-color-text-secondary);
 }
 
-/* Dark Mode */
+/* Dark Mode - Support both html.adm-theme-dark and .adm-theme-dark ancestor */
+html.adm-theme-dark .mobile-tool-checkout,
+.adm-theme-dark .mobile-tool-checkout {
+  background-color: #141414;
+}
+
+html.adm-theme-dark .stat-card,
 .adm-theme-dark .stat-card {
   background: #262626;
 }
 
+html.adm-theme-dark .selected-tool-card,
 .adm-theme-dark .selected-tool-card {
   background: #333;
+}
+
+html.adm-theme-dark .form-popup,
+.adm-theme-dark .form-popup {
+  background-color: #1f1f1f;
 }
