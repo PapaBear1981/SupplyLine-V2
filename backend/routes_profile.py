@@ -83,6 +83,7 @@ def update_profile():
             return jsonify({"error": "User not found"}), 404
 
         data = request.get_json() or {}
+        current_user_id = request.current_user.get("user_id")
 
         # Update fields
         first_name = data.get("first_name", "").strip()
@@ -118,11 +119,17 @@ def update_profile():
         )
         db.session.add(activity)
 
-        audit_log = AuditLog(
-            action_type="profile_update",
-            action_details=f"User {user.id} ({user.name}) updated profile"
+        AuditLog.log(
+            user_id=current_user_id,
+            action="profile_update",
+            resource_type="user",
+            resource_id=user.id,
+            details={
+                "user_name": user.name,
+                "email": user.email
+            },
+            ip_address=request.remote_addr
         )
-        db.session.add(audit_log)
         db.session.commit()
 
         logger.info(f"Profile updated for user {user.id}")
@@ -160,6 +167,7 @@ def change_password():
             return jsonify({"error": "User not found"}), 404
 
         data = request.get_json() or {}
+        current_user_id = request.current_user.get("user_id")
         current_password = data.get("current_password", "").strip()
         new_password = data.get("new_password", "").strip()
         confirm_password = data.get("confirm_password", "").strip()
@@ -206,11 +214,16 @@ def change_password():
         )
         db.session.add(activity)
 
-        audit_log = AuditLog(
-            action_type="password_change",
-            action_details=f"User {user.id} ({user.name}) changed password"
+        AuditLog.log(
+            user_id=current_user_id,
+            action="password_change",
+            resource_type="user",
+            resource_id=user.id,
+            details={
+                "user_name": user.name
+            },
+            ip_address=request.remote_addr
         )
-        db.session.add(audit_log)
         db.session.commit()
 
         logger.info(f"Password changed for user {user.id}")

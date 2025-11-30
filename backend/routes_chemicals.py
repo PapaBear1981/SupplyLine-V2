@@ -112,11 +112,18 @@ def _create_auto_reorder_request(chemical, user_id):
     db.session.add(request_item)
 
     # Log the auto-creation
-    log = AuditLog(
-        action_type="auto_reorder_request_created",
-        action_details=f"Auto-created reorder request {user_request.request_number} for chemical {chemical.part_number} (status: {chemical.status})"
+    AuditLog.log(
+        user_id=user_id,
+        action="auto_reorder_request_created",
+        resource_type="chemical_reorder_request",
+        resource_id=user_request.id,
+        details={
+            "request_number": user_request.request_number,
+            "part_number": chemical.part_number,
+            "chemical_status": chemical.status
+        },
+        ip_address=request.remote_addr
     )
-    db.session.add(log)
 
     logger.info(f"Auto-created reorder request {user_request.request_number} for chemical {chemical.part_number}")
     return user_request
@@ -287,6 +294,7 @@ def register_chemical_routes(app):
     @handle_errors
     def create_chemical_route():
         data = request.get_json() or {}
+        current_user_id = request.current_user.get("user_id")
 
         # Validate warehouse_id is required
         if not data.get("warehouse_id"):
@@ -347,11 +355,18 @@ def register_chemical_routes(app):
             logger.error(f"Error recording chemical creation transaction: {e!s}")
 
         # Log the action
-        log = AuditLog(
-            action_type="chemical_added",
-            action_details=f"Chemical {validated_data['part_number']} - {validated_data['lot_number']} added"
+        AuditLog.log(
+            user_id=current_user_id,
+            action="chemical_added",
+            resource_type="chemical",
+            resource_id=chemical.id,
+            details={
+                "part_number": validated_data['part_number'],
+                "lot_number": validated_data['lot_number'],
+                "warehouse_id": data["warehouse_id"]
+            },
+            ip_address=request.remote_addr
         )
-        db.session.add(log)
 
         # Log user activity
         if hasattr(request, "current_user"):
@@ -413,6 +428,8 @@ def register_chemical_routes(app):
     @handle_errors
     def chemical_issue_route(id):
         from utils.lot_utils import create_child_chemical
+
+        current_user_id = request.current_user.get("user_id")
 
         # Get the chemical
         chemical = Chemical.query.get_or_404(id)
@@ -490,11 +507,19 @@ def register_chemical_routes(app):
                 chemical.requested_quantity = chemical.minimum_stock_level or 1
 
             # Log the action for child lot creation
-            log_child = AuditLog(
-                action_type="child_lot_created",
-                action_details=f"Child lot {child_chemical.lot_number} created from {chemical.lot_number}: {quantity} {chemical.unit}"
+            AuditLog.log(
+                user_id=current_user_id,
+                action="child_lot_created",
+                resource_type="chemical",
+                resource_id=child_chemical.id,
+                details={
+                    "child_lot_number": child_chemical.lot_number,
+                    "parent_lot_number": chemical.lot_number,
+                    "quantity": quantity,
+                    "unit": chemical.unit
+                },
+                ip_address=request.remote_addr
             )
-            db.session.add(log_child)
         else:
             # Full consumption - issue from original chemical
             issuance = ChemicalIssuance(
@@ -552,11 +577,20 @@ def register_chemical_routes(app):
             logger.exception(f"Error recording chemical issuance transaction: {e}")
 
         # Log the action
-        log = AuditLog(
-            action_type="chemical_issued",
-            action_details=f"Chemical {chemical.part_number} - {child_chemical.lot_number if child_chemical else chemical.lot_number} issued: {quantity} {chemical.unit}"
+        AuditLog.log(
+            user_id=current_user_id,
+            action="chemical_issued",
+            resource_type="chemical",
+            resource_id=child_chemical.id if child_chemical else chemical.id,
+            details={
+                "part_number": chemical.part_number,
+                "lot_number": child_chemical.lot_number if child_chemical else chemical.lot_number,
+                "quantity": quantity,
+                "unit": chemical.unit,
+                "hangar": validated_data["hangar"]
+            },
+            ip_address=request.remote_addr
         )
-        db.session.add(log)
 
         # Log user activity
         if hasattr(request, "current_user"):
@@ -689,6 +723,7 @@ def register_chemical_routes(app):
     def chemical_return_route(id):
         chemical = Chemical.query.get_or_404(id)
         data = request.get_json() or {}
+        current_user_id = request.current_user.get("user_id")
 
         issuance_id = data.get("issuance_id")
         if not issuance_id:
@@ -778,13 +813,20 @@ def register_chemical_routes(app):
         except Exception as exc:
             logger.exception("Error recording chemical return transaction: %s", exc)
 
-        log = AuditLog(
-            action_type="chemical_returned",
-            action_details=(
-                f"Chemical {chemical.part_number} - {chemical.lot_number} returned: {quantity} {chemical.unit}"
-            ),
+        AuditLog.log(
+            user_id=current_user_id,
+            action="chemical_returned",
+            resource_type="chemical",
+            resource_id=chemical.id,
+            details={
+                "part_number": chemical.part_number,
+                "lot_number": chemical.lot_number,
+                "quantity": quantity,
+                "unit": chemical.unit,
+                "warehouse_id": warehouse_id
+            },
+            ip_address=request.remote_addr
         )
-        db.session.add(log)
 
         if hasattr(request, "current_user"):
             activity = UserActivity(
@@ -883,6 +925,7 @@ def register_chemical_routes(app):
 
             # Get request data
             data = request.get_json() or {}
+            current_user_id = request.current_user.get("user_id")
 
             # Validate requested quantity
             requested_quantity = data.get("requested_quantity")
@@ -920,11 +963,20 @@ def register_chemical_routes(app):
 
             # Log the action
             user_name = request.current_user.get("user_name", "Unknown user")
-            log = AuditLog(
-                action_type="chemical_reorder_requested",
-                action_details=f"Reorder requested for chemical {chemical.part_number} - {chemical.lot_number} by {user_name} (Qty: {requested_quantity}). Request #{user_request.request_number} created."
+            AuditLog.log(
+                user_id=current_user_id,
+                action="chemical_reorder_requested",
+                resource_type="chemical",
+                resource_id=chemical.id,
+                details={
+                    "part_number": chemical.part_number,
+                    "lot_number": chemical.lot_number,
+                    "requested_by": user_name,
+                    "quantity": requested_quantity,
+                    "request_number": user_request.request_number
+                },
+                ip_address=request.remote_addr
             )
-            db.session.add(log)
 
             # Log user activity
             if hasattr(request, "current_user"):
@@ -953,6 +1005,7 @@ def register_chemical_routes(app):
     @materials_manager_required
     def mark_chemical_as_ordered_route(id):
         try:
+            current_user_id = request.current_user.get("user_id")
             # Get the chemical
             chemical = Chemical.query.get_or_404(id)
 
@@ -1048,11 +1101,21 @@ def register_chemical_routes(app):
 
             # Log the action
             user_name = request.current_user.get("user_name", "Unknown user")
-            log = AuditLog(
-                action_type="chemical_ordered",
-                action_details=f"Chemical {chemical.part_number} - {chemical.lot_number} marked as ordered by {user_name}. Procurement order #{procurement_order.id} created for {order_quantity} {chemical.unit}."
+            AuditLog.log(
+                user_id=current_user_id,
+                action="chemical_ordered",
+                resource_type="chemical",
+                resource_id=chemical.id,
+                details={
+                    "part_number": chemical.part_number,
+                    "lot_number": chemical.lot_number,
+                    "ordered_by": user_name,
+                    "procurement_order_id": procurement_order.id,
+                    "order_quantity": order_quantity,
+                    "unit": chemical.unit
+                },
+                ip_address=request.remote_addr
             )
-            db.session.add(log)
 
             # Log user activity
             if hasattr(request, "current_user"):
@@ -1080,6 +1143,7 @@ def register_chemical_routes(app):
     @app.route("/api/chemicals/<int:id>", methods=["GET", "PUT", "DELETE"])
     @handle_errors
     def chemical_detail_route(id):
+        current_user_id = request.current_user.get("user_id")
         # Get the chemical
         chemical = Chemical.query.get_or_404(id)
 
@@ -1101,11 +1165,19 @@ def register_chemical_routes(app):
                         chemical.archived_date = datetime.utcnow()
 
                         # Add log for archiving
-                        archive_log = AuditLog(
-                            action_type="chemical_archived",
-                            action_details=f"Chemical {chemical.part_number} - {chemical.lot_number} automatically archived: expired"
+                        AuditLog.log(
+                            user_id=None,  # System action
+                            action="chemical_archived",
+                            resource_type="chemical",
+                            resource_id=chemical.id,
+                            details={
+                                "part_number": chemical.part_number,
+                                "lot_number": chemical.lot_number,
+                                "reason": "expired",
+                                "auto_archived": True
+                            },
+                            ip_address=request.remote_addr if hasattr(request, 'remote_addr') else None
                         )
-                        db.session.add(archive_log)
 
                         # Update reorder status for expired chemicals
                         chemical.update_reorder_status()
@@ -1171,11 +1243,17 @@ def register_chemical_routes(app):
             db.session.commit()
 
             # Log the action
-            log = AuditLog(
-                action_type="chemical_updated",
-                action_details=f"Chemical {chemical.part_number} - {chemical.lot_number} updated"
+            AuditLog.log(
+                user_id=current_user_id,
+                action="chemical_updated",
+                resource_type="chemical",
+                resource_id=chemical.id,
+                details={
+                    "part_number": chemical.part_number,
+                    "lot_number": chemical.lot_number
+                },
+                ip_address=request.remote_addr
             )
-            db.session.add(log)
 
             # Log user activity
             if hasattr(request, "current_user"):
@@ -1199,11 +1277,17 @@ def register_chemical_routes(app):
             db.session.delete(chemical)
 
             # Log the action
-            log = AuditLog(
-                action_type="chemical_deleted",
-                action_details=f"Chemical {part_number} - {lot_number} deleted"
+            AuditLog.log(
+                user_id=current_user_id,
+                action="chemical_deleted",
+                resource_type="chemical",
+                resource_id=id,
+                details={
+                    "part_number": part_number,
+                    "lot_number": lot_number
+                },
+                ip_address=request.remote_addr
             )
-            db.session.add(log)
 
             # Log user activity
             if hasattr(request, "current_user"):
@@ -1225,6 +1309,7 @@ def register_chemical_routes(app):
     @materials_manager_required
     def archive_chemical_route(id):
         try:
+            current_user_id = request.current_user.get("user_id")
             # Get the chemical
             chemical = Chemical.query.get_or_404(id)
 
@@ -1253,11 +1338,19 @@ def register_chemical_routes(app):
 
             # Log the action
             user_name = request.current_user.get("user_name", "Unknown user")
-            log = AuditLog(
-                action_type="chemical_archived",
-                action_details=f"Chemical {chemical.part_number} - {chemical.lot_number} archived by {user_name}: {data.get('reason')}"
+            AuditLog.log(
+                user_id=current_user_id,
+                action="chemical_archived",
+                resource_type="chemical",
+                resource_id=chemical.id,
+                details={
+                    "part_number": chemical.part_number,
+                    "lot_number": chemical.lot_number,
+                    "archived_by": user_name,
+                    "reason": data.get('reason')
+                },
+                ip_address=request.remote_addr
             )
-            db.session.add(log)
 
             # Log user activity
             if hasattr(request, "current_user"):
@@ -1285,6 +1378,7 @@ def register_chemical_routes(app):
     @materials_manager_required
     def unarchive_chemical_route(id):
         try:
+            current_user_id = request.current_user.get("user_id")
             # Get the chemical
             chemical = Chemical.query.get_or_404(id)
 
@@ -1306,11 +1400,18 @@ def register_chemical_routes(app):
 
             # Log the action
             user_name = request.current_user.get("user_name", "Unknown user")
-            log = AuditLog(
-                action_type="chemical_unarchived",
-                action_details=f"Chemical {chemical.part_number} - {chemical.lot_number} unarchived by {user_name}"
+            AuditLog.log(
+                user_id=current_user_id,
+                action="chemical_unarchived",
+                resource_type="chemical",
+                resource_id=chemical.id,
+                details={
+                    "part_number": chemical.part_number,
+                    "lot_number": chemical.lot_number,
+                    "unarchived_by": user_name
+                },
+                ip_address=request.remote_addr
             )
-            db.session.add(log)
 
             # Log user activity
             if hasattr(request, "current_user"):
@@ -1347,6 +1448,7 @@ def register_chemical_routes(app):
 
             # Get request data
             data = request.get_json() or {}
+            current_user_id = request.current_user.get("user_id")
 
             # Check if received quantity is provided
             quantity_log = ""
@@ -1413,11 +1515,20 @@ def register_chemical_routes(app):
 
             # Log the action
             user_name = request.current_user.get("user_name", "Unknown user")
-            log = AuditLog(
-                action_type="chemical_delivered",
-                action_details=f"Chemical {chemical.part_number} - {chemical.lot_number} marked as delivered by {user_name}{quantity_log}"
+            AuditLog.log(
+                user_id=current_user_id,
+                action="chemical_delivered",
+                resource_type="chemical",
+                resource_id=chemical.id,
+                details={
+                    "part_number": chemical.part_number,
+                    "lot_number": chemical.lot_number,
+                    "delivered_by": user_name,
+                    "received_quantity": data.get("received_quantity"),
+                    "quantity_log": quantity_log
+                },
+                ip_address=request.remote_addr
             )
-            db.session.add(log)
 
             # Log user activity
             if hasattr(request, "current_user"):

@@ -8,7 +8,6 @@ Admin-only access required for all operations.
 import logging
 
 from flask import jsonify, request, send_file
-from flask_jwt_extended import current_user  # type: ignore[import-not-found]
 
 from auth import admin_required, jwt_required
 from utils.database_backup import DatabaseBackupManager
@@ -64,8 +63,8 @@ def register_database_routes(app):
             )
 
             if success:
-                logger.info(f"Manual backup created by {current_user.name}", extra={
-                    "user_id": current_user.id,
+                logger.info(f"Manual backup created by {request.current_user.get('user_name')}", extra={
+                    "user_id": request.current_user.get("user_id"),
                     "backup_path": backup_path
                 })
 
@@ -133,8 +132,8 @@ def register_database_routes(app):
             success, message = backup_manager.delete_backup(str(backup_path))
 
             if success:
-                logger.info(f"Backup deleted by {current_user.name}", extra={
-                    "user_id": current_user.id,
+                logger.info(f"Backup deleted by {request.current_user.get('user_name')}", extra={
+                    "user_id": request.current_user.get("user_id"),
                     "backup_filename": backup_filename
                 })
 
@@ -183,8 +182,8 @@ def register_database_routes(app):
                     "message": "Invalid backup path"
                 }), 400
 
-            logger.info(f"Backup downloaded by {current_user.name}", extra={
-                "user_id": current_user.id,
+            logger.info(f"Backup downloaded by {request.current_user.get('user_name')}", extra={
+                "user_id": request.current_user.get("user_id"),
                 "backup_filename": backup_filename
             })
 
@@ -241,8 +240,8 @@ def register_database_routes(app):
             )
 
             if success:
-                logger.warning(f"Database restored by {current_user.name}", extra={
-                    "user_id": current_user.id,
+                logger.warning(f"Database restored by {request.current_user.get('user_name')}", extra={
+                    "user_id": request.current_user.get("user_id"),
                     "backup_filename": backup_filename,
                     "security_event": "database_restore"
                 })

@@ -15,6 +15,7 @@ def register_user_routes(app):
 @users_bp.route("/users", methods=["GET", "POST"])
 @login_required
 def users_route():
+    current_user_id = request.current_user.get("user_id")
     # Check permissions
     user_payload = request.current_user
     permissions = set(user_payload.get("permissions", []))
@@ -88,11 +89,18 @@ def users_route():
     db.session.commit()
 
     # Log the action
-    log = AuditLog(
-        action_type="create_user",
-        action_details=f"Created user {u.id} ({u.name})"
+    AuditLog.log(
+        user_id=current_user_id,
+        action="create_user",
+        resource_type="user",
+        resource_id=u.id,
+        details={
+            "user_name": u.name,
+            "employee_number": u.employee_number,
+            "department": u.department
+        },
+        ip_address=request.remote_addr
     )
-    db.session.add(log)
     db.session.commit()
 
     return jsonify(u.to_dict()), 201
@@ -100,6 +108,7 @@ def users_route():
 @users_bp.route("/users/<int:id>", methods=["GET", "PUT", "DELETE"])
 @login_required
 def user_detail_route(id):
+    current_user_id = request.current_user.get("user_id")
     # Check permissions
     user_payload = request.current_user
     permissions = set(user_payload.get("permissions", []))
@@ -150,11 +159,17 @@ def user_detail_route(id):
         db.session.commit()
 
         # Log the action
-        log = AuditLog(
-            action_type="update_user",
-            action_details=f"Updated user {user.id} ({user.name})"
+        AuditLog.log(
+            user_id=current_user_id,
+            action="update_user",
+            resource_type="user",
+            resource_id=user.id,
+            details={
+                "user_name": user.name,
+                "department": user.department
+            },
+            ip_address=request.remote_addr
         )
-        db.session.add(log)
         db.session.commit()
 
         return jsonify(user.to_dict(include_roles=True))
@@ -168,11 +183,16 @@ def user_detail_route(id):
         db.session.commit()
 
         # Log the action
-        log = AuditLog(
-            action_type="deactivate_user",
-            action_details=f"Deactivated user {user.id} ({user.name})"
+        AuditLog.log(
+            user_id=current_user_id,
+            action="deactivate_user",
+            resource_type="user",
+            resource_id=user.id,
+            details={
+                "user_name": user.name
+            },
+            ip_address=request.remote_addr
         )
-        db.session.add(log)
         db.session.commit()
 
         return jsonify({"message": f"User {user.name} deactivated successfully"})
@@ -182,7 +202,7 @@ def user_detail_route(id):
 @permission_required("user.manage")
 def unlock_user_account(id):
     """Unlock a user account that has been locked due to failed login attempts."""
-    # Get the user
+        # Get the user
     user = User.query.get_or_404(id)
 
     # Check if the account is actually locked
@@ -194,11 +214,18 @@ def unlock_user_account(id):
 
     # Log the action (get admin info from JWT token)
     user_payload = request.current_user
-    log = AuditLog(
-        action_type="account_unlocked",
-        action_details=f'Admin {user_payload.get("user_name", "Unknown")} (ID: {user_payload.get("user_id")}) manually unlocked account for user {user.name} (ID: {user.id})'
+    AuditLog.log(
+        user_id=current_user_id,
+        action="account_unlocked",
+        resource_type="user",
+        resource_id=user.id,
+        details={
+            "user_name": user.name,
+            "admin_name": user_payload.get("user_name", "Unknown"),
+            "admin_id": user_payload.get("user_id")
+        },
+        ip_address=request.remote_addr
     )
-    db.session.add(log)
 
     # Add user activity
     activity = UserActivity(

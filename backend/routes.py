@@ -497,6 +497,7 @@ def register_routes(app):
     @app.route("/api/admin/registration-requests/<int:id>/approve", methods=["POST"])
     @admin_required
     def approve_registration_request(id):
+        current_user_id = request.current_user.get("user_id")
         from models import RegistrationRequest
 
         # Get the registration request
@@ -527,11 +528,17 @@ def register_routes(app):
         db.session.commit()
 
         # Log the approval
-        log = AuditLog(
-            action_type="approve_registration",
-            action_details=f"Approved registration request {reg_request.id} ({reg_request.name})"
+        AuditLog.log(
+            user_id=current_user_id,
+            action="approve_registration",
+            resource_type="registration_request",
+            resource_id=reg_request.id,
+            details={
+                "name": reg_request.name,
+                "employee_number": reg_request.employee_number
+            },
+            ip_address=request.remote_addr
         )
-        db.session.add(log)
         db.session.commit()
 
         return jsonify({
@@ -543,6 +550,7 @@ def register_routes(app):
     @app.route("/api/admin/registration-requests/<int:id>/deny", methods=["POST"])
     @admin_required
     def deny_registration_request(id):
+        current_user_id = request.current_user.get("user_id")
         from models import RegistrationRequest
 
         # Get the registration request
@@ -562,11 +570,17 @@ def register_routes(app):
         db.session.commit()
 
         # Log the denial
-        log = AuditLog(
-            action_type="deny_registration",
-            action_details=f"Denied registration request {reg_request.id} ({reg_request.name})"
+        AuditLog.log(
+            user_id=current_user_id,
+            action="deny_registration",
+            resource_type="registration_request",
+            resource_id=reg_request.id,
+            details={
+                "name": reg_request.name,
+                "employee_number": reg_request.employee_number
+            },
+            ip_address=request.remote_addr
         )
-        db.session.add(log)
         db.session.commit()
 
         return jsonify({
@@ -822,6 +836,7 @@ def register_routes(app):
 
     @app.route("/api/tools", methods=["GET", "POST"])
     def tools_route():
+        current_user_id = request.current_user.get("user_id")
         # GET - List all tools with pagination
         if request.method == "GET":
             # PERFORMANCE: Add pagination to prevent unbounded dataset returns
@@ -1008,11 +1023,18 @@ def register_routes(app):
             # Don't fail the tool creation if transaction recording fails
 
         # Log the action
-        log = AuditLog(
-            action_type="create_tool",
-            action_details=f"Created tool {t.id} ({t.tool_number})"
+        AuditLog.log(
+            user_id=current_user_id,
+            action="create_tool",
+            resource_type="tool",
+            resource_id=t.id,
+            details={
+                "tool_number": t.tool_number,
+                "serial_number": t.serial_number,
+                "description": t.description
+            },
+            ip_address=request.remote_addr
         )
-        db.session.add(log)
         db.session.commit()
 
         # Return the complete tool object for the frontend
@@ -1040,6 +1062,7 @@ def register_routes(app):
 
     @app.route("/api/tools/<int:id>", methods=["GET", "PUT", "DELETE"])
     def get_tool(id):
+        current_user_id = request.current_user.get("user_id")
         tool = Tool.query.get_or_404(id)
 
         # GET - Get tool details
@@ -1129,11 +1152,18 @@ def register_routes(app):
                 db.session.commit()
 
                 # Log the action
-                log = AuditLog(
-                    action_type="delete_tool",
-                    action_details=f"Deleted tool {id} ({tool_number}) - {tool_description}. Force delete: {force_delete}"
+                AuditLog.log(
+                    user_id=current_user_id,
+                    action="delete_tool",
+                    resource_type="tool",
+                    resource_id=id,
+                    details={
+                        "tool_number": tool_number,
+                        "description": tool_description,
+                        "force_delete": force_delete
+                    },
+                    ip_address=request.remote_addr
                 )
-                db.session.add(log)
                 db.session.commit()
 
                 return jsonify({"message": "Tool deleted successfully"}), 200
@@ -1211,11 +1241,17 @@ def register_routes(app):
         logger.debug("Tool updated successfully", extra={"tool_id": id})
 
         # Log the action
-        log = AuditLog(
-            action_type="update_tool",
-            action_details=f"Updated tool {tool.id} ({tool.tool_number})"
+        AuditLog.log(
+            user_id=current_user_id,
+            action="update_tool",
+            resource_type="tool",
+            resource_id=tool.id,
+            details={
+                "tool_number": tool.tool_number,
+                "serial_number": tool.serial_number
+            },
+            ip_address=request.remote_addr
         )
-        db.session.add(log)
         db.session.commit()
 
         # Get the updated tool from the database
@@ -1246,6 +1282,7 @@ def register_routes(app):
         tool = Tool.query.get_or_404(id)
 
         data = request.get_json() or {}
+        current_user_id = request.current_user.get("user_id")
         reason = data.get("reason", "Tool retired by admin")
 
         # Update tool status to retired
@@ -1265,11 +1302,17 @@ def register_routes(app):
         db.session.commit()
 
         # Log the action
-        log = AuditLog(
-            action_type="retire_tool",
-            action_details=f"Retired tool {id} ({tool.tool_number}) - {reason}"
+        AuditLog.log(
+            user_id=current_user_id,
+            action="retire_tool",
+            resource_type="tool",
+            resource_id=id,
+            details={
+                "tool_number": tool.tool_number,
+                "reason": reason
+            },
+            ip_address=request.remote_addr
         )
-        db.session.add(log)
         db.session.commit()
 
         return jsonify({
@@ -1343,6 +1386,7 @@ def register_routes(app):
     @app.route("/api/checkouts", methods=["GET", "POST"])
     def checkouts_route():
         try:
+            current_user_id = request.current_user.get("user_id")
             if request.method == "GET":
                 checkouts = Checkout.query.all()
                 return jsonify([{
@@ -1459,11 +1503,18 @@ def register_routes(app):
                     logger.error(f"Error recording checkout transaction: {e!s}")
 
                 # Log the action
-                log = AuditLog(
-                    action_type="checkout_tool",
-                    action_details=f"User {user.name} (ID: {user_id}) checked out tool {tool.tool_number} (ID: {tool_id})"
+                AuditLog.log(
+                    user_id=current_user_id,
+                    action="checkout_tool",
+                    resource_type="tool",
+                    resource_id=tool_id,
+                    details={
+                        "tool_number": tool.tool_number,
+                        "checkout_user_id": user_id,
+                        "checkout_user_name": user.name
+                    },
+                    ip_address=request.remote_addr
                 )
-                db.session.add(log)
 
                 # Add user activity (use user_id from checkout, not session)
                 activity = UserActivity(
@@ -1493,6 +1544,7 @@ def register_routes(app):
     @login_required
     def return_route(id):
         try:
+            current_user_id = request.current_user.get("user_id")
             logger.debug("Return request received", extra={"checkout_id": id, "method": request.method})
 
             # Check if user is authorized through admin flag, department, or explicit permission
@@ -1586,11 +1638,18 @@ def register_routes(app):
                     action_details += f", notes: {notes}"
 
                 # Log the action
-                log = AuditLog(
-                    action_type="return_tool",
-                    action_details=action_details
+                AuditLog.log(
+                    user_id=current_user_id,
+                    action="return_tool",
+                    resource_type="tool",
+                    resource_id=tool_id,
+                    details={
+                        "tool_number": tool.tool_number,
+                        "condition": condition,
+                        "checkout_id": c.id if c else None
+                    },
+                    ip_address=request.remote_addr
                 )
-                db.session.add(log)
 
                 # Add user activity (use user_id from JWT token)
                 activity = UserActivity(
@@ -1826,11 +1885,18 @@ def register_routes(app):
         db.session.commit()
 
         # Log the registration request
-        log = AuditLog(
-            action_type="registration_request",
-            action_details=f"New registration request: {reg_request.id} ({reg_request.name})"
+        AuditLog.log(
+            user_id=None,  # No user yet, this is a registration
+            action="registration_request",
+            resource_type="registration_request",
+            resource_id=reg_request.id,
+            details={
+                "name": reg_request.name,
+                "employee_number": reg_request.employee_number,
+                "department": reg_request.department
+            },
+            ip_address=request.remote_addr
         )
-        db.session.add(log)
         db.session.commit()
 
         return jsonify({"message": "Registration request submitted. An administrator will review your request."}), 201
@@ -2535,6 +2601,7 @@ def register_routes(app):
     @tool_manager_required
     def remove_tool_from_service(id):
         try:
+            current_user_id = request.current_user.get("user_id")
             # Get the tool
             tool = Tool.query.get_or_404(id)
 
@@ -2580,9 +2647,17 @@ def register_routes(app):
 
             # Create audit log (use user info from JWT token)
             user_payload = request.current_user
-            log = AuditLog(
-                action_type=action_type,
-                action_details=f'User {user_payload.get("user_name", "Unknown")} (ID: {user_payload["user_id"]}) removed tool {tool.tool_number} (ID: {id}) from service. Reason: {data.get("reason")}'
+            AuditLog.log(
+                user_id=current_user_id,
+                action=action_type,
+                resource_type="tool",
+                resource_id=id,
+                details={
+                    "tool_number": tool.tool_number,
+                    "reason": data.get("reason"),
+                    "user_name": user_payload.get("user_name", "Unknown")
+                },
+                ip_address=request.remote_addr
             )
 
             # Create user activity
@@ -2595,7 +2670,6 @@ def register_routes(app):
 
             # Save changes
             db.session.add(service_record)
-            db.session.add(log)
             db.session.add(activity)
             db.session.commit()
 
@@ -2626,6 +2700,7 @@ def register_routes(app):
 
             # Get data from request
             data = request.get_json() or {}
+            current_user_id = request.current_user.get("user_id")
 
             # Validate required fields
             if not data.get("reason"):
@@ -2646,9 +2721,17 @@ def register_routes(app):
             )
 
             # Create audit log
-            log = AuditLog(
-                action_type="return_service",
-                action_details=f'User {user_payload.get("user_name", "Unknown")} (ID: {user_payload["user_id"]}) returned tool {tool.tool_number} (ID: {id}) to service. Reason: {data.get("reason")}'
+            AuditLog.log(
+                user_id=current_user_id,
+                action="return_service",
+                resource_type="tool",
+                resource_id=id,
+                details={
+                    "tool_number": tool.tool_number,
+                    "reason": data.get("reason"),
+                    "user_name": user_payload.get("user_name", "Unknown")
+                },
+                ip_address=request.remote_addr
             )
 
             # Create user activity
@@ -2661,7 +2744,6 @@ def register_routes(app):
 
             # Save changes
             db.session.add(service_record)
-            db.session.add(log)
             db.session.add(activity)
             db.session.commit()
 

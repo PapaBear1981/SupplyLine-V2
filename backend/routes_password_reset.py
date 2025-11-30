@@ -43,6 +43,7 @@ def register_password_reset_routes(app):
         Reset a user's password to a temporary password
         Requires admin privileges
         """
+        current_user_id = request.current_user.get("user_id")
         try:
             # Get the admin user performing the reset
             admin_user_id = request.current_user.get("user_id")
@@ -86,12 +87,14 @@ def register_password_reset_routes(app):
             db.session.commit()
 
             # Log the password reset action
-            audit_log = AuditLog(
-                action_type="admin_password_reset",
-                action_details=f"Admin {admin_user.name} (ID: {admin_user_id}) reset password for user {target_user.name} (ID: {user_id})"
+            AuditLog.log(
+                user_id=current_user_id,
+                action="admin_password_reset",
+                resource_type="user",
+                resource_id=user_id,
+                details={"target_name": target_user.name, "target_employee": target_user.employee_number},
+                ip_address=request.remote_addr
             )
-            db.session.add(audit_log)
-            db.session.commit()
 
             current_app.logger.info(
                 "Password reset by admin",
