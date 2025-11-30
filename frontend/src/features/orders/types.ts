@@ -249,12 +249,15 @@ export interface RequestItem {
   chemical_id?: number;
   kit_id?: number;
   kit_reorder_request_id?: number;
+  procurement_order_id?: number;
   vendor?: string;
   tracking_number?: string;
   ordered_date?: string; // ISO 8601
   expected_delivery_date?: string; // ISO 8601
   received_date?: string; // ISO 8601
   received_quantity?: number;
+  unit_cost?: number;
+  total_cost?: number;
   order_notes?: string;
   created_at: string; // ISO 8601
   updated_at: string; // ISO 8601
@@ -269,6 +272,11 @@ export interface RequestItem {
     id: number;
     kit_number: string;
     name: string;
+  };
+  request?: {
+    id: number;
+    request_number: string;
+    title: string;
   };
 }
 
