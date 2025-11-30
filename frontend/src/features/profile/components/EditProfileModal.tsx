@@ -18,14 +18,20 @@ export const EditProfileModal = ({ open, onClose, user }: EditProfileModalProps)
 
   useEffect(() => {
     if (open) {
+      // Split name into first_name and last_name for the form
+      const nameParts = user.name?.split(' ') || ['', ''];
+      const firstName = nameParts[0] || '';
+      const lastName = nameParts.slice(1).join(' ') || '';
+
       form.setFieldsValue({
-        name: user.name,
+        first_name: firstName,
+        last_name: lastName,
         email: user.email,
       });
     }
   }, [open, user, form]);
 
-  const handleSubmit = async (values: { name: string; email: string }) => {
+  const handleSubmit = async (values: { first_name: string; last_name: string; email: string }) => {
     try {
       const updatedUser = await updateProfile(values).unwrap();
 
@@ -65,14 +71,25 @@ export const EditProfileModal = ({ open, onClose, user }: EditProfileModalProps)
         autoComplete="off"
       >
         <Form.Item
-          label="Name"
-          name="name"
+          label="First Name"
+          name="first_name"
           rules={[
-            { required: true, message: 'Please enter your name' },
-            { min: 2, message: 'Name must be at least 2 characters' },
+            { required: true, message: 'Please enter your first name' },
+            { min: 2, message: 'First name must be at least 2 characters' },
           ]}
         >
-          <Input placeholder="Enter your name" />
+          <Input placeholder="Enter your first name" />
+        </Form.Item>
+
+        <Form.Item
+          label="Last Name"
+          name="last_name"
+          rules={[
+            { required: true, message: 'Please enter your last name' },
+            { min: 1, message: 'Last name is required' },
+          ]}
+        >
+          <Input placeholder="Enter your last name" />
         </Form.Item>
 
         <Form.Item

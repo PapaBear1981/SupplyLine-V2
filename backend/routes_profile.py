@@ -54,12 +54,13 @@ def get_profile():
 
         profile_data = {
             "id": user.id,
+            "name": user.name,
             "first_name": first_name,
             "last_name": last_name,
             "employee_number": user.employee_number,
             "email": user.email,
-            "role": "admin" if user.is_admin else "user",
-            "department_id": user.department,
+            "department": user.department,
+            "is_admin": user.is_admin,
             "is_active": user.is_active,
             "avatar": user.avatar
         }
@@ -139,12 +140,13 @@ def update_profile():
         name_parts = user.name.split(" ", 1) if user.name else ["", ""]
         return jsonify({
             "id": user.id,
+            "name": user.name,
             "first_name": name_parts[0] if len(name_parts) > 0 else "",
             "last_name": name_parts[1] if len(name_parts) > 1 else "",
             "employee_number": user.employee_number,
             "email": user.email,
-            "role": "admin" if user.is_admin else "user",
-            "department_id": user.department,
+            "department": user.department,
+            "is_admin": user.is_admin,
             "is_active": user.is_active,
             "avatar": user.avatar
         }), 200
