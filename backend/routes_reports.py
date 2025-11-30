@@ -19,9 +19,9 @@ from sqlalchemy import and_, func, or_
 
 from auth import department_required, jwt_required
 from models import (
+    Checkout,
     Chemical,
     ChemicalIssuance,
-    Checkout,
     ProcurementOrder,
     RequestItem,
     Tool,
@@ -665,7 +665,7 @@ def register_report_routes(app):
         """Generate chemical waste report (expired/disposed chemicals)."""
         try:
             timeframe = request.args.get("timeframe", "month")
-            start_date = calculate_date_range(timeframe)
+            _ = calculate_date_range(timeframe)  # For future filtering by timeframe
 
             # Find expired chemicals
             expired_chemicals = Chemical.query.filter(
@@ -847,8 +847,8 @@ def register_report_routes(app):
             # Summary
             summary = {
                 "totalIssuances": len(issuances),
-                "uniqueKits": len(set(i.kit_id for i in issuances)),
-                "uniqueItems": len(set(i.item_id for i in issuances)),
+                "uniqueKits": len({i.kit_id for i in issuances}),
+                "uniqueItems": len({i.item_id for i in issuances}),
                 "totalQuantity": sum(i.quantity for i in issuances)
             }
 
@@ -909,7 +909,7 @@ def register_report_routes(app):
                 "totalTransfers": len(transfers),
                 "toKits": to_kits,
                 "toWarehouse": to_warehouse,
-                "uniqueItems": len(set(t.item_id for t in transfers))
+                "uniqueItems": len({t.item_id for t in transfers})
             }
 
             # By day
@@ -1277,7 +1277,7 @@ def register_report_routes(app):
                 })
 
             # Summary
-            unique_users = len(set(a.user_id for a in activities))
+            unique_users = len({a.user_id for a in activities})
 
             action_counts = defaultdict(int)
             for a in activities:
@@ -1349,8 +1349,6 @@ def register_report_routes(app):
             tools = Tool.query.all()
             chemicals = Chemical.query.all()
             kits = Kit.query.all()
-
-            checked_out_ids = set(c.tool_id for c in Checkout.query.filter(Checkout.return_date.is_(None)).all())
 
             inventory_stats = {
                 "totalTools": len(tools),

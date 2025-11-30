@@ -7,6 +7,7 @@ from functools import wraps
 from flask import current_app, jsonify, request, session
 
 import utils as password_utils
+from auth.jwt_manager import jwt_required
 from models import (
     AuditLog,
     Checkout,
@@ -1060,8 +1061,9 @@ def register_routes(app):
         }), 201
 
     @app.route("/api/tools/<int:id>", methods=["GET", "PUT", "DELETE"])
+    @jwt_required
     def get_tool(id):
-        current_user_id = request.current_user.get("user_id")
+        current_user_id = request.current_user.get("user_id") if hasattr(request, "current_user") else None
         tool = Tool.query.get_or_404(id)
 
         # GET - Get tool details
@@ -1383,9 +1385,10 @@ def register_routes(app):
     register_profile_routes(app)
 
     @app.route("/api/checkouts", methods=["GET", "POST"])
+    @jwt_required
     def checkouts_route():
         try:
-            current_user_id = request.current_user.get("user_id")
+            current_user_id = request.current_user.get("user_id") if hasattr(request, "current_user") else None
             if request.method == "GET":
                 checkouts = Checkout.query.all()
                 return jsonify([{

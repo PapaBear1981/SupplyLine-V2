@@ -32,9 +32,10 @@ class TestToolRoutes:
         assert response.status_code == 200
         data = json.loads(response.data)
 
-        # API now returns paginated response
+        # API returns paginated response with pagination info at top level
         assert "tools" in data
-        assert "pagination" in data
+        assert "total" in data  # Pagination info is at top level
+        assert "page" in data
         assert isinstance(data["tools"], list)
         assert len(data["tools"]) >= 1
 
@@ -47,10 +48,10 @@ class TestToolRoutes:
         """Test getting tools list without authentication"""
         response = client.get("/api/tools")
 
-        # API no longer requires authentication for GET
-        assert response.status_code == 200
+        # API requires authentication for GET
+        assert response.status_code == 401
         data = json.loads(response.data)
-        assert "tools" in data
+        assert "error" in data or "message" in data
 
     def test_get_tool_by_id(self, client, auth_headers_user, test_tool):
         """Test getting specific tool by ID"""

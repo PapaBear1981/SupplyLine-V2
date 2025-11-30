@@ -24,6 +24,7 @@ from models import (
 )
 from utils.transaction_helper import record_tool_checkout, record_tool_return
 
+
 logger = logging.getLogger(__name__)
 
 

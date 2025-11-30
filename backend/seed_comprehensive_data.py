@@ -16,13 +16,14 @@ import os
 import sys
 from datetime import datetime, timedelta
 
+
 # Add the backend directory to the path
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 # Import app from run.py to get proper Flask context with all models loaded
-from run import app
 from models import Chemical, LotNumberSequence, Tool, User, Warehouse, db
-from models_kits import AircraftType, Kit, KitBox, KitExpendable, KitItem
+from models_kits import AircraftType, Kit, KitBox, KitExpendable
+from run import app
 
 
 def get_or_create_admin():
@@ -155,13 +156,13 @@ def seed_tools(warehouses):
 
     tools_data = [
         # Hand Tools
-        {"tool_number": "HT-001", "serial_number": "SN-HT-2024-001", "description": "Torque Wrench 1/2\" Drive 20-150 ft-lbs", "category": "Hand Tools", "condition": "Excellent"},
-        {"tool_number": "HT-002", "serial_number": "SN-HT-2024-002", "description": "Torque Wrench 3/8\" Drive 10-80 ft-lbs", "category": "Hand Tools", "condition": "Good"},
+        {"tool_number": "HT-001", "serial_number": "SN-HT-2024-001", "description": 'Torque Wrench 1/2" Drive 20-150 ft-lbs', "category": "Hand Tools", "condition": "Excellent"},
+        {"tool_number": "HT-002", "serial_number": "SN-HT-2024-002", "description": 'Torque Wrench 3/8" Drive 10-80 ft-lbs', "category": "Hand Tools", "condition": "Good"},
         {"tool_number": "HT-003", "serial_number": "SN-HT-2024-003", "description": "Safety Wire Pliers - 6 inch", "category": "Hand Tools", "condition": "Excellent"},
         {"tool_number": "HT-004", "serial_number": "SN-HT-2024-004", "description": "Rivet Gun - Pneumatic", "category": "Hand Tools", "condition": "Good"},
         {"tool_number": "HT-005", "serial_number": "SN-HT-2024-005", "description": "Bucking Bar Set - 6 piece", "category": "Hand Tools", "condition": "Fair"},
         {"tool_number": "HT-006", "serial_number": "SN-HT-2024-006", "description": "Cleco Pliers", "category": "Hand Tools", "condition": "Excellent"},
-        {"tool_number": "HT-007", "serial_number": "SN-HT-2024-007", "description": "Drill Bit Set - Cobalt 1/16\" to 1/2\"", "category": "Hand Tools", "condition": "Good"},
+        {"tool_number": "HT-007", "serial_number": "SN-HT-2024-007", "description": 'Drill Bit Set - Cobalt 1/16" to 1/2"', "category": "Hand Tools", "condition": "Good"},
 
         # Power Tools
         {"tool_number": "PT-001", "serial_number": "SN-PT-2024-001", "description": "Pneumatic Drill - 90 Degree", "category": "Power Tools", "condition": "Excellent"},
@@ -394,21 +395,21 @@ def seed_kit_expendables(kits):
     # Expendables for expendable boxes (Box1)
     expendable_items = [
         # Rivets - lot tracked
-        {"part_number": "MS20470AD4-4", "description": "Rivet, Universal Head, 1/8\" dia x 1/4\" grip", "quantity": 500, "unit": "each", "tracking_type": "lot", "category": "Rivets"},
-        {"part_number": "MS20470AD4-5", "description": "Rivet, Universal Head, 1/8\" dia x 5/16\" grip", "quantity": 500, "unit": "each", "tracking_type": "lot", "category": "Rivets"},
-        {"part_number": "MS20470AD5-6", "description": "Rivet, Universal Head, 5/32\" dia x 3/8\" grip", "quantity": 300, "unit": "each", "tracking_type": "lot", "category": "Rivets"},
-        {"part_number": "NAS1097AD4-4", "description": "Rivet, Countersunk, 1/8\" dia x 1/4\" grip", "quantity": 400, "unit": "each", "tracking_type": "lot", "category": "Rivets"},
-        {"part_number": "CR3212-4-02", "description": "Cherry Max Rivet, 1/8\" dia", "quantity": 200, "unit": "each", "tracking_type": "lot", "category": "Rivets"},
+        {"part_number": "MS20470AD4-4", "description": 'Rivet, Universal Head, 1/8" dia x 1/4" grip', "quantity": 500, "unit": "each", "tracking_type": "lot", "category": "Rivets"},
+        {"part_number": "MS20470AD4-5", "description": 'Rivet, Universal Head, 1/8" dia x 5/16" grip', "quantity": 500, "unit": "each", "tracking_type": "lot", "category": "Rivets"},
+        {"part_number": "MS20470AD5-6", "description": 'Rivet, Universal Head, 5/32" dia x 3/8" grip', "quantity": 300, "unit": "each", "tracking_type": "lot", "category": "Rivets"},
+        {"part_number": "NAS1097AD4-4", "description": 'Rivet, Countersunk, 1/8" dia x 1/4" grip', "quantity": 400, "unit": "each", "tracking_type": "lot", "category": "Rivets"},
+        {"part_number": "CR3212-4-02", "description": 'Cherry Max Rivet, 1/8" dia', "quantity": 200, "unit": "each", "tracking_type": "lot", "category": "Rivets"},
 
         # Fasteners - lot tracked
-        {"part_number": "AN3-5A", "description": "Bolt, Hex Head, 10-32 x 5/16\"", "quantity": 100, "unit": "each", "tracking_type": "lot", "category": "Fasteners"},
-        {"part_number": "AN4-6A", "description": "Bolt, Hex Head, 1/4-28 x 3/8\"", "quantity": 100, "unit": "each", "tracking_type": "lot", "category": "Fasteners"},
+        {"part_number": "AN3-5A", "description": 'Bolt, Hex Head, 10-32 x 5/16"', "quantity": 100, "unit": "each", "tracking_type": "lot", "category": "Fasteners"},
+        {"part_number": "AN4-6A", "description": 'Bolt, Hex Head, 1/4-28 x 3/8"', "quantity": 100, "unit": "each", "tracking_type": "lot", "category": "Fasteners"},
         {"part_number": "AN365-428A", "description": "Nut, Self-locking, 1/4-28", "quantity": 200, "unit": "each", "tracking_type": "lot", "category": "Fasteners"},
-        {"part_number": "AN960-416", "description": "Washer, Flat, 1/4\"", "quantity": 300, "unit": "each", "tracking_type": "lot", "category": "Fasteners"},
+        {"part_number": "AN960-416", "description": 'Washer, Flat, 1/4"', "quantity": 300, "unit": "each", "tracking_type": "lot", "category": "Fasteners"},
 
         # Safety Wire - lot tracked
-        {"part_number": "MS20995C32", "description": "Safety Wire, .032\" dia, Stainless", "quantity": 10, "unit": "lb", "tracking_type": "lot", "category": "Safety Wire"},
-        {"part_number": "MS20995C41", "description": "Safety Wire, .041\" dia, Stainless", "quantity": 5, "unit": "lb", "tracking_type": "lot", "category": "Safety Wire"},
+        {"part_number": "MS20995C32", "description": 'Safety Wire, .032" dia, Stainless', "quantity": 10, "unit": "lb", "tracking_type": "lot", "category": "Safety Wire"},
+        {"part_number": "MS20995C41", "description": 'Safety Wire, .041" dia, Stainless', "quantity": 5, "unit": "lb", "tracking_type": "lot", "category": "Safety Wire"},
     ]
 
     # Consumable items for consumable boxes (Box3)
@@ -434,7 +435,7 @@ def seed_kit_expendables(kits):
         {"part_number": "JACK-AXLE-5T", "description": "5-Ton Axle Jack", "quantity": 1, "unit": "each", "tracking_type": "serial", "category": "GSE"},
         {"part_number": "STAND-TAIL-Q4", "description": "Q400 Tail Stand", "quantity": 1, "unit": "each", "tracking_type": "serial", "category": "GSE"},
         {"part_number": "LADDER-WING", "description": "Wing Access Platform Ladder", "quantity": 1, "unit": "each", "tracking_type": "serial", "category": "GSE"},
-        {"part_number": "TOOLBOX-MOBILE", "description": "Mobile Tool Chest - 52\"", "quantity": 1, "unit": "each", "tracking_type": "serial", "category": "Storage"},
+        {"part_number": "TOOLBOX-MOBILE", "description": 'Mobile Tool Chest - 52"', "quantity": 1, "unit": "each", "tracking_type": "serial", "category": "Storage"},
         {"part_number": "COMPRESSOR-PORT", "description": "Portable Air Compressor", "quantity": 1, "unit": "each", "tracking_type": "serial", "category": "Equipment"},
     ]
 
@@ -543,8 +544,8 @@ def seed_database():
         # Seed data in order of dependencies
         warehouses = seed_warehouses()
         aircraft_types = seed_aircraft_types()
-        tools = seed_tools(warehouses)
-        chemicals = seed_chemicals(warehouses)
+        seed_tools(warehouses)
+        seed_chemicals(warehouses)
         kits = seed_kits(aircraft_types, admin)
         seed_kit_expendables(kits)
 

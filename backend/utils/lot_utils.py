@@ -14,7 +14,7 @@ Policy:
 
 import string
 
-from models import Chemical, db
+from models import Chemical
 
 
 def generate_child_lot_number(parent_lot_number, sequence):
