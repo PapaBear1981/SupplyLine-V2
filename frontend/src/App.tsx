@@ -34,13 +34,14 @@ import { ROUTES } from '@shared/constants/routes';
 function AppContent() {
   const { themeConfig } = useTheme();
   const isDark = themeConfig.mode === 'dark';
+  const primaryColor = COLOR_THEMES[themeConfig.colorTheme].primary;
 
   return (
     <ConfigProvider
       theme={{
         algorithm: isDark ? theme.darkAlgorithm : theme.defaultAlgorithm,
         token: {
-          colorPrimary: COLOR_THEMES[themeConfig.colorTheme].primary,
+          colorPrimary: primaryColor,
           borderRadius: 6,
         },
       }}
