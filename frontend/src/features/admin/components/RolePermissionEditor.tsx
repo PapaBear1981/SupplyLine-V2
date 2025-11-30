@@ -116,16 +116,6 @@ export const RolePermissionEditor: React.FC<RolePermissionEditorProps> = ({
     }
   }, [roleWithPermissions]);
 
-  // Expand all categories when searching
-  useEffect(() => {
-    if (searchValue) {
-      const matchingCategories = filteredTreeData.map((c) => c.key);
-      // eslint-disable-next-line react-hooks/set-state-in-effect
-      setExpandedKeys(matchingCategories);
-      // eslint-disable-next-line react-hooks/set-state-in-effect
-      setAutoExpandParent(true);
-    }
-  }, [searchValue, filteredTreeData]);
 
   const handleCheck: TreeProps['onCheck'] = (checked) => {
     if (Array.isArray(checked)) {
@@ -265,7 +255,7 @@ export const RolePermissionEditor: React.FC<RolePermissionEditorProps> = ({
               <Tree
                 checkable
                 checkedKeys={checkedKeys}
-                expandedKeys={expandedKeys}
+                expandedKeys={computedExpandedKeys}
                 autoExpandParent={autoExpandParent}
                 onCheck={handleCheck}
                 onExpand={handleExpand}

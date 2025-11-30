@@ -127,7 +127,8 @@ export const getMenuItems = (isAdmin: boolean = false, permissions: string[] = [
       })
       .map((item) => {
         // Remove permission-related fields and return as MenuItem
-        const { permission: _permission, adminOnly: _adminOnly, children, ...menuItem } = item;
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
+        const { permission, adminOnly, children, ...menuItem } = item;
         if (children) {
           return {
             ...menuItem,
