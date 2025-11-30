@@ -292,6 +292,12 @@ export function KitLocationMap({ height = 400 }: KitLocationMapProps) {
                 icon={createColoredIcon(STATUS_COLORS[kit.status] || '#1890ff')}
                 eventHandlers={{
                   click: () => setSelectedKitId(kit.id),
+                  mouseover: (e) => {
+                    e.target.openPopup();
+                  },
+                  mouseout: (e) => {
+                    e.target.closePopup();
+                  },
                 }}
               >
                 <Popup className={isDarkMode ? 'dark-mode' : ''}>
