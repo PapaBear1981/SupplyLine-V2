@@ -47,7 +47,7 @@ class JWTManager:
             "employee_number": user.employee_number,
             "is_admin": user.is_admin,
             "department": user.department,
-            "permissions": user.get_permissions(),
+            "permissions": user.get_effective_permissions(),  # Use effective permissions (role + user-specific)
             "iat": now,
             "exp": now + timedelta(minutes=15),
             "jti": secrets.token_hex(16),  # JWT ID for CSRF validation

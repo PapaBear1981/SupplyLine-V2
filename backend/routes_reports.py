@@ -17,7 +17,7 @@ from datetime import datetime, timedelta
 from flask import jsonify, make_response, request
 from sqlalchemy import and_, func, or_
 
-from auth import department_required, jwt_required
+from auth import department_required, jwt_required, permission_required
 from models import (
     Chemical,
     ChemicalIssuance,
@@ -65,7 +65,7 @@ def register_report_routes(app):
     # ========================================================================
 
     @app.route("/api/reports/export/pdf", methods=["POST"])
-    @jwt_required
+    @permission_required("report.export")
     def export_report_pdf():
         """Export report as PDF."""
         try:
@@ -90,7 +90,7 @@ def register_report_routes(app):
             return jsonify({"error": "Failed to generate PDF"}), 500
 
     @app.route("/api/reports/export/excel", methods=["POST"])
-    @jwt_required
+    @permission_required("report.export")
     def export_report_excel():
         """Export report as Excel."""
         try:
@@ -119,7 +119,7 @@ def register_report_routes(app):
     # ========================================================================
 
     @app.route("/api/reports/tools/inventory", methods=["GET"])
-    @jwt_required
+    @permission_required("report.tools")
     def tool_inventory_report():
         """Generate comprehensive tool inventory report with statistics."""
         try:

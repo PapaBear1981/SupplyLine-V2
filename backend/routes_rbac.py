@@ -241,8 +241,11 @@ def register_rbac_routes(app):
             return jsonify({"error": "User not found"}), 404
 
         return jsonify({
-            "permissions": user.get_permissions(),
-            "roles": [role.to_dict() for role in user.roles]
+            "permissions": user.get_effective_permissions(),  # Use effective permissions
+            "role_permissions": user.get_permissions(),  # Role-based only
+            "user_permissions": user.get_user_specific_permissions(),  # User-specific grants/denies
+            "roles": [role.to_dict() for role in user.roles],
+            "is_admin": user.is_admin
         })
 
     return app

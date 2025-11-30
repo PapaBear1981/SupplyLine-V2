@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { Outlet, useNavigate, useLocation } from 'react-router-dom';
 import {
   Layout,
@@ -33,6 +33,13 @@ export const MainLayout = () => {
   const dispatch = useAppDispatch();
   const user = useAppSelector((state) => state.auth.user);
   const [logoutApi] = useLogoutMutation();
+
+  // Memoize menu items based on user permissions
+  const menuItems = useMemo(() => {
+    const isAdmin = user?.is_admin || false;
+    const permissions = user?.permissions || [];
+    return getMenuItems(isAdmin, permissions);
+  }, [user?.is_admin, user?.permissions]);
 
   const {
     token: { colorBgContainer, borderRadiusLG },
@@ -113,7 +120,7 @@ export const MainLayout = () => {
           theme="dark"
           mode="inline"
           selectedKeys={[location.pathname]}
-          items={getMenuItems(user?.is_admin || false)}
+          items={menuItems}
           onClick={handleMenuClick}
         />
       </Sider>

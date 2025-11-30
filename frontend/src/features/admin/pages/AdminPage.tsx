@@ -6,6 +6,7 @@ import {
   NotificationOutlined,
   SafetyOutlined,
   ApartmentOutlined,
+  KeyOutlined,
 } from '@ant-design/icons';
 import { AdminOverview } from '../components/AdminOverview';
 import { UserManagement } from '../components/UserManagement';
@@ -13,6 +14,7 @@ import { DepartmentManagement } from '../components/DepartmentManagement';
 import { AnnouncementManagement } from '../components/AnnouncementManagement';
 import { RoleManagement } from '../components/RoleManagement';
 import { AircraftTypeManagement } from '../components/AircraftTypeManagement';
+import { PermissionOverview } from '../components/PermissionOverview';
 
 const { Title, Paragraph } = Typography;
 
@@ -63,10 +65,20 @@ export const AdminPage = () => {
       label: (
         <span>
           <SafetyOutlined />
-          Roles & Permissions
+          Roles
         </span>
       ),
       children: <RoleManagement />,
+    },
+    {
+      key: 'permissions',
+      label: (
+        <span>
+          <KeyOutlined />
+          Permissions
+        </span>
+      ),
+      children: <PermissionOverview />,
     },
     {
       key: 'aircraft-types',

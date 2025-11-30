@@ -35,6 +35,7 @@ export const baseApi = createApi({
     'RequestMessage',
     'RequestAnalytics',
     'KitReorder',
+    'Permission',
   ],
   endpoints: () => ({}),
 });

@@ -4,9 +4,11 @@ import {
   PlusOutlined,
   LockOutlined,
   SafetyOutlined,
+  KeyOutlined,
 } from '@ant-design/icons';
 import { UsersTable } from '@features/users/components/UsersTable';
 import { UserDrawer } from '@features/users/components/UserDrawer';
+import { UserPermissionEditor } from './UserPermissionEditor';
 import {
   useGetRolesQuery,
   useResetUserPasswordMutation,
@@ -21,6 +23,7 @@ export const UserManagement = () => {
   const [drawerMode, setDrawerMode] = useState<'view' | 'edit' | 'create' | null>(null);
   const [resetPasswordModalOpen, setResetPasswordModalOpen] = useState(false);
   const [permissionsModalOpen, setPermissionsModalOpen] = useState(false);
+  const [userPermissionEditorOpen, setUserPermissionEditorOpen] = useState(false);
   const [resetPasswordForm] = Form.useForm();
   const [permissionsForm] = Form.useForm();
 
@@ -207,6 +210,21 @@ export const UserManagement = () => {
           permissionsForm.resetFields();
         }}
         confirmLoading={isUpdatingPermissions}
+        footer={(_, { OkBtn, CancelBtn }) => (
+          <>
+            <Button
+              icon={<KeyOutlined />}
+              onClick={() => {
+                setPermissionsModalOpen(false);
+                setUserPermissionEditorOpen(true);
+              }}
+            >
+              Advanced Permissions
+            </Button>
+            <CancelBtn />
+            <OkBtn />
+          </>
+        )}
       >
         <Form form={permissionsForm} layout="vertical">
           <Form.Item
@@ -225,6 +243,18 @@ export const UserManagement = () => {
           </Form.Item>
         </Form>
       </Modal>
+
+      {/* User Permission Editor (Advanced) */}
+      <UserPermissionEditor
+        userId={selectedUser?.id || null}
+        userName={selectedUser?.name || ''}
+        isAdmin={selectedUser?.is_admin}
+        open={userPermissionEditorOpen}
+        onClose={() => {
+          setUserPermissionEditorOpen(false);
+          setSelectedUser(null);
+        }}
+      />
     </div>
   );
 };

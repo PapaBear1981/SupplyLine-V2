@@ -8,7 +8,7 @@ from datetime import datetime
 from flask import Blueprint, jsonify, request
 from sqlalchemy import or_
 
-from auth.jwt_manager import jwt_required
+from auth.jwt_manager import jwt_required, permission_required
 from models import Chemical, Tool, User, Warehouse, db
 
 
@@ -25,7 +25,7 @@ def require_admin():
 
 
 @warehouses_bp.route("/warehouses", methods=["GET"])
-@jwt_required
+@permission_required("warehouse.view")
 def get_warehouses():
     """
     Get list of all warehouses with pagination.
@@ -92,17 +92,13 @@ def get_warehouses():
 
 
 @warehouses_bp.route("/warehouses", methods=["POST"])
-@jwt_required
+@permission_required("warehouse.create")
 def create_warehouse():
     """
-    Create a new warehouse (admin only).
+    Create a new warehouse (requires warehouse.create permission).
     Required fields: name
     Optional fields: address, city, state, zip_code, country, warehouse_type, contact_person, contact_phone, contact_email
     """
-    # Check admin privileges
-    admin_check = require_admin()
-    if admin_check:
-        return admin_check
 
     try:
         data = request.get_json()
@@ -152,7 +148,7 @@ def create_warehouse():
 
 
 @warehouses_bp.route("/warehouses/<int:warehouse_id>", methods=["GET"])
-@jwt_required
+@permission_required("warehouse.view")
 def get_warehouse(warehouse_id):
     """Get details of a specific warehouse."""
     try:
@@ -168,16 +164,12 @@ def get_warehouse(warehouse_id):
 
 
 @warehouses_bp.route("/warehouses/<int:warehouse_id>", methods=["PUT"])
-@jwt_required
+@permission_required("warehouse.edit")
 def update_warehouse(warehouse_id):
     """
-    Update warehouse details (admin only).
+    Update warehouse details (requires warehouse.edit permission).
     Updatable fields: name, address, city, state, zip_code, country, warehouse_type, is_active, contact_person, contact_phone, contact_email
     """
-    # Check admin privileges
-    admin_check = require_admin()
-    if admin_check:
-        return admin_check
 
     try:
         warehouse = db.session.get(Warehouse, warehouse_id)
@@ -232,16 +224,12 @@ def update_warehouse(warehouse_id):
 
 
 @warehouses_bp.route("/warehouses/<int:warehouse_id>", methods=["DELETE"])
-@jwt_required
+@permission_required("warehouse.delete")
 def delete_warehouse(warehouse_id):
     """
-    Soft delete a warehouse (admin only).
+    Soft delete a warehouse (requires warehouse.delete permission).
     Sets is_active to False instead of actually deleting.
     """
-    # Check admin privileges
-    admin_check = require_admin()
-    if admin_check:
-        return admin_check
 
     try:
         warehouse = db.session.get(Warehouse, warehouse_id)
@@ -275,7 +263,7 @@ def delete_warehouse(warehouse_id):
 
 
 @warehouses_bp.route("/warehouses/<int:warehouse_id>/stats", methods=["GET"])
-@jwt_required
+@permission_required("warehouse.view")
 def get_warehouse_stats(warehouse_id):
     """Get statistics for a warehouse."""
     try:
@@ -338,7 +326,7 @@ def get_warehouse_stats(warehouse_id):
 
 
 @warehouses_bp.route("/warehouses/<int:warehouse_id>/tools", methods=["GET"])
-@jwt_required
+@permission_required("warehouse.view")
 def get_warehouse_tools(warehouse_id):
     """
     Get all tools in a warehouse.
@@ -400,7 +388,7 @@ def get_warehouse_tools(warehouse_id):
 
 
 @warehouses_bp.route("/warehouses/<int:warehouse_id>/chemicals", methods=["GET"])
-@jwt_required
+@permission_required("warehouse.view")
 def get_warehouse_chemicals(warehouse_id):
     """
     Get all chemicals in a warehouse.
@@ -462,7 +450,7 @@ def get_warehouse_chemicals(warehouse_id):
 
 
 @warehouses_bp.route("/warehouses/<int:warehouse_id>/inventory", methods=["GET"])
-@jwt_required
+@permission_required("warehouse.view")
 def get_warehouse_inventory(warehouse_id):
     """
     Get combined inventory (tools and chemicals) for a warehouse.
