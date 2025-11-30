@@ -605,9 +605,26 @@ class AuditLog(db.Model):
     ip_address = db.Column(db.String)
     timestamp = db.Column(db.DateTime, default=get_current_time)
 
-    # Deprecated fields (for backwards compatibility)
+    # Deprecated fields (for backwards compatibility with old code)
     action_type = db.Column(db.String)
     action_details = db.Column(db.String)
+
+    def __init__(self, action=None, action_type=None, action_details=None, user_id=None,
+                 resource_type=None, resource_id=None, details=None, ip_address=None, **kwargs):
+        """Initialize AuditLog with backward compatibility.
+
+        Supports both old-style (action_type, action_details) and new-style (action, details) creation.
+        """
+        super().__init__(**kwargs)
+        # Support both old and new field names
+        self.action = action or action_type or "unknown"
+        self.action_type = action_type or action
+        self.action_details = action_details
+        self.user_id = user_id
+        self.resource_type = resource_type
+        self.resource_id = resource_id
+        self.details = details
+        self.ip_address = ip_address
 
     @staticmethod
     def log(user_id, action, resource_type=None, resource_id=None, details=None, ip_address=None):

@@ -98,8 +98,8 @@ const KitItemList = ({ kitId }: KitItemListProps) => {
       key: 'item_type',
       width: 80,
       render: (type: string) => (
-        <Tooltip title={type.charAt(0).toUpperCase() + type.slice(1)}>
-          <span style={{ fontSize: 20 }}>{getItemTypeIcon(type)}</span>
+        <Tooltip title={type ? type.charAt(0).toUpperCase() + type.slice(1) : 'Unknown'}>
+          <span style={{ fontSize: 20 }}>{getItemTypeIcon(type || 'expendable')}</span>
         </Tooltip>
       ),
       filters: [

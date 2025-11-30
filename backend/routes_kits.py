@@ -1028,26 +1028,46 @@ def register_kit_routes(app):
         if not box:
             raise ValidationError("Invalid box ID for this kit")
 
-        # Normalise tracking inputs. API clients often omit tracking metadata for expendables
-        # that are not lot/serial controlled, so default to "none" unless a specific identifier
-        # is provided.
+        # Normalise tracking inputs. All expendables MUST have either a lot number or serial number
+        # for tracking purposes. If not provided, a lot number will be auto-generated.
         lot_number = data.get("lot_number") or None
         serial_number = data.get("serial_number") or None
         tracking_type = data.get("tracking_type")
         if tracking_type:
             tracking_type = tracking_type.strip().lower()
+            # 'none' is no longer allowed - convert to 'lot'
+            if tracking_type == "none":
+                tracking_type = "lot"
         elif serial_number:
             tracking_type = "serial"
-        elif lot_number:
-            tracking_type = "lot"
         else:
-            tracking_type = "none"
+            # Default to lot tracking
+            tracking_type = "lot"
 
-        # If the client requested lot tracking but did not provide an identifier, fall back to
-        # untracked mode so workflow tests (wizard + reorder fulfillment) can create inventory
-        # without additional user input.
+        # Auto-generate lot number if lot tracking is requested but no lot number provided
         if tracking_type == "lot" and not lot_number:
-            tracking_type = "none"
+            from models import LotNumberSequence
+            lot_number = LotNumberSequence.generate_lot_number()
+            logger.info(f"Auto-generated lot number {lot_number} for expendable {data.get('part_number')}")
+
+        # Validate uniqueness of serial/lot number across the system
+        from utils.serial_lot_validation import (
+            SerialLotValidationError,
+            check_lot_number_unique,
+            check_serial_number_unique,
+        )
+
+        part_number = data["part_number"].strip()
+        if tracking_type == "serial" and serial_number:
+            try:
+                check_serial_number_unique(part_number, serial_number)
+            except SerialLotValidationError as e:
+                raise ValidationError(str(e))
+        elif tracking_type == "lot" and lot_number:
+            try:
+                check_lot_number_unique(part_number, lot_number)
+            except SerialLotValidationError as e:
+                raise ValidationError(str(e))
 
         # Create expendable
         expendable = KitExpendable(
@@ -1069,18 +1089,6 @@ def register_kit_routes(app):
         is_valid, error_msg = expendable.validate_tracking()
         if not is_valid:
             raise ValidationError(error_msg)
-
-        # Validate serial number uniqueness if serial tracking
-        if expendable.tracking_type == "serial" and expendable.serial_number:
-            from utils.transaction_helper import validate_serial_number_uniqueness
-            is_unique, error_msg = validate_serial_number_uniqueness(
-                expendable.part_number,
-                expendable.serial_number,
-                "expendable",
-                exclude_id=None
-            )
-            if not is_unique:
-                raise ValidationError(error_msg)
 
         db.session.add(expendable)
         db.session.flush()  # Flush to get the expendable ID
