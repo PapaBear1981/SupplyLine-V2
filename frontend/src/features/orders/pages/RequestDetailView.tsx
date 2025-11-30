@@ -22,8 +22,6 @@ import {
 import {
   ArrowLeftOutlined,
   EditOutlined,
-  CheckCircleOutlined,
-  ShoppingCartOutlined,
 } from '@ant-design/icons';
 import dayjs from 'dayjs';
 import {
@@ -32,8 +30,6 @@ import {
   useGetRequestMessagesQuery,
   useCreateRequestMessageMutation,
   useMarkRequestMessageAsReadMutation,
-  useMarkItemsAsOrderedMutation,
-  useMarkItemsAsReceivedMutation,
 } from '../services/requestsApi';
 import { StatusBadge, PriorityBadge, ItemTypeBadge, MessageThread } from '../components';
 import type { UpdateRequestRequest, RequestItem } from '../types';
@@ -57,8 +53,6 @@ export const RequestDetailView: React.FC = () => {
   const [updateRequest, { isLoading: updating }] = useUpdateRequestMutation();
   const [createMessage] = useCreateRequestMessageMutation();
   const [markMessageAsRead] = useMarkRequestMessageAsReadMutation();
-  const [markItemsAsOrdered] = useMarkItemsAsOrderedMutation();
-  const [markItemsAsReceived] = useMarkItemsAsReceivedMutation();
 
   const handleEdit = () => {
     if (request) {
@@ -67,7 +61,6 @@ export const RequestDetailView: React.FC = () => {
         description: request.description,
         priority: request.priority,
         notes: request.notes,
-        status: request.status,
       });
       setIsEditModalVisible(true);
     }
@@ -81,42 +74,6 @@ export const RequestDetailView: React.FC = () => {
     } catch {
       message.error('Failed to update request');
     }
-  };
-
-  const handleMarkItemAsOrdered = (itemId: number) => {
-    Modal.confirm({
-      title: 'Mark Item as Ordered',
-      content: 'Are you sure you want to mark this item as ordered?',
-      onOk: async () => {
-        try {
-          await markItemsAsOrdered({
-            requestId: Number(requestId),
-            data: { items: [{ item_id: itemId }] },
-          }).unwrap();
-          message.success('Item marked as ordered');
-        } catch {
-          message.error('Failed to mark item as ordered');
-        }
-      },
-    });
-  };
-
-  const handleMarkItemAsReceived = (itemId: number) => {
-    Modal.confirm({
-      title: 'Mark Item as Received',
-      content: 'Are you sure you want to mark this item as received?',
-      onOk: async () => {
-        try {
-          await markItemsAsReceived({
-            requestId: Number(requestId),
-            data: { item_ids: [itemId] },
-          }).unwrap();
-          message.success('Item marked as received');
-        } catch {
-          message.error('Failed to mark item as received');
-        }
-      },
-    });
   };
 
   const handleSendMessage = async (data: { subject: string; message: string }) => {
@@ -149,21 +106,21 @@ export const RequestDetailView: React.FC = () => {
       title: 'Type',
       dataIndex: 'item_type',
       key: 'item_type',
-      width: 120,
+      width: 100,
       render: (type) => type && <ItemTypeBadge type={type} />,
     },
     {
       title: 'Part Number',
       dataIndex: 'part_number',
       key: 'part_number',
-      width: 150,
+      width: 120,
       render: (pn) => pn || '-',
     },
     {
       title: 'Quantity',
       dataIndex: 'quantity',
       key: 'quantity',
-      width: 100,
+      width: 80,
       render: (qty, record) => `${qty || 1} ${record.unit || 'each'}`,
     },
     {
@@ -174,31 +131,18 @@ export const RequestDetailView: React.FC = () => {
       render: (status) => <StatusBadge status={status} type="item" />,
     },
     {
-      title: 'Actions',
-      key: 'actions',
-      width: 200,
-      render: (_, record) => (
-        <Space>
-          {record.status === 'pending' && (
-            <Button
-              size="small"
-              icon={<ShoppingCartOutlined />}
-              onClick={() => handleMarkItemAsOrdered(record.id)}
-            >
-              Mark Ordered
-            </Button>
-          )}
-          {record.status === 'ordered' && (
-            <Button
-              size="small"
-              icon={<CheckCircleOutlined />}
-              onClick={() => handleMarkItemAsReceived(record.id)}
-            >
-              Mark Received
-            </Button>
-          )}
-        </Space>
-      ),
+      title: 'Vendor',
+      dataIndex: 'vendor',
+      key: 'vendor',
+      width: 150,
+      render: (vendor) => vendor || '-',
+    },
+    {
+      title: 'Tracking',
+      dataIndex: 'tracking_number',
+      key: 'tracking_number',
+      width: 150,
+      render: (tracking) => tracking || '-',
     },
   ];
 
@@ -341,16 +285,6 @@ export const RequestDetailView: React.FC = () => {
               <Select.Option value="normal">Normal</Select.Option>
               <Select.Option value="high">High</Select.Option>
               <Select.Option value="critical">Critical</Select.Option>
-            </Select>
-          </Form.Item>
-          <Form.Item name="status" label="Status">
-            <Select>
-              <Select.Option value="new">New</Select.Option>
-              <Select.Option value="in_progress">In Progress</Select.Option>
-              <Select.Option value="partially_ordered">Partially Ordered</Select.Option>
-              <Select.Option value="ordered">Ordered</Select.Option>
-              <Select.Option value="partially_received">Partially Received</Select.Option>
-              <Select.Option value="received">Received</Select.Option>
             </Select>
           </Form.Item>
           <Form.Item name="notes" label="Notes">

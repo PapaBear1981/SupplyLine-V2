@@ -31,6 +31,7 @@ export const baseApi = createApi({
     'Order',
     'OrderMessage',
     'OrderAnalytics',
+    'OrderRequestItems',
     'Request',
     'RequestMessage',
     'RequestAnalytics',

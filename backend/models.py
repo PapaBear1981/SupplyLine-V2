@@ -1114,6 +1114,9 @@ class RequestItem(db.Model):
     kit_id = db.Column(db.Integer, nullable=True, index=True)  # Kit ID for kit reorders
     kit_reorder_request_id = db.Column(db.Integer, nullable=True, index=True)  # Reference to KitReorderRequest
 
+    # Link to procurement order when item is ordered
+    procurement_order_id = db.Column(db.Integer, db.ForeignKey("procurement_orders.id"), nullable=True, index=True)
+
     # Order fulfillment details (filled by buyer)
     vendor = db.Column(db.String(200), nullable=True)
     tracking_number = db.Column(db.String(120), nullable=True)
@@ -1131,10 +1134,11 @@ class RequestItem(db.Model):
     # Relationships
     request = db.relationship("UserRequest", back_populates="items")
     chemical = db.relationship("Chemical", foreign_keys=[chemical_id])
+    procurement_order = db.relationship("ProcurementOrder", foreign_keys=[procurement_order_id], backref="request_items")
 
-    def to_dict(self):
+    def to_dict(self, include_request=False):
         """Serialize item for API responses."""
-        return {
+        result = {
             "id": self.id,
             "request_id": self.request_id,
             "item_type": self.item_type,
@@ -1147,6 +1151,7 @@ class RequestItem(db.Model):
             "chemical_id": self.chemical_id,
             "kit_id": self.kit_id,
             "kit_reorder_request_id": self.kit_reorder_request_id,
+            "procurement_order_id": self.procurement_order_id,
             "vendor": self.vendor,
             "tracking_number": self.tracking_number,
             "ordered_date": self.ordered_date.isoformat() if self.ordered_date else None,
@@ -1159,6 +1164,13 @@ class RequestItem(db.Model):
             "created_at": self.created_at.isoformat() if self.created_at else None,
             "updated_at": self.updated_at.isoformat() if self.updated_at else None,
         }
+        if include_request and self.request:
+            result["request"] = {
+                "id": self.request.id,
+                "request_number": self.request.request_number,
+                "title": self.request.title,
+            }
+        return result
 
 
 class UserRequestMessage(db.Model):

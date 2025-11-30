@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, Link } from 'react-router-dom';
 import {
   Card,
   Descriptions,
@@ -16,12 +16,16 @@ import {
   Typography,
   Tag,
   Spin,
+  Table,
+  Checkbox,
+  Alert,
 } from 'antd';
 import {
   ArrowLeftOutlined,
   EditOutlined,
   CheckCircleOutlined,
   RocketOutlined,
+  InboxOutlined,
 } from '@ant-design/icons';
 import dayjs from 'dayjs';
 import {
@@ -32,9 +36,13 @@ import {
   useGetOrderMessagesQuery,
   useCreateOrderMessageMutation,
   useMarkOrderMessageAsReadMutation,
+  useGetOrderRequestItemsQuery,
+  useMarkOrderRequestItemsReceivedMutation,
+  useUpdateOrderRequestItemMutation,
 } from '../services/ordersApi';
 import { StatusBadge, PriorityBadge, ItemTypeBadge, MessageThread } from '../components';
-import type { UpdateOrderRequest, MarkOrderedRequest } from '../types';
+import type { UpdateOrderRequest, MarkOrderedRequest, RequestItem } from '../types';
+import type { ColumnsType } from 'antd/es/table';
 
 const { Title, Text } = Typography;
 const { TextArea } = Input;
@@ -48,9 +56,13 @@ export const OrderDetailView: React.FC = () => {
   const [isEditModalVisible, setIsEditModalVisible] = useState(false);
   const [isOrderModalVisible, setIsOrderModalVisible] = useState(false);
   const [activeTab, setActiveTab] = useState('details');
+  const [selectedItemIds, setSelectedItemIds] = useState<number[]>([]);
 
   const { data: order, isLoading } = useGetOrderQuery(Number(orderId));
   const { data: messages = [], isLoading: messagesLoading } = useGetOrderMessagesQuery(
+    Number(orderId)
+  );
+  const { data: requestItems = [], isLoading: itemsLoading } = useGetOrderRequestItemsQuery(
     Number(orderId)
   );
   const [updateOrder, { isLoading: updating }] = useUpdateOrderMutation();
@@ -58,6 +70,8 @@ export const OrderDetailView: React.FC = () => {
   const [markAsDelivered, { isLoading: markingDelivered }] = useMarkOrderAsDeliveredMutation();
   const [createMessage] = useCreateOrderMessageMutation();
   const [markMessageAsRead] = useMarkOrderMessageAsReadMutation();
+  const [markItemsReceived, { isLoading: markingItemsReceived }] = useMarkOrderRequestItemsReceivedMutation();
+  const [updateRequestItem] = useUpdateOrderRequestItemMutation();
 
   const handleEdit = () => {
     if (order) {
@@ -121,6 +135,160 @@ export const OrderDetailView: React.FC = () => {
   const handleMarkMessageRead = async (messageId: number) => {
     await markMessageAsRead(messageId).unwrap();
   };
+
+  const handleMarkSelectedItemsReceived = async () => {
+    if (selectedItemIds.length === 0) {
+      message.warning('Please select items to mark as received');
+      return;
+    }
+
+    Modal.confirm({
+      title: 'Mark Items as Received',
+      content: `Are you sure you want to mark ${selectedItemIds.length} item(s) as received?`,
+      onOk: async () => {
+        try {
+          await markItemsReceived({
+            orderId: Number(orderId),
+            itemIds: selectedItemIds,
+          }).unwrap();
+          message.success(`${selectedItemIds.length} item(s) marked as received`);
+          setSelectedItemIds([]);
+        } catch {
+          message.error('Failed to mark items as received');
+        }
+      },
+    });
+  };
+
+  const handleUpdateItemStatus = async (itemId: number, status: string) => {
+    try {
+      await updateRequestItem({
+        orderId: Number(orderId),
+        itemId,
+        updates: { status: status as 'pending' | 'ordered' | 'shipped' | 'received' | 'cancelled' },
+      }).unwrap();
+      message.success('Item status updated');
+    } catch {
+      message.error('Failed to update item status');
+    }
+  };
+
+  // Filter items that can be marked as received (ordered or shipped, not yet received/cancelled)
+  const receivableItems = requestItems.filter(
+    (item) => item.status === 'ordered' || item.status === 'shipped'
+  );
+
+  const requestItemColumns: ColumnsType<RequestItem> = [
+    {
+      title: (
+        <Checkbox
+          checked={selectedItemIds.length > 0 && selectedItemIds.length === receivableItems.length}
+          indeterminate={selectedItemIds.length > 0 && selectedItemIds.length < receivableItems.length}
+          onChange={(e) => {
+            if (e.target.checked) {
+              setSelectedItemIds(receivableItems.map((item) => item.id));
+            } else {
+              setSelectedItemIds([]);
+            }
+          }}
+          disabled={receivableItems.length === 0}
+        />
+      ),
+      key: 'select',
+      width: 50,
+      render: (_, record) => {
+        const isReceivable = record.status === 'ordered' || record.status === 'shipped';
+        return (
+          <Checkbox
+            checked={selectedItemIds.includes(record.id)}
+            disabled={!isReceivable}
+            onChange={(e) => {
+              if (e.target.checked) {
+                setSelectedItemIds([...selectedItemIds, record.id]);
+              } else {
+                setSelectedItemIds(selectedItemIds.filter((id) => id !== record.id));
+              }
+            }}
+          />
+        );
+      },
+    },
+    {
+      title: 'Description',
+      dataIndex: 'description',
+      key: 'description',
+      width: 200,
+    },
+    {
+      title: 'Request',
+      key: 'request',
+      width: 120,
+      render: (_, record) =>
+        record.request ? (
+          <Link to={`/requests/${record.request.id}`}>{record.request.request_number}</Link>
+        ) : (
+          '-'
+        ),
+    },
+    {
+      title: 'Type',
+      dataIndex: 'item_type',
+      key: 'item_type',
+      width: 100,
+      render: (type) => type && <ItemTypeBadge type={type} />,
+    },
+    {
+      title: 'Part Number',
+      dataIndex: 'part_number',
+      key: 'part_number',
+      width: 120,
+      render: (pn) => pn || '-',
+    },
+    {
+      title: 'Quantity',
+      dataIndex: 'quantity',
+      key: 'quantity',
+      width: 80,
+      render: (qty, record) => `${qty || 1} ${record.unit || 'each'}`,
+    },
+    {
+      title: 'Status',
+      dataIndex: 'status',
+      key: 'status',
+      width: 120,
+      render: (status) => <StatusBadge status={status} type="item" />,
+    },
+    {
+      title: 'Actions',
+      key: 'actions',
+      width: 150,
+      render: (_, record) => {
+        if (record.status === 'received' || record.status === 'cancelled') {
+          return <Tag>{record.status === 'received' ? 'Received' : 'Cancelled'}</Tag>;
+        }
+        return (
+          <Space>
+            {record.status === 'ordered' && (
+              <Button
+                size="small"
+                onClick={() => handleUpdateItemStatus(record.id, 'shipped')}
+              >
+                Shipped
+              </Button>
+            )}
+            <Button
+              size="small"
+              type="primary"
+              icon={<CheckCircleOutlined />}
+              onClick={() => handleUpdateItemStatus(record.id, 'received')}
+            >
+              Received
+            </Button>
+          </Space>
+        );
+      },
+    },
+  ];
 
   if (isLoading || !order) {
     return (
@@ -204,6 +372,50 @@ export const OrderDetailView: React.FC = () => {
               </Descriptions.Item>
             )}
           </Descriptions>
+        </Card>
+      ),
+    },
+    {
+      key: 'items',
+      label: `Request Items (${requestItems.length})`,
+      children: (
+        <Card>
+          {requestItems.length === 0 ? (
+            <Alert
+              message="No Request Items"
+              description="This order is not linked to any user request items. It may have been created directly without a request."
+              type="info"
+              showIcon
+              icon={<InboxOutlined />}
+            />
+          ) : (
+            <>
+              {selectedItemIds.length > 0 && (
+                <div style={{ marginBottom: 16 }}>
+                  <Space>
+                    <Text>{selectedItemIds.length} item(s) selected</Text>
+                    <Button
+                      type="primary"
+                      icon={<CheckCircleOutlined />}
+                      onClick={handleMarkSelectedItemsReceived}
+                      loading={markingItemsReceived}
+                    >
+                      Mark Selected as Received
+                    </Button>
+                    <Button onClick={() => setSelectedItemIds([])}>Clear Selection</Button>
+                  </Space>
+                </div>
+              )}
+              <Table
+                columns={requestItemColumns}
+                dataSource={requestItems}
+                rowKey="id"
+                loading={itemsLoading}
+                pagination={false}
+                scroll={{ x: 900 }}
+              />
+            </>
+          )}
         </Card>
       ),
     },
