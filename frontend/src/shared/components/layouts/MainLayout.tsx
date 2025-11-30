@@ -23,6 +23,8 @@ import { useLogoutMutation } from '@features/auth/services/authApi';
 import { socketService } from '@services/socket';
 import { getMenuItems } from '@shared/constants/navigation';
 import { ROUTES } from '@shared/constants/routes';
+import { useIsMobile } from '@shared/hooks/useIsMobile';
+import { MobileLayout } from './MobileLayout';
 
 const { Header, Sider, Content } = Layout;
 const { Text } = Typography;
@@ -34,6 +36,7 @@ export const MainLayout = () => {
   const dispatch = useAppDispatch();
   const user = useAppSelector((state) => state.auth.user);
   const [logoutApi] = useLogoutMutation();
+  const isMobile = useIsMobile();
 
   // Memoize menu items based on user permissions
   const menuItems = useMemo(() => {
@@ -87,6 +90,10 @@ export const MainLayout = () => {
       danger: true,
     },
   ];
+
+  if (isMobile) {
+    return <MobileLayout />;
+  }
 
   return (
     <Layout style={{ minHeight: '100vh' }}>

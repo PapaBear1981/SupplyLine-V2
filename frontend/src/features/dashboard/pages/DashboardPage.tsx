@@ -16,6 +16,7 @@ import { useTheme } from '@features/settings/contexts/ThemeContext';
 import { COLOR_THEMES } from '@features/settings/types/theme';
 import { ROUTES } from '@shared/constants/routes';
 import { KitLocationMap } from '@features/kits';
+import { buildDashboardAlerts, type ToolStats, type ChemicalStats, type KitStats } from '../utils/buildDashboardAlerts';
 
 // API hooks
 import { useGetToolsQuery } from '@features/tools/services/toolsApi';
@@ -60,7 +61,7 @@ export const DashboardPage = () => {
   const { data: pendingReorders } = useGetReorderReportQuery({ status: 'pending' });
 
   // Calculate tool stats
-  const toolStats = useMemo(() => {
+  const toolStats = useMemo<ToolStats>(() => {
     const tools = toolsData?.tools || [];
     return {
       total: toolsData?.total || 0,
@@ -73,7 +74,7 @@ export const DashboardPage = () => {
   }, [toolsData]);
 
   // Calculate chemical stats
-  const chemicalStats = useMemo(() => {
+  const chemicalStats = useMemo<ChemicalStats>(() => {
     const chemicals = chemicalsData?.chemicals || [];
     return {
       total: chemicalsData?.pagination?.total || 0,
@@ -86,7 +87,7 @@ export const DashboardPage = () => {
   }, [chemicalsData]);
 
   // Calculate kit stats
-  const kitStats = useMemo(() => {
+  const kitStats = useMemo<KitStats>(() => {
     const kits = kitsData || [];
     return {
       total: kits.length,
@@ -96,115 +97,10 @@ export const DashboardPage = () => {
   }, [kitsData, pendingReorders]);
 
   // Generate alerts
-  const alerts = useMemo<DashboardAlert[]>(() => {
-    const alertsList: DashboardAlert[] = [];
-
-    // Calibration overdue alerts (highest priority)
-    if (toolStats.calibrationOverdue > 0) {
-      alertsList.push({
-        id: 'calibration-overdue',
-        type: 'calibration_overdue',
-        severity: 'error',
-        title: 'Calibration Overdue',
-        description: `${toolStats.calibrationOverdue} tool(s) have overdue calibration that requires immediate attention.`,
-        count: toolStats.calibrationOverdue,
-        link: ROUTES.TOOLS + '?calibration_status=overdue',
-      });
-    }
-
-    // Expired chemicals
-    if (chemicalStats.expired > 0) {
-      alertsList.push({
-        id: 'chemicals-expired',
-        type: 'expired',
-        severity: 'error',
-        title: 'Expired Chemicals',
-        description: `${chemicalStats.expired} chemical(s) have expired and should be disposed of properly.`,
-        count: chemicalStats.expired,
-        link: ROUTES.CHEMICALS + '?status=expired',
-      });
-    }
-
-    // Out of stock chemicals
-    if (chemicalStats.outOfStock > 0) {
-      alertsList.push({
-        id: 'chemicals-oos',
-        type: 'low_stock',
-        severity: 'error',
-        title: 'Out of Stock',
-        description: `${chemicalStats.outOfStock} chemical(s) are completely out of stock.`,
-        count: chemicalStats.outOfStock,
-        link: ROUTES.CHEMICALS + '?status=out_of_stock',
-      });
-    }
-
-    // Low stock chemicals
-    if (chemicalStats.lowStock > 0) {
-      alertsList.push({
-        id: 'chemicals-low',
-        type: 'low_stock',
-        severity: 'warning',
-        title: 'Low Stock Warning',
-        description: `${chemicalStats.lowStock} chemical(s) are running low on stock.`,
-        count: chemicalStats.lowStock,
-        link: ROUTES.CHEMICALS + '?status=low_stock',
-      });
-    }
-
-    // Calibration due soon
-    if (toolStats.calibrationDue > 0) {
-      alertsList.push({
-        id: 'calibration-due',
-        type: 'calibration_due',
-        severity: 'warning',
-        title: 'Calibration Due Soon',
-        description: `${toolStats.calibrationDue} tool(s) have calibration due within the next 30 days.`,
-        count: toolStats.calibrationDue,
-        link: ROUTES.TOOLS + '?calibration_status=due_soon',
-      });
-    }
-
-    // Expiring soon chemicals
-    if (chemicalStats.expiringSoon > 0) {
-      alertsList.push({
-        id: 'chemicals-expiring',
-        type: 'expiring_soon',
-        severity: 'warning',
-        title: 'Chemicals Expiring Soon',
-        description: `${chemicalStats.expiringSoon} chemical(s) will expire within 30 days.`,
-        count: chemicalStats.expiringSoon,
-        link: ROUTES.CHEMICALS,
-      });
-    }
-
-    // Pending reorders
-    if (kitStats.pendingReorders > 0) {
-      alertsList.push({
-        id: 'pending-reorders',
-        type: 'pending_reorder',
-        severity: 'info',
-        title: 'Pending Reorder Requests',
-        description: `${kitStats.pendingReorders} reorder request(s) are awaiting approval.`,
-        count: kitStats.pendingReorders,
-        link: ROUTES.KITS,
-      });
-    }
-
-    // Tools in maintenance
-    if (toolStats.maintenance > 0) {
-      alertsList.push({
-        id: 'tools-maintenance',
-        type: 'low_stock',
-        severity: 'info',
-        title: 'Tools in Maintenance',
-        description: `${toolStats.maintenance} tool(s) are currently undergoing maintenance.`,
-        count: toolStats.maintenance,
-        link: ROUTES.TOOLS + '?status=maintenance',
-      });
-    }
-
-    return alertsList;
-  }, [toolStats, chemicalStats, kitStats]);
+  const alerts = useMemo<DashboardAlert[]>(
+    () => buildDashboardAlerts({ toolStats, chemicalStats, kitStats }),
+    [chemicalStats, kitStats, toolStats],
+  );
 
   // Chart data
   const toolStatusChartData = useMemo(() => [
