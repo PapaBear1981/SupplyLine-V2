@@ -1,6 +1,58 @@
-import { Button, Form, Input, Select, Space, Switch } from 'antd';
+import { useMemo } from 'react';
+import { Button, Form, Input, Select, Space, Switch, Typography } from 'antd';
+import { CheckCircleFilled, CloseCircleFilled } from '@ant-design/icons';
 import type { FormInstance } from 'antd';
 import type { Department, UserFormValues } from '../types';
+
+const { Text } = Typography;
+
+interface PasswordRequirement {
+  label: string;
+  test: (password: string) => boolean;
+}
+
+const PASSWORD_REQUIREMENTS: PasswordRequirement[] = [
+  { label: 'At least 8 characters', test: (p) => p.length >= 8 },
+  { label: 'At least one uppercase letter (A-Z)', test: (p) => /[A-Z]/.test(p) },
+  { label: 'At least one lowercase letter (a-z)', test: (p) => /[a-z]/.test(p) },
+  { label: 'At least one digit (0-9)', test: (p) => /\d/.test(p) },
+  { label: 'At least one special character (!@#$%^&*...)', test: (p) => /[!@#$%^&*()_+\-=[\]{};':"\\|,.<>/?`~]/.test(p) },
+];
+
+interface PasswordRequirementsListProps {
+  password: string;
+}
+
+const PasswordRequirementsList = ({ password }: PasswordRequirementsListProps) => {
+  const requirements = useMemo(() => {
+    return PASSWORD_REQUIREMENTS.map((req) => ({
+      ...req,
+      met: password ? req.test(password) : false,
+    }));
+  }, [password]);
+
+  return (
+    <div style={{ marginTop: 8 }}>
+      {requirements.map((req, index) => (
+        <div key={index} style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 2 }}>
+          {req.met ? (
+            <CheckCircleFilled style={{ color: '#52c41a', fontSize: 12 }} />
+          ) : (
+            <CloseCircleFilled style={{ color: '#ff4d4f', fontSize: 12 }} />
+          )}
+          <Text
+            style={{
+              fontSize: 12,
+              color: req.met ? '#52c41a' : '#ff4d4f',
+            }}
+          >
+            {req.label}
+          </Text>
+        </div>
+      ))}
+    </div>
+  );
+};
 
 interface UserFormProps {
   form: FormInstance<UserFormValues>;
@@ -24,6 +76,9 @@ export const UserForm = ({
     value: dept.name,
     disabled: !dept.is_active,
   }));
+
+  // Watch password field for real-time validation display
+  const password = Form.useWatch('password', form) || '';
 
   return (
     <Form
@@ -78,13 +133,38 @@ export const UserForm = ({
         name="password"
         rules={
           mode === 'create'
-            ? [{ required: true, message: 'Please set a password' }]
-            : []
+            ? [
+                { required: true, message: 'Please set a password' },
+                {
+                  validator: (_, value) => {
+                    if (!value) return Promise.resolve();
+                    const allMet = PASSWORD_REQUIREMENTS.every((req) => req.test(value));
+                    if (allMet) return Promise.resolve();
+                    return Promise.reject(new Error('Password does not meet all requirements'));
+                  },
+                },
+              ]
+            : [
+                {
+                  validator: (_, value) => {
+                    if (!value) return Promise.resolve();
+                    const allMet = PASSWORD_REQUIREMENTS.every((req) => req.test(value));
+                    if (allMet) return Promise.resolve();
+                    return Promise.reject(new Error('Password does not meet all requirements'));
+                  },
+                },
+              ]
         }
-        extra={mode === 'edit' ? 'Leave blank to keep the current password' : undefined}
       >
-        <Input.Password placeholder={mode === 'create' ? 'Set a secure password' : 'Optional'} />
+        <Input.Password placeholder={mode === 'create' ? 'Set a secure password' : 'Optional - leave blank to keep current'} />
       </Form.Item>
+
+      {/* Show password requirements when creating or when editing with a password entered */}
+      {(mode === 'create' || password) && (
+        <div style={{ marginTop: -16, marginBottom: 16 }}>
+          <PasswordRequirementsList password={password} />
+        </div>
+      )}
 
       <Form.Item label="Admin Access" name="is_admin" valuePropName="checked">
         <Switch />

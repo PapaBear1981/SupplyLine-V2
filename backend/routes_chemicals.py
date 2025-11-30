@@ -151,8 +151,8 @@ def register_chemical_routes(app):
         # Validate pagination parameters
         if page < 1:
             return jsonify({"error": "Page must be >= 1"}), 400
-        if per_page < 1 or per_page > 500:
-            return jsonify({"error": "Per page must be between 1 and 500"}), 400
+        if per_page < 1 or per_page > 1000:
+            return jsonify({"error": "Per page must be between 1 and 1000"}), 400
 
         # Start with base query
         query = Chemical.query

@@ -835,6 +835,7 @@ def register_routes(app):
         return current_app.send_static_file(filename)
 
     @app.route("/api/tools", methods=["GET", "POST"])
+    @login_required
     def tools_route():
         current_user_id = request.current_user.get("user_id")
         # GET - List all tools with pagination
@@ -847,8 +848,8 @@ def register_routes(app):
             # Validate pagination parameters
             if page < 1:
                 return jsonify({"error": "Page must be >= 1"}), 400
-            if per_page < 1 or per_page > 500:
-                return jsonify({"error": "Per page must be between 1 and 500"}), 400
+            if per_page < 1 or per_page > 1000:
+                return jsonify({"error": "Per page must be between 1 and 1000"}), 400
 
             logger.debug("Tools list requested", extra={
                 "has_search_query": bool(search_query),
@@ -939,14 +940,12 @@ def register_routes(app):
             # Return paginated response
             response = {
                 "tools": tools_data,
-                "pagination": {
-                    "page": page,
-                    "per_page": per_page,
-                    "total": total_count,
-                    "pages": pagination.pages,
-                    "has_next": pagination.has_next,
-                    "has_prev": pagination.has_prev
-                }
+                "total": total_count,
+                "page": page,
+                "per_page": per_page,
+                "pages": pagination.pages,
+                "has_next": pagination.has_next,
+                "has_prev": pagination.has_prev
             }
 
             logger.debug("Tools response ready", extra={"result_count": len(tools_data)})
