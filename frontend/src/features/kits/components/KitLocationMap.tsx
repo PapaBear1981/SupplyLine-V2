@@ -30,9 +30,11 @@ if (!document.head.querySelector('#leaflet-dark-popup-styles')) {
 // Map surface tweaks for readability in dark mode
 const mapStyles = document.createElement('style');
 mapStyles.textContent = `
+  .leaflet-tile-container img {
+    image-rendering: auto;
+  }
   .leaflet-layer.kit-map-dark-tiles {
     filter: brightness(1.35) contrast(0.95) saturate(1.05);
-    transition: filter 0.3s ease;
   }
   .leaflet-container.kit-map-container-dark {
     background-color: #0f1824;
@@ -43,10 +45,17 @@ mapStyles.textContent = `
     box-shadow: 0 2px 6px rgba(0, 0, 0, 0.35);
   }
   .leaflet-container.kit-map-container-dark .leaflet-bar a {
+    background-color: rgba(24, 32, 46, 0.95);
     color: #f5f7fb;
+    border-bottom-color: #24334a;
   }
   .leaflet-container.kit-map-container-dark .leaflet-bar a:hover {
-    background-color: rgba(54, 72, 98, 0.85);
+    background-color: rgba(54, 72, 98, 0.95);
+    color: #ffffff;
+  }
+  .leaflet-container.kit-map-container-dark .leaflet-bar a.leaflet-disabled {
+    background-color: rgba(24, 32, 46, 0.6);
+    color: #6b7280;
   }
 `;
 if (!document.head.querySelector('#kit-map-styles')) {
@@ -332,8 +341,6 @@ export function KitLocationMap({ height = 400 }: KitLocationMapProps) {
               url={tileConfig.url}
               maxZoom={19}
               minZoom={2}
-              subdomains={['a', 'b', 'c', 'd']}
-              crossOrigin={true}
               className={tileLayerClassName}
             />
             <MapController selectedKit={selectedKit} kits={kitsWithLocation} />
