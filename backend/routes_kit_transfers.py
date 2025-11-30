@@ -31,6 +31,7 @@ def register_kit_transfer_routes(app):
     def create_transfer():
         """Initiate a transfer. Kit-involving transfers remain pending until explicitly completed."""
         data = request.get_json() or {}
+        current_user_id = request.current_user.get("user_id")
 
         required_fields = [
             "item_type",
@@ -145,14 +146,22 @@ def register_kit_transfer_routes(app):
         db.session.add(transfer)
         db.session.flush()
 
-        creation_log = AuditLog(
-            action_type="kit_transfer_created",
-            action_details=(
-                f"Transfer created: {data['item_type']} from {from_type} {data['from_location_id']} "
-                f"to {to_type} {data['to_location_id']}"
-            )
+        AuditLog.log(
+            user_id=current_user_id,
+            action="kit_transfer_created",
+            resource_type="kit_transfer",
+            resource_id=transfer.id,
+            details={
+                "item_type": data["item_type"],
+                "item_id": transfer_item_id,
+                "from_type": from_type,
+                "from_location_id": data["from_location_id"],
+                "to_type": to_type,
+                "to_location_id": data["to_location_id"],
+                "quantity": quantity
+            },
+            ip_address=request.remote_addr
         )
-        db.session.add(creation_log)
         db.session.commit()
 
         # Auto-complete warehouse-originated transfers immediately for instant feedback
@@ -436,11 +445,19 @@ def register_kit_transfer_routes(app):
                     notes="Warehouse to warehouse transfer"
                 )
 
-        log = AuditLog(
-            action_type="kit_transfer_completed",
-            action_details=f"Transfer completed: ID {transfer.id}"
+        AuditLog.log(
+            user_id=user_id,
+            action="kit_transfer_completed",
+            resource_type="kit_transfer",
+            resource_id=transfer.id,
+            details={
+                "item_type": transfer.item_type,
+                "quantity": transfer.quantity,
+                "from_type": transfer.from_location_type,
+                "to_type": transfer.to_location_type
+            },
+            ip_address=request.remote_addr if hasattr(request, "remote_addr") else None
         )
-        db.session.add(log)
         db.session.commit()
 
         response = transfer.to_dict()
@@ -509,6 +526,7 @@ def register_kit_transfer_routes(app):
     @handle_errors
     def cancel_transfer(id):
         """Cancel a transfer"""
+        current_user_id = request.current_user.get("user_id")
         transfer = KitTransfer.query.get_or_404(id)
 
         if transfer.status != "pending":
@@ -518,11 +536,18 @@ def register_kit_transfer_routes(app):
         db.session.commit()
 
         # Log action
-        log = AuditLog(
-            action_type="kit_transfer_cancelled",
-            action_details=f"Transfer cancelled: ID {transfer.id}"
+        AuditLog.log(
+            user_id=current_user_id,
+            action="kit_transfer_cancelled",
+            resource_type="kit_transfer",
+            resource_id=transfer.id,
+            details={
+                "item_type": transfer.item_type,
+                "from_type": transfer.from_location_type,
+                "to_type": transfer.to_location_type
+            },
+            ip_address=request.remote_addr
         )
-        db.session.add(log)
         db.session.commit()
 
         return jsonify(transfer.to_dict()), 200

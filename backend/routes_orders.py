@@ -204,6 +204,7 @@ def register_order_routes(app):
     @handle_errors
     def create_order():
         """Create a new procurement order."""
+        current_user_id = request.current_user.get("user_id")
 
         if request.content_type and "multipart/form-data" in request.content_type:
             data = request.form.to_dict()
@@ -322,11 +323,19 @@ def register_order_routes(app):
 
         db.session.commit()
 
-        log = AuditLog(
-            action_type="procurement_order_created",
-            action_details=f"Order {order.order_number} ({order.id}) created with status {order.status}",
+        AuditLog.log(
+            user_id=current_user_id,
+            action="procurement_order_created",
+            resource_type="procurement_order",
+            resource_id=order.id,
+            details={
+                "order_number": order.order_number,
+                "status": order.status,
+                "order_type": order.order_type,
+                "title": order.title
+            },
+            ip_address=request.remote_addr
         )
-        db.session.add(log)
         db.session.commit()
 
         logger.info("Procurement order created", extra={"order_id": order.id})
@@ -348,6 +357,7 @@ def register_order_routes(app):
     def update_order(order_id):
         order = ProcurementOrder.query.get_or_404(order_id)
         data = request.get_json() or {}
+        current_user_id = request.current_user.get("user_id")
 
         if data.get("title"):
             order.title = data["title"]
@@ -434,11 +444,17 @@ def register_order_routes(app):
 
         db.session.commit()
 
-        log = AuditLog(
-            action_type="procurement_order_updated",
-            action_details=f"Order {order.id} updated",
+        AuditLog.log(
+            user_id=current_user_id,
+            action="procurement_order_updated",
+            resource_type="procurement_order",
+            resource_id=order.id,
+            details={
+                "order_number": order.order_number,
+                "status": order.status
+            },
+            ip_address=request.remote_addr
         )
-        db.session.add(log)
         db.session.commit()
 
         return jsonify(order.to_dict())
@@ -540,6 +556,7 @@ def register_order_routes(app):
             return jsonify({"error": "You do not have access to this order"}), 403
 
         data = request.get_json() or {}
+        current_user_id = request.current_user.get("user_id")
         subject = data.get("subject") or f"Order {order.id} update"
         body = data.get("message")
         if not body:
@@ -581,11 +598,17 @@ def register_order_routes(app):
         db.session.add(message)
         db.session.commit()
 
-        log = AuditLog(
-            action_type="procurement_order_message_sent",
-            action_details=f"Message sent for order {order.id}",
+        AuditLog.log(
+            user_id=current_user_id,
+            action="procurement_order_message_sent",
+            resource_type="procurement_order_message",
+            resource_id=message.id,
+            details={
+                "order_id": order.id,
+                "subject": subject
+            },
+            ip_address=request.remote_addr
         )
-        db.session.add(log)
         db.session.commit()
 
         return jsonify(message.to_dict()), 201
@@ -601,6 +624,7 @@ def register_order_routes(app):
             return jsonify({"error": "You do not have access to this order"}), 403
 
         data = request.get_json() or {}
+        current_user_id = request.current_user.get("user_id")
         body = data.get("message")
         if not body:
             raise ValidationError("Message content is required")
@@ -627,11 +651,18 @@ def register_order_routes(app):
         db.session.add(reply)
         db.session.commit()
 
-        log = AuditLog(
-            action_type="procurement_order_message_reply",
-            action_details=f"Reply sent for order {order.id}",
+        AuditLog.log(
+            user_id=current_user_id,
+            action="procurement_order_message_reply",
+            resource_type="procurement_order_message",
+            resource_id=reply.id,
+            details={
+                "order_id": order.id,
+                "parent_message_id": parent_message.id,
+                "subject": reply.subject
+            },
+            ip_address=request.remote_addr
         )
-        db.session.add(log)
         db.session.commit()
 
         return jsonify(reply.to_dict()), 201
@@ -649,6 +680,7 @@ def register_order_routes(app):
 
         # Get optional received quantity from request
         data = request.get_json() or {}
+        current_user_id = request.current_user.get("user_id")
         received_quantity = data.get("received_quantity")
 
         # Update order status to received
@@ -662,11 +694,18 @@ def register_order_routes(app):
 
         # Log the action
         user_name = request.current_user.get("user_name", "Unknown user")
-        log = AuditLog(
-            action_type="order_delivered",
-            action_details=f"Order '{order.title}' (ID: {order.id}) marked as delivered by {user_name}"
+        AuditLog.log(
+            user_id=current_user_id,
+            action="order_delivered",
+            resource_type="procurement_order",
+            resource_id=order.id,
+            details={
+                "title": order.title,
+                "delivered_by": user_name,
+                "received_quantity": received_quantity
+            },
+            ip_address=request.remote_addr
         )
-        db.session.add(log)
 
         # Log user activity
         if hasattr(request, "current_user"):
@@ -698,6 +737,7 @@ def register_order_routes(app):
 
         # Get order details from request
         data = request.get_json() or {}
+        current_user_id = request.current_user.get("user_id")
 
         # Update order fields
         order.status = "ordered"
@@ -736,11 +776,19 @@ def register_order_routes(app):
         if order.tracking_number:
             log_details += f", Tracking: {order.tracking_number}"
 
-        log = AuditLog(
-            action_type="order_marked_ordered",
-            action_details=log_details
+        AuditLog.log(
+            user_id=current_user_id,
+            action="order_marked_ordered",
+            resource_type="procurement_order",
+            resource_id=order.id,
+            details={
+                "title": order.title,
+                "ordered_by": user_name,
+                "vendor": order.vendor,
+                "tracking_number": order.tracking_number
+            },
+            ip_address=request.remote_addr
         )
-        db.session.add(log)
 
         # Log user activity
         if hasattr(request, "current_user"):

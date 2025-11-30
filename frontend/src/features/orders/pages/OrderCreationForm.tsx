@@ -1,4 +1,3 @@
-import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Card, Form, Input, Select, InputNumber, Button, Space, message, Row, Col, Typography, DatePicker } from 'antd';
 import { ArrowLeftOutlined, SaveOutlined } from '@ant-design/icons';
@@ -18,7 +17,7 @@ export const OrderCreationForm: React.FC = () => {
       const result = await createOrder(values).unwrap();
       message.success('Order created successfully');
       navigate(`/orders/${result.id}`);
-    } catch (error) {
+    } catch {
       message.error('Failed to create order');
     }
   };

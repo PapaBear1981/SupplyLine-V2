@@ -27,6 +27,7 @@ def register_rbac_routes(app):
     @permission_required("role.manage")
     def create_role():
         data = request.get_json() or {}
+        current_user_id = request.current_user.get("user_id")
 
         # Validate required fields
         if not data.get("name"):
@@ -57,11 +58,17 @@ def register_rbac_routes(app):
             db.session.commit()
 
         # Log the action
-        log = AuditLog(
-            action_type="create_role",
-            action_details=f"Created role {role.id} ({role.name})"
+        AuditLog.log(
+            user_id=current_user_id,
+            action="create_role",
+            resource_type="role",
+            resource_id=role.id,
+            details={
+                "role_name": role.name,
+                "description": role.description
+            },
+            ip_address=request.remote_addr
         )
-        db.session.add(log)
         db.session.commit()
 
         return jsonify(role.to_dict(include_permissions=True)), 201
@@ -73,6 +80,7 @@ def register_rbac_routes(app):
         role = Role.query.get_or_404(id)
 
         data = request.get_json() or {}
+        current_user_id = request.current_user.get("user_id")
 
         # For system roles, only allow permission updates, not name/description changes
         if role.is_system_role:
@@ -105,11 +113,17 @@ def register_rbac_routes(app):
         db.session.commit()
 
         # Log the action
-        log = AuditLog(
-            action_type="update_role",
-            action_details=f"Updated role {role.id} ({role.name})"
+        AuditLog.log(
+            user_id=current_user_id,
+            action="update_role",
+            resource_type="role",
+            resource_id=role.id,
+            details={
+                "role_name": role.name,
+                "is_system_role": role.is_system_role
+            },
+            ip_address=request.remote_addr
         )
-        db.session.add(log)
         db.session.commit()
 
         return jsonify(role.to_dict(include_permissions=True))
@@ -118,6 +132,7 @@ def register_rbac_routes(app):
     @app.route("/api/roles/<int:id>", methods=["DELETE"])
     @permission_required("role.manage")
     def delete_role(id):
+        current_user_id = request.current_user.get("user_id")
         role = Role.query.get_or_404(id)
 
         # Don't allow deletion of system roles
@@ -134,11 +149,16 @@ def register_rbac_routes(app):
         db.session.delete(role)
 
         # Log the action
-        log = AuditLog(
-            action_type="delete_role",
-            action_details=f"Deleted role {role.id} ({role.name})"
+        AuditLog.log(
+            user_id=current_user_id,
+            action="delete_role",
+            resource_type="role",
+            resource_id=id,
+            details={
+                "role_name": role.name
+            },
+            ip_address=request.remote_addr
         )
-        db.session.add(log)
         db.session.commit()
 
         return jsonify({"message": "Role deleted successfully"})
@@ -179,6 +199,7 @@ def register_rbac_routes(app):
     def update_user_roles(user_id):
         user = User.query.get_or_404(user_id)
         data = request.get_json() or {}
+        current_user_id = request.current_user.get("user_id")
 
         if "roles" not in data or not isinstance(data["roles"], list):
             return jsonify({"error": "Roles list is required"}), 400
@@ -196,11 +217,17 @@ def register_rbac_routes(app):
         db.session.commit()
 
         # Log the action
-        log = AuditLog(
-            action_type="update_user_roles",
-            action_details=f"Updated roles for user {user.id} ({user.name})"
+        AuditLog.log(
+            user_id=current_user_id,
+            action="update_user_roles",
+            resource_type="user",
+            resource_id=user.id,
+            details={
+                "user_name": user.name,
+                "role_ids": data["roles"]
+            },
+            ip_address=request.remote_addr
         )
-        db.session.add(log)
         db.session.commit()
 
         return jsonify([role.to_dict() for role in user.roles])

@@ -60,7 +60,7 @@ export const DepartmentManagement = () => {
     try {
       await deleteDepartment(id).unwrap();
       message.success('Department deleted successfully');
-    } catch (error) {
+    } catch {
       message.error('Failed to delete department');
     }
   };
@@ -77,7 +77,7 @@ export const DepartmentManagement = () => {
       }
       setModalOpen(false);
       form.resetFields();
-    } catch (error) {
+    } catch {
       message.error(`Failed to ${editingDepartment ? 'update' : 'create'} department`);
     }
   };

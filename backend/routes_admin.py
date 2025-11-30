@@ -7,9 +7,9 @@ from datetime import UTC, datetime
 from flask import jsonify, request
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 
-from auth import admin_required, jwt_required
-from models import Announcement, AuditLog, Department, Role, User, UserRole, db
 import utils as password_utils
+from auth import admin_required
+from models import Announcement, AuditLog, Department, Role, User, UserRole, db
 
 logger = logging.getLogger(__name__)
 

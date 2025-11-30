@@ -58,10 +58,14 @@ export const UserDrawer = ({
   const [unlockUser, { isLoading: isUnlocking }] = useUnlockUserMutation();
 
   useEffect(() => {
-    setMode(initialMode);
-    if (initialMode === 'create') {
-      form.resetFields();
-    }
+    // Update mode asynchronously to avoid cascading renders
+    const timer = setTimeout(() => {
+      setMode(initialMode);
+      if (initialMode === 'create') {
+        form.resetFields();
+      }
+    }, 0);
+    return () => clearTimeout(timer);
   }, [initialMode, form]);
 
   useEffect(() => {
@@ -118,7 +122,7 @@ export const UserDrawer = ({
       onSuccess?.();
       onClose();
       form.resetFields();
-    } catch (err) {
+    } catch {
       message.error('Failed to save user. Please try again.');
     }
   };
@@ -129,7 +133,7 @@ export const UserDrawer = ({
       await unlockUser(userId).unwrap();
       message.success('Account unlocked');
       onSuccess?.();
-    } catch (err) {
+    } catch {
       message.error('Failed to unlock account');
     }
   };

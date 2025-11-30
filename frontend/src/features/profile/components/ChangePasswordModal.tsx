@@ -21,8 +21,9 @@ export const ChangePasswordModal = ({ open, onClose }: ChangePasswordModalProps)
       message.success('Password changed successfully!');
       form.resetFields();
       onClose();
-    } catch (error: any) {
-      message.error(error?.data?.message || 'Failed to change password');
+    } catch (error: unknown) {
+      const err = error as { data?: { message?: string } };
+      message.error(err?.data?.message || 'Failed to change password');
     }
   };
 

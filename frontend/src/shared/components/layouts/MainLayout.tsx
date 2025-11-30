@@ -45,8 +45,8 @@ export const MainLayout = () => {
   const handleLogout = async () => {
     try {
       await logoutApi().unwrap();
-    } catch (error) {
-      console.error('Logout failed:', error);
+    } catch {
+      // Ignore logout errors - still clear local state
     } finally {
       dispatch(logout());
       navigate(ROUTES.LOGIN);
