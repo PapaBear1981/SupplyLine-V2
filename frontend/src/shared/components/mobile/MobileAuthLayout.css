@@ -1,0 +1,60 @@
+.mobile-auth-layout {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  background: linear-gradient(180deg, var(--adm-color-primary) 0%, var(--adm-color-secondary) 100%);
+}
+
+.mobile-auth-header {
+  padding: 48px 24px 32px;
+  text-align: center;
+}
+
+.mobile-auth-logo {
+  font-size: 32px;
+  font-weight: 700;
+  color: white;
+  letter-spacing: -0.5px;
+}
+
+.mobile-auth-subtitle {
+  font-size: 14px;
+  color: rgba(255, 255, 255, 0.85);
+  margin-top: 4px;
+}
+
+.mobile-auth-content {
+  flex: 1;
+  background-color: var(--adm-color-background);
+  border-top-left-radius: 24px;
+  border-top-right-radius: 24px;
+  padding: 32px 20px;
+  margin-top: 16px;
+}
+
+.mobile-auth-footer {
+  padding: 16px 24px;
+  text-align: center;
+  background-color: var(--adm-color-background);
+}
+
+.mobile-auth-footer-text {
+  font-size: 12px;
+  color: var(--adm-color-text-secondary);
+}
+
+/* Dark mode support - Support both html.adm-theme-dark and .adm-theme-dark ancestor */
+html.adm-theme-dark .mobile-auth-layout,
+.adm-theme-dark .mobile-auth-layout {
+  background: linear-gradient(180deg, var(--adm-color-primary) 0%, var(--adm-color-secondary) 100%);
+}
+
+html.adm-theme-dark .mobile-auth-content,
+.adm-theme-dark .mobile-auth-content {
+  background-color: #141414;
+}
+
+html.adm-theme-dark .mobile-auth-footer,
+.adm-theme-dark .mobile-auth-footer {
+  background-color: #141414;
+}

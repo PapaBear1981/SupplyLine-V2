@@ -1,5 +1,6 @@
 import { createContext, useContext, useState, useEffect } from 'react';
 import type { ReactNode } from 'react';
+import { COLOR_THEMES } from '../types/theme';
 import type { ThemeConfig, ThemeContextType, ThemeMode, ColorTheme } from '../types/theme';
 
 const THEME_STORAGE_KEY = 'supplyline-theme-config';
@@ -30,6 +31,19 @@ export const ThemeProvider = ({ children }: ThemeProviderProps) => {
 
   useEffect(() => {
     localStorage.setItem(THEME_STORAGE_KEY, JSON.stringify(themeConfig));
+
+    const { primary: primaryColor, secondary: secondaryColor } = COLOR_THEMES[themeConfig.colorTheme];
+    document.documentElement.style.setProperty('--adm-color-primary', primaryColor);
+    document.documentElement.style.setProperty('--adm-color-secondary', secondaryColor);
+
+    // Apply dark mode class to document for antd-mobile theming
+    if (themeConfig.mode === 'dark') {
+      document.documentElement.classList.add('adm-theme-dark');
+      document.documentElement.setAttribute('data-prefers-color-scheme', 'dark');
+    } else {
+      document.documentElement.classList.remove('adm-theme-dark');
+      document.documentElement.setAttribute('data-prefers-color-scheme', 'light');
+    }
   }, [themeConfig]);
 
   const setThemeMode = (mode: ThemeMode) => {

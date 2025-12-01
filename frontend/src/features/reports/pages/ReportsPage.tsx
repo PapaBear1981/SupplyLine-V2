@@ -12,12 +12,14 @@ import {
 } from '@ant-design/icons';
 import { Dayjs } from 'dayjs';
 import type { RangePickerProps } from 'antd/es/date-picker';
+import { useIsMobile } from '@shared/hooks/useMobile';
 
 import { ToolReports } from '../components/ToolReports';
 import { ChemicalReports } from '../components/ChemicalReports';
 import { KitReports } from '../components/KitReports';
 import { OrderReports } from '../components/OrderReports';
 import { AdminReports } from '../components/AdminReports';
+import { MobileReports } from '../components/mobile';
 import type { ReportTimeframe, ExportFormat } from '../types';
 
 import styles from './ReportsPage.module.scss';
@@ -35,6 +37,7 @@ const timeframeOptions = [
 ];
 
 export function ReportsPage() {
+  const isMobile = useIsMobile();
   const [activeTab, setActiveTab] = useState('tools');
   const [timeframe, setTimeframe] = useState<ReportTimeframe>('month');
   const [customDateRange, setCustomDateRange] = useState<[Dayjs | null, Dayjs | null]>([null, null]);
@@ -66,6 +69,11 @@ export function ReportsPage() {
     }
     return { timeframe: timeframe };
   };
+
+  // Render mobile version if on mobile device
+  if (isMobile) {
+    return <MobileReports timeframe={timeframe} dateParams={getDateParams()} />;
+  }
 
   const handleExport = async (format: ExportFormat) => {
     if (!currentReportData || !currentReportType) {

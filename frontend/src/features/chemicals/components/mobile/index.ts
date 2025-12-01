@@ -1,0 +1,1 @@
+export { MobileChemicalsList } from './MobileChemicalsList';

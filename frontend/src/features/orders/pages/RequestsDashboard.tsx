@@ -25,7 +25,8 @@ import {
 import dayjs from 'dayjs';
 import relativeTime from 'dayjs/plugin/relativeTime';
 import { useGetRequestsQuery, useGetRequestAnalyticsQuery } from '../services/requestsApi';
-import { StatusBadge, PriorityBadge } from '../components';
+import { StatusBadge, PriorityBadge, MobileRequestsList } from '../components';
+import { useIsMobile } from '@shared/hooks/useMobile';
 import type { UserRequest, RequestStatus, RequestPriority } from '../types';
 import type { ColumnsType } from 'antd/es/table';
 
@@ -33,6 +34,7 @@ dayjs.extend(relativeTime);
 
 export const RequestsDashboard: React.FC = () => {
   const navigate = useNavigate();
+  const isMobile = useIsMobile();
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<RequestStatus[]>([]);
   const [priorityFilter, setPriorityFilter] = useState<RequestPriority[]>([]);
@@ -45,6 +47,11 @@ export const RequestsDashboard: React.FC = () => {
 
   const { data: requests = [], isLoading, refetch } = useGetRequestsQuery(queryParams);
   const { data: analytics } = useGetRequestAnalyticsQuery();
+
+  // Render mobile version if on mobile device
+  if (isMobile) {
+    return <MobileRequestsList />;
+  }
 
   const columns: ColumnsType<UserRequest> = [
     {

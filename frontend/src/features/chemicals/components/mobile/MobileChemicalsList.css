@@ -1,0 +1,194 @@
+.mobile-chemicals-list {
+  padding-bottom: 80px;
+}
+
+.search-bar-container {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+  background: var(--adm-color-background);
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+
+.search-bar {
+  flex: 1;
+}
+
+.filter-button {
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--adm-color-fill-content);
+  border-radius: 8px;
+  font-size: 20px;
+  color: var(--adm-color-text-secondary);
+}
+
+.filter-button.active {
+  background: var(--adm-color-primary);
+  color: white;
+}
+
+.active-filters {
+  padding: 0 16px 12px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.chemical-icon {
+  width: 44px;
+  height: 44px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 20px;
+}
+
+.chemical-item-title {
+  font-weight: 600;
+  font-size: 15px;
+}
+
+.chemical-item-subtitle {
+  font-size: 13px;
+  color: var(--adm-color-text-secondary);
+  margin-top: 2px;
+}
+
+.chemical-item-desc {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 4px;
+}
+
+.chemical-item-desc > span {
+  font-size: 13px;
+  color: var(--adm-color-text-secondary);
+  display: -webkit-box;
+  -webkit-line-clamp: 1;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.chemical-item-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.chemical-item-tags .adm-tag {
+  font-size: 11px;
+  padding: 2px 6px;
+}
+
+.chemical-skeleton {
+  height: 80px;
+  margin-bottom: 12px;
+  border-radius: 8px;
+}
+
+/* Filter Popup */
+.filter-popup {
+  padding: 16px;
+}
+
+.filter-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+  font-size: 18px;
+  font-weight: 600;
+}
+
+.filter-options {
+  padding: 12px 0;
+}
+
+/* Detail Popup */
+.detail-popup {
+  padding: 20px 16px;
+}
+
+.detail-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--adm-border-color);
+}
+
+.detail-title {
+  font-size: 20px;
+  font-weight: 600;
+}
+
+.detail-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 20px;
+  padding-top: 16px;
+  border-top: 1px solid var(--adm-border-color);
+}
+
+/* Form Popup */
+.form-popup {
+  padding: 16px;
+  padding-bottom: 32px;
+}
+
+.form-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+  font-size: 18px;
+  font-weight: 600;
+}
+
+.form-header svg {
+  font-size: 24px;
+  color: var(--adm-color-text-secondary);
+}
+
+/* Dark mode - Support both html.adm-theme-dark and .adm-theme-dark ancestor */
+html.adm-theme-dark .search-bar-container,
+.adm-theme-dark .search-bar-container {
+  background: #141414;
+}
+
+html.adm-theme-dark .filter-button,
+.adm-theme-dark .filter-button {
+  background: #333;
+}
+
+html.adm-theme-dark .mobile-chemicals-list,
+.adm-theme-dark .mobile-chemicals-list {
+  background-color: #141414;
+}
+
+html.adm-theme-dark .filter-popup,
+.adm-theme-dark .filter-popup,
+html.adm-theme-dark .detail-popup,
+.adm-theme-dark .detail-popup,
+html.adm-theme-dark .form-popup,
+.adm-theme-dark .form-popup {
+  background-color: #1f1f1f;
+}
+
+html.adm-theme-dark .detail-header,
+.adm-theme-dark .detail-header,
+html.adm-theme-dark .detail-actions,
+.adm-theme-dark .detail-actions {
+  border-color: #424242;
+}

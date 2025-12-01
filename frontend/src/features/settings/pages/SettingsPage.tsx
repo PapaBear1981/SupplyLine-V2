@@ -3,13 +3,21 @@ import { BulbOutlined, BulbFilled, CheckCircleFilled } from '@ant-design/icons';
 import { useTheme } from '../contexts/ThemeContext';
 import { COLOR_THEMES } from '../types/theme';
 import type { ColorTheme } from '../types/theme';
+import { MobileSettings } from '../components/mobile';
+import { useIsMobile } from '@shared/hooks/useMobile';
 
 const { Title, Text, Paragraph } = Typography;
 const { useToken } = theme;
 
 export const SettingsPage = () => {
+  const isMobile = useIsMobile();
   const { themeConfig, setThemeMode, setColorTheme } = useTheme();
   const { token } = useToken();
+
+  // Render mobile version if on mobile device
+  if (isMobile) {
+    return <MobileSettings />;
+  }
 
   return (
     <div style={{ maxWidth: 1200, margin: '0 auto' }}>

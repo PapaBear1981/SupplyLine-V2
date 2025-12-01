@@ -38,11 +38,14 @@ import KitBoxManager from '../components/KitBoxManager';
 import KitItemList from '../components/KitItemList';
 import KitIssuanceHistory from '../components/KitIssuanceHistory';
 import EditKitModal from '../components/EditKitModal';
+import { MobileKitDetailPage } from '../components/mobile';
+import { useIsMobile } from '@shared/hooks/useMobile';
 
 const { Title, Text } = Typography;
 const { TabPane } = Tabs;
 
 const KitDetailView = () => {
+  const isMobile = useIsMobile();
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const kitId = parseInt(id || '0');
@@ -53,6 +56,11 @@ const KitDetailView = () => {
   const { data: alerts } = useGetKitAlertsQuery(kitId);
   const { data: analytics } = useGetKitAnalyticsQuery({ kitId, days: 30 });
   const [deleteKit, { isLoading: isDeleting }] = useDeleteKitMutation();
+
+  // Render mobile version if on mobile device
+  if (isMobile) {
+    return <MobileKitDetailPage />;
+  }
 
   const handleDelete = () => {
     Modal.confirm({

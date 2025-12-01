@@ -31,7 +31,8 @@ import dayjs from 'dayjs';
 import relativeTime from 'dayjs/plugin/relativeTime';
 import { useGetOrdersQuery, useGetOrderAnalyticsQuery } from '../services/ordersApi';
 import { useGetRequestsQuery, useGetRequestAnalyticsQuery } from '../services/requestsApi';
-import { StatusBadge, PriorityBadge, ItemTypeBadge } from '../components';
+import { StatusBadge, PriorityBadge, ItemTypeBadge, MobileOrdersList } from '../components';
+import { useIsMobile } from '@shared/hooks/useMobile';
 import type { ProcurementOrder, OrderStatus, OrderPriority, OrderType, UserRequest, RequestStatus, RequestPriority } from '../types';
 import type { ColumnsType } from 'antd/es/table';
 
@@ -41,6 +42,7 @@ const { Option } = Select;
 
 export const OrdersDashboard: React.FC = () => {
   const navigate = useNavigate();
+  const isMobile = useIsMobile();
   const [activeTab, setActiveTab] = useState('requests');
 
   // Orders state
@@ -78,6 +80,11 @@ export const OrdersDashboard: React.FC = () => {
   const pendingRequestsCount = requests.filter(
     (r) => ['new', 'in_progress', 'awaiting_info'].includes(r.status)
   ).length;
+
+  // Render mobile version if on mobile device
+  if (isMobile) {
+    return <MobileOrdersList />;
+  }
 
   const handleCreateOrder = () => {
     navigate('/orders/new');

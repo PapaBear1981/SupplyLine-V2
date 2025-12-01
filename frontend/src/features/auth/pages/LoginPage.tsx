@@ -6,15 +6,23 @@ import { useAppDispatch } from '@app/hooks';
 import { setCredentials } from '../slices/authSlice';
 import { socketService } from '@services/socket';
 import { ROUTES } from '@shared/constants/routes';
+import { useIsMobile } from '@shared/hooks/useMobile';
+import { MobileLoginForm } from '../components/mobile';
 import type { LoginRequest } from '../types';
 import './LoginPage.css';
 
 const { Title, Text } = Typography;
 
 export const LoginPage = () => {
+  const isMobile = useIsMobile();
   const navigate = useNavigate();
   const dispatch = useAppDispatch();
   const [login, { isLoading }] = useLoginMutation();
+
+  // Render mobile version if on mobile device
+  if (isMobile) {
+    return <MobileLoginForm />;
+  }
 
   const handleSubmit = async (values: LoginRequest) => {
     try {

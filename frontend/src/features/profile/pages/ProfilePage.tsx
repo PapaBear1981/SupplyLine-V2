@@ -25,17 +25,24 @@ import { setCredentials } from '@features/auth/slices/authSlice';
 import { useUploadAvatarMutation } from '../services/profileApi';
 import { EditProfileModal } from '../components/EditProfileModal';
 import { ChangePasswordModal } from '../components/ChangePasswordModal';
+import { MobileProfile } from '../components/mobile';
+import { useIsMobile } from '@shared/hooks/useMobile';
 
 const { Title, Text } = Typography;
 
 export const ProfilePage = () => {
+  const isMobile = useIsMobile();
   const dispatch = useAppDispatch();
   const user = useAppSelector((state) => state.auth.user);
   const token = useAppSelector((state) => state.auth.token);
   const [uploadAvatar, { isLoading: isUploading }] = useUploadAvatarMutation();
-
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isPasswordModalOpen, setIsPasswordModalOpen] = useState(false);
+
+  // Render mobile version if on mobile device
+  if (isMobile) {
+    return <MobileProfile />;
+  }
 
   const uploadProps: UploadProps = {
     name: 'avatar',

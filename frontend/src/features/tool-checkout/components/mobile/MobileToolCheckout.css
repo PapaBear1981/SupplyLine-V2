@@ -1,0 +1,203 @@
+.mobile-tool-checkout {
+  padding-bottom: 80px;
+}
+
+/* Stats Row */
+.stats-row {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+  padding: 12px;
+}
+
+.stat-card {
+  padding: 12px 8px;
+  text-align: center;
+  border-radius: 12px;
+}
+
+.stat-icon {
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto 8px;
+  font-size: 16px;
+}
+
+.stat-icon.blue {
+  background: rgba(24, 144, 255, 0.15);
+  color: #1890ff;
+}
+
+.stat-icon.green {
+  background: rgba(82, 196, 26, 0.15);
+  color: #52c41a;
+}
+
+.stat-icon.red {
+  background: rgba(255, 77, 79, 0.15);
+  color: #ff4d4f;
+}
+
+.stat-value {
+  font-size: 20px;
+  font-weight: 700;
+  line-height: 1.2;
+}
+
+.stat-label {
+  font-size: 11px;
+  color: var(--adm-color-text-secondary);
+  margin-top: 2px;
+}
+
+/* Checkout Tabs */
+.checkout-tabs {
+  margin-top: 8px;
+}
+
+.checkout-tabs .adm-tabs-header {
+  padding: 0 12px;
+}
+
+/* Checkout Item */
+.checkout-icon {
+  width: 44px;
+  height: 44px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 20px;
+  background: rgba(24, 144, 255, 0.15);
+  color: #1890ff;
+}
+
+.checkout-icon.overdue {
+  background: rgba(255, 77, 79, 0.15);
+  color: #ff4d4f;
+}
+
+.checkout-item-title {
+  font-weight: 600;
+  font-size: 15px;
+}
+
+.checkout-item-subtitle {
+  font-size: 13px;
+  color: var(--adm-color-text-secondary);
+  margin-top: 2px;
+  display: -webkit-box;
+  -webkit-line-clamp: 1;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.checkout-item-desc {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: 4px;
+}
+
+.checkout-item-desc > span {
+  font-size: 12px;
+  color: var(--adm-color-text-secondary);
+}
+
+.checkout-item-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.checkout-item-meta .adm-tag {
+  font-size: 11px;
+  padding: 2px 6px;
+}
+
+.checkout-user {
+  font-size: 11px;
+  color: var(--adm-color-text-secondary);
+}
+
+.checkout-skeleton {
+  height: 80px;
+  margin-bottom: 12px;
+  border-radius: 8px;
+}
+
+/* Form Popup */
+.form-popup {
+  padding: 16px;
+  padding-bottom: 32px;
+}
+
+.form-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+  font-size: 18px;
+  font-weight: 600;
+}
+
+.form-header svg {
+  font-size: 24px;
+  color: var(--adm-color-text-secondary);
+}
+
+.tool-search-results {
+  margin-bottom: 16px;
+  max-height: 200px;
+  overflow-y: auto;
+}
+
+.selected-tool-card {
+  margin-bottom: 16px;
+  padding: 12px;
+  background: var(--adm-color-fill-content);
+  border-radius: 8px;
+}
+
+.selected-tool-info {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.selected-tool-info strong {
+  font-size: 16px;
+}
+
+.selected-tool-info span {
+  font-size: 13px;
+}
+
+.text-secondary {
+  color: var(--adm-color-text-secondary);
+}
+
+/* Dark Mode - Support both html.adm-theme-dark and .adm-theme-dark ancestor */
+html.adm-theme-dark .mobile-tool-checkout,
+.adm-theme-dark .mobile-tool-checkout {
+  background-color: #141414;
+}
+
+html.adm-theme-dark .stat-card,
+.adm-theme-dark .stat-card {
+  background: #262626;
+}
+
+html.adm-theme-dark .selected-tool-card,
+.adm-theme-dark .selected-tool-card {
+  background: #333;
+}
+
+html.adm-theme-dark .form-popup,
+.adm-theme-dark .form-popup {
+  background-color: #1f1f1f;
+}
