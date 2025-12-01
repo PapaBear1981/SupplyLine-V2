@@ -75,8 +75,12 @@ export const MobileChemicalsList = () => {
   const hasMore = chemicalsData ? page < chemicalsData.pagination.pages : false;
 
   const warehouseOptions = useMemo(() => {
+    const warehouses = warehousesData?.warehouses || [];
+    if (warehouses.length === 0) {
+      return [[{ label: 'Loading...', value: '' }]];
+    }
     return [[
-      ...(warehousesData?.warehouses || []).map(w => ({
+      ...warehouses.map(w => ({
         label: w.name,
         value: w.id,
       })),
