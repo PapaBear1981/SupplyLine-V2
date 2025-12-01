@@ -118,6 +118,16 @@ export const MobileChemicalsList = () => {
   const handleEdit = (chemical: Chemical) => {
     setFormMode('edit');
     setSelectedChemical(chemical);
+
+    // Parse expiration date safely
+    let expirationDate: Date | undefined;
+    if (chemical.expiration_date) {
+      const parsed = dayjs(chemical.expiration_date);
+      if (parsed.isValid()) {
+        expirationDate = parsed.toDate();
+      }
+    }
+
     form.setFieldsValue({
       part_number: chemical.part_number,
       lot_number: chemical.lot_number,
@@ -127,9 +137,9 @@ export const MobileChemicalsList = () => {
       unit: chemical.unit,
       location: chemical.location || '',
       category: chemical.category || '',
-      status: chemical.status ? [chemical.status] : undefined,  // Picker expects array
-      warehouse_id: chemical.warehouse_id ? [chemical.warehouse_id] : undefined,  // Picker expects array
-      expiration_date: chemical.expiration_date ? dayjs(chemical.expiration_date).toDate() : undefined,
+      status: chemical.status,
+      warehouse_id: chemical.warehouse_id,
+      expiration_date: expirationDate,
       minimum_stock_level: chemical.minimum_stock_level,
       notes: chemical.notes || '',
     });
@@ -155,9 +165,6 @@ export const MobileChemicalsList = () => {
   const handleFormSubmit = async () => {
     try {
       const values = await form.validateFields();
-      // Extract values from Picker arrays
-      const status = Array.isArray(values.status) ? values.status[0] : values.status;
-      const warehouseId = Array.isArray(values.warehouse_id) ? values.warehouse_id[0] : values.warehouse_id;
 
       const formData: ChemicalFormData = {
         part_number: values.part_number,
@@ -168,8 +175,8 @@ export const MobileChemicalsList = () => {
         unit: values.unit,
         location: values.location,  // Required field
         category: values.category || undefined,
-        status: status || 'available',
-        warehouse_id: warehouseId || undefined,
+        status: values.status || 'available',
+        warehouse_id: values.warehouse_id || undefined,
         expiration_date: values.expiration_date ? dayjs(values.expiration_date).format('YYYY-MM-DD') : undefined,
         minimum_stock_level: values.minimum_stock_level || undefined,
         notes: values.notes || undefined,
