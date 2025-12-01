@@ -76,7 +76,6 @@ export const MobileChemicalsList = () => {
 
   const warehouseOptions = useMemo(() => {
     return [[
-      { label: 'None', value: '' },
       ...(warehousesData?.warehouses || []).map(w => ({
         label: w.name,
         value: w.id,
@@ -159,7 +158,7 @@ export const MobileChemicalsList = () => {
         manufacturer: values.manufacturer || undefined,
         quantity: values.quantity,
         unit: values.unit,
-        location: values.location || undefined,
+        location: values.location,  // Required field
         category: values.category || undefined,
         status: values.status || 'available',
         warehouse_id: values.warehouse_id || undefined,
@@ -505,8 +504,12 @@ export const MobileChemicalsList = () => {
             >
               <Input placeholder="e.g., kg, L, units" />
             </Form.Item>
-            <Form.Item name="location" label="Location">
-              <Input placeholder="Enter location (optional)" />
+            <Form.Item
+              name="location"
+              label="Location"
+              rules={[{ required: true, message: 'Please enter the storage location (e.g., shelf, bin)' }]}
+            >
+              <Input placeholder="e.g., Shelf A-1, Bin 5" />
             </Form.Item>
             <Form.Item name="category" label="Category">
               <Input placeholder="Enter category (optional)" />
@@ -524,6 +527,7 @@ export const MobileChemicalsList = () => {
             <Form.Item
               name="warehouse_id"
               label="Warehouse"
+              rules={[{ required: true, message: 'Warehouse is required' }]}
               trigger="onConfirm"
               onClick={(_e, pickerRef) => pickerRef.current?.open()}
             >
