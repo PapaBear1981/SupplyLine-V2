@@ -58,8 +58,10 @@ export const ChemicalDrawer = ({
       }
       onSuccess?.();
       onClose();
-    } catch {
-      message.error(`Failed to ${mode === 'create' ? 'create' : 'update'} chemical`);
+    } catch (error) {
+      const errorMessage = (error as { data?: { error?: string } })?.data?.error
+        || `Failed to ${mode === 'create' ? 'create' : 'update'} chemical`;
+      message.error(errorMessage);
     }
   };
 
