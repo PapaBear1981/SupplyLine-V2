@@ -161,7 +161,7 @@ CHEMICAL_SCHEMA = {
         "part_number": {"max_length": 100},
         "lot_number": {"max_length": 100},
         "quantity": {"min": 0},
-        "unit": {"choices": ["each", "oz", "ml", "l", "g", "kg", "lb", "gal", "tubes"]},
+        "unit": {"choices": ["each", "oz", "ml", "l", "g", "kg", "lb", "gal", "tube", "tubes"]},
         "description": {"max_length": 500},
         "manufacturer": {"max_length": 200},
         "location": {"max_length": 100},
