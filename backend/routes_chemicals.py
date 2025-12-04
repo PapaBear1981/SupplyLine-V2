@@ -1215,8 +1215,22 @@ def register_chemical_routes(app):
             # Update chemical
             data = request.get_json() or {}
 
+            # Merge existing chemical data with incoming update data
+            # This allows partial updates while still validating required fields
+            merged_data = {
+                "part_number": data.get("part_number", chemical.part_number),
+                "lot_number": data.get("lot_number", chemical.lot_number),
+                "quantity": data.get("quantity", chemical.quantity),
+                "unit": data.get("unit", chemical.unit),
+                "location": data.get("location", chemical.location),
+            }
+            # Add optional fields only if provided in request
+            for field in ["description", "manufacturer", "category", "status", "expiration_date", "minimum_stock_level", "notes", "warehouse_id"]:
+                if field in data:
+                    merged_data[field] = data[field]
+
             # Validate and sanitize input using schema
-            validated_data = validate_schema(data, "chemical")
+            validated_data = validate_schema(merged_data, "chemical")
 
             logger.info(f"Updating chemical {id} with data: {validated_data}")
 
