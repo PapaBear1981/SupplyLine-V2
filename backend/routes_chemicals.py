@@ -304,6 +304,10 @@ def register_chemical_routes(app):
         if not data.get("warehouse_id"):
             raise ValidationError("warehouse_id is required for all chemicals")
 
+        # Validate location is required
+        if not data.get("location") or not data.get("location").strip():
+            raise ValidationError("location is required for all chemicals (e.g., shelf, bin)")
+
         # Validate warehouse exists and is active using validation function
         warehouse = validate_warehouse_id(data["warehouse_id"])
 
@@ -324,7 +328,7 @@ def register_chemical_routes(app):
         except SerialLotValidationError as e:
             raise ValidationError(str(e))
 
-        # Create new chemical - warehouse_id is required
+        # Create new chemical - warehouse_id and location are required
         chemical = Chemical(
             part_number=validated_data["part_number"],
             lot_number=validated_data["lot_number"],
@@ -332,7 +336,7 @@ def register_chemical_routes(app):
             manufacturer=validated_data.get("manufacturer", ""),
             quantity=validated_data["quantity"],
             unit=validated_data["unit"],
-            location=validated_data.get("location", ""),
+            location=validated_data["location"],  # Required field
             category=validated_data.get("category", "General"),
             status=validated_data.get("status", "available"),
             warehouse_id=data["warehouse_id"],  # Required field
@@ -1211,8 +1215,22 @@ def register_chemical_routes(app):
             # Update chemical
             data = request.get_json() or {}
 
+            # Merge existing chemical data with incoming update data
+            # This allows partial updates while still validating required fields
+            merged_data = {
+                "part_number": data.get("part_number", chemical.part_number),
+                "lot_number": data.get("lot_number", chemical.lot_number),
+                "quantity": data.get("quantity", chemical.quantity),
+                "unit": data.get("unit", chemical.unit),
+                "location": data.get("location", chemical.location),
+            }
+            # Add optional fields only if provided in request
+            for field in ["description", "manufacturer", "category", "status", "expiration_date", "minimum_stock_level", "notes", "warehouse_id"]:
+                if field in data:
+                    merged_data[field] = data[field]
+
             # Validate and sanitize input using schema
-            validated_data = validate_schema(data, "chemical")
+            validated_data = validate_schema(merged_data, "chemical")
 
             logger.info(f"Updating chemical {id} with data: {validated_data}")
 

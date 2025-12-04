@@ -75,9 +75,12 @@ export const MobileChemicalsList = () => {
   const hasMore = chemicalsData ? page < chemicalsData.pagination.pages : false;
 
   const warehouseOptions = useMemo(() => {
+    const warehouses = warehousesData?.warehouses || [];
+    if (warehouses.length === 0) {
+      return [[{ label: 'Loading...', value: '' }]];
+    }
     return [[
-      { label: 'None', value: '' },
-      ...(warehousesData?.warehouses || []).map(w => ({
+      ...warehouses.map(w => ({
         label: w.name,
         value: w.id,
       })),
@@ -115,6 +118,16 @@ export const MobileChemicalsList = () => {
   const handleEdit = (chemical: Chemical) => {
     setFormMode('edit');
     setSelectedChemical(chemical);
+
+    // Parse expiration date safely
+    let expirationDate: Date | undefined;
+    if (chemical.expiration_date) {
+      const parsed = dayjs(chemical.expiration_date);
+      if (parsed.isValid()) {
+        expirationDate = parsed.toDate();
+      }
+    }
+
     form.setFieldsValue({
       part_number: chemical.part_number,
       lot_number: chemical.lot_number,
@@ -126,7 +139,7 @@ export const MobileChemicalsList = () => {
       category: chemical.category || '',
       status: chemical.status,
       warehouse_id: chemical.warehouse_id,
-      expiration_date: chemical.expiration_date ? dayjs(chemical.expiration_date).toDate() : undefined,
+      expiration_date: expirationDate,
       minimum_stock_level: chemical.minimum_stock_level,
       notes: chemical.notes || '',
     });
@@ -152,6 +165,7 @@ export const MobileChemicalsList = () => {
   const handleFormSubmit = async () => {
     try {
       const values = await form.validateFields();
+
       const formData: ChemicalFormData = {
         part_number: values.part_number,
         lot_number: values.lot_number,
@@ -159,7 +173,7 @@ export const MobileChemicalsList = () => {
         manufacturer: values.manufacturer || undefined,
         quantity: values.quantity,
         unit: values.unit,
-        location: values.location || undefined,
+        location: values.location,  // Required field
         category: values.category || undefined,
         status: values.status || 'available',
         warehouse_id: values.warehouse_id || undefined,
@@ -505,8 +519,12 @@ export const MobileChemicalsList = () => {
             >
               <Input placeholder="e.g., kg, L, units" />
             </Form.Item>
-            <Form.Item name="location" label="Location">
-              <Input placeholder="Enter location (optional)" />
+            <Form.Item
+              name="location"
+              label="Location"
+              rules={[{ required: true, message: 'Please enter the storage location (e.g., shelf, bin)' }]}
+            >
+              <Input placeholder="e.g., Shelf A-1, Bin 5" />
             </Form.Item>
             <Form.Item name="category" label="Category">
               <Input placeholder="Enter category (optional)" />
@@ -524,6 +542,7 @@ export const MobileChemicalsList = () => {
             <Form.Item
               name="warehouse_id"
               label="Warehouse"
+              rules={[{ required: true, message: 'Warehouse is required' }]}
               trigger="onConfirm"
               onClick={(_e, pickerRef) => pickerRef.current?.open()}
             >

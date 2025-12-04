@@ -46,7 +46,7 @@ export interface ChemicalFormData {
   manufacturer?: string;
   quantity: number;
   unit: string;
-  location?: string;
+  location: string;
   category?: string;
   status?: ChemicalStatus;
   warehouse_id: number;

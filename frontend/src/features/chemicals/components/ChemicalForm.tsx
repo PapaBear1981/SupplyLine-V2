@@ -122,8 +122,9 @@ export const ChemicalForm = ({ form, initialValues, onSubmit, onCancel, loading 
       <Form.Item
         label="Location"
         name="location"
+        rules={[{ required: true, message: 'Please enter the storage location (e.g., shelf, bin)' }]}
       >
-        <Input placeholder="Storage location" />
+        <Input placeholder="e.g., Shelf A-1, Bin 5" />
       </Form.Item>
 
       <Form.Item
