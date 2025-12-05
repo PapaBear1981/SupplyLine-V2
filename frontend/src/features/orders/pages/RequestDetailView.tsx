@@ -101,6 +101,17 @@ export const RequestDetailView: React.FC = () => {
       dataIndex: 'description',
       key: 'description',
       width: 250,
+      render: (description, record) => (
+        <Space direction="vertical" size={0}>
+          <Text>{description}</Text>
+          {record.source_type === 'kit_reorder' && record.kit && (
+            <Text type="secondary" style={{ fontSize: 12 }}>
+              <Tag color="cyan" style={{ fontSize: 10 }}>KIT REORDER</Tag>
+              {record.kit.name}
+            </Text>
+          )}
+        </Space>
+      ),
     },
     {
       title: 'Type',
@@ -129,6 +140,18 @@ export const RequestDetailView: React.FC = () => {
       key: 'status',
       width: 120,
       render: (status) => <StatusBadge status={status} type="item" />,
+    },
+    {
+      title: 'Source',
+      dataIndex: 'source_type',
+      key: 'source_type',
+      width: 100,
+      render: (sourceType) => {
+        if (!sourceType || sourceType === 'manual') return <Tag>Manual</Tag>;
+        if (sourceType === 'kit_reorder') return <Tag color="cyan">Kit Reorder</Tag>;
+        if (sourceType === 'chemical_reorder') return <Tag color="purple">Chemical Reorder</Tag>;
+        return <Tag>{sourceType}</Tag>;
+      },
     },
     {
       title: 'Vendor',
