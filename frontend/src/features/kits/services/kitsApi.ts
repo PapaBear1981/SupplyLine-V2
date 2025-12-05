@@ -185,6 +185,17 @@ export const kitsApi = baseApi.injectEndpoints({
       providesTags: (_result, _error, { kitId }) => [{ type: 'Kit', id: kitId }],
     }),
 
+    getKitItemDetails: builder.query<
+      { item: KitItem; history: KitIssuance[]; total_issuances: number },
+      { kitId: number; itemId: number }
+    >({
+      query: ({ kitId, itemId }) => `/api/kits/${kitId}/items/${itemId}/details`,
+      providesTags: (_result, _error, { kitId, itemId }) => [
+        { type: 'Kit', id: kitId },
+        { type: 'Kit', id: `item-${itemId}` },
+      ],
+    }),
+
     addKitItem: builder.mutation<KitItem, { kitId: number; data: KitItemFormData }>({
       query: ({ kitId, data }) => ({
         url: `/api/kits/${kitId}/items`,
@@ -435,6 +446,7 @@ export const {
 
   // Items
   useGetKitItemsQuery,
+  useGetKitItemDetailsQuery,
   useAddKitItemMutation,
   useUpdateKitItemMutation,
   useRemoveKitItemMutation,
