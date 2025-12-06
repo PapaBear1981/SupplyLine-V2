@@ -25,7 +25,7 @@ import { useGetSecuritySettingsQuery, useUpdateSecuritySettingsMutation } from '
 const { Title, Text, Paragraph } = Typography;
 
 export const SystemSettings = () => {
-  const { data: settings, isLoading, refetch } = useGetSecuritySettingsQuery();
+  const { data: settings, isLoading } = useGetSecuritySettingsQuery();
   const [updateSettings, { isLoading: isUpdating }] = useUpdateSecuritySettingsMutation();
   const [form] = Form.useForm();
   const [hasChanges, setHasChanges] = useState(false);
