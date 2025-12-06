@@ -206,10 +206,13 @@ export const MobileProfile = () => {
             block
             onClick={() => {
               // Split name into first_name and last_name
-              const nameParts = user.name?.split(' ', 2) || ['', ''];
+              // Handle multi-word names properly (e.g., "Mary Jane Watson")
+              const nameParts = user.name?.trim().split(/\s+/) || [];
+              const firstName = nameParts[0] || '';
+              const lastName = nameParts.slice(1).join(' ') || '';
               editForm.setFieldsValue({
-                first_name: nameParts[0] || '',
-                last_name: nameParts[1] || '',
+                first_name: firstName,
+                last_name: lastName,
                 email: user.email,
               });
               setEditProfileVisible(true);
