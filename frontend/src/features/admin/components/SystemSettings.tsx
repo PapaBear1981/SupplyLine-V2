@@ -35,7 +35,7 @@ export const SystemSettings = () => {
       await updateSettings(values).unwrap();
       message.success('System settings updated successfully');
       setHasChanges(false);
-      refetch();
+      // Note: refetch() is not needed - RTK Query automatically refetches when SystemSettings tag is invalidated
     } catch (error: unknown) {
       if (error && typeof error === 'object' && 'data' in error) {
         const apiError = error as { data?: { error?: string } };

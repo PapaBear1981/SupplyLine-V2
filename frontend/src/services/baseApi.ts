@@ -35,8 +35,9 @@ const baseQueryWithAuth: BaseQueryFn<
     try {
       const { socketService } = await import('@services/socket');
       socketService.disconnect();
-    } catch {
-      // Socket service might not be available, ignore
+    } catch (error) {
+      // Socket service might not be available
+      console.debug('Socket disconnect skipped during logout:', error instanceof Error ? error.message : 'service unavailable');
     }
 
     // Redirect to login page

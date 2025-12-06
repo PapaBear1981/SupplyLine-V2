@@ -21,12 +21,12 @@ export const LoginPage = () => {
   const isAuthenticated = useAppSelector((state) => state.auth.isAuthenticated);
   const [login, { isLoading }] = useLoginMutation();
 
-  // Redirect to dashboard if already authenticated
+  // Redirect to dashboard if already authenticated (skip for mobile since MobileLoginForm handles it)
   useEffect(() => {
-    if (isAuthenticated) {
+    if (isAuthenticated && !isMobile) {
       navigate(ROUTES.DASHBOARD, { replace: true });
     }
-  }, [isAuthenticated, navigate]);
+  }, [isAuthenticated, navigate, isMobile]);
 
   // Render mobile version if on mobile device
   if (isMobile) {
