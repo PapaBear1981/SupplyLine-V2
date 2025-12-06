@@ -4,7 +4,7 @@ import { useAppSelector, useAppDispatch } from '@app/hooks';
 import { ROUTES } from '@shared/constants/routes';
 import { Spin } from 'antd';
 import { useGetCurrentUserQuery } from '../services/authApi';
-import { setCredentials, logout } from '../slices/authSlice';
+import { setCredentials } from '../slices/authSlice';
 import { socketService } from '@services/socket';
 
 export const ProtectedRoute = () => {
@@ -12,7 +12,7 @@ export const ProtectedRoute = () => {
   const { isAuthenticated, token, user } = useAppSelector((state) => state.auth);
 
   // Fetch current user if authenticated but user data is not loaded
-  const { data: currentUser, isLoading, isError, error } = useGetCurrentUserQuery(undefined, {
+  const { data: currentUser, isLoading } = useGetCurrentUserQuery(undefined, {
     skip: !isAuthenticated || !!user,
   });
 
@@ -34,20 +34,8 @@ export const ProtectedRoute = () => {
     }
   }, [isAuthenticated, token, user]);
 
-  // Handle authentication errors - only logout on 401/403
-  useEffect(() => {
-    if (isError && error) {
-      // Check if error has status property (FetchBaseQueryError)
-      if ('status' in error) {
-        // Only logout on actual authentication errors (401, 403)
-        if (error.status === 401 || error.status === 403) {
-          socketService.disconnect();
-          dispatch(logout());
-        }
-      }
-      // For non-status errors (network/parsing), don't logout
-    }
-  }, [isError, error, dispatch]);
+  // Note: 401/403 errors are now handled globally in baseApi.ts
+  // which will automatically logout and redirect to login
 
   // Show loading state while checking authentication or fetching user
   if (token === undefined || (isAuthenticated && !user && isLoading)) {

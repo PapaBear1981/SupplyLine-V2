@@ -7,6 +7,7 @@ import {
   SafetyOutlined,
   ApartmentOutlined,
   KeyOutlined,
+  SettingOutlined,
 } from '@ant-design/icons';
 import { AdminOverview } from '../components/AdminOverview';
 import { UserManagement } from '../components/UserManagement';
@@ -15,6 +16,7 @@ import { AnnouncementManagement } from '../components/AnnouncementManagement';
 import { RoleManagement } from '../components/RoleManagement';
 import { AircraftTypeManagement } from '../components/AircraftTypeManagement';
 import { PermissionOverview } from '../components/PermissionOverview';
+import { SystemSettings } from '../components/SystemSettings';
 
 const { Title, Paragraph } = Typography;
 
@@ -89,6 +91,16 @@ export const AdminPage = () => {
         </span>
       ),
       children: <AircraftTypeManagement />,
+    },
+    {
+      key: 'system',
+      label: (
+        <span>
+          <SettingOutlined />
+          System
+        </span>
+      ),
+      children: <SystemSettings />,
     },
   ];
 

@@ -53,7 +53,7 @@ def run_migration():
         for field_name, field_type in checkout_fields:
             if field_name not in checkout_columns:
                 print(f"Adding {field_name} column to checkouts...")
-                cursor.execute(f"ALTER TABLE checkouts ADD COLUMN {field_name} {field_type}")
+                cursor.execute(f"ALTER TABLE checkouts ADD COLUMN {field_name} {field_type}")  # nosec B608 - field_name and field_type are from hardcoded checkout_fields list, not user input
             else:
                 print(f"{field_name} column already exists in checkouts")
 
@@ -120,7 +120,7 @@ def run_migration():
         for index_name, column_name in checkout_indexes:
             if index_name not in existing_indexes:
                 print(f"Creating index {index_name}...")
-                cursor.execute(f"CREATE INDEX IF NOT EXISTS {index_name} ON checkouts({column_name})")
+                cursor.execute(f"CREATE INDEX IF NOT EXISTS {index_name} ON checkouts({column_name})")  # nosec B608 - index_name and column_name are from hardcoded checkout_indexes list, not user input
             else:
                 print(f"Index {index_name} already exists")
 
