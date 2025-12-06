@@ -823,8 +823,8 @@ def register_kit_routes(app):
     @handle_errors
     def get_kit_item_details(kit_id, item_id):
         """Get detailed information and history for a specific kit item"""
+        from models import Chemical, Expendable, Tool
         from models_kits import KitIssuance
-        from models import Expendable, Tool, Chemical
 
         logger.info(f"Fetching item details for kit_id={kit_id}, item_id={item_id}")
 

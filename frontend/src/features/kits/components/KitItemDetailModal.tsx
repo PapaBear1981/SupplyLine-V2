@@ -22,7 +22,7 @@ import {
 } from '@ant-design/icons';
 import type { ColumnsType } from 'antd/es/table';
 import { useGetKitItemDetailsQuery } from '../services/kitsApi';
-import type { KitIssuance, ItemStatus } from '../types';
+import type { KitIssuance, ItemStatus, KitItem } from '../types';
 import KitIssuanceForm from './KitIssuanceForm';
 
 const { Title, Text } = Typography;
@@ -397,7 +397,7 @@ const KitItemDetailModal = ({ open, onClose, kitId, itemId }: KitItemDetailModal
         <KitIssuanceForm
           visible={issuanceModalVisible}
           kitId={kitId}
-          item={item as any}
+          item={item as KitItem}
           onClose={() => setIssuanceModalVisible(false)}
         />
       )}
