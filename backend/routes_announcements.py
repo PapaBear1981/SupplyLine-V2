@@ -130,27 +130,29 @@ def register_announcement_routes(app):
             current_user_id = request.current_user.get("user_id")
 
             # Validate required fields
-            required_fields = ["title", "content", "priority"]
+            required_fields = ["title", "message", "priority"]
             for field in required_fields:
                 if not data.get(field):
                     return jsonify({"error": f"Missing required field: {field}"}), 400
 
             # Parse expiration date if provided
             expiration_date = None
-            if data.get("expiration_date"):
+            if data.get("expiration_date") or data.get("expires_at"):
                 try:
-                    expiration_date = datetime.fromisoformat(data.get("expiration_date").replace("Z", "+00:00"))
+                    date_str = data.get("expiration_date") or data.get("expires_at")
+                    expiration_date = datetime.fromisoformat(date_str.replace("Z", "+00:00"))
                 except ValueError:
                     return jsonify({"error": "Invalid expiration date format. Use ISO format (YYYY-MM-DDTHH:MM:SS.sssZ)"}), 400
 
             # Create announcement
             announcement = Announcement(
                 title=data.get("title"),
-                content=data.get("content"),
+                message=data.get("message"),
                 priority=data.get("priority"),
                 created_by=request.current_user["user_id"],
                 expiration_date=expiration_date,
-                is_active=data.get("is_active", True)
+                is_active=data.get("is_active", True),
+                target_departments=data.get("target_departments")
             )
 
             # Save to database
@@ -199,18 +201,21 @@ def register_announcement_routes(app):
             # Update fields if provided
             if "title" in data:
                 announcement.title = data["title"]
-            if "content" in data:
-                announcement.content = data["content"]
+            if "message" in data:
+                announcement.message = data["message"]
             if "priority" in data:
                 announcement.priority = data["priority"]
             if "is_active" in data:
                 announcement.is_active = data["is_active"]
+            if "target_departments" in data:
+                announcement.target_departments = data["target_departments"]
 
             # Parse expiration date if provided
-            if "expiration_date" in data:
-                if data["expiration_date"]:
+            if "expiration_date" in data or "expires_at" in data:
+                date_value = data.get("expiration_date") or data.get("expires_at")
+                if date_value:
                     try:
-                        announcement.expiration_date = datetime.fromisoformat(data["expiration_date"].replace("Z", "+00:00"))
+                        announcement.expiration_date = datetime.fromisoformat(date_value.replace("Z", "+00:00"))
                     except ValueError:
                         return jsonify({"error": "Invalid expiration date format. Use ISO format (YYYY-MM-DDTHH:MM:SS.sssZ)"}), 400
                 else:

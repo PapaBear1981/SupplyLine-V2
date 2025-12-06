@@ -1781,13 +1781,14 @@ class Announcement(db.Model):
     __tablename__ = "announcements"
     id = db.Column(db.Integer, primary_key=True)
     title = db.Column(db.String, nullable=False)
-    content = db.Column(db.Text, nullable=False)
-    priority = db.Column(db.String, nullable=False, default="medium")  # high, medium, low
+    message = db.Column(db.Text, nullable=False)
+    priority = db.Column(db.String, nullable=False, default="medium")  # high, medium, low, urgent
     created_by = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False)
     created_at = db.Column(db.DateTime, default=get_current_time)
     updated_at = db.Column(db.DateTime, default=get_current_time, onupdate=get_current_time)
     expiration_date = db.Column(db.DateTime, nullable=True)
     is_active = db.Column(db.Boolean, default=True)
+    target_departments = db.Column(db.JSON, nullable=True)
 
     # Relationships
     author = db.relationship("User", foreign_keys=[created_by])
@@ -1796,14 +1797,15 @@ class Announcement(db.Model):
         data = {
             "id": self.id,
             "title": self.title,
-            "content": self.content,
+            "message": self.message,
             "priority": self.priority,
             "created_by": self.created_by,
             "author_name": self.author.name if self.author else "Unknown",
             "created_at": self.created_at.isoformat(),
             "updated_at": self.updated_at.isoformat(),
-            "expiration_date": self.expiration_date.isoformat() if self.expiration_date else None,
-            "is_active": self.is_active
+            "expires_at": self.expiration_date.isoformat() if self.expiration_date else None,
+            "is_active": self.is_active,
+            "target_departments": self.target_departments
         }
 
         if include_reads and hasattr(self, "reads"):

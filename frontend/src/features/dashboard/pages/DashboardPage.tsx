@@ -33,7 +33,6 @@ import {
   RecentActivity,
   InventoryPieChart,
   ActivityChart,
-  QuickActions,
   AnnouncementsPanel,
 } from '../components';
 import { MobileDashboard } from '../components/mobile';
@@ -216,13 +215,6 @@ export const DashboardPage = () => {
     { name: 'Maintenance', value: toolStats.maintenance, color: '#faad14' },
   ].filter(item => item.value > 0), [toolStats]);
 
-  const chemicalStatusChartData = useMemo(() => [
-    { name: 'Available', value: chemicalStats.available, color: '#52c41a' },
-    { name: 'Low Stock', value: chemicalStats.lowStock, color: '#faad14' },
-    { name: 'Out of Stock', value: chemicalStats.outOfStock, color: '#ff4d4f' },
-    { name: 'Expired', value: chemicalStats.expired, color: '#8c8c8c' },
-  ].filter(item => item.value > 0), [chemicalStats]);
-
   const activityChartData = useMemo(() => {
     return utilizationData?.activityOverTime || [];
   }, [utilizationData]);
@@ -360,10 +352,9 @@ export const DashboardPage = () => {
           />
         </Col>
         <Col xs={24} lg={8}>
-          <InventoryPieChart
-            title="Chemical Status"
-            data={chemicalStatusChartData}
-            loading={chemicalsLoading}
+          <AnnouncementsPanel
+            announcements={announcements || []}
+            loading={announcementsLoading}
           />
         </Col>
         <Col xs={24} lg={8}>
@@ -391,9 +382,6 @@ export const DashboardPage = () => {
             loading={isLoading}
             onRefresh={handleRefreshAlerts}
           />
-
-          {/* Quick Actions */}
-          <QuickActions isAdmin={user?.is_admin} />
         </div>
 
         <div className={styles.sideColumn}>
@@ -402,12 +390,6 @@ export const DashboardPage = () => {
             activities={recentActivity || []}
             loading={activityLoading}
             onRefresh={refetchActivity}
-          />
-
-          {/* Announcements */}
-          <AnnouncementsPanel
-            announcements={announcements || []}
-            loading={announcementsLoading}
           />
         </div>
       </div>
