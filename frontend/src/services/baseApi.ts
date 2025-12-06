@@ -35,7 +35,7 @@ const baseQueryWithAuth: BaseQueryFn<
     try {
       const { socketService } = await import('@services/socket');
       socketService.disconnect();
-    } catch (error) {
+    } catch {
       // Socket service might not be available, ignore
     }
 
