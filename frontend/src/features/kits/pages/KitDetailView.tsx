@@ -37,6 +37,7 @@ import type { KitStatus } from '../types';
 import KitBoxManager from '../components/KitBoxManager';
 import KitItemList from '../components/KitItemList';
 import KitIssuanceHistory from '../components/KitIssuanceHistory';
+import KitReordersManager from '../components/KitReordersManager';
 import EditKitModal from '../components/EditKitModal';
 import { MobileKitDetailPage } from '../components/mobile';
 import { useIsMobile } from '@shared/hooks/useMobile';
@@ -299,7 +300,7 @@ const KitDetailView = () => {
               }
               key="reorders"
             >
-              <Text>Reorder management coming soon...</Text>
+              <KitReordersManager kitId={kitId} />
             </TabPane>
 
             <TabPane tab="Messages" key="messages">

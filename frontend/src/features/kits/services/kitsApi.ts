@@ -23,6 +23,8 @@ import type {
   KitWizardResponse,
   KitLocationsResponse,
   KitLocationFormData,
+  CreateReorderRequest,
+  ReorderFilters,
 } from '../types';
 
 export const kitsApi = baseApi.injectEndpoints({
@@ -183,6 +185,17 @@ export const kitsApi = baseApi.injectEndpoints({
         params: params || {},
       }),
       providesTags: (_result, _error, { kitId }) => [{ type: 'Kit', id: kitId }],
+    }),
+
+    getKitItemDetails: builder.query<
+      { item: KitItem; history: KitIssuance[]; total_issuances: number },
+      { kitId: number; itemId: number }
+    >({
+      query: ({ kitId, itemId }) => `/api/kits/${kitId}/items/${itemId}/details`,
+      providesTags: (_result, _error, { kitId, itemId }) => [
+        { type: 'Kit', id: kitId },
+        { type: 'Kit', id: `item-${itemId}` },
+      ],
     }),
 
     addKitItem: builder.mutation<KitItem, { kitId: number; data: KitItemFormData }>({
@@ -408,6 +421,120 @@ export const kitsApi = baseApi.injectEndpoints({
         { type: 'Kit', id: 'LIST' },
       ],
     }),
+
+    // ==================== Reorders ====================
+    getKitReorders: builder.query<KitReorderRequest[], { kitId: number; params?: ReorderFilters }>({
+      query: ({ kitId, params }) => ({
+        url: '/api/reorder-requests',
+        params: { kit_id: kitId, ...params },
+      }),
+      providesTags: (result, _error, { kitId }) => [
+        { type: 'Kit', id: `reorders-${kitId}` },
+        ...(result?.map(({ id }) => ({ type: 'KitReorder' as const, id })) ?? []),
+      ],
+    }),
+
+    getReorderDetails: builder.query<KitReorderRequest, number>({
+      query: (id) => `/api/reorder-requests/${id}`,
+      providesTags: (_result, _error, id) => [{ type: 'KitReorder', id }],
+    }),
+
+    createReorder: builder.mutation<KitReorderRequest, { kitId: number; data: CreateReorderRequest }>({
+      query: ({ kitId, data }) => {
+        // Handle multipart/form-data if image exists
+        if (data.image) {
+          const formData = new FormData();
+          formData.append('item_type', data.item_type);
+          if (data.item_id) formData.append('item_id', data.item_id.toString());
+          formData.append('part_number', data.part_number);
+          formData.append('description', data.description);
+          formData.append('quantity_requested', data.quantity_requested.toString());
+          if (data.priority) formData.append('priority', data.priority);
+          if (data.notes) formData.append('notes', data.notes);
+          formData.append('image', data.image);
+
+          return {
+            url: `/api/kits/${kitId}/reorder`,
+            method: 'POST',
+            body: formData,
+          };
+        }
+
+        // JSON request (no image)
+        return {
+          url: `/api/kits/${kitId}/reorder`,
+          method: 'POST',
+          body: data,
+        };
+      },
+      invalidatesTags: (_result, _error, { kitId }) => [
+        { type: 'Kit', id: `reorders-${kitId}` },
+        { type: 'Kit', id: kitId },
+      ],
+    }),
+
+    approveReorder: builder.mutation<KitReorderRequest, number>({
+      query: (id) => ({
+        url: `/api/reorder-requests/${id}/approve`,
+        method: 'PUT',
+      }),
+      invalidatesTags: (result, _error, id) => [
+        { type: 'KitReorder', id },
+        { type: 'Kit', id: result?.kit_id },
+        { type: 'Kit', id: `reorders-${result?.kit_id}` },
+      ],
+    }),
+
+    markReorderOrdered: builder.mutation<KitReorderRequest, number>({
+      query: (id) => ({
+        url: `/api/reorder-requests/${id}/order`,
+        method: 'PUT',
+      }),
+      invalidatesTags: (result, _error, id) => [
+        { type: 'KitReorder', id },
+        { type: 'Kit', id: result?.kit_id },
+        { type: 'Kit', id: `reorders-${result?.kit_id}` },
+      ],
+    }),
+
+    fulfillReorder: builder.mutation<KitReorderRequest, { id: number; box_id?: number }>({
+      query: ({ id, box_id }) => ({
+        url: `/api/reorder-requests/${id}/fulfill`,
+        method: 'PUT',
+        body: box_id ? { box_id } : {},
+      }),
+      invalidatesTags: (result, _error, { id }) => [
+        { type: 'KitReorder', id },
+        { type: 'Kit', id: result?.kit_id },
+        { type: 'Kit', id: `items-${result?.kit_id}` },
+        { type: 'Kit', id: `reorders-${result?.kit_id}` },
+      ],
+    }),
+
+    cancelReorder: builder.mutation<KitReorderRequest, number>({
+      query: (id) => ({
+        url: `/api/reorder-requests/${id}/cancel`,
+        method: 'PUT',
+      }),
+      invalidatesTags: (result, _error, id) => [
+        { type: 'KitReorder', id },
+        { type: 'Kit', id: result?.kit_id },
+        { type: 'Kit', id: `reorders-${result?.kit_id}` },
+      ],
+    }),
+
+    updateReorder: builder.mutation<KitReorderRequest, { id: number; data: Partial<CreateReorderRequest> }>({
+      query: ({ id, data }) => ({
+        url: `/api/reorder-requests/${id}`,
+        method: 'PUT',
+        body: data,
+      }),
+      invalidatesTags: (result, _error, { id }) => [
+        { type: 'KitReorder', id },
+        { type: 'Kit', id: result?.kit_id },
+        { type: 'Kit', id: `reorders-${result?.kit_id}` },
+      ],
+    }),
   }),
 });
 
@@ -435,6 +562,7 @@ export const {
 
   // Items
   useGetKitItemsQuery,
+  useGetKitItemDetailsQuery,
   useAddKitItemMutation,
   useUpdateKitItemMutation,
   useRemoveKitItemMutation,
@@ -462,4 +590,14 @@ export const {
   // Locations
   useGetKitLocationsQuery,
   useUpdateKitLocationMutation,
+
+  // Reorders
+  useGetKitReordersQuery,
+  useGetReorderDetailsQuery,
+  useCreateReorderMutation,
+  useApproveReorderMutation,
+  useMarkReorderOrderedMutation,
+  useFulfillReorderMutation,
+  useCancelReorderMutation,
+  useUpdateReorderMutation,
 } = kitsApi;

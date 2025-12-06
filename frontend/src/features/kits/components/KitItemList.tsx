@@ -20,6 +20,7 @@ import type { ColumnsType } from 'antd/es/table';
 import { useGetKitItemsQuery } from '../services/kitsApi';
 import type { KitItem, ItemStatus } from '../types';
 import KitIssuanceForm from './KitIssuanceForm';
+import KitItemDetailModal from './KitItemDetailModal';
 
 const { Option } = Select;
 const { Title, Text } = Typography;
@@ -33,6 +34,8 @@ const KitItemList = ({ kitId }: KitItemListProps) => {
   const [statusFilter, setStatusFilter] = useState<ItemStatus | undefined>();
   const [issuanceModalVisible, setIssuanceModalVisible] = useState(false);
   const [selectedItem, setSelectedItem] = useState<KitItem | null>(null);
+  const [detailModalVisible, setDetailModalVisible] = useState(false);
+  const [selectedItemId, setSelectedItemId] = useState<number | null>(null);
 
   const { data: itemsData, isLoading } = useGetKitItemsQuery({
     kitId,
@@ -59,6 +62,11 @@ const KitItemList = ({ kitId }: KitItemListProps) => {
     }
     setSelectedItem(item);
     setIssuanceModalVisible(true);
+  };
+
+  const handleRowClick = (record: KitItem) => {
+    setSelectedItemId(record.id);
+    setDetailModalVisible(true);
   };
 
   const getStatusColor = (status: ItemStatus) => {
@@ -152,7 +160,7 @@ const KitItemList = ({ kitId }: KitItemListProps) => {
       title: 'Quantity',
       dataIndex: 'quantity',
       key: 'quantity',
-      width: 100,
+      width: 160,
       render: (quantity: number, record: KitItem) => {
         const unit = 'unit' in record ? (record as KitItem & { unit?: string }).unit : undefined;
         const minStock = record.minimum_stock_level;
@@ -163,6 +171,7 @@ const KitItemList = ({ kitId }: KitItemListProps) => {
             <Badge
               count={quantity}
               showZero
+              overflowCount={Infinity}
               style={{
                 backgroundColor: isLow ? '#faad14' : '#52c41a',
               }}
@@ -200,7 +209,10 @@ const KitItemList = ({ kitId }: KitItemListProps) => {
               type="link"
               size="small"
               icon={<IssuesCloseOutlined />}
-              onClick={() => handleIssue(record)}
+              onClick={(e) => {
+                e.stopPropagation();
+                handleIssue(record);
+              }}
             >
               Issue
             </Button>
@@ -260,6 +272,10 @@ const KitItemList = ({ kitId }: KitItemListProps) => {
           dataSource={allItems}
           rowKey={(record) => `${record.source || 'item'}-${record.id}`}
           loading={isLoading}
+          onRow={(record) => ({
+            onClick: () => handleRowClick(record),
+            style: { cursor: 'pointer' },
+          })}
           pagination={{
             pageSize: 50,
             showSizeChanger: true,
@@ -277,6 +293,18 @@ const KitItemList = ({ kitId }: KitItemListProps) => {
           setSelectedItem(null);
         }}
       />
+
+      {selectedItemId && (
+        <KitItemDetailModal
+          open={detailModalVisible}
+          onClose={() => {
+            setDetailModalVisible(false);
+            setSelectedItemId(null);
+          }}
+          kitId={kitId}
+          itemId={selectedItemId}
+        />
+      )}
     </>
   );
 };

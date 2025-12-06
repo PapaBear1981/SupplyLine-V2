@@ -12,6 +12,7 @@ import {
   Statistic,
   Empty,
   Badge,
+  Tooltip,
 } from 'antd';
 import {
   PlusOutlined,
@@ -21,11 +22,12 @@ import {
   CheckCircleOutlined,
   ExclamationCircleOutlined,
   InboxOutlined,
+  EyeOutlined,
 } from '@ant-design/icons';
 import dayjs from 'dayjs';
 import relativeTime from 'dayjs/plugin/relativeTime';
 import { useGetRequestsQuery, useGetRequestAnalyticsQuery } from '../services/requestsApi';
-import { StatusBadge, PriorityBadge, MobileRequestsList } from '../components';
+import { StatusBadge, PriorityBadge, MobileRequestsList, RequestDetailModal } from '../components';
 import { useIsMobile } from '@shared/hooks/useMobile';
 import type { UserRequest, RequestStatus, RequestPriority } from '../types';
 import type { ColumnsType } from 'antd/es/table';
@@ -38,6 +40,8 @@ export const RequestsDashboard: React.FC = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<RequestStatus[]>([]);
   const [priorityFilter, setPriorityFilter] = useState<RequestPriority[]>([]);
+  const [detailModalVisible, setDetailModalVisible] = useState(false);
+  const [selectedRequestId, setSelectedRequestId] = useState<number | null>(null);
 
   const queryParams = {
     search: searchQuery || undefined,
@@ -53,6 +57,11 @@ export const RequestsDashboard: React.FC = () => {
     return <MobileRequestsList />;
   }
 
+  const handleViewDetails = (request: UserRequest) => {
+    setSelectedRequestId(request.id);
+    setDetailModalVisible(true);
+  };
+
   const columns: ColumnsType<UserRequest> = [
     {
       title: 'Request #',
@@ -63,7 +72,10 @@ export const RequestsDashboard: React.FC = () => {
       render: (requestNumber: string, record: UserRequest) => (
         <Button
           type="link"
-          onClick={() => navigate(`/requests/${record.id}`)}
+          onClick={(e) => {
+            e.stopPropagation();
+            handleViewDetails(record);
+          }}
           style={{ padding: 0, fontWeight: 600 }}
         >
           {requestNumber}
@@ -140,11 +152,20 @@ export const RequestsDashboard: React.FC = () => {
       title: 'Actions',
       key: 'actions',
       fixed: 'right',
-      width: 100,
+      width: 80,
+      align: 'center',
       render: (_, record: UserRequest) => (
-        <Button size="small" onClick={() => navigate(`/requests/${record.id}`)}>
-          View
-        </Button>
+        <Tooltip title="View Details">
+          <Button
+            type="link"
+            size="small"
+            icon={<EyeOutlined />}
+            onClick={(e) => {
+              e.stopPropagation();
+              handleViewDetails(record);
+            }}
+          />
+        </Tooltip>
       ),
     },
   ];
@@ -273,6 +294,10 @@ export const RequestsDashboard: React.FC = () => {
           loading={isLoading}
           rowKey="id"
           scroll={{ x: 1300 }}
+          onRow={(record) => ({
+            onClick: () => handleViewDetails(record),
+            style: { cursor: 'pointer' },
+          })}
           pagination={{
             pageSize: 20,
             showSizeChanger: true,
@@ -283,6 +308,17 @@ export const RequestsDashboard: React.FC = () => {
           }}
         />
       </Card>
+
+      {selectedRequestId && (
+        <RequestDetailModal
+          open={detailModalVisible}
+          requestId={selectedRequestId}
+          onClose={() => {
+            setDetailModalVisible(false);
+            setSelectedRequestId(null);
+          }}
+        />
+      )}
     </div>
   );
 };
