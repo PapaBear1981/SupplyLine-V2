@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Card,
@@ -14,6 +14,7 @@ import {
   Alert,
   Typography,
   Badge,
+  Tooltip,
 } from 'antd';
 import {
   PlusOutlined,
@@ -21,12 +22,15 @@ import {
   ExclamationCircleOutlined,
   ReloadOutlined,
   SearchOutlined,
+  QuestionCircleOutlined,
 } from '@ant-design/icons';
 import type { ColumnsType } from 'antd/es/table';
 import { useGetKitsQuery, useGetAircraftTypesQuery } from '../services/kitsApi';
 import type { Kit, KitStatus } from '../types';
 import { useIsMobile } from '@shared/hooks/useMobile';
 import { MobileKitsList } from '../components/mobile';
+import { useHotkeyContext } from '@shared/contexts/HotkeyContext';
+import { KITS_HOTKEYS, formatHotkey } from '@shared/constants/hotkeys';
 
 const { Title } = Typography;
 const { Option } = Select;
@@ -37,6 +41,7 @@ const KitsDashboard = () => {
   const [statusFilter, setStatusFilter] = useState<KitStatus | undefined>();
   const [aircraftTypeFilter, setAircraftTypeFilter] = useState<number | undefined>();
   const [searchQuery, setSearchQuery] = useState('');
+  const { registerHotkey, unregisterScope, setActiveScope, showHelp } = useHotkeyContext();
 
   const { data: kits = [], isLoading, error, refetch } = useGetKitsQuery({
     status: statusFilter,
@@ -44,6 +49,25 @@ const KitsDashboard = () => {
   });
 
   const { data: aircraftTypes = [] } = useGetAircraftTypesQuery({});
+
+  const handleCreateKit = useCallback(() => {
+    navigate('/kits/new');
+  }, [navigate]);
+
+  // Register page-specific hotkeys
+  useEffect(() => {
+    if (isMobile) return;
+
+    setActiveScope('kits');
+
+    // Ctrl+N to create new kit
+    registerHotkey('kits', KITS_HOTKEYS.CREATE_KIT, handleCreateKit);
+
+    return () => {
+      unregisterScope('kits');
+      setActiveScope('global');
+    };
+  }, [registerHotkey, unregisterScope, setActiveScope, handleCreateKit, isMobile]);
 
   // Render mobile version
   if (isMobile) {
@@ -167,14 +191,21 @@ const KitsDashboard = () => {
             <Title level={2}>
               <ToolOutlined /> Mobile Warehouse (Kits)
             </Title>
-            <Button
-              type="primary"
-              icon={<PlusOutlined />}
-              size="large"
-              onClick={() => navigate('/kits/new')}
-            >
-              Create New Kit
-            </Button>
+            <Space>
+              <Tooltip title={`Create New Kit (${formatHotkey(KITS_HOTKEYS.CREATE_KIT)})`}>
+                <Button
+                  type="primary"
+                  icon={<PlusOutlined />}
+                  size="large"
+                  onClick={handleCreateKit}
+                >
+                  Create New Kit
+                </Button>
+              </Tooltip>
+              <Tooltip title="Keyboard shortcuts (Shift+?)">
+                <Button icon={<QuestionCircleOutlined />} size="large" onClick={showHelp} />
+              </Tooltip>
+            </Space>
           </Space>
         </Col>
 

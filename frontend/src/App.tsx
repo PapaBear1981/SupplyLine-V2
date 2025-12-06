@@ -7,6 +7,8 @@ import { ProtectedRoute } from '@features/auth/components/ProtectedRoute';
 import { AdminRoute } from '@features/auth/components/AdminRoute';
 import { PermissionProvider } from '@features/auth/context/PermissionContext';
 import { MobileProvider } from '@shared/contexts/MobileContext';
+import { HotkeyProvider } from '@shared/contexts/HotkeyContext';
+import { HotkeyHelp } from '@shared/components/HotkeyHelp';
 import { LoginPage } from '@features/auth/pages/LoginPage';
 import { DashboardPage } from '@features/dashboard/pages/DashboardPage';
 import { ToolsPage } from '@features/tools/pages/ToolsPage';
@@ -49,54 +51,57 @@ function AppContent() {
       <MobileConfigProvider>
         <div className={isDark ? 'adm-theme-dark' : ''}>
           <BrowserRouter>
-            <Routes>
-              {/* Auth Routes */}
-              <Route element={<ResponsiveAuthLayout />}>
-                <Route path={ROUTES.LOGIN} element={<LoginPage />} />
-              </Route>
+            <HotkeyProvider>
+              <Routes>
+                {/* Auth Routes */}
+                <Route element={<ResponsiveAuthLayout />}>
+                  <Route path={ROUTES.LOGIN} element={<LoginPage />} />
+                </Route>
 
-              {/* Protected Routes */}
-              <Route element={<ProtectedRoute />}>
-                <Route element={<ResponsiveLayout />}>
-                  <Route path={ROUTES.HOME} element={<Navigate to={ROUTES.DASHBOARD} replace />} />
-                  <Route path={ROUTES.DASHBOARD} element={<DashboardPage />} />
-                  <Route path={ROUTES.TOOL_CHECKOUT} element={<ToolCheckoutPage />} />
-                  <Route path={ROUTES.TOOLS} element={<ToolsPage />} />
-                  <Route path={ROUTES.CHEMICALS} element={<ChemicalsPage />} />
+                {/* Protected Routes */}
+                <Route element={<ProtectedRoute />}>
+                  <Route element={<ResponsiveLayout />}>
+                    <Route path={ROUTES.HOME} element={<Navigate to={ROUTES.DASHBOARD} replace />} />
+                    <Route path={ROUTES.DASHBOARD} element={<DashboardPage />} />
+                    <Route path={ROUTES.TOOL_CHECKOUT} element={<ToolCheckoutPage />} />
+                    <Route path={ROUTES.TOOLS} element={<ToolsPage />} />
+                    <Route path={ROUTES.CHEMICALS} element={<ChemicalsPage />} />
 
-                  {/* Kits Routes */}
-                  <Route path={ROUTES.KITS} element={<KitsDashboard />} />
-                  <Route path="/kits/new" element={<KitWizard />} />
-                  <Route path="/kits/:id" element={<KitDetailView />} />
-                  <Route path="/kits/:id/edit" element={<div>Edit Kit (Coming Soon)</div>} />
-                  <Route path="/kits/:id/duplicate" element={<div>Duplicate Kit (Coming Soon)</div>} />
+                    {/* Kits Routes */}
+                    <Route path={ROUTES.KITS} element={<KitsDashboard />} />
+                    <Route path="/kits/new" element={<KitWizard />} />
+                    <Route path="/kits/:id" element={<KitDetailView />} />
+                    <Route path="/kits/:id/edit" element={<div>Edit Kit (Coming Soon)</div>} />
+                    <Route path="/kits/:id/duplicate" element={<div>Duplicate Kit (Coming Soon)</div>} />
 
-                  {/* Orders Routes */}
-                  <Route path="/orders" element={<OrdersDashboard />} />
-                  <Route path="/orders/new" element={<OrderCreationForm />} />
-                  <Route path="/orders/:orderId" element={<OrderDetailView />} />
+                    {/* Orders Routes */}
+                    <Route path="/orders" element={<OrdersDashboard />} />
+                    <Route path="/orders/new" element={<OrderCreationForm />} />
+                    <Route path="/orders/:orderId" element={<OrderDetailView />} />
 
-                  {/* Requests Routes */}
-                  <Route path="/requests" element={<RequestsDashboard />} />
-                  <Route path="/requests/new" element={<RequestCreationForm />} />
-                  <Route path="/requests/:requestId" element={<RequestDetailView />} />
+                    {/* Requests Routes */}
+                    <Route path="/requests" element={<RequestsDashboard />} />
+                    <Route path="/requests/new" element={<RequestCreationForm />} />
+                    <Route path="/requests/:requestId" element={<RequestDetailView />} />
 
-                  <Route path={ROUTES.WAREHOUSES} element={<WarehousesPage />} />
-                  <Route path={ROUTES.REPORTS} element={<ReportsPage />} />
-                  <Route path={ROUTES.USERS} element={<UsersPage />} />
-                  <Route path={ROUTES.PROFILE} element={<ProfilePage />} />
-                  <Route path={ROUTES.SETTINGS} element={<SettingsPage />} />
+                    <Route path={ROUTES.WAREHOUSES} element={<WarehousesPage />} />
+                    <Route path={ROUTES.REPORTS} element={<ReportsPage />} />
+                    <Route path={ROUTES.USERS} element={<UsersPage />} />
+                    <Route path={ROUTES.PROFILE} element={<ProfilePage />} />
+                    <Route path={ROUTES.SETTINGS} element={<SettingsPage />} />
 
-                  {/* Admin-only routes - Desktop only on mobile */}
-                  <Route element={<AdminRoute />}>
-                    <Route path={ROUTES.ADMIN} element={<AdminPageWrapper />} />
+                    {/* Admin-only routes - Desktop only on mobile */}
+                    <Route element={<AdminRoute />}>
+                      <Route path={ROUTES.ADMIN} element={<AdminPageWrapper />} />
+                    </Route>
                   </Route>
                 </Route>
-              </Route>
 
-              {/* 404 Route */}
-              <Route path="*" element={<Navigate to={ROUTES.HOME} replace />} />
-            </Routes>
+                {/* 404 Route */}
+                <Route path="*" element={<Navigate to={ROUTES.HOME} replace />} />
+              </Routes>
+              <HotkeyHelp />
+            </HotkeyProvider>
           </BrowserRouter>
         </div>
       </MobileConfigProvider>

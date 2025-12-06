@@ -1,10 +1,12 @@
-import { useState } from 'react';
-import { Typography, Button, Space } from 'antd';
-import { PlusOutlined } from '@ant-design/icons';
+import { useState, useEffect, useCallback } from 'react';
+import { Typography, Button, Space, Tooltip } from 'antd';
+import { PlusOutlined, QuestionCircleOutlined } from '@ant-design/icons';
 import { ToolsTable } from '../components/ToolsTable';
 import { ToolDrawer } from '../components/ToolDrawer';
 import { MobileToolsList } from '../components/mobile';
 import { useIsMobile } from '@shared/hooks/useMobile';
+import { useHotkeyContext } from '@shared/contexts/HotkeyContext';
+import { TOOLS_HOTKEYS, formatHotkey } from '@shared/constants/hotkeys';
 import type { Tool } from '../types';
 
 const { Title } = Typography;
@@ -13,11 +15,7 @@ export const ToolsPage = () => {
   const isMobile = useIsMobile();
   const [selectedTool, setSelectedTool] = useState<Tool | null>(null);
   const [drawerMode, setDrawerMode] = useState<'view' | 'edit' | 'create' | null>(null);
-
-  // Render mobile version if on mobile device
-  if (isMobile) {
-    return <MobileToolsList />;
-  }
+  const { registerHotkey, unregisterScope, setActiveScope, showHelp } = useHotkeyContext();
 
   const handleView = (tool: Tool) => {
     setSelectedTool(tool);
@@ -29,15 +27,35 @@ export const ToolsPage = () => {
     setDrawerMode('edit');
   };
 
-  const handleCreate = () => {
+  const handleCreate = useCallback(() => {
     setSelectedTool(null);
     setDrawerMode('create');
-  };
+  }, []);
 
   const handleCloseDrawer = () => {
     setDrawerMode(null);
     setSelectedTool(null);
   };
+
+  // Register page-specific hotkeys
+  useEffect(() => {
+    if (isMobile) return;
+
+    setActiveScope('tools');
+
+    // Ctrl+A to add new tool
+    registerHotkey('tools', TOOLS_HOTKEYS.ADD_TOOL, handleCreate);
+
+    return () => {
+      unregisterScope('tools');
+      setActiveScope('global');
+    };
+  }, [registerHotkey, unregisterScope, setActiveScope, handleCreate, isMobile]);
+
+  // Render mobile version if on mobile device
+  if (isMobile) {
+    return <MobileToolsList />;
+  }
 
   return (
     <div>
@@ -55,13 +73,18 @@ export const ToolsPage = () => {
           Tools
         </Title>
         <Space>
-          <Button
-            type="primary"
-            icon={<PlusOutlined />}
-            onClick={handleCreate}
-          >
-            Add Tool
-          </Button>
+          <Tooltip title={`Add Tool (${formatHotkey(TOOLS_HOTKEYS.ADD_TOOL)})`}>
+            <Button
+              type="primary"
+              icon={<PlusOutlined />}
+              onClick={handleCreate}
+            >
+              Add Tool
+            </Button>
+          </Tooltip>
+          <Tooltip title="Keyboard shortcuts (Shift+?)">
+            <Button icon={<QuestionCircleOutlined />} onClick={showHelp} />
+          </Tooltip>
         </Space>
       </div>
 
