@@ -58,8 +58,7 @@ def run_migration():
             if existing_data:
                 # Get column count to build the INSERT statement
                 placeholders = ','.join(['?' for _ in range(len(columns))])
-                # nosec B608: placeholders are safely constructed from column count, not user input
-                insert_sql = f"INSERT INTO announcements VALUES ({placeholders})"
+                insert_sql = f"INSERT INTO announcements VALUES ({placeholders})"  # nosec B608 - placeholders are safely constructed from column count, not user input
                 cursor.executemany(insert_sql, existing_data)
                 print(f"Migrated {len(existing_data)} announcement records")
 
