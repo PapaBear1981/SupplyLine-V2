@@ -7,6 +7,7 @@ import {
   Tooltip,
   Typography,
   Alert,
+  theme,
 } from 'antd';
 import type { TableProps } from 'antd';
 import {
@@ -31,6 +32,7 @@ export const OverdueCheckoutsTable = ({ onCheckin }: OverdueCheckoutsTableProps)
   const [pageSize, setPageSize] = useState(25);
   const [selectedCheckout, setSelectedCheckout] = useState<ToolCheckout | null>(null);
   const [detailsOpen, setDetailsOpen] = useState(false);
+  const { token } = theme.useToken();
 
   const { data, isLoading, isFetching } = useGetOverdueCheckoutsQuery({
     page,
@@ -224,23 +226,19 @@ export const OverdueCheckoutsTable = ({ onCheckin }: OverdueCheckoutsTableProps)
       />
 
       <style>{`
-        .ant-table-row-overdue {
-          background-color: #fffbe6 !important;
+        .ant-table-row-overdue > td,
+        .ant-table-row-warning > td {
+          background-color: ${token.colorWarningBg} !important;
         }
-        .ant-table-row-overdue:hover > td {
-          background-color: #fff1b8 !important;
-        }
-        .ant-table-row-warning {
-          background-color: #fff7e6 !important;
-        }
+        .ant-table-row-overdue:hover > td,
         .ant-table-row-warning:hover > td {
-          background-color: #ffe7ba !important;
+          background-color: ${token.colorWarningBgHover} !important;
         }
-        .ant-table-row-critical {
-          background-color: #fff2f0 !important;
+        .ant-table-row-critical > td {
+          background-color: ${token.colorErrorBg} !important;
         }
         .ant-table-row-critical:hover > td {
-          background-color: #ffccc7 !important;
+          background-color: ${token.colorErrorBgHover} !important;
         }
       `}</style>
     </>

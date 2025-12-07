@@ -20,7 +20,7 @@ interface LabelSizeSelectorProps {
  * Label Size Selector Component
  *
  * Visual selector for choosing label size with helpful information
- * about each size option including dimensions, use cases, and field counts.
+ * about each size option including dimensions, use cases, and examples.
  * Memoized to prevent unnecessary re-renders when parent state changes.
  */
 export const LabelSizeSelector = memo(function LabelSizeSelector({
