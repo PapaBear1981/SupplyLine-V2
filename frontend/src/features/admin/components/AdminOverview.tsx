@@ -8,9 +8,12 @@ import {
   LockOutlined,
 } from '@ant-design/icons';
 import { useGetAdminStatsQuery } from '../services/adminApi';
+import { useGetRecentKitActivityQuery } from '@features/kits/services/kitsApi';
+import { RecentActivity } from '@features/dashboard/components/RecentActivity';
 
 export const AdminOverview = () => {
   const { data: stats, isLoading, error } = useGetAdminStatsQuery();
+  const { data: recentActivity, isLoading: activityLoading, refetch: refetchActivity } = useGetRecentKitActivityQuery({ limit: 10 });
 
   if (isLoading) {
     return (
@@ -93,6 +96,17 @@ export const AdminOverview = () => {
               valueStyle={{ color: '#13c2c2' }}
             />
           </Card>
+        </Col>
+      </Row>
+
+      {/* Recent Activity */}
+      <Row gutter={[16, 16]} style={{ marginTop: 24 }}>
+        <Col span={24}>
+          <RecentActivity
+            activities={recentActivity || []}
+            loading={activityLoading}
+            onRefresh={refetchActivity}
+          />
         </Col>
       </Row>
     </div>

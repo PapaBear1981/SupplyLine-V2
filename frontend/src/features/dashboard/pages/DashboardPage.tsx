@@ -21,7 +21,7 @@ import { useIsMobile } from '@shared/hooks/useMobile';
 // API hooks
 import { useGetToolsQuery } from '@features/tools/services/toolsApi';
 import { useGetChemicalsQuery } from '@features/chemicals/services/chemicalsApi';
-import { useGetKitsQuery, useGetRecentKitActivityQuery, useGetReorderReportQuery } from '@features/kits/services/kitsApi';
+import { useGetKitsQuery, useGetReorderReportQuery } from '@features/kits/services/kitsApi';
 import { useGetWarehousesQuery } from '@features/warehouses/services/warehousesApi';
 import { useGetAnnouncementsQuery, useGetOnlineUsersQuery } from '@features/admin/services/adminApi';
 
@@ -30,7 +30,6 @@ import {
   WelcomeCard,
   StatCard,
   AlertsPanel,
-  RecentActivity,
   InventoryPieChart,
   AnnouncementsPanel,
 } from '../components';
@@ -56,7 +55,6 @@ export const DashboardPage = () => {
   const { data: warehousesData, isLoading: warehousesLoading } = useGetWarehousesQuery();
   const { data: onlineUsersData } = useGetOnlineUsersQuery(undefined, { pollingInterval: 30000 }); // Poll every 30 seconds
   const { data: announcements, isLoading: announcementsLoading } = useGetAnnouncementsQuery();
-  const { data: recentActivity, isLoading: activityLoading, refetch: refetchActivity } = useGetRecentKitActivityQuery({ limit: 10 });
   const { data: pendingReorders } = useGetReorderReportQuery({ status: 'pending' });
 
   // Calculate tool stats
@@ -364,17 +362,6 @@ export const DashboardPage = () => {
       <Row gutter={[16, 16]} style={{ marginBottom: 24 }}>
         <Col span={24}>
           <KitLocationMap height={400} />
-        </Col>
-      </Row>
-
-      {/* Recent Activity */}
-      <Row gutter={[16, 16]} style={{ marginBottom: 24 }}>
-        <Col span={24}>
-          <RecentActivity
-            activities={recentActivity || []}
-            loading={activityLoading}
-            onRefresh={refetchActivity}
-          />
         </Col>
       </Row>
     </div>
