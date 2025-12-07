@@ -7,6 +7,7 @@ import {
   Space,
   Tooltip,
   Typography,
+  theme,
 } from 'antd';
 import type { TableProps } from 'antd';
 import {
@@ -34,6 +35,7 @@ export const ActiveCheckoutsTable = ({ onCheckin }: ActiveCheckoutsTableProps) =
   const [committedSearch, setCommittedSearch] = useState('');
   const [selectedCheckout, setSelectedCheckout] = useState<ToolCheckout | null>(null);
   const [detailsOpen, setDetailsOpen] = useState(false);
+  const { token } = theme.useToken();
 
   const { data, isLoading, isFetching } = useGetActiveCheckoutsQuery({
     page,
@@ -248,11 +250,11 @@ export const ActiveCheckoutsTable = ({ onCheckin }: ActiveCheckoutsTableProps) =
       />
 
       <style>{`
-        .ant-table-row-overdue {
-          background-color: #fff2f0 !important;
+        .ant-table-row-overdue > td {
+          background-color: ${token.colorErrorBg} !important;
         }
         .ant-table-row-overdue:hover > td {
-          background-color: #ffebe8 !important;
+          background-color: ${token.colorErrorBgHover} !important;
         }
       `}</style>
     </>
