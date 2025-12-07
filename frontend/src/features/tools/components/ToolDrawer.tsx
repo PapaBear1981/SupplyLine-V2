@@ -225,13 +225,18 @@ export const ToolDrawer = ({ open, mode: initialMode, toolId, onClose, onSuccess
       <div style={{ textAlign: 'center', padding: 24 }}>
         <Image
           src={`data:image/png;base64,${barcodeData.qr_code}`}
-          alt="Tool QR Code"
+          alt={`QR Code for tool ${tool?.tool_number ?? ''}`}
           width={250}
           preview={false}
         />
         <div style={{ marginTop: 16 }}>
-          <Button type="primary" icon={<QrcodeOutlined />}>
-            Print QR Code
+          <Button
+            type="primary"
+            icon={<PrinterOutlined />}
+            onClick={() => setPrintModalOpen(true)}
+            aria-label="Print label for this tool"
+          >
+            Print Label
           </Button>
         </div>
       </div>
@@ -251,12 +256,14 @@ export const ToolDrawer = ({ open, mode: initialMode, toolId, onClose, onSuccess
           <Button
             icon={<PrinterOutlined />}
             onClick={() => setPrintModalOpen(true)}
+            aria-label="Print label for this tool"
           >
             Print Label
           </Button>
           <Button
             icon={<EditOutlined />}
             onClick={() => setMode('edit')}
+            aria-label="Edit tool details"
           >
             Edit
           </Button>

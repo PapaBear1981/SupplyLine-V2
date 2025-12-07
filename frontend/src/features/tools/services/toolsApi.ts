@@ -130,7 +130,10 @@ export const toolsApi = baseApi.injectEndpoints({
       query: (toolId) => `/api/tools/${toolId}/barcode`,
     }),
 
-    // Print tool label as PDF
+    /**
+     * Print tool label as PDF
+     * Generates a PDF label with barcode/QR code for the specified tool
+     */
     printToolLabel: builder.mutation<Blob, {
       toolId: number;
       labelSize: LabelSize;
@@ -142,13 +145,25 @@ export const toolsApi = baseApi.injectEndpoints({
           label_size: labelSize,
           code_type: codeType,
         },
-        responseHandler: async (response) => {
+        responseHandler: async (response: Response) => {
           if (!response.ok) {
-            throw new Error('Failed to generate label PDF');
+            // Try to extract error message from response
+            let errorMessage = 'Failed to generate label PDF';
+            try {
+              const errorData = await response.json();
+              errorMessage = errorData.message || errorData.error || errorMessage;
+            } catch {
+              // Response is not JSON, use status text
+              errorMessage = response.statusText || errorMessage;
+            }
+            throw new Error(errorMessage);
           }
           return response.blob();
         },
-        cache: 'no-cache',
+        // Prevent caching to ensure fresh label generation
+        headers: {
+          'Cache-Control': 'no-cache',
+        },
       }),
     }),
 
