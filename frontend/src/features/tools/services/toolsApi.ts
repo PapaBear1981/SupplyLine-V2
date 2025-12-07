@@ -7,6 +7,7 @@ import type {
   ToolCalibration,
   ToolCheckout,
 } from '../types';
+import type { LabelSize, CodeType, LabelSizesResponse } from '@/types/label';
 
 export const toolsApi = baseApi.injectEndpoints({
   endpoints: (builder) => ({
@@ -128,6 +129,33 @@ export const toolsApi = baseApi.injectEndpoints({
     getToolBarcode: builder.query<{ qr_code: string; barcode: string }, number>({
       query: (toolId) => `/api/tools/${toolId}/barcode`,
     }),
+
+    // Print tool label as PDF
+    printToolLabel: builder.mutation<Blob, {
+      toolId: number;
+      labelSize: LabelSize;
+      codeType: CodeType;
+    }>({
+      query: ({ toolId, labelSize, codeType }) => ({
+        url: `/api/barcode/tool/${toolId}`,
+        params: {
+          label_size: labelSize,
+          code_type: codeType,
+        },
+        responseHandler: async (response) => {
+          if (!response.ok) {
+            throw new Error('Failed to generate label PDF');
+          }
+          return response.blob();
+        },
+        cache: 'no-cache',
+      }),
+    }),
+
+    // Get available label sizes
+    getLabelSizes: builder.query<LabelSizesResponse, void>({
+      query: () => '/api/barcode/label-sizes',
+    }),
   }),
 });
 
@@ -144,4 +172,6 @@ export const {
   useSearchToolsQuery,
   useLazySearchToolsQuery,
   useGetToolBarcodeQuery,
+  usePrintToolLabelMutation,
+  useGetLabelSizesQuery,
 } = toolsApi;

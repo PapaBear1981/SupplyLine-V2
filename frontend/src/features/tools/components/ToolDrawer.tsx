@@ -18,6 +18,7 @@ import {
   QrcodeOutlined,
   HistoryOutlined,
   InfoCircleOutlined,
+  PrinterOutlined,
 } from '@ant-design/icons';
 import dayjs from 'dayjs';
 import {
@@ -29,6 +30,7 @@ import {
 } from '../services/toolsApi';
 import { ToolForm } from './ToolForm';
 import type { ToolFormData, ToolStatus, CalibrationStatus } from '../types';
+import { LabelPrintModal } from '@/components/shared/LabelPrintModal';
 
 interface ToolDrawerProps {
   open: boolean;
@@ -41,6 +43,7 @@ interface ToolDrawerProps {
 export const ToolDrawer = ({ open, mode: initialMode, toolId, onClose, onSuccess }: ToolDrawerProps) => {
   const [mode, setMode] = useState(initialMode);
   const [form] = Form.useForm();
+  const [printModalOpen, setPrintModalOpen] = useState(false);
 
   // Fetch tool data if viewing or editing
   const { data: tool, isLoading } = useGetToolQuery(toolId!, {
@@ -246,6 +249,12 @@ export const ToolDrawer = ({ open, mode: initialMode, toolId, onClose, onSuccess
       return (
         <Space>
           <Button
+            icon={<PrinterOutlined />}
+            onClick={() => setPrintModalOpen(true)}
+          >
+            Print Label
+          </Button>
+          <Button
             icon={<EditOutlined />}
             onClick={() => setMode('edit')}
           >
@@ -312,6 +321,17 @@ export const ToolDrawer = ({ open, mode: initialMode, toolId, onClose, onSuccess
           onSubmit={handleSubmit}
           onCancel={handleCancel}
           loading={isUpdating || isCreating}
+        />
+      )}
+
+      {/* Label Print Modal */}
+      {toolId && tool && (
+        <LabelPrintModal
+          open={printModalOpen}
+          onClose={() => setPrintModalOpen(false)}
+          itemType="tool"
+          itemId={toolId}
+          itemDescription={tool.tool_number}
         />
       )}
     </Drawer>
