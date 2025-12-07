@@ -226,15 +226,11 @@ export const OverdueCheckoutsTable = ({ onCheckin }: OverdueCheckoutsTableProps)
       />
 
       <style>{`
-        .ant-table-row-overdue > td {
-          background-color: ${token.colorWarningBg} !important;
-        }
-        .ant-table-row-overdue:hover > td {
-          background-color: ${token.colorWarningBgHover} !important;
-        }
+        .ant-table-row-overdue > td,
         .ant-table-row-warning > td {
           background-color: ${token.colorWarningBg} !important;
         }
+        .ant-table-row-overdue:hover > td,
         .ant-table-row-warning:hover > td {
           background-color: ${token.colorWarningBgHover} !important;
         }
