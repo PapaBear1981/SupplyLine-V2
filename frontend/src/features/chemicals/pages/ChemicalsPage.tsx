@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
 import { Typography, Button, Space } from 'antd';
 import { PlusOutlined } from '@ant-design/icons';
 import { ChemicalsTable } from '../components/ChemicalsTable';
@@ -24,40 +24,42 @@ export const ChemicalsPage = () => {
     return <MobileChemicalsList />;
   }
 
-  const handleRowClick = (chemical: Chemical) => {
+  const handleRowClick = useCallback((chemical: Chemical) => {
     setSelectedChemical(chemical);
     setDetailsModalOpen(true);
-  };
+  }, []);
 
-  const handleEdit = (chemical: Chemical) => {
+  const handleEdit = useCallback((chemical: Chemical) => {
     setSelectedChemical(chemical);
     setDrawerMode('edit');
-  };
+  }, []);
 
-  const handleCreate = () => {
+  const handleCreate = useCallback(() => {
     setSelectedChemical(null);
     setDrawerMode('create');
-  };
+  }, []);
 
-  const handleCloseDrawer = () => {
+  const handleCloseDrawer = useCallback(() => {
     setDrawerMode(null);
     setSelectedChemical(null);
-  };
+  }, []);
 
-  const handleCloseDetailsModal = () => {
+  const handleCloseDetailsModal = useCallback(() => {
     setDetailsModalOpen(false);
     setSelectedChemical(null);
-  };
+  }, []);
 
-  const handleIssue = (chemical: Chemical) => {
+  const handleIssue = useCallback((chemical: Chemical) => {
+    // Close details modal if open (when issuing from within the modal)
+    setDetailsModalOpen(false);
     setChemicalToIssue(chemical);
     setIssuanceModalOpen(true);
-  };
+  }, []);
 
-  const handleCloseIssuanceModal = () => {
+  const handleCloseIssuanceModal = useCallback(() => {
     setIssuanceModalOpen(false);
     setChemicalToIssue(null);
-  };
+  }, []);
 
   return (
     <div>

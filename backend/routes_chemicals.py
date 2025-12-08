@@ -675,8 +675,9 @@ def register_chemical_routes(app):
         total_issued = total_issued_from_issuances + total_issued_to_children
         initial_quantity = chemical.quantity + total_issued
 
-        # Debug logging
-        app.logger.info(f"Chemical {chemical.lot_number} - Current qty: {chemical.quantity}, Direct issued: {total_issued_from_issuances}, Child lots issued: {total_issued_to_children}, Total issued: {total_issued}, Calculated initial: {initial_quantity}, Issuance count: {len(issuances)}, Child count: {len(child_chemicals)}")
+        # Debug logging (only in development mode)
+        if app.debug:
+            app.logger.debug(f"Chemical {chemical.lot_number} - Current qty: {chemical.quantity}, Direct issued: {total_issued_from_issuances}, Child lots issued: {total_issued_to_children}, Total issued: {total_issued}, Calculated initial: {initial_quantity}, Issuance count: {len(issuances)}, Child count: {len(child_chemicals)}")
 
         # 1. Add creation event with calculated initial quantity
         history.append({
@@ -724,7 +725,8 @@ def register_chemical_routes(app):
             })
 
         # Sort all history by event_date (oldest first for cradle-to-grave display)
-        history.sort(key=lambda x: x.get("event_date", ""), reverse=False)
+        # Use empty string as fallback to handle None dates gracefully
+        history.sort(key=lambda x: x.get("event_date") or "", reverse=False)
 
         return jsonify({
             "chemical": chemical.to_dict(),

@@ -184,9 +184,9 @@ export const ChemicalDetailsModal = ({ open, onClose, chemical, onIssue }: Chemi
 
   const canIssue = chemical && chemical.status !== 'expired' && chemical.quantity > 0;
 
-  const totalEvents = (data?.history?.length || 0);
-  const totalIssuances = data?.total_issuances || 0;
-  const totalChildLots = data?.total_child_lots || 0;
+  const totalEvents = data?.history?.length ?? 0;
+  const totalIssuances = data?.total_issuances ?? 0;
+  const totalChildLots = data?.total_child_lots ?? 0;
 
   const tabItems = [
     {
@@ -248,8 +248,8 @@ export const ChemicalDetailsModal = ({ open, onClose, chemical, onIssue }: Chemi
                 <Text strong>{chemical?.lot_number}</Text>
               </Descriptions.Item>
               <Descriptions.Item label="Status">
-                <Tag color={getStatusColor(chemical?.status || 'available')}>
-                  {chemical?.status.replaceAll('_', ' ').toUpperCase()}
+                <Tag color={getStatusColor(chemical?.status ?? 'available')}>
+                  {chemical?.status?.replaceAll('_', ' ').toUpperCase() ?? 'UNKNOWN'}
                 </Tag>
               </Descriptions.Item>
               <Descriptions.Item label="Quantity">
@@ -316,7 +316,7 @@ export const ChemicalDetailsModal = ({ open, onClose, chemical, onIssue }: Chemi
                 {chemical?.expiration_date ? (
                   <Space>
                     {dayjs(chemical.expiration_date).format('MMM D, YYYY')}
-                    {chemical.expiring_soon && !chemical.status?.includes('expired') && (
+                    {chemical.expiring_soon && chemical.status !== 'expired' && (
                       <Tag color="orange" icon={<ClockCircleOutlined />}>
                         Expiring Soon
                       </Tag>
@@ -422,24 +422,26 @@ export const ChemicalDetailsModal = ({ open, onClose, chemical, onIssue }: Chemi
       open={open}
       onCancel={onClose}
       width={1000}
-      footer={[
-        <Button key="close" onClick={onClose}>
-          Close
-        </Button>,
-        canIssue && onIssue && (
-          <Button
-            key="issue"
-            type="primary"
-            icon={<ExportOutlined />}
-            onClick={handleIssue}
-          >
-            Issue Chemical
+      footer={
+        <Space>
+          <Button key="close" onClick={onClose}>
+            Close
           </Button>
-        ),
-      ]}
+          {canIssue && onIssue && (
+            <Button
+              key="issue"
+              type="primary"
+              icon={<ExportOutlined />}
+              onClick={handleIssue}
+            >
+              Issue Chemical
+            </Button>
+          )}
+        </Space>
+      }
     >
       {isLoading && (
-        <div style={{ textAlign: 'center', padding: '40px' }}>
+        <div style={{ textAlign: 'center', padding: '40px' }} role="status" aria-label="Loading chemical details">
           <Spin size="large" />
         </div>
       )}
