@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import {
   Modal,
   Form,
@@ -14,6 +14,7 @@ import { WarningOutlined } from '@ant-design/icons';
 import { useIssueChemicalMutation } from '../services/chemicalsApi';
 import { useGetUsersQuery } from '@features/users/services/usersApi';
 import { useAppSelector } from '@app/hooks';
+import { LabelPrintModal } from '@/components/shared/LabelPrintModal';
 import type { Chemical } from '../types';
 
 const { TextArea } = Input;
@@ -37,6 +38,8 @@ export const ChemicalIssuanceModal = ({
   const [issueChemical, { isLoading }] = useIssueChemicalMutation();
   const { data: users } = useGetUsersQuery();
   const currentUser = useAppSelector((state) => state.auth.user);
+  const [showPrintModal, setShowPrintModal] = useState(false);
+  const [childChemical, setChildChemical] = useState<Chemical | null>(null);
 
   useEffect(() => {
     if (open && chemical) {
@@ -75,6 +78,12 @@ export const ChemicalIssuanceModal = ({
         message.info(result.message);
       }
 
+      // If a child chemical was created, trigger label print modal
+      if (result.child_chemical) {
+        setChildChemical(result.child_chemical);
+        setShowPrintModal(true);
+      }
+
       onClose();
       form.resetFields();
       onSuccess?.();
@@ -108,6 +117,7 @@ export const ChemicalIssuanceModal = ({
   };
 
   return (
+    <>
     <Modal
       title="Issue Chemical"
       open={open}
@@ -265,6 +275,21 @@ export const ChemicalIssuanceModal = ({
         </Form>
       </Space>
     </Modal>
+
+    {/* Label Print Modal for child chemicals */}
+    {childChemical && (
+      <LabelPrintModal
+        open={showPrintModal}
+        onClose={() => {
+          setShowPrintModal(false);
+          setChildChemical(null);
+        }}
+        itemType="chemical"
+        itemId={childChemical.id}
+        itemDescription={`${childChemical.part_number} - ${childChemical.lot_number}`}
+      />
+    )}
+  </>
   );
 };
 

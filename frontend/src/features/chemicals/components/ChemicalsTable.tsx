@@ -15,7 +15,6 @@ import type { TableProps } from 'antd';
 import {
   EditOutlined,
   DeleteOutlined,
-  EyeOutlined,
   SearchOutlined,
   ExclamationCircleOutlined,
   ExportOutlined,
@@ -30,12 +29,12 @@ import type { Chemical, ChemicalStatus } from '../types';
 const { Text } = Typography;
 
 interface ChemicalsTableProps {
-  onView: (chemical: Chemical) => void;
+  onRowClick: (chemical: Chemical) => void;
   onEdit: (chemical: Chemical) => void;
   onIssue: (chemical: Chemical) => void;
 }
 
-export const ChemicalsTable = ({ onView, onEdit, onIssue }: ChemicalsTableProps) => {
+export const ChemicalsTable = ({ onRowClick, onEdit, onIssue }: ChemicalsTableProps) => {
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(50);
   const [searchQuery, setSearchQuery] = useState('');
@@ -162,36 +161,49 @@ export const ChemicalsTable = ({ onView, onEdit, onIssue }: ChemicalsTableProps)
       title: 'Actions',
       key: 'actions',
       fixed: 'right',
-      width: 200,
+      width: 160,
       render: (_, record) => {
         const canIssue = record.status !== 'expired' && record.quantity > 0;
         return (
           <Space size="small">
-            <Tooltip title="View Details">
-              <Button type="text" icon={<EyeOutlined />} onClick={() => onView(record)} />
-            </Tooltip>
             <Tooltip title={canIssue ? 'Issue' : 'Cannot issue (expired or out of stock)'}>
               <Button
                 type="text"
                 icon={<ExportOutlined />}
-                onClick={() => onIssue(record)}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onIssue(record);
+                }}
                 disabled={!canIssue}
               />
             </Tooltip>
             <Tooltip title="Edit">
-              <Button type="text" icon={<EditOutlined />} onClick={() => onEdit(record)} />
+              <Button
+                type="text"
+                icon={<EditOutlined />}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onEdit(record);
+                }}
+              />
             </Tooltip>
             <Popconfirm
               title="Delete chemical?"
               description="This action cannot be undone."
               onConfirm={() => handleDelete(record.id)}
+              onCancel={(e) => e?.stopPropagation()}
               okText="Yes"
               cancelText="No"
               okButtonProps={{ danger: true }}
               icon={<ExclamationCircleOutlined style={{ color: 'red' }} />}
             >
               <Tooltip title="Delete">
-                <Button type="text" danger icon={<DeleteOutlined />} />
+                <Button
+                  type="text"
+                  danger
+                  icon={<DeleteOutlined />}
+                  onClick={(e) => e.stopPropagation()}
+                />
               </Tooltip>
             </Popconfirm>
           </Space>
@@ -228,6 +240,10 @@ export const ChemicalsTable = ({ onView, onEdit, onIssue }: ChemicalsTableProps)
         rowKey="id"
         loading={isLoading || isFetching}
         scroll={{ x: 1200 }}
+        onRow={(record) => ({
+          onClick: () => onRowClick(record),
+          style: { cursor: 'pointer' },
+        })}
         pagination={{
           current: page,
           pageSize,

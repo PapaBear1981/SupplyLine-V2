@@ -635,6 +635,104 @@ def register_chemical_routes(app):
 
         return jsonify(response_data)
 
+    @app.route("/api/chemicals/<int:id>/history", methods=["GET"])
+    @jwt_required
+    @handle_errors
+    def chemical_history_route(id):
+        """Get the complete cradle-to-grave history for a specific chemical."""
+        # Get the chemical
+        chemical = Chemical.query.get_or_404(id)
+
+        # Build comprehensive history
+        history = []
+
+        # 2. Get all issuances for this chemical (moved before creation event to calculate initial quantity)
+        issuances = (
+            ChemicalIssuance.query
+            .filter_by(chemical_id=id)
+            .options(joinedload(ChemicalIssuance.user))
+            .order_by(ChemicalIssuance.issue_date.asc())
+            .all()
+        )
+
+        # 3. Get all child lots created from this parent (need this early to calculate initial quantity)
+        child_chemicals = Chemical.query.filter_by(parent_lot_number=chemical.lot_number).all()
+
+        # Calculate total issued from direct issuances
+        total_issued_from_issuances = sum(issuance.quantity for issuance in issuances)
+
+        # Calculate total issued to create child lots (each child lot's initial quantity)
+        total_issued_to_children = 0
+        child_initial_quantities = {}  # Store for later use
+        for child in child_chemicals:
+            child_issuances = ChemicalIssuance.query.filter_by(chemical_id=child.id).all()
+            child_total_issued = sum(ci.quantity for ci in child_issuances)
+            child_initial_qty = child.quantity + child_total_issued
+            child_initial_quantities[child.id] = child_initial_qty
+            total_issued_to_children += child_initial_qty
+
+        # Calculate total issued (direct issuances + child lot creations)
+        total_issued = total_issued_from_issuances + total_issued_to_children
+        initial_quantity = chemical.quantity + total_issued
+
+        # Debug logging
+        app.logger.info(f"Chemical {chemical.lot_number} - Current qty: {chemical.quantity}, Direct issued: {total_issued_from_issuances}, Child lots issued: {total_issued_to_children}, Total issued: {total_issued}, Calculated initial: {initial_quantity}, Issuance count: {len(issuances)}, Child count: {len(child_chemicals)}")
+
+        # 1. Add creation event with calculated initial quantity
+        history.append({
+            "id": f"created-{chemical.id}",
+            "type": "created",
+            "chemical_id": chemical.id,
+            "event_date": chemical.date_added,
+            "description": "Chemical added to system",
+            "lot_number": chemical.lot_number,
+            "part_number": chemical.part_number,
+            "quantity": initial_quantity,
+            "unit": chemical.unit,
+        })
+
+        # Format issuances with user information
+        for issuance in issuances:
+            history.append({
+                "id": f"issuance-{issuance.id}",
+                "type": "issuance",
+                "chemical_id": issuance.chemical_id,
+                "quantity": issuance.quantity,
+                "hangar": issuance.hangar,
+                "purpose": issuance.purpose,
+                "work_order": issuance.work_order,
+                "notes": issuance.notes,
+                "event_date": issuance.issue_date.isoformat() if issuance.issue_date else None,
+                "user_id": issuance.user_id,
+                "user_name": issuance.user.full_name if issuance.user else "Unknown",
+                "unit": chemical.unit,
+            })
+
+        # 4. Add child lot creation events using pre-calculated quantities
+        for child in child_chemicals:
+            history.append({
+                "id": f"child-{child.id}",
+                "type": "child_lot_created",
+                "chemical_id": child.id,
+                "event_date": child.date_added,
+                "description": "Child lot created from issuance",
+                "lot_number": child.lot_number,
+                "part_number": child.part_number,
+                "lot_sequence": child.lot_sequence,
+                "quantity": child_initial_quantities[child.id],
+                "unit": child.unit,
+            })
+
+        # Sort all history by event_date (oldest first for cradle-to-grave display)
+        history.sort(key=lambda x: x.get("event_date", ""), reverse=False)
+
+        return jsonify({
+            "chemical": chemical.to_dict(),
+            "history": history,
+            "total_issuances": len([h for h in history if h.get("type") == "issuance"]),
+            "total_child_lots": len([h for h in history if h.get("type") == "child_lot_created"]),
+        })
+
     def _parse_chemical_barcode(code):
         """Parse a chemical barcode into part and lot numbers.
 

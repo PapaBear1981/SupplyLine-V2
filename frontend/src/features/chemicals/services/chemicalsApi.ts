@@ -2,6 +2,7 @@ import { baseApi } from '@services/baseApi';
 import type {
   Chemical,
   ChemicalFormData,
+  ChemicalHistoryEvent,
   ChemicalIssuanceFormData,
   ChemicalIssuanceResponse,
   ChemicalsListResponse,
@@ -89,6 +90,14 @@ export const chemicalsApi = baseApi.injectEndpoints({
         { type: 'Chemical', id: 'LIST' },
       ],
     }),
+
+    getChemicalHistory: builder.query<
+      { chemical: Chemical; history: ChemicalHistoryEvent[]; total_issuances: number; total_child_lots: number },
+      number
+    >({
+      query: (id) => `/api/chemicals/${id}/history`,
+      providesTags: (_result, _error, id) => [{ type: 'Chemical', id }],
+    }),
   }),
 });
 
@@ -99,4 +108,5 @@ export const {
   useUpdateChemicalMutation,
   useDeleteChemicalMutation,
   useIssueChemicalMutation,
+  useGetChemicalHistoryQuery,
 } = chemicalsApi;

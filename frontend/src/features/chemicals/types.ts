@@ -92,7 +92,31 @@ export interface ChemicalIssuance {
   quantity: number;
   hangar: string;
   purpose?: string;
+  work_order?: string;
+  notes?: string;
   issue_date: string;
+  user_name?: string;
+}
+
+export interface ChemicalHistoryEvent {
+  id: string | number;
+  type: 'created' | 'issuance' | 'child_lot_created';
+  chemical_id: number;
+  event_date: string;
+  description?: string;
+  lot_number?: string;
+  part_number?: string;
+  quantity?: number;
+  unit?: string;
+  // For issuance events
+  hangar?: string;
+  purpose?: string;
+  work_order?: string;
+  notes?: string;
+  user_id?: number;
+  user_name?: string;
+  // For child lot events
+  lot_sequence?: number;
 }
 
 export interface ChemicalIssuanceResponse {

@@ -3,6 +3,7 @@ import { Typography, Button, Space } from 'antd';
 import { PlusOutlined } from '@ant-design/icons';
 import { ChemicalsTable } from '../components/ChemicalsTable';
 import { ChemicalDrawer } from '../components/ChemicalDrawer';
+import { ChemicalDetailsModal } from '../components/ChemicalDetailsModal';
 import { ChemicalIssuanceModal } from '../components/ChemicalIssuanceModal';
 import { MobileChemicalsList } from '../components/mobile';
 import { useIsMobile } from '@shared/hooks/useMobile';
@@ -13,7 +14,8 @@ const { Title } = Typography;
 export const ChemicalsPage = () => {
   const isMobile = useIsMobile();
   const [selectedChemical, setSelectedChemical] = useState<Chemical | null>(null);
-  const [drawerMode, setDrawerMode] = useState<'view' | 'edit' | 'create' | null>(null);
+  const [drawerMode, setDrawerMode] = useState<'edit' | 'create' | null>(null);
+  const [detailsModalOpen, setDetailsModalOpen] = useState(false);
   const [issuanceModalOpen, setIssuanceModalOpen] = useState(false);
   const [chemicalToIssue, setChemicalToIssue] = useState<Chemical | null>(null);
 
@@ -22,9 +24,9 @@ export const ChemicalsPage = () => {
     return <MobileChemicalsList />;
   }
 
-  const handleView = (chemical: Chemical) => {
+  const handleRowClick = (chemical: Chemical) => {
     setSelectedChemical(chemical);
-    setDrawerMode('view');
+    setDetailsModalOpen(true);
   };
 
   const handleEdit = (chemical: Chemical) => {
@@ -39,6 +41,11 @@ export const ChemicalsPage = () => {
 
   const handleCloseDrawer = () => {
     setDrawerMode(null);
+    setSelectedChemical(null);
+  };
+
+  const handleCloseDetailsModal = () => {
+    setDetailsModalOpen(false);
     setSelectedChemical(null);
   };
 
@@ -74,11 +81,18 @@ export const ChemicalsPage = () => {
         </Space>
       </div>
 
-      <ChemicalsTable onView={handleView} onEdit={handleEdit} onIssue={handleIssue} />
+      <ChemicalsTable onRowClick={handleRowClick} onEdit={handleEdit} onIssue={handleIssue} />
+
+      <ChemicalDetailsModal
+        open={detailsModalOpen}
+        chemical={selectedChemical}
+        onClose={handleCloseDetailsModal}
+        onIssue={handleIssue}
+      />
 
       <ChemicalDrawer
         open={drawerMode !== null}
-        mode={drawerMode || 'view'}
+        mode={drawerMode || 'edit'}
         chemicalId={selectedChemical?.id}
         onClose={handleCloseDrawer}
         onSuccess={() => setSelectedChemical(null)}
