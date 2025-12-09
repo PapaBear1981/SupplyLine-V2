@@ -202,6 +202,27 @@
   font-size: 14px;
 }
 
+/* Announcements Popup */
+.announcements-popup-content {
+  padding: 16px;
+  background: var(--adm-color-background);
+}
+
+.announcements-popup-header {
+  margin-bottom: 16px;
+}
+
+.announcements-popup-header h3 {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--adm-color-text);
+}
+
+.announcements-popup-footer {
+  margin-top: 16px;
+}
+
 /* Warehouse Vitals */
 .warehouse-vitals-swiper {
   margin-bottom: 8px;
@@ -328,6 +349,22 @@ html.adm-theme-dark .warehouse-stat-value,
 html.adm-theme-dark .warehouse-stats,
 .adm-theme-dark .warehouse-stats {
   border-color: #404040;
+}
+
+html.adm-theme-dark .announcements-popup-content,
+.adm-theme-dark .announcements-popup-content {
+  background: #1f1f1f;
+}
+
+html.adm-theme-dark .announcements-popup-header h3,
+.adm-theme-dark .announcements-popup-header h3 {
+  color: rgba(255, 255, 255, 0.85);
+}
+
+/* Style the popup body for dark mode */
+html.adm-theme-dark .announcements-popup .adm-popup-body,
+.adm-theme-dark .announcements-popup .adm-popup-body {
+  background: #1f1f1f;
 }
 
 /* Animations */

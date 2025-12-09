@@ -454,11 +454,13 @@ export const MobileDashboard = () => {
         visible={announcementsPopupOpen}
         onMaskClick={() => setAnnouncementsPopupOpen(false)}
         position="bottom"
-        bodyStyle={{ minHeight: '40vh', maxHeight: '80vh', overflow: 'auto', padding: 16 }}
+        bodyStyle={{ minHeight: '40vh', maxHeight: '80vh', overflow: 'auto' }}
+        className="announcements-popup"
       >
-        <div style={{ marginBottom: 16 }}>
-          <h3 style={{ margin: 0 }}>All Announcements ({activeAnnouncements.length})</h3>
-        </div>
+        <div className="announcements-popup-content">
+          <div className="announcements-popup-header">
+            <h3>All Announcements ({activeAnnouncements.length})</h3>
+          </div>
         <List>
           {activeAnnouncements.map((announcement) => (
             <List.Item
@@ -481,15 +483,16 @@ export const MobileDashboard = () => {
               {announcement.title}
             </List.Item>
           ))}
-        </List>
-        <div style={{ marginTop: 16 }}>
-          <Button
-            block
-            color="primary"
-            onClick={() => setAnnouncementsPopupOpen(false)}
-          >
-            Close
-          </Button>
+          </List>
+          <div className="announcements-popup-footer">
+            <Button
+              block
+              color="primary"
+              onClick={() => setAnnouncementsPopupOpen(false)}
+            >
+              Close
+            </Button>
+          </div>
         </div>
       </Popup>
     </div>
