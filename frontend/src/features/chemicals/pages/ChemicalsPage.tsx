@@ -2,12 +2,13 @@ import { useState, useCallback } from 'react';
 import { Typography, Button, Space } from 'antd';
 import { PlusOutlined } from '@ant-design/icons';
 import { ChemicalsTable } from '../components/ChemicalsTable';
+import { ChemicalsFilters } from '../components/ChemicalsFilters';
 import { ChemicalDrawer } from '../components/ChemicalDrawer';
 import { ChemicalDetailsModal } from '../components/ChemicalDetailsModal';
 import { ChemicalIssuanceModal } from '../components/ChemicalIssuanceModal';
 import { MobileChemicalsList } from '../components/mobile';
 import { useIsMobile } from '@shared/hooks/useMobile';
-import type { Chemical } from '../types';
+import type { Chemical, ChemicalStatus } from '../types';
 
 const { Title } = Typography;
 
@@ -18,6 +19,12 @@ export const ChemicalsPage = () => {
   const [detailsModalOpen, setDetailsModalOpen] = useState(false);
   const [issuanceModalOpen, setIssuanceModalOpen] = useState(false);
   const [chemicalToIssue, setChemicalToIssue] = useState<Chemical | null>(null);
+
+  // Filter state
+  const [category, setCategory] = useState<string | undefined>(undefined);
+  const [status, setStatus] = useState<ChemicalStatus | undefined>(undefined);
+  const [warehouseId, setWarehouseId] = useState<number | undefined>(undefined);
+  const [showArchived, setShowArchived] = useState(false);
 
   // Render mobile version if on mobile device
   if (isMobile) {
@@ -83,7 +90,26 @@ export const ChemicalsPage = () => {
         </Space>
       </div>
 
-      <ChemicalsTable onRowClick={handleRowClick} onEdit={handleEdit} onIssue={handleIssue} />
+      <ChemicalsFilters
+        category={category}
+        status={status}
+        warehouseId={warehouseId}
+        showArchived={showArchived}
+        onCategoryChange={setCategory}
+        onStatusChange={setStatus}
+        onWarehouseChange={setWarehouseId}
+        onShowArchivedChange={setShowArchived}
+      />
+
+      <ChemicalsTable
+        onRowClick={handleRowClick}
+        onEdit={handleEdit}
+        onIssue={handleIssue}
+        category={category}
+        status={status}
+        warehouseId={warehouseId}
+        showArchived={showArchived}
+      />
 
       <ChemicalDetailsModal
         open={detailsModalOpen}

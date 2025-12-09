@@ -145,6 +145,7 @@ def register_chemical_routes(app):
         # Get query parameters for filtering
         category = request.args.get("category")
         status = request.args.get("status")
+        warehouse_id = request.args.get("warehouse_id", type=int)
         search = request.args.get("q")
         show_archived = request.args.get("archived", "false").lower() == "true"
 
@@ -170,6 +171,8 @@ def register_chemical_routes(app):
             query = query.filter(Chemical.category == category)
         if status:
             query = query.filter(Chemical.status == status)
+        if warehouse_id:
+            query = query.filter(Chemical.warehouse_id == warehouse_id)
         if search:
             query = query.filter(
                 db.or_(

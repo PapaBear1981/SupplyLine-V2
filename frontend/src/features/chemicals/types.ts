@@ -73,6 +73,7 @@ export interface ChemicalsQueryParams {
   q?: string;
   status?: ChemicalStatus;
   category?: string;
+  warehouse_id?: number;
   archived?: boolean;
 }
 

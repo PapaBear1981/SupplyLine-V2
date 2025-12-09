@@ -32,9 +32,21 @@ interface ChemicalsTableProps {
   onRowClick: (chemical: Chemical) => void;
   onEdit: (chemical: Chemical) => void;
   onIssue: (chemical: Chemical) => void;
+  category?: string;
+  status?: ChemicalStatus;
+  warehouseId?: number;
+  showArchived?: boolean;
 }
 
-export const ChemicalsTable = ({ onRowClick, onEdit, onIssue }: ChemicalsTableProps) => {
+export const ChemicalsTable = ({
+  onRowClick,
+  onEdit,
+  onIssue,
+  category,
+  status,
+  warehouseId,
+  showArchived,
+}: ChemicalsTableProps) => {
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(50);
   const [searchQuery, setSearchQuery] = useState('');
@@ -44,6 +56,10 @@ export const ChemicalsTable = ({ onRowClick, onEdit, onIssue }: ChemicalsTablePr
     page,
     per_page: pageSize,
     q: committedSearch || undefined,
+    category,
+    status,
+    warehouse_id: warehouseId,
+    archived: showArchived,
   });
 
   const [deleteChemical] = useDeleteChemicalMutation();
@@ -90,17 +106,67 @@ export const ChemicalsTable = ({ onRowClick, onEdit, onIssue }: ChemicalsTablePr
       width: 140,
     },
     {
+      title: 'Kit / Box',
+      key: 'kit_location',
+      width: 180,
+      render: (_text, record) => {
+        if (record.kit_name) {
+          const boxInfo = record.box_number ? ` / Box ${record.box_number}` : '';
+          return (
+            <Space direction="vertical" size={0}>
+              <Text strong>{record.kit_name}</Text>
+              {boxInfo && <Text type="secondary" style={{ fontSize: '12px' }}>{boxInfo}</Text>}
+            </Space>
+          );
+        }
+        return '—';
+      },
+    },
+    {
+      title: 'Warehouse',
+      dataIndex: 'warehouse_name',
+      key: 'warehouse_name',
+      width: 140,
+      render: (_text, record) => record.warehouse_name || record.warehouse_id || '—',
+    },
+    {
+      title: 'Location',
+      dataIndex: 'location',
+      key: 'location',
+      width: 120,
+      render: (location, record) => {
+        if (!location) return '—';
+        return (
+          <Tooltip title={`${record.warehouse_name || 'Warehouse'}: ${location}`}>
+            <Text>{location}</Text>
+          </Tooltip>
+        );
+      },
+    },
+    {
       title: 'Description',
       dataIndex: 'description',
       key: 'description',
       ellipsis: true,
+      width: 200,
     },
     {
-      title: 'Manufacturer',
-      dataIndex: 'manufacturer',
-      key: 'manufacturer',
-      width: 160,
-      render: (text) => text || '—',
+      title: 'Category',
+      dataIndex: 'category',
+      key: 'category',
+      width: 140,
+      render: (category) => category || '—',
+      filters: [
+        { text: 'Adhesive', value: 'Adhesive' },
+        { text: 'Cleaner', value: 'Cleaner' },
+        { text: 'Coating', value: 'Coating' },
+        { text: 'Lubricant', value: 'Lubricant' },
+        { text: 'Paint', value: 'Paint' },
+        { text: 'Sealant', value: 'Sealant' },
+        { text: 'Solvent', value: 'Solvent' },
+        { text: 'Other', value: 'Other' },
+      ],
+      onFilter: (value, record) => record.category === value,
     },
     {
       title: 'Quantity',
@@ -149,13 +215,6 @@ export const ChemicalsTable = ({ onRowClick, onEdit, onIssue }: ChemicalsTablePr
       sorter: (a, b) =>
         (a.expiration_date ? dayjs(a.expiration_date).valueOf() : 0) -
         (b.expiration_date ? dayjs(b.expiration_date).valueOf() : 0),
-    },
-    {
-      title: 'Warehouse',
-      dataIndex: 'warehouse_name',
-      key: 'warehouse_name',
-      width: 160,
-      render: (_text, record) => record.warehouse_name || record.warehouse_id || '—',
     },
     {
       title: 'Actions',

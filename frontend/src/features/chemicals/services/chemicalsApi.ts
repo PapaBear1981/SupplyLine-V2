@@ -22,6 +22,7 @@ export const chemicalsApi = baseApi.injectEndpoints({
             ...(queryParams.q && { q: queryParams.q }),
             ...(queryParams.status && { status: queryParams.status }),
             ...(queryParams.category && { category: queryParams.category }),
+            ...(queryParams.warehouse_id && { warehouse_id: queryParams.warehouse_id }),
             ...(queryParams.archived !== undefined && {
               archived: queryParams.archived,
             }),
