@@ -26,6 +26,7 @@ import {
   useUnlockUserMutation,
   useUpdateUserMutation,
 } from '../services/usersApi';
+import { useGetWarehousesQuery } from '@features/warehouses/services/warehousesApi';
 import type { CreateUserRequest, UserFormValues } from '../types';
 
 const { Text } = Typography;
@@ -52,6 +53,7 @@ export const UserDrawer = ({
     skip: !userId || initialMode === 'create',
   });
   const { data: departments } = useGetDepartmentsQuery();
+  const { data: warehousesData } = useGetWarehousesQuery({ per_page: 1000 });
 
   const [createUser, { isLoading: isCreating }] = useCreateUserMutation();
   const [updateUser, { isLoading: isUpdating }] = useUpdateUserMutation();
@@ -77,6 +79,7 @@ export const UserDrawer = ({
         email: user.email || undefined,
         is_admin: user.is_admin,
         is_active: user.is_active,
+        warehouse_id: user.warehouse_id || undefined,
         password: undefined,
       });
     }
@@ -107,6 +110,7 @@ export const UserDrawer = ({
           email: values.email,
           is_admin: values.is_admin,
           is_active: values.is_active,
+          warehouse_id: values.warehouse_id,
           password: values.password,
         };
         await createUser(createPayload).unwrap();
@@ -221,6 +225,9 @@ export const UserDrawer = ({
           <Descriptions.Item label="Email">
             {user.email || 'Not provided'}
           </Descriptions.Item>
+          <Descriptions.Item label="Assigned Warehouse">
+            {user.warehouse_name || 'Not assigned'}
+          </Descriptions.Item>
           <Descriptions.Item label="Status">
             <Space size="small" wrap>
               <Tag color={user.is_active ? 'green' : 'red'}>
@@ -300,6 +307,7 @@ export const UserDrawer = ({
         form={form}
         mode={mode}
         departments={departments}
+        warehouses={warehousesData?.warehouses}
         onSubmit={handleSubmit}
         onCancel={() => {
           if (mode === 'create') {

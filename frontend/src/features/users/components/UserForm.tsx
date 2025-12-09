@@ -3,6 +3,7 @@ import { Button, Form, Input, Select, Space, Switch, Typography } from 'antd';
 import { CheckCircleFilled, CloseCircleFilled } from '@ant-design/icons';
 import type { FormInstance } from 'antd';
 import type { Department, UserFormValues } from '../types';
+import type { Warehouse } from '@features/warehouses/types';
 
 const { Text } = Typography;
 
@@ -58,6 +59,7 @@ interface UserFormProps {
   form: FormInstance<UserFormValues>;
   mode: 'create' | 'edit';
   departments?: Department[];
+  warehouses?: Warehouse[];
   onSubmit: (values: UserFormValues) => void;
   onCancel: () => void;
   submitting?: boolean;
@@ -67,6 +69,7 @@ export const UserForm = ({
   form,
   mode,
   departments,
+  warehouses,
   onSubmit,
   onCancel,
   submitting,
@@ -76,6 +79,13 @@ export const UserForm = ({
     value: dept.name,
     disabled: !dept.is_active,
   }));
+
+  const warehouseOptions = (warehouses || [])
+    .filter((w) => w.is_active)
+    .map((warehouse) => ({
+      label: warehouse.name,
+      value: warehouse.id,
+    }));
 
   // Watch password field for real-time validation display
   const password = Form.useWatch('password', form) || '';
@@ -126,6 +136,20 @@ export const UserForm = ({
         rules={[{ type: 'email', message: 'Please enter a valid email' }]}
       >
         <Input placeholder="name@company.com" />
+      </Form.Item>
+
+      <Form.Item
+        label="Assigned Warehouse"
+        name="warehouse_id"
+        tooltip="Assign this user to a warehouse to track their work location"
+      >
+        <Select
+          placeholder="Select warehouse (optional)"
+          options={warehouseOptions}
+          showSearch
+          optionFilterProp="label"
+          allowClear
+        />
       </Form.Item>
 
       <Form.Item

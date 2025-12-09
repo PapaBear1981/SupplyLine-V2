@@ -53,6 +53,8 @@ export interface User {
   account_locked?: boolean;
   account_locked_until?: string | null;
   last_failed_login?: string | null;
+  warehouse_id?: number | null;
+  warehouse_name?: string | null;
   roles?: UserRole[];
   permissions?: string[];  // Effective permissions
   role_permissions?: string[];  // Role-based permissions only
@@ -80,6 +82,7 @@ export interface UserFormValues {
   email?: string | null;
   is_admin?: boolean;
   is_active?: boolean;
+  warehouse_id?: number | null;
   password?: string;
 }
 

@@ -81,7 +81,8 @@ def users_route():
         employee_number=data.get("employee_number"),
         department=data.get("department"),
         is_admin=data.get("is_admin", False),
-        is_active=data.get("is_active", True)
+        is_active=data.get("is_active", True),
+        warehouse_id=data.get("warehouse_id")
     )
     u.set_password(data.get("password"))
 
@@ -149,6 +150,8 @@ def user_detail_route(id):
             user.is_admin = data["is_admin"]
         if "is_active" in data:
             user.is_active = data["is_active"]
+        if "warehouse_id" in data:
+            user.warehouse_id = data["warehouse_id"]
         if data.get("password"):
             # Validate password strength
             is_valid, errors = password_utils.validate_password_strength(data["password"])
@@ -166,7 +169,8 @@ def user_detail_route(id):
             resource_id=user.id,
             details={
                 "user_name": user.name,
-                "department": user.department
+                "department": user.department,
+                "warehouse_id": user.warehouse_id
             },
             ip_address=request.remote_addr
         )

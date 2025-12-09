@@ -150,7 +150,11 @@ class User(db.Model):
     account_locked_until = db.Column(db.DateTime, nullable=True)
     last_failed_login = db.Column(db.DateTime, nullable=True)
 
+    # Warehouse assignment
+    warehouse_id = db.Column(db.Integer, db.ForeignKey("warehouses.id"), nullable=True)
+
     # Relationships
+    warehouse = db.relationship("Warehouse", backref="assigned_users", foreign_keys=[warehouse_id])
     roles = association_proxy("user_roles", "role")
     password_histories = db.relationship(
         "PasswordHistory",
@@ -413,7 +417,9 @@ class User(db.Model):
             "created_at": self.created_at.isoformat() if self.created_at else None,
             "avatar": self.avatar,
             "force_password_change": self.force_password_change,
-            "password_changed_at": self.password_changed_at.isoformat() if self.password_changed_at else None
+            "password_changed_at": self.password_changed_at.isoformat() if self.password_changed_at else None,
+            "warehouse_id": self.warehouse_id,
+            "warehouse_name": self.warehouse.name if self.warehouse else None
         }
 
         if include_roles:
