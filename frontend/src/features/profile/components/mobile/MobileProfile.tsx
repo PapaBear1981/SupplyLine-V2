@@ -20,6 +20,7 @@ import {
   MailOutline,
   TeamOutline,
   FileOutline,
+  LocationOutline,
 } from 'antd-mobile-icons';
 import { useAppSelector, useAppDispatch } from '@app/hooks';
 import { setCredentials } from '@features/auth/slices/authSlice';
@@ -257,6 +258,12 @@ export const MobileProfile = () => {
             extra={user.department || 'N/A'}
           >
             Department
+          </List.Item>
+          <List.Item
+            prefix={<LocationOutline />}
+            extra={user.warehouse_name || 'Not assigned'}
+          >
+            Assigned Warehouse
           </List.Item>
           <List.Item
             prefix={<UserOutline />}

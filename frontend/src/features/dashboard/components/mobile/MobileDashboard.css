@@ -202,6 +202,86 @@
   font-size: 14px;
 }
 
+/* Warehouse Vitals */
+.warehouse-vitals-swiper {
+  margin-bottom: 8px;
+}
+
+.warehouse-vitals-swiper .adm-swiper {
+  --track-padding: 0;
+}
+
+.swiper-indicator {
+  position: absolute;
+  bottom: 8px;
+  right: 12px;
+  background: rgba(0, 0, 0, 0.5);
+  color: white;
+  padding: 2px 8px;
+  border-radius: 12px;
+  font-size: 12px;
+}
+
+.warehouse-vital-card {
+  padding: 16px;
+  border-radius: 12px;
+}
+
+.warehouse-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+
+.warehouse-name {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--adm-color-text);
+}
+
+.warehouse-location {
+  font-size: 12px;
+  color: var(--adm-color-text-secondary);
+  margin-bottom: 12px;
+  display: flex;
+  align-items: center;
+}
+
+.warehouse-stats {
+  display: flex;
+  justify-content: space-around;
+  padding-top: 12px;
+  border-top: 1px solid var(--adm-border-color);
+}
+
+.warehouse-stat {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  flex: 1;
+  padding: 8px;
+  border-radius: 8px;
+  transition: background 0.2s;
+}
+
+.warehouse-stat:active {
+  background: var(--adm-color-fill-content);
+}
+
+.warehouse-stat-value {
+  font-size: 20px;
+  font-weight: 700;
+  margin-top: 4px;
+  color: var(--adm-color-text);
+}
+
+.warehouse-stat-label {
+  font-size: 11px;
+  color: var(--adm-color-text-secondary);
+  margin-top: 2px;
+}
+
 /* Dark Mode - Support both html.adm-theme-dark and .adm-theme-dark ancestor */
 html.adm-theme-dark .mobile-welcome,
 .adm-theme-dark .mobile-welcome {
@@ -231,6 +311,23 @@ html.adm-theme-dark .quick-action,
 html.adm-theme-dark .section-title,
 .adm-theme-dark .section-title {
   color: rgba(255, 255, 255, 0.85);
+}
+
+html.adm-theme-dark .warehouse-vital-card,
+.adm-theme-dark .warehouse-vital-card {
+  background: #262626;
+}
+
+html.adm-theme-dark .warehouse-name,
+.adm-theme-dark .warehouse-name,
+html.adm-theme-dark .warehouse-stat-value,
+.adm-theme-dark .warehouse-stat-value {
+  color: rgba(255, 255, 255, 0.85);
+}
+
+html.adm-theme-dark .warehouse-stats,
+.adm-theme-dark .warehouse-stats {
+  border-color: #404040;
 }
 
 /* Animations */

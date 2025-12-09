@@ -18,18 +18,29 @@ import {
   Dialog,
   SwipeAction,
   Empty,
+  Tabs,
+  DotLoading,
+  Space,
 } from 'antd-mobile';
 import { AddOutline, FilterOutline, CloseOutline } from 'antd-mobile-icons';
 import {
   ExperimentOutlined,
   ExclamationCircleOutlined,
   ClockCircleOutlined,
+  HistoryOutlined,
+  InfoCircleOutlined,
+  ExportOutlined,
+  PlusCircleOutlined,
+  SplitCellsOutlined,
 } from '@ant-design/icons';
 import dayjs from 'dayjs';
-import { useGetChemicalsQuery, useCreateChemicalMutation, useUpdateChemicalMutation, useDeleteChemicalMutation } from '../../services/chemicalsApi';
+import relativeTime from 'dayjs/plugin/relativeTime';
+import { useGetChemicalsQuery, useCreateChemicalMutation, useUpdateChemicalMutation, useDeleteChemicalMutation, useGetChemicalHistoryQuery } from '../../services/chemicalsApi';
 import { useGetWarehousesQuery } from '@features/warehouses/services/warehousesApi';
-import type { Chemical, ChemicalStatus, ChemicalFormData } from '../../types';
+import type { Chemical, ChemicalStatus, ChemicalFormData, ChemicalHistoryEvent } from '../../types';
 import './MobileChemicalsList.css';
+
+dayjs.extend(relativeTime);
 
 // Status color mapping
 const statusColors: Record<ChemicalStatus, string> = {
@@ -70,6 +81,12 @@ export const MobileChemicalsList = () => {
   const [createChemical, { isLoading: isCreating }] = useCreateChemicalMutation();
   const [updateChemical, { isLoading: isUpdating }] = useUpdateChemicalMutation();
   const [deleteChemical] = useDeleteChemicalMutation();
+
+  // Fetch history when a chemical is selected
+  const { data: historyData, isLoading: historyLoading } = useGetChemicalHistoryQuery(
+    selectedChemical?.id || 0,
+    { skip: !showDetailPopup || !selectedChemical }
+  );
 
   const chemicals = chemicalsData?.chemicals || [];
   const hasMore = chemicalsData ? page < chemicalsData.pagination.pages : false;
@@ -180,6 +197,79 @@ export const MobileChemicalsList = () => {
     } catch {
       Toast.show({ content: 'Failed to save chemical', icon: 'fail' });
     }
+  };
+
+  // Helper to render history event
+  const renderHistoryEvent = (event: ChemicalHistoryEvent) => {
+    const getEventIcon = () => {
+      switch (event.type) {
+        case 'created':
+          return <PlusCircleOutlined style={{ color: '#52c41a' }} />;
+        case 'issuance':
+          return <ExportOutlined style={{ color: '#1890ff' }} />;
+        case 'child_lot_created':
+          return <SplitCellsOutlined style={{ color: '#722ed1' }} />;
+        default:
+          return <HistoryOutlined />;
+      }
+    };
+
+    const getEventColor = () => {
+      switch (event.type) {
+        case 'created':
+          return '#52c41a';
+        case 'issuance':
+          return '#1890ff';
+        case 'child_lot_created':
+          return '#722ed1';
+        default:
+          return '#8c8c8c';
+      }
+    };
+
+    return (
+      <div key={event.id} className="history-event">
+        <div className="history-event-icon" style={{ color: getEventColor() }}>
+          {getEventIcon()}
+        </div>
+        <div className="history-event-content">
+          <div className="history-event-header">
+            <Tag color={getEventColor()} fill="outline" style={{ '--border-radius': '4px' }}>
+              {event.type.replace(/_/g, ' ')}
+            </Tag>
+            <span className="history-event-date">
+              {dayjs(event.event_date).fromNow()}
+            </span>
+          </div>
+          <div className="history-event-details">
+            {event.type === 'created' && (
+              <>
+                <div>Initial quantity: <strong>{event.quantity} {event.unit}</strong></div>
+                {event.description && <div>{event.description}</div>}
+              </>
+            )}
+            {event.type === 'issuance' && (
+              <>
+                <div>Quantity: <strong>{event.quantity} {event.unit}</strong></div>
+                {event.user_name && <div>By: {event.user_name}</div>}
+                {event.hangar && <div>Hangar: {event.hangar}</div>}
+                {event.purpose && <div>Purpose: {event.purpose}</div>}
+                {event.work_order && <div>Work Order: {event.work_order}</div>}
+              </>
+            )}
+            {event.type === 'child_lot_created' && (
+              <>
+                <div>Lot: <strong>{event.lot_number}</strong></div>
+                <div>Quantity: <strong>{event.quantity} {event.unit}</strong></div>
+              </>
+            )}
+          </div>
+          <div className="history-event-time">
+            {dayjs(event.event_date).format('MMM D, YYYY h:mm A')}
+          </div>
+        </div>
+      </div>
+    );
   };
 
   const renderChemicalItem = (chemical: Chemical) => (
@@ -370,8 +460,10 @@ export const MobileChemicalsList = () => {
         bodyStyle={{
           borderTopLeftRadius: 16,
           borderTopRightRadius: 16,
-          maxHeight: '80vh',
-          overflow: 'auto',
+          height: '85vh',
+          overflow: 'hidden',
+          display: 'flex',
+          flexDirection: 'column',
         }}
       >
         {selectedChemical && (
@@ -382,55 +474,123 @@ export const MobileChemicalsList = () => {
                 {selectedChemical.status.replace('_', ' ')}
               </Tag>
             </div>
-            <List>
-              <List.Item extra={selectedChemical.lot_number}>Lot Number</List.Item>
-              {selectedChemical.description && (
-                <List.Item extra={selectedChemical.description}>Description</List.Item>
-              )}
-              {selectedChemical.manufacturer && (
-                <List.Item extra={selectedChemical.manufacturer}>Manufacturer</List.Item>
-              )}
-              <List.Item extra={`${selectedChemical.quantity} ${selectedChemical.unit}`}>Quantity</List.Item>
-              {selectedChemical.location && (
-                <List.Item extra={selectedChemical.location}>Location</List.Item>
-              )}
-              {selectedChemical.category && (
-                <List.Item extra={selectedChemical.category}>Category</List.Item>
-              )}
-              {selectedChemical.warehouse_name && (
-                <List.Item extra={selectedChemical.warehouse_name}>Warehouse</List.Item>
-              )}
-              {selectedChemical.expiration_date && (
-                <List.Item
-                  extra={
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                      {dayjs(selectedChemical.expiration_date).format('MMM D, YYYY')}
-                      {selectedChemical.expiring_soon && (
-                        <Tag color="#faad14" fill="outline">Soon</Tag>
-                      )}
+            <Tabs className="detail-tabs">
+              <Tabs.Tab
+                title={
+                  <Space align="center">
+                    <InfoCircleOutlined />
+                    <span>Details</span>
+                  </Space>
+                }
+                key="details"
+              >
+                <div className="tab-content">
+                  <List>
+                    <List.Item extra={selectedChemical.lot_number}>Lot Number</List.Item>
+                    {selectedChemical.description && (
+                      <List.Item extra={selectedChemical.description}>Description</List.Item>
+                    )}
+                    {selectedChemical.manufacturer && (
+                      <List.Item extra={selectedChemical.manufacturer}>Manufacturer</List.Item>
+                    )}
+                    <List.Item extra={`${selectedChemical.quantity} ${selectedChemical.unit}`}>Quantity</List.Item>
+                    {selectedChemical.location && (
+                      <List.Item extra={selectedChemical.location}>Location</List.Item>
+                    )}
+                    {selectedChemical.category && (
+                      <List.Item extra={selectedChemical.category}>Category</List.Item>
+                    )}
+                    {selectedChemical.warehouse_name && (
+                      <List.Item extra={selectedChemical.warehouse_name}>Warehouse</List.Item>
+                    )}
+                    {selectedChemical.kit_name && (
+                      <List.Item extra={selectedChemical.kit_name}>Kit</List.Item>
+                    )}
+                    {selectedChemical.box_number && (
+                      <List.Item extra={selectedChemical.box_number}>Box</List.Item>
+                    )}
+                    {selectedChemical.expiration_date && (
+                      <List.Item
+                        extra={
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                            {dayjs(selectedChemical.expiration_date).format('MMM D, YYYY')}
+                            {selectedChemical.expiring_soon && (
+                              <Tag color="#faad14" fill="outline">Soon</Tag>
+                            )}
+                          </div>
+                        }
+                      >
+                        Expiration Date
+                      </List.Item>
+                    )}
+                    {selectedChemical.minimum_stock_level && (
+                      <List.Item extra={selectedChemical.minimum_stock_level}>Minimum Stock Level</List.Item>
+                    )}
+                    <List.Item extra={dayjs(selectedChemical.date_added).format('MMM D, YYYY')}>
+                      Date Added
+                    </List.Item>
+                    {selectedChemical.parent_lot_number && (
+                      <List.Item extra={selectedChemical.parent_lot_number}>Parent Lot</List.Item>
+                    )}
+                    {selectedChemical.notes && (
+                      <List.Item>
+                        <div>
+                          <div style={{ fontWeight: 500, marginBottom: 4 }}>Notes</div>
+                          <div style={{ color: 'var(--adm-color-text-secondary)', fontSize: 14 }}>
+                            {selectedChemical.notes}
+                          </div>
+                        </div>
+                      </List.Item>
+                    )}
+                  </List>
+                </div>
+              </Tabs.Tab>
+              <Tabs.Tab
+                title={
+                  <Space align="center">
+                    <HistoryOutlined />
+                    <span>History</span>
+                    {historyData?.history && historyData.history.length > 0 && (
+                      <Tag color="primary" fill="solid" style={{ '--border-radius': '10px', marginLeft: 4 }}>
+                        {historyData.history.length}
+                      </Tag>
+                    )}
+                  </Space>
+                }
+                key="history"
+              >
+                <div className="tab-content">
+                  {historyLoading ? (
+                    <div className="history-loading">
+                      <DotLoading color="primary" />
+                      <span>Loading history...</span>
                     </div>
-                  }
-                >
-                  Expiration Date
-                </List.Item>
-              )}
-              {selectedChemical.minimum_stock_level && (
-                <List.Item extra={selectedChemical.minimum_stock_level}>Minimum Stock Level</List.Item>
-              )}
-              <List.Item extra={dayjs(selectedChemical.date_added).format('MMM D, YYYY')}>
-                Date Added
-              </List.Item>
-              {selectedChemical.notes && (
-                <List.Item>
-                  <div>
-                    <div style={{ fontWeight: 500, marginBottom: 4 }}>Notes</div>
-                    <div style={{ color: 'var(--adm-color-text-secondary)', fontSize: 14 }}>
-                      {selectedChemical.notes}
-                    </div>
-                  </div>
-                </List.Item>
-              )}
-            </List>
+                  ) : historyData?.history && historyData.history.length > 0 ? (
+                    <>
+                      <div className="history-summary">
+                        <Space wrap>
+                          {historyData.total_issuances > 0 && (
+                            <Tag color="#1890ff" fill="outline">
+                              {historyData.total_issuances} Issuance{historyData.total_issuances !== 1 ? 's' : ''}
+                            </Tag>
+                          )}
+                          {historyData.total_child_lots > 0 && (
+                            <Tag color="#722ed1" fill="outline">
+                              {historyData.total_child_lots} Child Lot{historyData.total_child_lots !== 1 ? 's' : ''}
+                            </Tag>
+                          )}
+                        </Space>
+                      </div>
+                      <div className="history-timeline">
+                        {historyData.history.map(renderHistoryEvent)}
+                      </div>
+                    </>
+                  ) : (
+                    <Empty description="No history available" style={{ padding: '48px 0' }} />
+                  )}
+                </div>
+              </Tabs.Tab>
+            </Tabs>
             <div className="detail-actions">
               <Button block color="primary" onClick={() => handleEdit(selectedChemical)}>
                 Edit Chemical

@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Card,
@@ -12,6 +12,7 @@ import {
   Badge,
   Popup,
   Button,
+  Swiper,
 } from 'antd-mobile';
 import {
   RightOutline,
@@ -29,6 +30,8 @@ import {
   ShoppingCartOutlined,
   SwapOutlined,
   PlusOutlined,
+  EnvironmentOutlined,
+  AppstoreOutlined,
 } from '@ant-design/icons';
 import { useAppSelector } from '@app/hooks';
 import { ROUTES } from '@shared/constants/routes';
@@ -115,6 +118,11 @@ export const MobileDashboard = () => {
         return priorityA - priorityB;
       });
   }, [announcements]);
+
+  // Get active warehouses
+  const activeWarehouses = useMemo(() => {
+    return (warehousesData?.warehouses || []).filter((w) => w.is_active);
+  }, [warehousesData]);
 
   const hasMoreAnnouncements = activeAnnouncements.length > 1;
   const topAnnouncement = activeAnnouncements[0];
@@ -302,6 +310,89 @@ export const MobileDashboard = () => {
           </div>
         ))}
       </div>
+
+      {/* Warehouse Vitals */}
+      {activeWarehouses.length > 0 && (
+        <>
+          <div className="section-title" style={{ marginTop: 20 }}>
+            <span>Warehouse Vitals</span>
+            <RightOutline
+              className="section-more"
+              onClick={() => navigate(ROUTES.WAREHOUSES)}
+            />
+          </div>
+          <div className="warehouse-vitals-swiper">
+            {warehousesLoading ? (
+              <Card style={{ padding: 16 }}>
+                <Skeleton.Paragraph lineCount={3} animated />
+              </Card>
+            ) : (
+              <Swiper
+                indicator={(total, current) => (
+                  <div className="swiper-indicator">
+                    {current + 1} / {total}
+                  </div>
+                )}
+                style={{ '--border-radius': '12px' }}
+              >
+                {activeWarehouses.map((warehouse) => (
+                  <Swiper.Item key={warehouse.id}>
+                    <Card
+                      className="warehouse-vital-card"
+                      onClick={() => navigate(`${ROUTES.WAREHOUSES}/${warehouse.id}`)}
+                    >
+                      <div className="warehouse-header">
+                        <div className="warehouse-name">{warehouse.name}</div>
+                        <Tag
+                          color={warehouse.warehouse_type === 'main' ? 'primary' : 'success'}
+                          fill="outline"
+                        >
+                          {warehouse.warehouse_type === 'main' ? 'Main' : 'Satellite'}
+                        </Tag>
+                      </div>
+                      {(warehouse.city || warehouse.state) && (
+                        <div className="warehouse-location">
+                          <EnvironmentOutlined style={{ marginRight: 4 }} />
+                          {[warehouse.city, warehouse.state].filter(Boolean).join(', ')}
+                        </div>
+                      )}
+                      <div className="warehouse-stats">
+                        <div
+                          className="warehouse-stat"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            navigate(`${ROUTES.TOOLS}?warehouse_id=${warehouse.id}`);
+                          }}
+                        >
+                          <ToolOutlined style={{ color: '#1890ff', fontSize: 20 }} />
+                          <div className="warehouse-stat-value">{warehouse.tools_count ?? 0}</div>
+                          <div className="warehouse-stat-label">Tools</div>
+                        </div>
+                        <div
+                          className="warehouse-stat"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            navigate(`${ROUTES.CHEMICALS}?warehouse_id=${warehouse.id}`);
+                          }}
+                        >
+                          <ExperimentOutlined style={{ color: '#52c41a', fontSize: 20 }} />
+                          <div className="warehouse-stat-value">{warehouse.chemicals_count ?? 0}</div>
+                          <div className="warehouse-stat-label">Chemicals</div>
+                        </div>
+                        <div className="warehouse-stat">
+                          <AppstoreOutlined style={{ color: '#722ed1', fontSize: 20 }} />
+                          <div className="warehouse-stat-value">{warehouse.expendables_count ?? 0}</div>
+                          <div className="warehouse-stat-label">Expendables</div>
+                        </div>
+                      </div>
+                    </Card>
+                  </Swiper.Item>
+                ))}
+              </Swiper>
+            )}
+          </div>
+        </>
+      )}
 
       {/* Quick Actions */}
       <div className="section-title" style={{ marginTop: 20 }}>Quick Actions</div>
