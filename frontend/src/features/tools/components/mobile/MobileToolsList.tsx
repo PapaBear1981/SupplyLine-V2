@@ -126,21 +126,29 @@ export const MobileToolsList = () => {
   const handleEdit = (tool: Tool) => {
     setFormMode('edit');
     setSelectedTool(tool);
+    // Reset form first to clear any previous state
+    form.resetFields();
+    // Then set values with proper fallbacks
     form.setFieldsValue({
-      tool_number: tool.tool_number,
-      serial_number: tool.serial_number,
+      tool_number: tool.tool_number || '',
+      serial_number: tool.serial_number || '',
       lot_number: tool.lot_number || '',
-      description: tool.description,
-      condition: tool.condition,
-      location: tool.location,
+      description: tool.description || '',
+      condition: tool.condition || '', // Ensure condition is populated
+      location: tool.location || '',
       category: tool.category || '',
-      status: tool.status,
-      warehouse_id: tool.warehouse_id,
-      requires_calibration: tool.requires_calibration,
-      calibration_frequency_days: tool.calibration_frequency_days,
+      status: tool.status ? [tool.status] : undefined, // Picker expects array value
+      warehouse_id: tool.warehouse_id ? [tool.warehouse_id] : undefined, // Picker expects array value
+      requires_calibration: tool.requires_calibration || false,
+      calibration_frequency_days: tool.calibration_frequency_days || undefined,
     });
     setShowDetailPopup(false);
     setShowFormPopup(true);
+  };
+
+  const handleCloseForm = () => {
+    form.resetFields();
+    setShowFormPopup(false);
   };
 
   const handleDelete = async (tool: Tool) => {
@@ -161,6 +169,10 @@ export const MobileToolsList = () => {
   const handleFormSubmit = async () => {
     try {
       const values = await form.validateFields();
+      // Extract values from Picker arrays (Picker returns [value] format)
+      const statusValue = Array.isArray(values.status) ? values.status[0] : values.status;
+      const warehouseValue = Array.isArray(values.warehouse_id) ? values.warehouse_id[0] : values.warehouse_id;
+
       const formData: ToolFormData = {
         tool_number: values.tool_number,
         serial_number: values.serial_number,
@@ -169,8 +181,8 @@ export const MobileToolsList = () => {
         condition: values.condition,
         location: values.location,
         category: values.category || undefined,
-        status: values.status || 'available',
-        warehouse_id: values.warehouse_id || undefined,
+        status: statusValue || 'available',
+        warehouse_id: warehouseValue || undefined,
         requires_calibration: values.requires_calibration || false,
         calibration_frequency_days: values.calibration_frequency_days || undefined,
       };
@@ -438,7 +450,7 @@ export const MobileToolsList = () => {
       {/* Tool Form Popup */}
       <Popup
         visible={showFormPopup}
-        onMaskClick={() => setShowFormPopup(false)}
+        onMaskClick={handleCloseForm}
         position="bottom"
         bodyStyle={{
           borderTopLeftRadius: 16,
@@ -450,20 +462,29 @@ export const MobileToolsList = () => {
         <div className="form-popup">
           <div className="form-header">
             <span>{formMode === 'create' ? 'Add New Tool' : 'Edit Tool'}</span>
-            <CloseOutline onClick={() => setShowFormPopup(false)} />
+            <CloseOutline onClick={handleCloseForm} />
           </div>
           <Form
             form={form}
             layout="vertical"
             footer={
-              <Button
-                block
-                color="primary"
-                loading={isCreating || isUpdating}
-                onClick={handleFormSubmit}
-              >
-                {formMode === 'create' ? 'Create Tool' : 'Save Changes'}
-              </Button>
+              <div style={{ display: 'flex', gap: 12 }}>
+                <Button
+                  block
+                  fill="outline"
+                  onClick={handleCloseForm}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  block
+                  color="primary"
+                  loading={isCreating || isUpdating}
+                  onClick={handleFormSubmit}
+                >
+                  {formMode === 'create' ? 'Create Tool' : 'Save Changes'}
+                </Button>
+              </div>
             }
           >
             <Form.Item
@@ -511,20 +532,22 @@ export const MobileToolsList = () => {
               name="status"
               label="Status"
               trigger="onConfirm"
+              getValueFromEvent={(val: (string | number)[]) => val}
               onClick={(_e, pickerRef) => pickerRef.current?.open()}
             >
               <Picker columns={statusOptions}>
-                {(items) => items[0]?.label || 'Select status'}
+                {(items) => items?.[0]?.label ?? 'Select status'}
               </Picker>
             </Form.Item>
             <Form.Item
               name="warehouse_id"
               label="Warehouse"
               trigger="onConfirm"
+              getValueFromEvent={(val: (string | number)[]) => val}
               onClick={(_e, pickerRef) => pickerRef.current?.open()}
             >
               <Picker columns={warehouseOptions}>
-                {(items) => items[0]?.label || 'Select warehouse'}
+                {(items) => items?.[0]?.label ?? 'Select warehouse'}
               </Picker>
             </Form.Item>
             <Form.Item
