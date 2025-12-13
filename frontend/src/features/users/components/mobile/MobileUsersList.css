@@ -1,0 +1,232 @@
+.mobile-users-list {
+  padding-bottom: 80px;
+}
+
+.search-bar-container {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+  background: var(--adm-color-background);
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+
+.search-bar {
+  flex: 1;
+}
+
+.filter-button {
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--adm-color-fill-content);
+  border-radius: 8px;
+  font-size: 20px;
+  color: var(--adm-color-text-secondary);
+  position: relative;
+}
+
+.filter-button.active {
+  background: var(--adm-color-primary);
+  color: white;
+}
+
+.filter-badge {
+  position: absolute;
+  top: -4px;
+  right: -4px;
+  width: 18px;
+  height: 18px;
+  background: #ff4d4f;
+  color: white;
+  border-radius: 50%;
+  font-size: 11px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.active-filters {
+  padding: 0 16px 12px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.user-item-title {
+  font-weight: 600;
+  font-size: 15px;
+}
+
+.user-item-subtitle {
+  font-size: 13px;
+  color: var(--adm-color-text-secondary);
+  margin-top: 2px;
+}
+
+.user-item-desc {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 4px;
+}
+
+.user-item-desc > span {
+  font-size: 13px;
+  color: var(--adm-color-text-secondary);
+}
+
+.user-item-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.user-item-tags .adm-tag {
+  font-size: 11px;
+  padding: 2px 6px;
+}
+
+.user-skeleton {
+  height: 80px;
+  margin-bottom: 12px;
+  border-radius: 8px;
+}
+
+/* Filter Popup */
+.filter-popup {
+  padding: 16px;
+}
+
+.filter-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+  font-size: 18px;
+  font-weight: 600;
+}
+
+.filter-options {
+  padding: 12px 0;
+}
+
+/* Detail Popup */
+.detail-popup {
+  padding: 20px 16px;
+}
+
+.detail-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 16px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--adm-border-color);
+}
+
+.detail-user-info {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.detail-title {
+  font-size: 18px;
+  font-weight: 600;
+}
+
+.detail-subtitle {
+  font-size: 14px;
+  color: var(--adm-color-text-secondary);
+  margin-top: 2px;
+}
+
+.detail-badges {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  align-items: flex-end;
+}
+
+.locked-warning {
+  background: #fff2e8;
+  color: #d46b08;
+  padding: 12px 16px;
+  border-radius: 8px;
+  margin-bottom: 16px;
+  font-size: 14px;
+  display: flex;
+  align-items: center;
+}
+
+.detail-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 20px;
+  padding-top: 16px;
+  border-top: 1px solid var(--adm-border-color);
+}
+
+/* Form Popup */
+.form-popup {
+  padding: 16px;
+  padding-bottom: 32px;
+}
+
+.form-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+  font-size: 18px;
+  font-weight: 600;
+}
+
+.form-header svg {
+  font-size: 24px;
+  color: var(--adm-color-text-secondary);
+}
+
+/* Dark mode - Support both html.adm-theme-dark and .adm-theme-dark ancestor */
+html.adm-theme-dark .search-bar-container,
+.adm-theme-dark .search-bar-container {
+  background: #141414;
+}
+
+html.adm-theme-dark .filter-button,
+.adm-theme-dark .filter-button {
+  background: #333;
+}
+
+html.adm-theme-dark .mobile-users-list,
+.adm-theme-dark .mobile-users-list {
+  background-color: #141414;
+}
+
+html.adm-theme-dark .filter-popup,
+.adm-theme-dark .filter-popup,
+html.adm-theme-dark .detail-popup,
+.adm-theme-dark .detail-popup,
+html.adm-theme-dark .form-popup,
+.adm-theme-dark .form-popup {
+  background-color: #1f1f1f;
+}
+
+html.adm-theme-dark .detail-header,
+.adm-theme-dark .detail-header,
+html.adm-theme-dark .detail-actions,
+.adm-theme-dark .detail-actions {
+  border-color: #424242;
+}
+
+html.adm-theme-dark .locked-warning,
+.adm-theme-dark .locked-warning {
+  background: #2a1c10;
+  color: #faad14;
+}

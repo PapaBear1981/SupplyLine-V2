@@ -3,13 +3,21 @@ import { Button, Space, Typography } from 'antd';
 import { PlusOutlined } from '@ant-design/icons';
 import { UsersTable } from '../components/UsersTable';
 import { UserDrawer } from '../components/UserDrawer';
+import { MobileUsersList } from '../components/mobile';
+import { useIsMobile } from '@shared/hooks/useMobile';
 import type { User } from '../types';
 
 const { Title, Paragraph } = Typography;
 
 export const UsersPage = () => {
+  const isMobile = useIsMobile();
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
   const [drawerMode, setDrawerMode] = useState<'view' | 'edit' | 'create' | null>(null);
+
+  // Render mobile version if on mobile device
+  if (isMobile) {
+    return <MobileUsersList />;
+  }
 
   const handleView = (user: User) => {
     setSelectedUser(user);
