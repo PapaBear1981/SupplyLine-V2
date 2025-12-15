@@ -11,6 +11,7 @@ import {
   Tag,
   Space,
   ImageUploader,
+  Collapse,
 } from 'antd-mobile';
 import type { ImageUploadItem } from 'antd-mobile/es/components/image-uploader';
 import {
@@ -21,7 +22,9 @@ import {
   TeamOutline,
   FileOutline,
   LocationOutline,
+  InformationCircleOutline,
 } from 'antd-mobile-icons';
+import { APP_VERSION, VERSION_HISTORY, type VersionRelease } from '@config/version';
 import { useAppSelector, useAppDispatch } from '@app/hooks';
 import { setCredentials } from '@features/auth/slices/authSlice';
 import {
@@ -281,6 +284,51 @@ export const MobileProfile = () => {
           </List.Item>
         </List>
       </Card>
+
+      {/* Version History */}
+      <div className="version-card">
+        <Collapse>
+          <Collapse.Panel
+            key="version-history"
+            title={
+              <div className="version-collapse-header">
+                <div className="version-collapse-title">
+                  <InformationCircleOutline className="version-collapse-icon" />
+                  <span>App Version & Updates</span>
+                </div>
+                <Tag color="primary" style={{ '--border-radius': '4px' }}>
+                  v{APP_VERSION}
+                </Tag>
+              </div>
+            }
+          >
+            <div className="version-history">
+              {VERSION_HISTORY.slice(0, 5).map((release: VersionRelease) => (
+                <div key={release.version} className="release-item">
+                  <div className="release-header">
+                    <Tag
+                      color={
+                        release.type === 'major' ? 'danger' :
+                        release.type === 'minor' ? 'primary' : 'default'
+                      }
+                      style={{ '--border-radius': '4px' }}
+                    >
+                      v{release.version}
+                    </Tag>
+                    <span className="release-date">{release.date}</span>
+                  </div>
+                  <div className="release-title">{release.title}</div>
+                  <ul className="release-highlights">
+                    {release.highlights.map((highlight: string, idx: number) => (
+                      <li key={idx}>{highlight}</li>
+                    ))}
+                  </ul>
+                </div>
+              ))}
+            </div>
+          </Collapse.Panel>
+        </Collapse>
+      </div>
 
       {/* Edit Profile Popup */}
       <Popup

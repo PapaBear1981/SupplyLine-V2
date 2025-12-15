@@ -12,13 +12,18 @@ import {
   message,
   Tag,
   Spin,
+  Timeline,
+  Collapse,
 } from 'antd';
 import {
   UserOutlined,
   EditOutlined,
   LockOutlined,
   UploadOutlined,
+  InfoCircleOutlined,
+  RocketOutlined,
 } from '@ant-design/icons';
+import { APP_VERSION, VERSION_HISTORY, type VersionRelease } from '@config/version';
 import type { UploadProps } from 'antd';
 import { useAppSelector, useAppDispatch } from '@app/hooks';
 import { setCredentials } from '@features/auth/slices/authSlice';
@@ -204,6 +209,52 @@ export const ProfilePage = () => {
             </Descriptions.Item>
           </Descriptions>
         </Card>
+
+        {/* Version History */}
+        <Collapse
+          defaultActiveKey={[]}
+          items={[
+            {
+              key: 'version-history',
+              label: (
+                <Space>
+                  <InfoCircleOutlined />
+                  <span>App Version & Updates</span>
+                  <Tag color="blue" icon={<RocketOutlined />} style={{ marginLeft: 8 }}>
+                    v{APP_VERSION}
+                  </Tag>
+                </Space>
+              ),
+              children: (
+                <Timeline
+                  items={VERSION_HISTORY.map((release: VersionRelease) => ({
+                    color: release.type === 'major' ? 'red' : release.type === 'minor' ? 'blue' : 'gray',
+                    children: (
+                      <div key={release.version}>
+                        <div style={{ marginBottom: 8 }}>
+                          <Space>
+                            <Tag color={release.type === 'major' ? 'red' : release.type === 'minor' ? 'blue' : 'default'}>
+                              v{release.version}
+                            </Tag>
+                            <Text type="secondary">{release.date}</Text>
+                          </Space>
+                        </div>
+                        <Title level={5} style={{ margin: '0 0 8px 0' }}>{release.title}</Title>
+                        <ul style={{ margin: 0, paddingLeft: 20 }}>
+                          {release.highlights.map((highlight: string, idx: number) => (
+                            <li key={idx} style={{ marginBottom: 4 }}>
+                              <Text type="secondary">{highlight}</Text>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    ),
+                  }))}
+                />
+              ),
+            },
+          ]}
+        />
       </Space>
 
       {/* Modals */}
