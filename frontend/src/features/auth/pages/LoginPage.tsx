@@ -1,8 +1,9 @@
 import { Form, Input, Button, Typography, Divider, message } from 'antd';
 import { UserOutlined, LockOutlined, ArrowRightOutlined } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
+import { useEffect } from 'react';
 import { useLoginMutation } from '../services/authApi';
-import { useAppDispatch } from '@app/hooks';
+import { useAppDispatch, useAppSelector } from '@app/hooks';
 import { setCredentials } from '../slices/authSlice';
 import { socketService } from '@services/socket';
 import { ROUTES } from '@shared/constants/routes';
@@ -17,7 +18,15 @@ export const LoginPage = () => {
   const isMobile = useIsMobile();
   const navigate = useNavigate();
   const dispatch = useAppDispatch();
+  const isAuthenticated = useAppSelector((state) => state.auth.isAuthenticated);
   const [login, { isLoading }] = useLoginMutation();
+
+  // Redirect to dashboard if already authenticated (skip for mobile since MobileLoginForm handles it)
+  useEffect(() => {
+    if (isAuthenticated && !isMobile) {
+      navigate(ROUTES.DASHBOARD, { replace: true });
+    }
+  }, [isAuthenticated, navigate, isMobile]);
 
   // Render mobile version if on mobile device
   if (isMobile) {

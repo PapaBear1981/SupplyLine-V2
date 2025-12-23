@@ -223,6 +223,16 @@ export interface KitReorderRequest {
   is_automatic: boolean;
   image_path?: string;
   message_count?: number;
+  user_request?: {
+    id: number;
+    request_number: string;
+    status: string;
+  };
+  procurement_orders?: Array<{
+    id: number;
+    order_number: string;
+    status: string;
+  }>;
 }
 
 // Kit Message
@@ -363,6 +373,23 @@ export interface KitReorderFormData {
   priority: ReorderPriority;
   notes?: string;
   image_path?: string;
+}
+
+export interface CreateReorderRequest {
+  item_type: ItemType;
+  item_id?: number;
+  part_number: string;
+  description: string;
+  quantity_requested: number;
+  priority?: ReorderPriority;
+  notes?: string;
+  image?: File;
+}
+
+export interface ReorderFilters {
+  status?: ReorderStatus;
+  priority?: ReorderPriority;
+  is_automatic?: boolean;
 }
 
 // Query params

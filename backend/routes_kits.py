@@ -818,6 +818,157 @@ def register_kit_routes(app):
 
         return jsonify(result), 200
 
+    @app.route("/api/kits/<int:kit_id>/items/<int:item_id>/details", methods=["GET"])
+    @jwt_required
+    @handle_errors
+    def get_kit_item_details(kit_id, item_id):
+        """Get detailed information and history for a specific kit item"""
+        from models import Chemical, Expendable, Tool
+        from models_kits import KitIssuance
+
+        logger.info(f"Fetching item details for kit_id={kit_id}, item_id={item_id}")
+
+        kit = Kit.query.get_or_404(kit_id)
+
+        # Try to find the item in KitItem table first
+        kit_item = KitItem.query.filter_by(id=item_id, kit_id=kit_id).first()
+
+        # If not found, try old KitExpendable table for backward compatibility
+        if not kit_item:
+            from models_kits import KitExpendable
+            kit_expendable = KitExpendable.query.filter_by(id=item_id, kit_id=kit_id).first()
+
+            if not kit_expendable:
+                logger.error(f"Item not found in KitItem or KitExpendable: id={item_id}, kit_id={kit_id}")
+                return jsonify({"error": f"Item {item_id} not found in kit {kit_id}"}), 404
+
+            # Handle old KitExpendable
+            item_details = {
+                "id": kit_expendable.id,
+                "kit_id": kit_expendable.kit_id,
+                "kit_name": kit.name,
+                "box_id": kit_expendable.box_id,
+                "box_number": kit_expendable.box.box_number if kit_expendable.box else None,
+                "item_type": "expendable",
+                "item_id": kit_expendable.id,
+                "quantity": kit_expendable.quantity,
+                "location": kit_expendable.location,
+                "status": kit_expendable.status,
+                "part_number": kit_expendable.part_number,
+                "serial_number": kit_expendable.serial_number,
+                "lot_number": kit_expendable.lot_number,
+                "description": kit_expendable.description,
+                "unit": kit_expendable.unit,
+                "minimum_stock_level": kit_expendable.minimum_stock_level,
+                "tracking_type": kit_expendable.tracking_type,
+                "added_date": kit_expendable.added_date.isoformat() if kit_expendable.added_date else None,
+                "last_updated": kit_expendable.last_updated.isoformat() if kit_expendable.last_updated else None,
+            }
+
+            # Get issuance history
+            history_query = KitIssuance.query.filter_by(kit_id=kit_id)
+            if kit_expendable.part_number:
+                history_query = history_query.filter(KitIssuance.part_number == kit_expendable.part_number)
+            if kit_expendable.lot_number:
+                history_query = history_query.filter(KitIssuance.lot_number == kit_expendable.lot_number)
+
+            issuances = history_query.order_by(KitIssuance.issued_date.desc()).all()
+            history = []
+            for issuance in issuances:
+                issuance_dict = issuance.to_dict()
+                if issuance.issued_by_user:
+                    issuance_dict["issued_by_name"] = issuance.issued_by_user.name
+                history.append(issuance_dict)
+
+            return jsonify({
+                "item": item_details,
+                "history": history,
+                "total_issuances": len(history)
+            }), 200
+
+        # Get the full item details based on item type
+        item_details = {
+            "id": kit_item.id,
+            "kit_id": kit_item.kit_id,
+            "kit_name": kit.name,
+            "box_id": kit_item.box_id,
+            "box_number": kit_item.box.box_number if kit_item.box else None,
+            "item_type": kit_item.item_type,
+            "item_id": kit_item.item_id,
+            "quantity": kit_item.quantity,
+            "location": kit_item.location,
+            "status": kit_item.status,
+            "added_date": kit_item.added_date.isoformat() if kit_item.added_date else None,
+            "last_updated": kit_item.last_updated.isoformat() if kit_item.last_updated else None,
+        }
+
+        # Get additional details from the source item
+        if kit_item.item_type == "tool":
+            tool = db.session.get(Tool, kit_item.item_id)
+            if tool:
+                item_details.update({
+                    "part_number": tool.tool_number,
+                    "serial_number": tool.serial_number,
+                    "description": tool.description,
+                    "manufacturer": tool.manufacturer,
+                    "model": tool.model,
+                    "category": tool.category,
+                    "warehouse_id": tool.warehouse_id,
+                })
+        elif kit_item.item_type == "chemical":
+            chemical = db.session.get(Chemical, kit_item.item_id)
+            if chemical:
+                item_details.update({
+                    "part_number": chemical.part_number,
+                    "lot_number": chemical.lot_number,
+                    "description": chemical.description,
+                    "manufacturer": chemical.manufacturer,
+                    "unit": chemical.unit,
+                    "warehouse_id": chemical.warehouse_id,
+                })
+        elif kit_item.item_type == "expendable":
+            expendable = db.session.get(Expendable, kit_item.item_id)
+            if expendable:
+                item_details.update({
+                    "part_number": expendable.part_number,
+                    "serial_number": expendable.serial_number,
+                    "lot_number": expendable.lot_number,
+                    "description": expendable.description,
+                    "manufacturer": expendable.manufacturer,
+                    "unit": expendable.unit,
+                    "category": expendable.category,
+                    "minimum_stock_level": kit_item.minimum_stock_level,
+                    "tracking_type": expendable.tracking_type,
+                })
+
+        # Get issuance history for this specific item
+        # Filter by part_number/lot_number combination
+        part_number = item_details.get("part_number")
+        lot_number = item_details.get("lot_number")
+
+        history_query = KitIssuance.query.filter_by(kit_id=kit_id)
+
+        if part_number:
+            history_query = history_query.filter(KitIssuance.part_number == part_number)
+        if lot_number:
+            history_query = history_query.filter(KitIssuance.lot_number == lot_number)
+
+        issuances = history_query.order_by(KitIssuance.issued_date.desc()).all()
+
+        history = []
+        for issuance in issuances:
+            issuance_dict = issuance.to_dict()
+            # Add user name if available
+            if issuance.issued_by_user:
+                issuance_dict["issued_by_name"] = issuance.issued_by_user.name
+            history.append(issuance_dict)
+
+        return jsonify({
+            "item": item_details,
+            "history": history,
+            "total_issuances": len(history)
+        }), 200
+
     @app.route("/api/kits/<int:kit_id>/items", methods=["POST"])
     @materials_required
     @handle_errors

@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Card,
@@ -10,6 +10,8 @@ import {
   Space,
   DotLoading,
   Badge,
+  Popup,
+  Button,
 } from 'antd-mobile';
 import {
   RightOutline,
@@ -43,6 +45,7 @@ import './MobileDashboard.css';
 export const MobileDashboard = () => {
   const navigate = useNavigate();
   const user = useAppSelector((state) => state.auth.user);
+  const [announcementsPopupOpen, setAnnouncementsPopupOpen] = useState(false);
 
   // Fetch data
   const { data: toolsData, isLoading: toolsLoading } = useGetToolsQuery({ per_page: 1000 });
@@ -101,8 +104,20 @@ export const MobileDashboard = () => {
     return count;
   }, [toolStats, chemicalStats]);
 
-  // Get active announcement
-  const activeAnnouncement = announcements?.[0];
+  // Get active announcements
+  const activeAnnouncements = useMemo(() => {
+    return (announcements || [])
+      .filter((a) => a.is_active)
+      .sort((a, b) => {
+        const priorityOrder: Record<string, number> = { urgent: 0, high: 1, medium: 2, low: 3 };
+        const priorityA = priorityOrder[a.priority] ?? 4;
+        const priorityB = priorityOrder[b.priority] ?? 4;
+        return priorityA - priorityB;
+      });
+  }, [announcements]);
+
+  const hasMoreAnnouncements = activeAnnouncements.length > 1;
+  const topAnnouncement = activeAnnouncements[0];
 
   const isLoading = toolsLoading || chemicalsLoading || kitsLoading || warehousesLoading;
 
@@ -219,12 +234,23 @@ export const MobileDashboard = () => {
       </div>
 
       {/* Announcement Banner */}
-      {activeAnnouncement && (
-        <NoticeBar
-          content={activeAnnouncement.title}
-          color={activeAnnouncement.priority === 'urgent' ? 'error' : 'info'}
-          style={{ marginBottom: 16 }}
-        />
+      {topAnnouncement && (
+        <div style={{ marginBottom: 16 }}>
+          <NoticeBar
+            content={topAnnouncement.title}
+            color={topAnnouncement.priority === 'urgent' ? 'error' : 'info'}
+            extra={
+              hasMoreAnnouncements && (
+                <span
+                  style={{ fontSize: 12, color: 'var(--adm-color-primary)', cursor: 'pointer' }}
+                  onClick={() => setAnnouncementsPopupOpen(true)}
+                >
+                  +{activeAnnouncements.length - 1} more
+                </span>
+              )
+            }
+          />
+        </div>
       )}
 
       {/* Stats Grid */}
@@ -331,6 +357,50 @@ export const MobileDashboard = () => {
           </div>
         )}
       </Card>
+
+      {/* All Announcements Popup */}
+      <Popup
+        visible={announcementsPopupOpen}
+        onMaskClick={() => setAnnouncementsPopupOpen(false)}
+        position="bottom"
+        bodyStyle={{ minHeight: '40vh', maxHeight: '80vh', overflow: 'auto', padding: 16 }}
+      >
+        <div style={{ marginBottom: 16 }}>
+          <h3 style={{ margin: 0 }}>All Announcements ({activeAnnouncements.length})</h3>
+        </div>
+        <List>
+          {activeAnnouncements.map((announcement) => (
+            <List.Item
+              key={announcement.id}
+              description={announcement.message}
+              extra={
+                <Tag
+                  color={
+                    announcement.priority === 'urgent'
+                      ? 'danger'
+                      : announcement.priority === 'high'
+                      ? 'warning'
+                      : 'primary'
+                  }
+                >
+                  {announcement.priority.toUpperCase()}
+                </Tag>
+              }
+            >
+              {announcement.title}
+            </List.Item>
+          ))}
+        </List>
+        <div style={{ marginTop: 16 }}>
+          <Button
+            block
+            color="primary"
+            onClick={() => setAnnouncementsPopupOpen(false)}
+          >
+            Close
+          </Button>
+        </div>
+      </Popup>
     </div>
   );
 };

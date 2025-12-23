@@ -18,7 +18,6 @@ from models import (
     RequestItem,
     User,
     UserActivity,
-    UserRequest,
     db,
     get_current_time,
 )
@@ -830,7 +829,7 @@ def register_order_routes(app):
     @handle_errors
     def get_order_request_items(order_id):
         """Get request items linked to this procurement order."""
-        order = ProcurementOrder.query.get_or_404(order_id)
+        _order = ProcurementOrder.query.get_or_404(order_id)
 
         # Get all request items linked to this order
         items = RequestItem.query.filter_by(procurement_order_id=order_id).all()
@@ -903,7 +902,7 @@ def register_order_routes(app):
     @handle_errors
     def update_order_request_item(order_id, item_id):
         """Update a request item linked to this order (vendor, tracking, status, etc.)."""
-        order = ProcurementOrder.query.get_or_404(order_id)
+        _order = ProcurementOrder.query.get_or_404(order_id)
 
         item = RequestItem.query.filter_by(
             id=item_id,

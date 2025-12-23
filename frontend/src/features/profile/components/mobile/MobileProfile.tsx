@@ -205,8 +205,14 @@ export const MobileProfile = () => {
             fill="solid"
             block
             onClick={() => {
+              // Split name into first_name and last_name
+              // Handle multi-word names properly (e.g., "Mary Jane Watson")
+              const nameParts = user.name?.trim().split(/\s+/) || [];
+              const firstName = nameParts[0] || '';
+              const lastName = nameParts.slice(1).join(' ') || '';
               editForm.setFieldsValue({
-                name: user.name,
+                first_name: firstName,
+                last_name: lastName,
                 email: user.email,
               });
               setEditProfileVisible(true);
@@ -305,14 +311,24 @@ export const MobileProfile = () => {
             }
           >
             <Form.Item
-              name="name"
-              label="Name"
+              name="first_name"
+              label="First Name"
               rules={[
-                { required: true, message: 'Please enter your name' },
-                { min: 2, message: 'Name must be at least 2 characters' },
+                { required: true, message: 'Please enter your first name' },
+                { min: 2, message: 'First name must be at least 2 characters' },
               ]}
             >
-              <Input placeholder="Enter your name" />
+              <Input placeholder="Enter your first name" />
+            </Form.Item>
+            <Form.Item
+              name="last_name"
+              label="Last Name"
+              rules={[
+                { required: true, message: 'Please enter your last name' },
+                { min: 2, message: 'Last name must be at least 2 characters' },
+              ]}
+            >
+              <Input placeholder="Enter your last name" />
             </Form.Item>
             <Form.Item
               name="email"

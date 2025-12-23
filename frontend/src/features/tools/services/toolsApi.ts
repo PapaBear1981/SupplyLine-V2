@@ -7,6 +7,7 @@ import type {
   ToolCalibration,
   ToolCheckout,
 } from '../types';
+import type { LabelSize, CodeType, LabelSizesResponse } from '@/types/label';
 
 export const toolsApi = baseApi.injectEndpoints({
   endpoints: (builder) => ({
@@ -128,6 +129,48 @@ export const toolsApi = baseApi.injectEndpoints({
     getToolBarcode: builder.query<{ qr_code: string; barcode: string }, number>({
       query: (toolId) => `/api/tools/${toolId}/barcode`,
     }),
+
+    /**
+     * Print tool label as PDF
+     * Generates a PDF label with barcode/QR code for the specified tool
+     */
+    printToolLabel: builder.mutation<Blob, {
+      toolId: number;
+      labelSize: LabelSize;
+      codeType: CodeType;
+    }>({
+      query: ({ toolId, labelSize, codeType }) => ({
+        url: `/api/barcode/tool/${toolId}`,
+        params: {
+          label_size: labelSize,
+          code_type: codeType,
+        },
+        responseHandler: async (response: Response) => {
+          if (!response.ok) {
+            // Try to extract error message from response
+            let errorMessage = 'Failed to generate label PDF';
+            try {
+              const errorData = await response.json();
+              errorMessage = errorData.message || errorData.error || errorMessage;
+            } catch {
+              // Response is not JSON, use status text
+              errorMessage = response.statusText || errorMessage;
+            }
+            throw new Error(errorMessage);
+          }
+          return response.blob();
+        },
+        // Prevent caching to ensure fresh label generation
+        headers: {
+          'Cache-Control': 'no-cache',
+        },
+      }),
+    }),
+
+    // Get available label sizes
+    getLabelSizes: builder.query<LabelSizesResponse, void>({
+      query: () => '/api/barcode/label-sizes',
+    }),
   }),
 });
 
@@ -144,4 +187,6 @@ export const {
   useSearchToolsQuery,
   useLazySearchToolsQuery,
   useGetToolBarcodeQuery,
+  usePrintToolLabelMutation,
+  useGetLabelSizesQuery,
 } = toolsApi;

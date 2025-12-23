@@ -21,7 +21,7 @@ import { useIsMobile } from '@shared/hooks/useMobile';
 // API hooks
 import { useGetToolsQuery } from '@features/tools/services/toolsApi';
 import { useGetChemicalsQuery } from '@features/chemicals/services/chemicalsApi';
-import { useGetKitsQuery, useGetRecentKitActivityQuery, useGetKitUtilizationAnalyticsQuery, useGetReorderReportQuery } from '@features/kits/services/kitsApi';
+import { useGetKitsQuery, useGetRecentKitActivityQuery, useGetReorderReportQuery } from '@features/kits/services/kitsApi';
 import { useGetWarehousesQuery } from '@features/warehouses/services/warehousesApi';
 import { useGetAnnouncementsQuery, useGetOnlineUsersQuery } from '@features/admin/services/adminApi';
 
@@ -32,8 +32,6 @@ import {
   AlertsPanel,
   RecentActivity,
   InventoryPieChart,
-  ActivityChart,
-  QuickActions,
   AnnouncementsPanel,
 } from '../components';
 import { MobileDashboard } from '../components/mobile';
@@ -59,7 +57,6 @@ export const DashboardPage = () => {
   const { data: onlineUsersData } = useGetOnlineUsersQuery(undefined, { pollingInterval: 30000 }); // Poll every 30 seconds
   const { data: announcements, isLoading: announcementsLoading } = useGetAnnouncementsQuery();
   const { data: recentActivity, isLoading: activityLoading, refetch: refetchActivity } = useGetRecentKitActivityQuery({ limit: 10 });
-  const { data: utilizationData, isLoading: utilizationLoading } = useGetKitUtilizationAnalyticsQuery({ days: 14 });
   const { data: pendingReorders } = useGetReorderReportQuery({ status: 'pending' });
 
   // Calculate tool stats
@@ -216,17 +213,6 @@ export const DashboardPage = () => {
     { name: 'Maintenance', value: toolStats.maintenance, color: '#faad14' },
   ].filter(item => item.value > 0), [toolStats]);
 
-  const chemicalStatusChartData = useMemo(() => [
-    { name: 'Available', value: chemicalStats.available, color: '#52c41a' },
-    { name: 'Low Stock', value: chemicalStats.lowStock, color: '#faad14' },
-    { name: 'Out of Stock', value: chemicalStats.outOfStock, color: '#ff4d4f' },
-    { name: 'Expired', value: chemicalStats.expired, color: '#8c8c8c' },
-  ].filter(item => item.value > 0), [chemicalStats]);
-
-  const activityChartData = useMemo(() => {
-    return utilizationData?.activityOverTime || [];
-  }, [utilizationData]);
-
   const handleRefreshAlerts = () => {
     refetchTools();
     refetchChemicals();
@@ -360,17 +346,16 @@ export const DashboardPage = () => {
           />
         </Col>
         <Col xs={24} lg={8}>
-          <InventoryPieChart
-            title="Chemical Status"
-            data={chemicalStatusChartData}
-            loading={chemicalsLoading}
+          <AnnouncementsPanel
+            announcements={announcements || []}
+            loading={announcementsLoading}
           />
         </Col>
         <Col xs={24} lg={8}>
-          <ActivityChart
-            title="Activity (Last 14 Days)"
-            data={activityChartData}
-            loading={utilizationLoading}
+          <AlertsPanel
+            alerts={alerts}
+            loading={isLoading}
+            onRefresh={handleRefreshAlerts}
           />
         </Col>
       </Row>
@@ -382,35 +367,16 @@ export const DashboardPage = () => {
         </Col>
       </Row>
 
-      {/* Main Content Grid */}
-      <div className={styles.contentGrid}>
-        <div className={styles.mainColumn}>
-          {/* Alerts Panel */}
-          <AlertsPanel
-            alerts={alerts}
-            loading={isLoading}
-            onRefresh={handleRefreshAlerts}
-          />
-
-          {/* Quick Actions */}
-          <QuickActions isAdmin={user?.is_admin} />
-        </div>
-
-        <div className={styles.sideColumn}>
-          {/* Recent Activity */}
+      {/* Recent Activity */}
+      <Row gutter={[16, 16]} style={{ marginBottom: 24 }}>
+        <Col span={24}>
           <RecentActivity
             activities={recentActivity || []}
             loading={activityLoading}
             onRefresh={refetchActivity}
           />
-
-          {/* Announcements */}
-          <AnnouncementsPanel
-            announcements={announcements || []}
-            loading={announcementsLoading}
-          />
-        </div>
-      </div>
+        </Col>
+      </Row>
     </div>
   );
 };

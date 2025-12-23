@@ -52,7 +52,7 @@ def run_migration():
         for field_name, field_type in location_fields:
             if field_name not in columns:
                 print(f"Adding {field_name} column to kits table...")
-                cursor.execute(f"ALTER TABLE kits ADD COLUMN {field_name} {field_type}")
+                cursor.execute(f"ALTER TABLE kits ADD COLUMN {field_name} {field_type}")  # nosec B608 - field_name and field_type are from hardcoded location_fields list, not user input
             else:
                 print(f"{field_name} column already exists in kits table")
 
