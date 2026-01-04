@@ -12,6 +12,7 @@ import type {
   ToolCheckout,
   ToolSearchResult,
   ToolTimelineResponse,
+  UserCheckoutsResponse,
 } from '../types';
 
 export const checkoutApi = baseApi.injectEndpoints({
@@ -120,6 +121,30 @@ export const checkoutApi = baseApi.injectEndpoints({
               { type: 'Checkout' as const, id: 'MY' },
             ]
           : [{ type: 'Checkout' as const, id: 'MY' }],
+    }),
+
+    getUserCheckouts: builder.query<UserCheckoutsResponse, { userId: number; params?: CheckoutQueryParams }>({
+      query: ({ userId, params }) => {
+        const queryParams = params ?? {};
+        return {
+          url: `/api/tool-checkouts/user/${userId}`,
+          params: {
+            page: queryParams.page || 1,
+            per_page: queryParams.per_page || 50,
+            ...(queryParams.include_returned && { include_returned: 'true' }),
+          },
+        };
+      },
+      providesTags: (result) =>
+        result
+          ? [
+              ...result.checkouts.map(({ id }) => ({
+                type: 'Checkout' as const,
+                id,
+              })),
+              { type: 'Checkout' as const, id: 'USER_LOOKUP' },
+            ]
+          : [{ type: 'Checkout' as const, id: 'USER_LOOKUP' }],
     }),
 
     getOverdueCheckouts: builder.query<CheckoutListResponse, CheckoutQueryParams | void>({
@@ -270,6 +295,8 @@ export const {
   // Queries
   useGetActiveCheckoutsQuery,
   useGetMyCheckoutsQuery,
+  useGetUserCheckoutsQuery,
+  useLazyGetUserCheckoutsQuery,
   useGetOverdueCheckoutsQuery,
   useGetCheckoutDetailsQuery,
 

@@ -544,6 +544,51 @@ def register_tool_checkout_routes(app):
             return jsonify({"error": str(e)}), 500
 
     # ============================================
+    # Get Checkouts by User ID (for admin/lookup)
+    # ============================================
+    @app.route("/api/tool-checkouts/user/<int:user_id>", methods=["GET"])
+    @jwt_required
+    def get_tool_checkouts_by_user(user_id):
+        """Get checkouts for a specific user (for admin lookup)"""
+        try:
+            # Verify user exists
+            user = db.session.get(User, user_id)
+            if not user:
+                return jsonify({"error": "User not found"}), 404
+
+            include_returned = request.args.get("include_returned", "false").lower() == "true"
+            page = request.args.get("page", 1, type=int)
+            per_page = request.args.get("per_page", 50, type=int)
+
+            query = Checkout.query.filter(Checkout.user_id == user_id)
+
+            if not include_returned:
+                query = query.filter(Checkout.return_date.is_(None))
+
+            query = query.order_by(Checkout.checkout_date.desc())
+
+            total = query.count()
+            checkouts = query.offset((page - 1) * per_page).limit(per_page).all()
+
+            return jsonify({
+                "checkouts": [c.to_dict() for c in checkouts],
+                "user": {
+                    "id": user.id,
+                    "name": user.name,
+                    "employee_number": user.employee_number,
+                    "department": user.department,
+                },
+                "total": total,
+                "page": page,
+                "per_page": per_page,
+                "pages": (total + per_page - 1) // per_page,
+            }), 200
+
+        except Exception as e:
+            logger.exception("Error getting user checkouts")
+            return jsonify({"error": str(e)}), 500
+
+    # ============================================
     # Get Overdue Checkouts
     # ============================================
     @app.route("/api/tool-checkouts/overdue", methods=["GET"])

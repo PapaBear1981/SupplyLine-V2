@@ -205,6 +205,16 @@ export interface ToolTimelineResponse {
   pages: number;
 }
 
+// User checkout lookup response
+export interface UserCheckoutsResponse extends CheckoutListResponse {
+  user: {
+    id: number;
+    name: string;
+    employee_number: string;
+    department: string;
+  };
+}
+
 // Query params
 export interface CheckoutQueryParams {
   page?: number;
