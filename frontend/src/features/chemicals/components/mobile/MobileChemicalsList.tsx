@@ -28,6 +28,7 @@ import {
 import dayjs from 'dayjs';
 import { useGetChemicalsQuery, useCreateChemicalMutation, useUpdateChemicalMutation, useDeleteChemicalMutation } from '../../services/chemicalsApi';
 import { useGetWarehousesQuery } from '@features/warehouses/services/warehousesApi';
+import { useGenerateLotNumberMutation } from '@services/inventoryApi';
 import type { Chemical, ChemicalStatus, ChemicalFormData } from '../../types';
 import './MobileChemicalsList.css';
 
@@ -70,6 +71,7 @@ export const MobileChemicalsList = () => {
   const [createChemical, { isLoading: isCreating }] = useCreateChemicalMutation();
   const [updateChemical, { isLoading: isUpdating }] = useUpdateChemicalMutation();
   const [deleteChemical] = useDeleteChemicalMutation();
+  const [generateLotNumber, { isLoading: isGeneratingLot }] = useGenerateLotNumberMutation();
 
   const chemicals = chemicalsData?.chemicals || [];
   const hasMore = chemicalsData ? page < chemicalsData.pagination.pages : false;
@@ -113,6 +115,16 @@ export const MobileChemicalsList = () => {
     setSelectedChemical(null);
     form.resetFields();
     setShowFormPopup(true);
+  };
+
+  const handleGenerateLotNumber = async () => {
+    try {
+      const result = await generateLotNumber().unwrap();
+      form.setFieldValue('lot_number', result.lot_number);
+      Toast.show({ content: 'Lot number generated', icon: 'success' });
+    } catch {
+      Toast.show({ content: 'Failed to generate lot number', icon: 'fail' });
+    }
   };
 
   const handleEdit = (chemical: Chemical) => {
@@ -496,6 +508,20 @@ export const MobileChemicalsList = () => {
               name="lot_number"
               label="Lot Number"
               rules={[{ required: true, message: 'Lot number is required' }]}
+              extra={
+                formMode === 'create' && (
+                  <Button
+                    size="small"
+                    color="primary"
+                    fill="outline"
+                    loading={isGeneratingLot}
+                    onClick={handleGenerateLotNumber}
+                    style={{ marginTop: 8 }}
+                  >
+                    Auto-Generate
+                  </Button>
+                )
+              }
             >
               <Input placeholder="Enter lot number" />
             </Form.Item>

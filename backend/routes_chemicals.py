@@ -10,6 +10,7 @@ from models import (
     Chemical,
     ChemicalIssuance,
     ChemicalReturn,
+    InventoryTransaction,
     ProcurementOrder,
     RequestItem,
     User,
@@ -186,7 +187,7 @@ def register_chemical_routes(app):
 
         # Batch update status based on expiration and stock level to avoid N+1 queries
         chemicals_to_update = []
-        archive_logs = []
+        archived_chemicals = []  # Track chemicals that were auto-archived this request
 
         for chemical in chemicals:
             try:
@@ -203,21 +204,53 @@ def register_chemical_routes(app):
                     chemical.status = "expired"
                     status_changed = True
 
-                    # Auto-archive expired chemicals if the columns exist
+                    # Auto-archive expired chemicals and create disposal record
                     try:
                         chemical.is_archived = True
                         chemical.archived_reason = "expired"
                         chemical.archived_date = datetime.utcnow()
 
-                        # Prepare log for archiving (batch insert later)
-                        archive_logs.append({
-                            "action_type": "chemical_archived",
-                            "action_details": f"Chemical {chemical.part_number} - {chemical.lot_number} automatically archived: expired",
-                            "timestamp": datetime.utcnow()
-                        })
+                        # Track for filtering from response
+                        archived_chemicals.append(chemical.id)
+
+                        # Create disposal/removal inventory transaction
+                        disposal_transaction = InventoryTransaction(
+                            item_type="chemical",
+                            item_id=chemical.id,
+                            transaction_type="disposal",
+                            user_id=1,  # System user
+                            quantity_change=-chemical.quantity,  # Remove all remaining quantity
+                            location_from=chemical.location,
+                            notes=f"Auto-disposed: Chemical expired on {chemical.expiration_date.strftime('%Y-%m-%d') if chemical.expiration_date else 'unknown date'}. "
+                                  f"Removed {chemical.quantity} {chemical.unit} from inventory.",
+                            lot_number=chemical.lot_number
+                        )
+                        db.session.add(disposal_transaction)
+
+                        # Create audit log entry
+                        AuditLog.log(
+                            user_id=1,  # System user
+                            action="chemical_disposed",
+                            resource_type="chemical",
+                            resource_id=chemical.id,
+                            details={
+                                "part_number": chemical.part_number,
+                                "lot_number": chemical.lot_number,
+                                "reason": "expired",
+                                "quantity_disposed": chemical.quantity,
+                                "unit": chemical.unit,
+                                "expiration_date": chemical.expiration_date.isoformat() if chemical.expiration_date else None,
+                                "location": chemical.location,
+                                "warehouse_id": chemical.warehouse_id
+                            },
+                            ip_address=request.remote_addr if request else None
+                        )
 
                         # Update reorder status for expired chemicals
                         chemical.update_reorder_status()
+
+                        logger.info(f"Auto-disposed expired chemical: {chemical.part_number} (Lot: {chemical.lot_number}), "
+                                   f"Qty: {chemical.quantity} {chemical.unit}")
                     except AttributeError as e:
                         # If the columns don't exist, just update the status
                         logger.debug(f"Archive columns not found for chemical {chemical.id}: {e!s}")
@@ -240,13 +273,13 @@ def register_chemical_routes(app):
                 if status_changed:
                     chemicals_to_update.append(chemical)
 
-        # Batch insert archive logs if any
-        if archive_logs:
-            db.session.bulk_insert_mappings(AuditLog, archive_logs)
-
         # Single commit for all changes
-        if chemicals_to_update or archive_logs:
+        if chemicals_to_update:
             db.session.commit()
+
+        # Filter out chemicals that were just archived (unless show_archived is true)
+        if archived_chemicals and not show_archived:
+            chemicals = [c for c in chemicals if c.id not in archived_chemicals]
 
         # Get kit and box information for chemicals
         from models_kits import KitItem
@@ -1588,3 +1621,160 @@ def register_chemical_routes(app):
             db.session.rollback()
             print(f"Error in mark chemical as delivered route: {e!s}")
             return jsonify({"error": "An error occurred while marking the chemical as delivered"}), 500
+
+    # Get chemical transaction history (disposals, issuances, returns, etc.)
+    @app.route("/api/chemicals/<int:id>/history", methods=["GET"])
+    @jwt_required
+    def get_chemical_history(id):
+        """Get full transaction history for a chemical including disposals."""
+        try:
+            chemical = Chemical.query.get_or_404(id)
+
+            # Get all inventory transactions for this chemical
+            transactions = InventoryTransaction.query.filter(
+                InventoryTransaction.item_type == "chemical",
+                InventoryTransaction.item_id == id
+            ).order_by(InventoryTransaction.timestamp.desc()).all()
+
+            # Get audit log entries for this chemical
+            audit_logs = AuditLog.query.filter(
+                AuditLog.resource_type == "chemical",
+                AuditLog.resource_id == id
+            ).order_by(AuditLog.timestamp.desc()).limit(50).all()
+
+            return jsonify({
+                "chemical": chemical.to_dict(),
+                "transactions": [t.to_dict() for t in transactions],
+                "audit_logs": [
+                    {
+                        "id": log.id,
+                        "action": log.action,
+                        "details": log.details,
+                        "timestamp": log.timestamp.isoformat() if log.timestamp else None,
+                        "user_id": log.user_id
+                    }
+                    for log in audit_logs
+                ]
+            })
+        except Exception as e:
+            logger.exception("Error getting chemical history")
+            return jsonify({"error": str(e)}), 500
+
+    # Get all disposed/archived chemicals
+    @app.route("/api/chemicals/disposed", methods=["GET"])
+    @jwt_required
+    def get_disposed_chemicals():
+        """Get list of all disposed/archived chemicals with their disposal records."""
+        try:
+            page = request.args.get("page", 1, type=int)
+            per_page = request.args.get("per_page", 50, type=int)
+
+            # Get archived chemicals
+            query = Chemical.query.filter(Chemical.is_archived.is_(True))
+            pagination = query.order_by(Chemical.archived_date.desc()).paginate(
+                page=page, per_page=per_page, error_out=False
+            )
+
+            chemicals_data = []
+            for chemical in pagination.items:
+                chem_dict = chemical.to_dict()
+
+                # Get the disposal transaction if any
+                disposal = InventoryTransaction.query.filter(
+                    InventoryTransaction.item_type == "chemical",
+                    InventoryTransaction.item_id == chemical.id,
+                    InventoryTransaction.transaction_type == "disposal"
+                ).order_by(InventoryTransaction.timestamp.desc()).first()
+
+                if disposal:
+                    chem_dict["disposal_record"] = disposal.to_dict()
+
+                chemicals_data.append(chem_dict)
+
+            return jsonify({
+                "chemicals": chemicals_data,
+                "pagination": {
+                    "page": page,
+                    "per_page": per_page,
+                    "total": pagination.total,
+                    "pages": pagination.pages
+                }
+            })
+        except Exception as e:
+            logger.exception("Error getting disposed chemicals")
+            return jsonify({"error": str(e)}), 500
+
+    # Manually dispose a chemical (for non-expired disposals)
+    @app.route("/api/chemicals/<int:id>/dispose", methods=["POST"])
+    @materials_manager_required
+    def dispose_chemical(id):
+        """Manually dispose of a chemical with a reason."""
+        try:
+            current_user_id = request.current_user.get("user_id")
+            data = request.get_json() or {}
+
+            chemical = Chemical.query.get_or_404(id)
+
+            reason = data.get("reason", "manual_disposal")
+            notes = data.get("notes", "")
+
+            # Archive the chemical
+            chemical.is_archived = True
+            chemical.archived_reason = reason
+            chemical.archived_date = datetime.utcnow()
+            chemical.status = "disposed"
+
+            # Create disposal transaction
+            disposal_transaction = InventoryTransaction(
+                item_type="chemical",
+                item_id=chemical.id,
+                transaction_type="disposal",
+                user_id=current_user_id,
+                quantity_change=-chemical.quantity,
+                location_from=chemical.location,
+                notes=f"Manual disposal: {reason}. {notes}".strip(),
+                lot_number=chemical.lot_number
+            )
+            db.session.add(disposal_transaction)
+
+            # Create audit log
+            user_name = request.current_user.get("user_name", "Unknown")
+            AuditLog.log(
+                user_id=current_user_id,
+                action="chemical_disposed",
+                resource_type="chemical",
+                resource_id=chemical.id,
+                details={
+                    "part_number": chemical.part_number,
+                    "lot_number": chemical.lot_number,
+                    "reason": reason,
+                    "notes": notes,
+                    "quantity_disposed": chemical.quantity,
+                    "unit": chemical.unit,
+                    "disposed_by": user_name,
+                    "location": chemical.location
+                },
+                ip_address=request.remote_addr
+            )
+
+            # Log user activity
+            activity = UserActivity(
+                user_id=current_user_id,
+                activity_type="chemical_disposed",
+                description=f"Disposed chemical {chemical.part_number} (Lot: {chemical.lot_number}): {reason}"
+            )
+            db.session.add(activity)
+
+            db.session.commit()
+
+            logger.info(f"Chemical {chemical.part_number} (Lot: {chemical.lot_number}) manually disposed by user {current_user_id}")
+
+            return jsonify({
+                "chemical": chemical.to_dict(),
+                "disposal_record": disposal_transaction.to_dict(),
+                "message": "Chemical disposed successfully"
+            })
+        except Exception as e:
+            db.session.rollback()
+            logger.exception("Error disposing chemical")
+            return jsonify({"error": str(e)}), 500

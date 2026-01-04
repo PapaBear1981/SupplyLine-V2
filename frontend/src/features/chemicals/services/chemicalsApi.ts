@@ -2,10 +2,12 @@ import { baseApi } from '@services/baseApi';
 import type {
   Chemical,
   ChemicalFormData,
+  ChemicalHistoryResponse,
   ChemicalIssuanceFormData,
   ChemicalIssuanceResponse,
   ChemicalsListResponse,
   ChemicalsQueryParams,
+  DisposedChemicalsResponse,
 } from '../types';
 
 export const chemicalsApi = baseApi.injectEndpoints({
@@ -89,6 +91,44 @@ export const chemicalsApi = baseApi.injectEndpoints({
         { type: 'Chemical', id: 'LIST' },
       ],
     }),
+
+    getDisposedChemicals: builder.query<
+      DisposedChemicalsResponse,
+      { page?: number; per_page?: number } | void
+    >({
+      query: (params) => {
+        const queryParams = params || {};
+        return {
+          url: '/api/chemicals/disposed',
+          params: {
+            page: queryParams.page || 1,
+            per_page: queryParams.per_page || 50,
+          },
+        };
+      },
+      providesTags: [{ type: 'Chemical', id: 'DISPOSED' }],
+    }),
+
+    getChemicalHistory: builder.query<ChemicalHistoryResponse, number>({
+      query: (id) => `/api/chemicals/${id}/history`,
+      providesTags: (_result, _error, id) => [{ type: 'Chemical', id }],
+    }),
+
+    disposeChemical: builder.mutation<
+      { chemical: Chemical; disposal_record: unknown; message: string },
+      { id: number; reason: string; notes?: string }
+    >({
+      query: ({ id, reason, notes }) => ({
+        url: `/api/chemicals/${id}/dispose`,
+        method: 'POST',
+        body: { reason, notes },
+      }),
+      invalidatesTags: (_result, _error, { id }) => [
+        { type: 'Chemical', id },
+        { type: 'Chemical', id: 'LIST' },
+        { type: 'Chemical', id: 'DISPOSED' },
+      ],
+    }),
   }),
 });
 
@@ -99,4 +139,7 @@ export const {
   useUpdateChemicalMutation,
   useDeleteChemicalMutation,
   useIssueChemicalMutation,
+  useGetDisposedChemicalsQuery,
+  useGetChemicalHistoryQuery,
+  useDisposeChemicalMutation,
 } = chemicalsApi;

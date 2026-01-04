@@ -1,8 +1,10 @@
 import { useEffect, useCallback } from 'react';
-import { Form, Input, InputNumber, Select, DatePicker, Button, Space } from 'antd';
+import { Form, Input, InputNumber, Select, DatePicker, Button, Space, message } from 'antd';
+import { ThunderboltOutlined } from '@ant-design/icons';
 import type { FormInstance } from 'antd';
 import dayjs from 'dayjs';
 import type { Chemical, ChemicalFormData } from '../types';
+import { useGenerateLotNumberMutation } from '@services/inventoryApi';
 
 const { Option } = Select;
 const { TextArea } = Input;
@@ -17,6 +19,17 @@ interface ChemicalFormProps {
 
 export const ChemicalForm = ({ form, initialValues, onSubmit, onCancel, loading }: ChemicalFormProps) => {
   const isEditing = !!initialValues;
+  const [generateLotNumber, { isLoading: isGeneratingLot }] = useGenerateLotNumberMutation();
+
+  const handleGenerateLotNumber = async () => {
+    try {
+      const result = await generateLotNumber().unwrap();
+      form.setFieldValue('lot_number', result.lot_number);
+      message.success('Lot number generated');
+    } catch {
+      message.error('Failed to generate lot number');
+    }
+  };
 
   const getInitialFormValues = useCallback(() => {
     if (!initialValues) return {};
@@ -77,10 +90,27 @@ export const ChemicalForm = ({ form, initialValues, onSubmit, onCancel, loading 
 
       <Form.Item
         label="Lot Number"
-        name="lot_number"
-        rules={[{ required: true, message: 'Please enter lot number' }]}
+        required
       >
-        <Input placeholder="e.g., LOT-123" />
+        <Space.Compact style={{ width: '100%' }}>
+          <Form.Item
+            name="lot_number"
+            noStyle
+            rules={[{ required: true, message: 'Please enter lot number' }]}
+          >
+            <Input placeholder="e.g., LOT-251204-0001" style={{ width: 'calc(100% - 110px)' }} />
+          </Form.Item>
+          <Button
+            type="default"
+            icon={<ThunderboltOutlined />}
+            onClick={handleGenerateLotNumber}
+            loading={isGeneratingLot}
+            disabled={isEditing}
+            title={isEditing ? 'Cannot change lot number when editing' : 'Auto-generate lot number'}
+          >
+            Generate
+          </Button>
+        </Space.Compact>
       </Form.Item>
 
       <Form.Item

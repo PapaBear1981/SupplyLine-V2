@@ -105,3 +105,46 @@ export interface ChemicalIssuanceResponse {
   };
   message?: string;
 }
+
+// Disposal/Transaction types
+export interface DisposalRecord {
+  id: number;
+  item_type: string;
+  item_id: number;
+  transaction_type: string;
+  timestamp: string;
+  user_id: number;
+  user_name: string;
+  quantity_change: number;
+  location_from?: string;
+  location_to?: string;
+  reference_number?: string;
+  notes?: string;
+  lot_number?: string;
+}
+
+export interface DisposedChemical extends Chemical {
+  disposal_record?: DisposalRecord;
+}
+
+export interface DisposedChemicalsResponse {
+  chemicals: DisposedChemical[];
+  pagination: {
+    page: number;
+    per_page: number;
+    total: number;
+    pages: number;
+  };
+}
+
+export interface ChemicalHistoryResponse {
+  chemical: Chemical;
+  transactions: DisposalRecord[];
+  audit_logs: {
+    id: number;
+    action: string;
+    details: Record<string, unknown>;
+    timestamp: string;
+    user_id: number;
+  }[];
+}
