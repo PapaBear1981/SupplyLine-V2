@@ -116,7 +116,7 @@ export const ToolCheckoutPage = () => {
           icon={<PlusOutlined />}
           onClick={() => setCheckoutModalOpen(true)}
         >
-          Quick Checkout
+          Checkout
         </Button>
       </div>
 

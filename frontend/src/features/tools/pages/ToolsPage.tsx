@@ -1,8 +1,9 @@
 import { useState } from 'react';
 import { Typography, Button, Space } from 'antd';
-import { PlusOutlined } from '@ant-design/icons';
+import { PlusOutlined, SwapOutlined } from '@ant-design/icons';
 import { ToolsTable } from '../components/ToolsTable';
 import { ToolDrawer } from '../components/ToolDrawer';
+import { QuickCheckoutModal } from '@features/tool-checkout/components/QuickCheckoutModal';
 import { MobileToolsList } from '../components/mobile';
 import { useIsMobile } from '@shared/hooks/useMobile';
 import type { Tool } from '../types';
@@ -13,6 +14,7 @@ export const ToolsPage = () => {
   const isMobile = useIsMobile();
   const [selectedTool, setSelectedTool] = useState<Tool | null>(null);
   const [drawerMode, setDrawerMode] = useState<'view' | 'edit' | 'create' | null>(null);
+  const [checkoutModalOpen, setCheckoutModalOpen] = useState(false);
 
   // Render mobile version if on mobile device
   if (isMobile) {
@@ -56,6 +58,12 @@ export const ToolsPage = () => {
         </Title>
         <Space>
           <Button
+            icon={<SwapOutlined />}
+            onClick={() => setCheckoutModalOpen(true)}
+          >
+            Checkout
+          </Button>
+          <Button
             type="primary"
             icon={<PlusOutlined />}
             onClick={handleCreate}
@@ -72,6 +80,11 @@ export const ToolsPage = () => {
         mode={drawerMode || 'view'}
         toolId={selectedTool?.id}
         onClose={handleCloseDrawer}
+      />
+
+      <QuickCheckoutModal
+        open={checkoutModalOpen}
+        onClose={() => setCheckoutModalOpen(false)}
       />
     </div>
   );
