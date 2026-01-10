@@ -1,6 +1,7 @@
 import { createSlice } from '@reduxjs/toolkit';
 import type { PayloadAction } from '@reduxjs/toolkit';
 import type { AuthState, User } from '../types';
+import { setTokenExpiration } from '@services/baseApi';
 
 const storedToken = localStorage.getItem('access_token');
 const initialToken = storedToken && storedToken !== 'undefined' ? storedToken : null;
@@ -17,7 +18,7 @@ const authSlice = createSlice({
   reducers: {
     setCredentials: (
       state,
-      action: PayloadAction<{ user: User; token?: string | null }>
+      action: PayloadAction<{ user: User; token?: string | null; expiresIn?: number }>
     ) => {
       const token = action.payload.token ?? null;
       state.user = action.payload.user;
@@ -26,6 +27,11 @@ const authSlice = createSlice({
 
       if (token) {
         localStorage.setItem('access_token', token);
+
+        // Set token expiration for automatic refresh
+        if (action.payload.expiresIn) {
+          setTokenExpiration(action.payload.expiresIn);
+        }
       } else {
         localStorage.removeItem('access_token');
       }
@@ -35,6 +41,8 @@ const authSlice = createSlice({
       state.token = null;
       state.isAuthenticated = false;
       localStorage.removeItem('access_token');
+      localStorage.removeItem('token_expires_at');
+      localStorage.removeItem('last_user_activity');
     },
   },
 });

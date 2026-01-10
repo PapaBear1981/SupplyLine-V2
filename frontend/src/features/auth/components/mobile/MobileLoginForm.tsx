@@ -29,7 +29,11 @@ export const MobileLoginForm = () => {
     try {
       const values = await form.validateFields();
       const result = await login(values as LoginRequest).unwrap();
-      dispatch(setCredentials({ user: result.user, token: result.access_token }));
+      dispatch(setCredentials({
+        user: result.user,
+        token: result.access_token,
+        expiresIn: result.expires_in
+      }));
 
       // Establish WebSocket connection for real-time features
       try {
