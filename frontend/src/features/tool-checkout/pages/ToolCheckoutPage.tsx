@@ -15,13 +15,11 @@ import {
   ClockCircleOutlined,
   WarningOutlined,
   HistoryOutlined,
-  UserOutlined,
   PlusOutlined,
 } from '@ant-design/icons';
 import { useGetCheckoutStatsQuery } from '../services/checkoutApi';
 import { QuickCheckoutModal } from '../components/QuickCheckoutModal';
 import { ActiveCheckoutsTable } from '../components/ActiveCheckoutsTable';
-import { MyCheckoutsTable } from '../components/MyCheckoutsTable';
 import { OverdueCheckoutsTable } from '../components/OverdueCheckoutsTable';
 import { CheckinModal } from '../components/CheckinModal';
 import { MobileToolCheckout } from '../components/mobile';
@@ -73,16 +71,6 @@ export const ToolCheckoutPage = () => {
       children: <ActiveCheckoutsTable onCheckin={handleCheckin} />,
     },
     {
-      key: 'my',
-      label: (
-        <span>
-          <UserOutlined />
-          My Checkouts
-        </span>
-      ),
-      children: <MyCheckoutsTable onCheckin={handleCheckin} />,
-    },
-    {
       key: 'overdue',
       label: (
         <span>
@@ -119,7 +107,7 @@ export const ToolCheckoutPage = () => {
             Tool Checkout
           </Title>
           <Text type="secondary">
-            Check out and return tools, view checkout history
+            Check out tools to users, view active checkouts, and returns
           </Text>
         </div>
         <Button
@@ -128,7 +116,7 @@ export const ToolCheckoutPage = () => {
           icon={<PlusOutlined />}
           onClick={() => setCheckoutModalOpen(true)}
         >
-          Quick Checkout
+          Checkout
         </Button>
       </div>
 
