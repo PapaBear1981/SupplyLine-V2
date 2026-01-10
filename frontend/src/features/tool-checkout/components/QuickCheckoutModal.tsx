@@ -14,6 +14,8 @@ import {
   Spin,
   message,
   Divider,
+  Steps,
+  theme,
 } from 'antd';
 import {
   SearchOutlined,
@@ -21,6 +23,7 @@ import {
   CloseCircleOutlined,
   WarningOutlined,
   ToolOutlined,
+  UserOutlined,
 } from '@ant-design/icons';
 import dayjs from 'dayjs';
 import {
@@ -29,8 +32,11 @@ import {
   useLazyCheckToolAvailabilityQuery,
 } from '../services/checkoutApi';
 import type { ToolSearchResult, ToolCondition } from '../types';
+import { UserSearchSelect } from './UserSearchSelect';
+import type { User } from '@features/users/types';
 
 const { Text, Title } = Typography;
+const { useToken } = theme;
 
 interface QuickCheckoutModalProps {
   open: boolean;
@@ -45,9 +51,11 @@ const conditionOptions: { value: ToolCondition; label: string }[] = [
 ];
 
 export const QuickCheckoutModal = ({ open, onClose }: QuickCheckoutModalProps) => {
+  const { token } = useToken();
   const [form] = Form.useForm();
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedTool, setSelectedTool] = useState<ToolSearchResult | null>(null);
+  const [selectedUser, setSelectedUser] = useState<User | null>(null);
   const [searchResults, setSearchResults] = useState<ToolSearchResult[]>([]);
 
   const [searchTools, { isLoading: searching }] = useLazySearchToolsForCheckoutQuery();
@@ -92,6 +100,11 @@ export const QuickCheckoutModal = ({ open, onClose }: QuickCheckoutModalProps) =
       return;
     }
 
+    if (!selectedUser) {
+      message.error('Please select who is checking out this tool');
+      return;
+    }
+
     if (!availability?.available) {
       message.error('This tool is not available for checkout');
       return;
@@ -100,6 +113,7 @@ export const QuickCheckoutModal = ({ open, onClose }: QuickCheckoutModalProps) =
     try {
       await createCheckout({
         tool_id: selectedTool.id,
+        user_id: selectedUser.id,
         expected_return_date: values.expected_return_date
           ? (values.expected_return_date as dayjs.Dayjs).toISOString()
           : undefined,
@@ -109,7 +123,9 @@ export const QuickCheckoutModal = ({ open, onClose }: QuickCheckoutModalProps) =
         project: values.project as string | undefined,
       }).unwrap();
 
-      message.success(`Tool ${selectedTool.tool_number} checked out successfully`);
+      message.success(
+        `Tool ${selectedTool.tool_number} checked out to ${selectedUser.name} successfully`
+      );
       handleClose();
     } catch (error: unknown) {
       const err = error as { data?: { error?: string; blocking_reasons?: string[] } };
@@ -123,6 +139,7 @@ export const QuickCheckoutModal = ({ open, onClose }: QuickCheckoutModalProps) =
 
   const handleClose = useCallback(() => {
     setSelectedTool(null);
+    setSelectedUser(null);
     setSearchTerm('');
     setSearchResults([]);
     form.resetFields();
@@ -133,6 +150,13 @@ export const QuickCheckoutModal = ({ open, onClose }: QuickCheckoutModalProps) =
     if (available) return 'success';
     if (status === 'checked_out') return 'warning';
     return 'error';
+  };
+
+  // Determine current step
+  const getCurrentStep = () => {
+    if (!selectedTool) return 0;
+    if (!selectedUser) return 1;
+    return 2;
   };
 
   return (
@@ -149,6 +173,27 @@ export const QuickCheckoutModal = ({ open, onClose }: QuickCheckoutModalProps) =
       footer={null}
       destroyOnClose
     >
+      {/* Progress Steps */}
+      <Steps
+        current={getCurrentStep()}
+        size="small"
+        style={{ marginBottom: 24 }}
+        items={[
+          {
+            title: 'Select Tool',
+            icon: <ToolOutlined />,
+          },
+          {
+            title: 'Select User',
+            icon: <UserOutlined />,
+          },
+          {
+            title: 'Checkout Details',
+            icon: <CheckCircleOutlined />,
+          },
+        ]}
+      />
+
       {/* Tool Search */}
       {!selectedTool && (
         <div style={{ marginBottom: 24 }}>
@@ -180,31 +225,31 @@ export const QuickCheckoutModal = ({ open, onClose }: QuickCheckoutModalProps) =
                     cursor: tool.available ? 'pointer' : 'not-allowed',
                     opacity: tool.available ? 1 : 0.6,
                     padding: '12px 16px',
-                    borderRadius: 8,
+                    borderRadius: token.borderRadius,
                     marginBottom: 8,
-                    border: '1px solid #d9d9d9',
+                    border: `1px solid ${token.colorBorder}`,
                     transition: 'all 0.2s',
                   }}
                   onMouseEnter={(e) => {
                     if (tool.available) {
-                      e.currentTarget.style.backgroundColor = '#f5f5f5';
-                      e.currentTarget.style.borderColor = '#1890ff';
+                      e.currentTarget.style.backgroundColor = token.colorBgTextHover;
+                      e.currentTarget.style.borderColor = token.colorPrimary;
                     }
                   }}
                   onMouseLeave={(e) => {
                     e.currentTarget.style.backgroundColor = 'transparent';
-                    e.currentTarget.style.borderColor = '#d9d9d9';
+                    e.currentTarget.style.borderColor = token.colorBorder;
                   }}
                 >
                   <List.Item.Meta
                     avatar={
                       tool.available ? (
                         <CheckCircleOutlined
-                          style={{ fontSize: 24, color: '#52c41a' }}
+                          style={{ fontSize: 24, color: token.colorSuccess }}
                         />
                       ) : (
                         <CloseCircleOutlined
-                          style={{ fontSize: 24, color: '#ff4d4f' }}
+                          style={{ fontSize: 24, color: token.colorError }}
                         />
                       )
                     }
@@ -262,16 +307,58 @@ export const QuickCheckoutModal = ({ open, onClose }: QuickCheckoutModalProps) =
         </div>
       )}
 
+      {/* User Selection */}
+      {selectedTool && !selectedUser && (
+        <div>
+          {/* Selected Tool Info - Compact */}
+          <div
+            style={{
+              background: token.colorBgContainer,
+              padding: 12,
+              borderRadius: token.borderRadius,
+              marginBottom: 16,
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              border: `1px solid ${token.colorBorder}`,
+            }}
+          >
+            <div>
+              <Space>
+                <Text strong>{selectedTool.tool_number}</Text>
+                <Text type="secondary">({selectedTool.serial_number})</Text>
+              </Space>
+              <div>
+                <Text type="secondary">{selectedTool.description}</Text>
+              </div>
+            </div>
+            <Button size="small" onClick={() => setSelectedTool(null)}>
+              Change Tool
+            </Button>
+          </div>
+
+          {/* User Search */}
+          <div>
+            <Title level={5}>Who is checking out this tool?</Title>
+            <UserSearchSelect
+              value={null}
+              onChange={(_userId, user) => setSelectedUser(user)}
+            />
+          </div>
+        </div>
+      )}
+
       {/* Selected Tool & Checkout Form */}
-      {selectedTool && (
+      {selectedTool && selectedUser && (
         <div>
           {/* Selected Tool Info */}
           <div
             style={{
-              background: '#f5f5f5',
+              background: token.colorBgContainer,
               padding: 16,
-              borderRadius: 8,
+              borderRadius: token.borderRadius,
               marginBottom: 24,
+              border: `1px solid ${token.colorBorder}`,
             }}
           >
             <div
@@ -295,6 +382,39 @@ export const QuickCheckoutModal = ({ open, onClose }: QuickCheckoutModalProps) =
                 </div>
               </div>
               <Button onClick={() => setSelectedTool(null)}>Change Tool</Button>
+            </div>
+          </div>
+
+          {/* Selected User Info */}
+          <div
+            style={{
+              background: token.colorSuccessBg,
+              padding: 16,
+              borderRadius: token.borderRadius,
+              marginBottom: 24,
+              borderLeft: `4px solid ${token.colorSuccess}`,
+            }}
+          >
+            <div
+              style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'start',
+              }}
+            >
+              <div>
+                <Space>
+                  <UserOutlined style={{ fontSize: 18, color: token.colorSuccess }} />
+                  <Text strong style={{ fontSize: 16 }}>
+                    Checking out to: {selectedUser.name}
+                  </Text>
+                </Space>
+                <div style={{ marginTop: 8 }}>
+                  <Tag>#{selectedUser.employee_number}</Tag>
+                  {selectedUser.department && <Tag color="blue">{selectedUser.department}</Tag>}
+                </div>
+              </div>
+              <Button onClick={() => setSelectedUser(null)}>Change User</Button>
             </div>
           </div>
 

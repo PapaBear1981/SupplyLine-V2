@@ -32,12 +32,13 @@ import relativeTime from 'dayjs/plugin/relativeTime';
 import {
   useGetCheckoutStatsQuery,
   useGetActiveCheckoutsQuery,
-  useGetMyCheckoutsQuery,
   useGetOverdueCheckoutsQuery,
   useSearchToolsForCheckoutQuery,
   useCreateCheckoutMutation,
   useCheckinToolMutation,
 } from '../../services/checkoutApi';
+import { useLazyGetUsersQuery } from '@features/users/services/usersApi';
+import type { User } from '@features/users/types';
 import type { ToolCheckout } from '../../types';
 import './MobileToolCheckout.css';
 
@@ -54,27 +55,37 @@ const conditionOptions = [
 ];
 
 export const MobileToolCheckout = () => {
-  const [activeTab, setActiveTab] = useState('my');
+  const [activeTab, setActiveTab] = useState('active');
   const [showCheckoutPopup, setShowCheckoutPopup] = useState(false);
   const [showCheckinPopup, setShowCheckinPopup] = useState(false);
   const [selectedCheckout, setSelectedCheckout] = useState<ToolCheckout | null>(null);
+  const [selectedUser, setSelectedUser] = useState<User | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
+  const [userSearchQuery, setUserSearchQuery] = useState('');
   const [checkoutForm] = Form.useForm();
   const [checkinForm] = Form.useForm();
 
   // API queries
   const { data: stats, isLoading: statsLoading, refetch: refetchStats } = useGetCheckoutStatsQuery();
   const { data: activeCheckouts, isLoading: activeLoading, refetch: refetchActive } = useGetActiveCheckoutsQuery({});
-  const { data: myCheckouts, isLoading: myLoading, refetch: refetchMy } = useGetMyCheckoutsQuery({});
   const { data: overdueCheckouts, isLoading: overdueLoading, refetch: refetchOverdue } = useGetOverdueCheckoutsQuery({});
   const { data: toolResults } = useSearchToolsForCheckoutQuery(searchQuery, {
     skip: searchQuery.length < 2,
   });
+  const [searchUsers, { data: userResults }] = useLazyGetUsersQuery();
   const [checkoutTool, { isLoading: isCheckingOut }] = useCreateCheckoutMutation();
   const [checkinTool, { isLoading: isCheckingIn }] = useCheckinToolMutation();
 
   const handleRefresh = async () => {
-    await Promise.all([refetchStats(), refetchActive(), refetchMy(), refetchOverdue()]);
+    await Promise.all([refetchStats(), refetchActive(), refetchOverdue()]);
+  };
+
+  // Search users when userSearchQuery changes
+  const handleUserSearch = (query: string) => {
+    setUserSearchQuery(query);
+    if (query.length >= 2) {
+      searchUsers({ q: query });
+    }
   };
 
   const handleCheckin = (checkout: ToolCheckout) => {
@@ -86,16 +97,25 @@ export const MobileToolCheckout = () => {
   const handleCheckoutSubmit = async () => {
     try {
       const values = await checkoutForm.validateFields();
+
+      if (!selectedUser) {
+        Toast.show({ content: 'Please select who is checking out this tool', icon: 'fail' });
+        return;
+      }
+
       await checkoutTool({
         tool_id: values.tool_id,
+        user_id: selectedUser.id,
         condition_at_checkout: values.condition || 'Good',
         notes: values.notes || undefined,
         work_order: values.work_order || undefined,
       }).unwrap();
-      Toast.show({ content: 'Tool checked out successfully', icon: 'success' });
+      Toast.show({ content: `Tool checked out to ${selectedUser.name} successfully`, icon: 'success' });
       setShowCheckoutPopup(false);
       checkoutForm.resetFields();
       setSearchQuery('');
+      setUserSearchQuery('');
+      setSelectedUser(null);
       handleRefresh();
     } catch (error: unknown) {
       const errorMessage = error && typeof error === 'object' && 'data' in error
@@ -169,7 +189,6 @@ export const MobileToolCheckout = () => {
     </List.Item>
   );
 
-  const myList = myCheckouts?.checkouts || [];
   const activeList = activeCheckouts?.checkouts || [];
   const overdueList = overdueCheckouts?.checkouts || [];
 
@@ -236,26 +255,8 @@ export const MobileToolCheckout = () => {
         <Tabs activeKey={activeTab} onChange={setActiveTab} className="checkout-tabs">
           <Tabs.Tab
             title={
-              <Badge content={myList.length > 0 ? myList.length : null}>
-                <span><UserOutlined /> My</span>
-              </Badge>
-            }
-            key="my"
-          >
-            {myLoading ? (
-              <div style={{ padding: 16 }}>
-                {[1, 2, 3].map(i => <Skeleton key={i} animated className="checkout-skeleton" />)}
-              </div>
-            ) : myList.length === 0 ? (
-              <Empty description="No active checkouts" style={{ padding: '48px 0' }} />
-            ) : (
-              <List>{myList.map(c => renderCheckoutItem(c))}</List>
-            )}
-          </Tabs.Tab>
-          <Tabs.Tab
-            title={
               <Badge content={activeList.length > 0 ? activeList.length : null}>
-                <span><SwapOutlined /> All</span>
+                <span><SwapOutlined /> Active</span>
               </Badge>
             }
             key="active"
@@ -349,6 +350,55 @@ export const MobileToolCheckout = () => {
             </List>
           )}
 
+          <SearchBar
+            placeholder="Search user by name or employee number..."
+            value={userSearchQuery}
+            onChange={handleUserSearch}
+            style={{ marginBottom: 16 }}
+          />
+
+          {userSearchQuery.length >= 2 && userResults && userResults.length > 0 && (
+            <List header="Select User" className="user-search-results">
+              {userResults.filter((u) => u.is_active).map((user) => (
+                <List.Item
+                  key={user.id}
+                  onClick={() => {
+                    setSelectedUser(user);
+                    checkoutForm.setFieldValue('user_display', `${user.name} (#${user.employee_number})`);
+                    setUserSearchQuery('');
+                  }}
+                  description={user.department || 'No department'}
+                >
+                  {user.name} #{user.employee_number}
+                </List.Item>
+              ))}
+            </List>
+          )}
+
+          {selectedUser && (
+            <Card
+              style={{
+                marginBottom: 16,
+                backgroundColor: 'var(--adm-color-success-light, #e6f7e6)',
+                borderColor: 'var(--adm-color-success, #52c41a)',
+              }}
+            >
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div>
+                  <div style={{ fontWeight: 'bold' }}>
+                    <UserOutlined /> Checking out to: {selectedUser.name}
+                  </div>
+                  <div style={{ fontSize: 12, opacity: 0.65 }}>
+                    #{selectedUser.employee_number} {selectedUser.department && `• ${selectedUser.department}`}
+                  </div>
+                </div>
+                <Button size="small" onClick={() => setSelectedUser(null)}>
+                  Change
+                </Button>
+              </div>
+            </Card>
+          )}
+
           <Form
             form={checkoutForm}
             layout="vertical"
@@ -370,6 +420,13 @@ export const MobileToolCheckout = () => {
               rules={[{ required: true, message: 'Please select a tool' }]}
             >
               <Input placeholder="Search and select a tool above" readOnly />
+            </Form.Item>
+            <Form.Item
+              name="user_display"
+              label="Checking Out To"
+              rules={[{ required: true, message: 'Please select a user' }]}
+            >
+              <Input placeholder="Search and select a user above" readOnly />
             </Form.Item>
             <Form.Item
               name="condition"
