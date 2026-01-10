@@ -13,13 +13,11 @@ const { Text } = Typography;
 const { useToken } = theme;
 
 interface UserSearchSelectProps {
-  value?: number | null;
   onChange: (userId: number | null, user: User | null) => void;
   disabled?: boolean;
 }
 
 export const UserSearchSelect = ({
-  value: _value,
   onChange,
   disabled = false,
 }: UserSearchSelectProps) => {

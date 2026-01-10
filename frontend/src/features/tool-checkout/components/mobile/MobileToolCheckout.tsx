@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
   Card,
   Tabs,
@@ -80,13 +80,15 @@ export const MobileToolCheckout = () => {
     await Promise.all([refetchStats(), refetchActive(), refetchOverdue()]);
   };
 
-  // Search users when userSearchQuery changes
-  const handleUserSearch = (query: string) => {
-    setUserSearchQuery(query);
-    if (query.length >= 2) {
-      searchUsers({ q: query });
+  // Debounced user search (300ms)
+  useEffect(() => {
+    if (userSearchQuery.length >= 2) {
+      const timer = setTimeout(() => {
+        searchUsers({ q: userSearchQuery });
+      }, 300);
+      return () => clearTimeout(timer);
     }
-  };
+  }, [userSearchQuery, searchUsers]);
 
   const handleCheckin = (checkout: ToolCheckout) => {
     setSelectedCheckout(checkout);
@@ -353,7 +355,7 @@ export const MobileToolCheckout = () => {
           <SearchBar
             placeholder="Search user by name or employee number..."
             value={userSearchQuery}
-            onChange={handleUserSearch}
+            onChange={setUserSearchQuery}
             style={{ marginBottom: 16 }}
           />
 

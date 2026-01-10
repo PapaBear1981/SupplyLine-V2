@@ -341,7 +341,6 @@ export const QuickCheckoutModal = ({ open, onClose }: QuickCheckoutModalProps) =
           <div>
             <Title level={5}>Who is checking out this tool?</Title>
             <UserSearchSelect
-              value={null}
               onChange={(_userId, user) => setSelectedUser(user)}
             />
           </div>
