@@ -409,6 +409,42 @@ class User(db.Model):
         delta = self.account_locked_until - get_current_time()
         return delta.total_seconds()
 
+    # TOTP Secret Encryption Methods
+    def set_totp_secret_encrypted(self, plaintext_secret):
+        """
+        Set the TOTP secret with encryption.
+
+        Args:
+            plaintext_secret: The Base32-encoded TOTP secret in plaintext
+
+        Raises:
+            ValueError: If secret is None or empty
+        """
+        from utils.encryption import encrypt_totp_secret
+
+        if not plaintext_secret:
+            msg = "TOTP secret cannot be None or empty"
+            raise ValueError(msg)
+
+        self.totp_secret = encrypt_totp_secret(plaintext_secret)
+
+    def get_totp_secret_decrypted(self):
+        """
+        Get the decrypted TOTP secret.
+
+        Returns:
+            The decrypted Base32-encoded TOTP secret, or None if not set
+
+        Raises:
+            InvalidToken: If decryption fails (wrong key or corrupted data)
+        """
+        from utils.encryption import decrypt_totp_secret
+
+        if not self.totp_secret:
+            return None
+
+        return decrypt_totp_secret(self.totp_secret)
+
     def to_dict(self, include_roles=False, include_permissions=False, include_lockout_info=False, include_user_permissions=False):
         result = {
             "id": self.id,

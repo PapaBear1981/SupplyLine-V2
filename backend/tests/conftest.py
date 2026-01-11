@@ -195,8 +195,8 @@ def admin_user_with_totp(db_session):
         is_active=True
     )
     user.set_password("admin123")
-    # Enable TOTP for testing 2FA flow
-    user.totp_secret = pyotp.random_base32()
+    # Enable TOTP for testing 2FA flow (with encryption)
+    user.set_totp_secret_encrypted(pyotp.random_base32())
     user.is_totp_enabled = True
     db_session.add(user)
     db_session.commit()

@@ -162,6 +162,8 @@ urllib3==2.6.3
     # via requests
 
 # TOTP Two-Factor Authentication
+cryptography==44.0.0
+    # via -r requirements.in
 pyotp==2.9.0
     # via -r requirements.in
 qrcode==8.0

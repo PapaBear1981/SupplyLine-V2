@@ -116,8 +116,8 @@ def register_totp_routes(app):
             # Generate a new secret
             secret = pyotp.random_base32()
 
-            # Store the secret (not yet active)
-            user.totp_secret = secret
+            # Store the secret encrypted (not yet active)
+            user.set_totp_secret_encrypted(secret)
             db.session.commit()
 
             # Generate the provisioning URI
@@ -206,8 +206,8 @@ def register_totp_routes(app):
                     "code": "SETUP_NOT_STARTED"
                 }), 400
 
-            # Verify the code
-            if not verify_totp_code(user.totp_secret, code):
+            # Verify the code (decrypt secret for verification)
+            if not verify_totp_code(user.get_totp_secret_decrypted(), code):
                 logger.warning(f"Invalid TOTP code during setup for user {user_id}")
                 return jsonify({
                     "error": "Invalid code. Please try again.",
@@ -308,8 +308,8 @@ def register_totp_routes(app):
                     "code": "TOTP_NOT_ENABLED"
                 }), 400
 
-            # Verify the code
-            if not verify_totp_code(user.totp_secret, code):
+            # Verify the code (decrypt secret for verification)
+            if not verify_totp_code(user.get_totp_secret_decrypted(), code):
                 # Increment failed login attempts
                 user.increment_failed_login()
                 db.session.commit()
