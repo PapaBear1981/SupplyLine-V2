@@ -7,6 +7,7 @@ from functools import wraps
 from flask import current_app, jsonify, request, session
 
 import utils as password_utils
+
 from auth.jwt_manager import jwt_required
 from models import (
     AuditLog,

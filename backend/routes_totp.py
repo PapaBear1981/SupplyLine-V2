@@ -566,7 +566,6 @@ def register_totp_routes(app):
         app is unavailable. The code is consumed (removed) upon successful use.
         """
         import json
-        from datetime import timedelta
 
         from werkzeug.security import check_password_hash
 
