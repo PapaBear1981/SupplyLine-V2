@@ -62,3 +62,24 @@ export interface TotpDisableResponse {
   message: string;
   is_totp_enabled: boolean;
 }
+
+// Backup Codes Types
+export interface BackupCodesResponse {
+  message: string;
+  backup_codes: string[];
+  generated_at: string;
+}
+
+export interface BackupCodeVerifyRequest {
+  employee_number: string;
+  code: string;
+}
+
+export interface BackupCodeVerifyResponse {
+  message: string;
+  user: User;
+  access_token: string;
+  refresh_token: string;
+  expires_in: number;
+  codes_remaining: number;
+}

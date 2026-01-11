@@ -10,6 +10,9 @@ import type {
   TotpVerifyResponse,
   TotpDisableRequest,
   TotpDisableResponse,
+  BackupCodesResponse,
+  BackupCodeVerifyRequest,
+  BackupCodeVerifyResponse,
 } from '../types';
 
 export const authApi = baseApi.injectEndpoints({
@@ -72,6 +75,20 @@ export const authApi = baseApi.injectEndpoints({
       }),
       invalidatesTags: ['User'],
     }),
+    // Backup Codes endpoints
+    generateBackupCodes: builder.mutation<BackupCodesResponse, void>({
+      query: () => ({
+        url: '/api/auth/totp/backup-codes/generate',
+        method: 'POST',
+      }),
+    }),
+    verifyBackupCode: builder.mutation<BackupCodeVerifyResponse, BackupCodeVerifyRequest>({
+      query: (data) => ({
+        url: '/api/auth/totp/verify-backup-code',
+        method: 'POST',
+        body: data,
+      }),
+    }),
   }),
 });
 
@@ -85,4 +102,6 @@ export const {
   useVerifyTotpSetupMutation,
   useVerifyTotpMutation,
   useDisableTotpMutation,
+  useGenerateBackupCodesMutation,
+  useVerifyBackupCodeMutation,
 } = authApi;

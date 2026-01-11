@@ -1,0 +1,72 @@
+.backup-codes-display {
+  max-width: 700px;
+  margin: 0 auto;
+}
+
+.backup-codes-card {
+  background: rgba(255, 255, 255, 0.05);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(94, 165, 255, 0.2);
+  border-radius: 12px;
+}
+
+.codes-grid {
+  margin: 20px 0;
+}
+
+.code-item {
+  display: flex;
+  align-items: center;
+  padding: 12px 16px;
+  background: rgba(15, 35, 55, 0.4);
+  border: 1px solid rgba(94, 165, 255, 0.3);
+  border-radius: 8px;
+  font-family: 'Courier New', monospace;
+  transition: all 0.3s ease;
+}
+
+.code-item:hover {
+  border-color: rgba(94, 165, 255, 0.6);
+  background: rgba(15, 35, 55, 0.6);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(94, 165, 255, 0.15);
+}
+
+.code-number {
+  color: rgba(229, 239, 255, 0.5);
+  margin-right: 12px;
+  font-size: 14px;
+  min-width: 20px;
+}
+
+.code-value {
+  color: #5ea5ff;
+  font-size: 18px;
+  font-weight: bold;
+  letter-spacing: 2px;
+  user-select: all;
+}
+
+/* Light theme support */
+.adm-theme-light .backup-codes-card {
+  background: #ffffff;
+  border: 1px solid #d9d9d9;
+}
+
+.adm-theme-light .code-item {
+  background: #f5f5f5;
+  border: 1px solid #d9d9d9;
+}
+
+.adm-theme-light .code-item:hover {
+  border-color: #5ea5ff;
+  background: #e6f7ff;
+}
+
+.adm-theme-light .code-number {
+  color: #8c8c8c;
+}
+
+.adm-theme-light .code-value {
+  color: #1890ff;
+}
