@@ -460,3 +460,206 @@ def register_totp_routes(app):
                 "error": "Internal server error",
                 "code": "SERVER_ERROR"
             }), 500
+
+    @app.route("/api/auth/totp/backup-codes/generate", methods=["POST"])
+    @jwt_required
+    def totp_generate_backup_codes():
+        """Generate 10 single-use backup codes for account recovery.
+
+        Returns plain-text codes that are hashed and stored in the database.
+        These codes should be saved securely by the user.
+        """
+        import json
+        import secrets
+        from datetime import datetime
+        from werkzeug.security import generate_password_hash
+
+        try:
+            user_payload = request.current_user
+            user_id = user_payload["user_id"]
+
+            user = db.session.get(User, user_id)
+            if not user:
+                return jsonify({
+                    "error": "User not found",
+                    "code": "USER_NOT_FOUND"
+                }), 404
+
+            # Check if TOTP is enabled
+            if not user.is_totp_enabled:
+                return jsonify({
+                    "error": "Two-factor authentication must be enabled first",
+                    "code": "TOTP_NOT_ENABLED"
+                }), 400
+
+            # Generate 10 random 8-character backup codes
+            backup_codes_plain = []
+            backup_codes_hashed = []
+
+            for _ in range(10):
+                # Generate alphanumeric code (uppercase for readability)
+                code = ''.join(secrets.choice('ABCDEFGHJKLMNPQRSTUVWXYZ23456789') for _ in range(8))
+                backup_codes_plain.append(code)
+                backup_codes_hashed.append(generate_password_hash(code))
+
+            # Store hashed codes as JSON array
+            user.backup_codes = json.dumps(backup_codes_hashed)
+            user.backup_codes_generated_at = datetime.utcnow()
+            db.session.commit()
+
+            # Log the generation
+            activity = UserActivity(
+                user_id=user.id,
+                activity_type="backup_codes_generated",
+                description="User generated backup codes",
+                ip_address=request.remote_addr
+            )
+            db.session.add(activity)
+
+            AuditLog.log(
+                user_id=user.id,
+                action="backup_codes_generated",
+                resource_type="user",
+                resource_id=user.id,
+                details={"count": 10},
+                ip_address=request.remote_addr
+            )
+            db.session.commit()
+
+            logger.info(f"Backup codes generated for user {user_id}")
+
+            # Return plain-text codes (only shown once!)
+            return jsonify({
+                "message": "Backup codes generated successfully",
+                "backup_codes": backup_codes_plain,
+                "generated_at": user.backup_codes_generated_at.isoformat()
+            }), 200
+
+        except Exception as e:
+            logger.error(f"Backup codes generation error: {e!s}")
+            return jsonify({
+                "error": "Internal server error",
+                "code": "SERVER_ERROR"
+            }), 500
+
+    @app.route("/api/auth/totp/verify-backup-code", methods=["POST"])
+    def totp_verify_backup_code():
+        """Verify and consume a backup code for login.
+
+        This endpoint allows login using a backup code when the authenticator
+        app is unavailable. The code is consumed (removed) upon successful use.
+        """
+        import json
+        from datetime import timedelta
+        from werkzeug.security import check_password_hash
+
+        try:
+            data = request.get_json()
+            employee_number = data.get("employee_number")
+            backup_code = data.get("code")
+
+            if not employee_number or not backup_code:
+                return jsonify({
+                    "error": "Employee number and backup code are required",
+                    "code": "MISSING_FIELDS"
+                }), 400
+
+            # Find user by employee number
+            user = User.query.filter_by(employee_number=employee_number).first()
+            if not user:
+                logger.warning(f"Backup code attempt for non-existent user: {employee_number}")
+                return jsonify({
+                    "error": "Invalid employee number or backup code",
+                    "code": "INVALID_CREDENTIALS"
+                }), 401
+
+            # Check if TOTP is enabled
+            if not user.is_totp_enabled:
+                return jsonify({
+                    "error": "Two-factor authentication is not enabled",
+                    "code": "TOTP_NOT_ENABLED"
+                }), 400
+
+            # Check if backup codes exist
+            if not user.backup_codes:
+                return jsonify({
+                    "error": "No backup codes available",
+                    "code": "NO_BACKUP_CODES"
+                }), 400
+
+            # Parse stored backup codes
+            try:
+                backup_codes_hashed = json.loads(user.backup_codes)
+            except json.JSONDecodeError:
+                logger.error(f"Invalid backup codes JSON for user {user.id}")
+                return jsonify({
+                    "error": "Backup codes data corrupted",
+                    "code": "DATA_ERROR"
+                }), 500
+
+            # Verify the code matches one of the hashed codes
+            matching_code_index = None
+            for idx, hashed_code in enumerate(backup_codes_hashed):
+                if check_password_hash(hashed_code, backup_code.upper()):
+                    matching_code_index = idx
+                    break
+
+            if matching_code_index is None:
+                logger.warning(f"Invalid backup code attempt for user {user.id}")
+                return jsonify({
+                    "error": "Invalid backup code",
+                    "code": "INVALID_CODE"
+                }), 401
+
+            # Remove the used backup code
+            backup_codes_hashed.pop(matching_code_index)
+            user.backup_codes = json.dumps(backup_codes_hashed) if backup_codes_hashed else None
+            db.session.commit()
+
+            # Generate JWT tokens
+            jwt_manager = JWTManager.from_config(current_app.config)
+            access_token = jwt_manager.create_access_token(
+                user_id=user.id,
+                employee_number=user.employee_number
+            )
+            refresh_token = jwt_manager.create_refresh_token(
+                user_id=user.id,
+                employee_number=user.employee_number
+            )
+
+            # Log the login
+            activity = UserActivity(
+                user_id=user.id,
+                activity_type="backup_code_login",
+                description="User logged in using backup code",
+                ip_address=request.remote_addr
+            )
+            db.session.add(activity)
+
+            AuditLog.log(
+                user_id=user.id,
+                action="backup_code_login",
+                resource_type="user",
+                resource_id=user.id,
+                details={"codes_remaining": len(backup_codes_hashed)},
+                ip_address=request.remote_addr
+            )
+            db.session.commit()
+
+            logger.info(f"Backup code login successful for user {user.id} ({len(backup_codes_hashed)} codes remaining)")
+
+            return jsonify({
+                "message": "Login successful",
+                "user": user.to_dict(),
+                "access_token": access_token,
+                "refresh_token": refresh_token,
+                "expires_in": jwt_manager.access_token_expiry.total_seconds(),
+                "codes_remaining": len(backup_codes_hashed)
+            }), 200
+
+        except Exception as e:
+            logger.error(f"Backup code verification error: {e!s}")
+            return jsonify({
+                "error": "Internal server error",
+                "code": "SERVER_ERROR"
+            }), 500

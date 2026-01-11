@@ -154,6 +154,10 @@ class User(db.Model):
     totp_secret = db.Column(db.String(32), nullable=True)  # Base32 encoded secret
     is_totp_enabled = db.Column(db.Boolean, default=False)
 
+    # Backup codes for TOTP recovery
+    backup_codes = db.Column(db.Text, nullable=True)  # JSON array of hashed codes
+    backup_codes_generated_at = db.Column(db.DateTime, nullable=True)
+
     # Relationships
     roles = association_proxy("user_roles", "role")
     password_histories = db.relationship(
