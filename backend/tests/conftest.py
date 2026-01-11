@@ -156,8 +156,7 @@ def jwt_manager(app):
 
 @pytest.fixture
 def admin_user(db_session):
-    """Create admin user for testing with TOTP enabled"""
-    import pyotp
+    """Create admin user for testing WITHOUT TOTP enabled (for backward compatibility)"""
     # Use ADMIN001 to match backend/conftest.py and avoid conflicts
     # Delete any existing admin user (in case app initialization created one)
     existing = User.query.filter_by(employee_number="ADMIN001").first()
@@ -173,7 +172,30 @@ def admin_user(db_session):
         is_active=True
     )
     user.set_password("admin123")
-    # Enable TOTP to bypass mandatory 2FA setup in tests
+    # NOT enabling TOTP to support legacy tests expecting immediate tokens
+    db_session.add(user)
+    db_session.commit()
+    return user
+
+@pytest.fixture
+def admin_user_with_totp(db_session):
+    """Create admin user for testing WITH TOTP enabled (for 2FA flow tests)"""
+    import pyotp
+    # Use a different employee number to avoid conflicts
+    existing = User.query.filter_by(employee_number="ADMIN002").first()
+    if existing:
+        db_session.delete(existing)
+        db_session.commit()
+
+    user = User(
+        name="Test Admin with TOTP",
+        employee_number="ADMIN002",
+        department="IT",
+        is_admin=True,
+        is_active=True
+    )
+    user.set_password("admin123")
+    # Enable TOTP for testing 2FA flow
     user.totp_secret = pyotp.random_base32()
     user.is_totp_enabled = True
     db_session.add(user)
@@ -183,7 +205,6 @@ def admin_user(db_session):
 @pytest.fixture
 def test_user(db_session):
     """Alias for regular_user to support tests that use test_user fixture"""
-    import pyotp
     # Delete any existing user to ensure clean state
     existing = User.query.filter_by(employee_number="USER001").first()
     if existing:
@@ -198,9 +219,7 @@ def test_user(db_session):
         is_active=True
     )
     user.set_password("user123")
-    # Enable TOTP to bypass mandatory 2FA setup in tests
-    user.totp_secret = pyotp.random_base32()
-    user.is_totp_enabled = True
+    # NOT enabling TOTP to support legacy tests
     db_session.add(user)
     db_session.commit()
     return user
@@ -208,7 +227,6 @@ def test_user(db_session):
 @pytest.fixture
 def regular_user(db_session):
     """Create regular user for testing"""
-    import pyotp
     existing = User.query.filter_by(employee_number="USER001").first()
     if existing:
         db_session.delete(existing)
@@ -222,9 +240,7 @@ def regular_user(db_session):
         is_active=True
     )
     user.set_password("user123")
-    # Enable TOTP to bypass mandatory 2FA setup in tests
-    user.totp_secret = pyotp.random_base32()
-    user.is_totp_enabled = True
+    # NOT enabling TOTP to support legacy tests
     db_session.add(user)
     db_session.commit()
     return user
@@ -302,7 +318,6 @@ def user_auth_headers(client, regular_user, jwt_manager):
 def materials_user(db_session):
     """Create a Materials department user"""
     import uuid
-    import pyotp
     emp_number = f"MAT{uuid.uuid4().hex[:6]}"
 
     user = User(
@@ -313,9 +328,7 @@ def materials_user(db_session):
         is_active=True
     )
     user.set_password("materials123")
-    # Enable TOTP to bypass mandatory 2FA setup in tests
-    user.totp_secret = pyotp.random_base32()
-    user.is_totp_enabled = True
+    # NOT enabling TOTP to support legacy tests
     db_session.add(user)
     db_session.commit()
     return user
@@ -495,7 +508,6 @@ class TestUtils:
     @staticmethod
     def create_test_user(db_session, employee_number, name="Test User", is_admin=False):
         """Create a test user"""
-        import pyotp
         user = User(
             name=name,
             employee_number=employee_number,
@@ -504,9 +516,7 @@ class TestUtils:
             is_active=True
         )
         user.set_password("test123")
-        # Enable TOTP to bypass mandatory 2FA setup in tests
-        user.totp_secret = pyotp.random_base32()
-        user.is_totp_enabled = True
+        # NOT enabling TOTP to support legacy tests
         db_session.add(user)
         db_session.commit()
         return user
@@ -519,7 +529,6 @@ def test_utils():
 @pytest.fixture
 def test_user_2(db_session):
     """Create a second test user"""
-    import pyotp
     from models import User
 
     user = User(
@@ -530,9 +539,7 @@ def test_user_2(db_session):
         is_active=True
     )
     user.set_password("test456")
-    # Enable TOTP to bypass mandatory 2FA setup in tests
-    user.totp_secret = pyotp.random_base32()
-    user.is_totp_enabled = True
+    # NOT enabling TOTP to support legacy tests
     db_session.add(user)
     db_session.commit()
     return user
