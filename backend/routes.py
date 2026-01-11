@@ -6,8 +6,6 @@ from functools import wraps
 
 from flask import current_app, jsonify, request, session
 
-import utils as password_utils
-
 from auth.jwt_manager import jwt_required
 from models import (
     AuditLog,
@@ -60,6 +58,8 @@ from utils.file_validation import FileValidationError, validate_image_upload
 from utils.password_reset_security import get_password_reset_tracker
 from utils.rate_limiter import rate_limit
 from utils.validation import validate_serial_number_format, validate_warehouse_id
+
+import utils as password_utils
 
 
 logger = logging.getLogger(__name__)
