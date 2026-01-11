@@ -41,6 +41,7 @@ def register_auth_routes(app):
             # Basic validation
             employee_number = data.get("employee_number")
             password = data.get("password")
+            remember_me = data.get("remember_me", False)
 
             if not employee_number or not password:
                 return jsonify({"error": "Missing employee_number or password"}), 400
@@ -150,11 +151,8 @@ def register_auth_routes(app):
 
                 # Return a temporary limited token for TOTP setup only
                 # This token can ONLY be used for the TOTP setup endpoint
-                jwt_manager = JWTManager.from_config(current_app.config)
-                setup_token = jwt_manager.create_access_token(
-                    user_id=user.id,
-                    employee_number=user.employee_number
-                )
+                tokens = JWTManager.generate_tokens(user)
+                setup_token = tokens["access_token"]
 
                 return jsonify({
                     "message": "Two-factor authentication setup required",
@@ -234,7 +232,8 @@ def register_auth_routes(app):
                 "message": "Login successful",
                 "user": user.to_dict(include_roles=True, include_permissions=True),
                 "access_token": tokens["access_token"],
-                "refresh_token": tokens["refresh_token"]
+                "refresh_token": tokens["refresh_token"],
+                "expires_in": 900  # 15 minutes for access token
             })
 
             # Set access token cookie (HttpOnly, Secure, SameSite)
@@ -248,11 +247,13 @@ def register_auth_routes(app):
                 path="/"
             )
 
-            # Set refresh token cookie (HttpOnly, Secure, SameSite)
+            # Set refresh token cookie with extended expiration if remember_me is True
+            # Remember me: 30 days, Default: 7 days
+            refresh_token_max_age = 2592000 if remember_me else 604800  # 30 days vs 7 days
             response.set_cookie(
                 "refresh_token",
                 value=tokens["refresh_token"],
-                max_age=604800,  # 7 days
+                max_age=refresh_token_max_age,
                 httponly=True,  # Prevents JavaScript access
                 secure=current_app.config.get("SESSION_COOKIE_SECURE", True),  # HTTPS only in production
                 samesite="Lax",  # CSRF protection

@@ -42,6 +42,10 @@ export interface TotpVerifySetupRequest {
 export interface TotpVerifySetupResponse {
   message: string;
   is_totp_enabled: boolean;
+  access_token?: string;
+  refresh_token?: string;
+  user?: User;
+  expires_in?: number;
 }
 
 export interface TotpVerifyRequest {

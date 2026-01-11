@@ -36,6 +36,23 @@ const authSlice = createSlice({
         localStorage.removeItem('access_token');
       }
     },
+    setSetupToken: (
+      state,
+      action: PayloadAction<{ user: User; token: string; expiresIn?: number }>
+    ) => {
+      // Store setup token for TOTP API calls, but DON'T set isAuthenticated
+      // This prevents refresh bypass during 2FA setup
+      state.user = action.payload.user;
+      state.token = action.payload.token;
+      state.isAuthenticated = false; // CRITICAL: Not authenticated until 2FA complete
+
+      // Store in sessionStorage (NOT localStorage) so it clears on browser close
+      sessionStorage.setItem('setup_token', action.payload.token);
+
+      if (action.payload.expiresIn) {
+        setTokenExpiration(action.payload.expiresIn);
+      }
+    },
     logout: (state) => {
       state.user = null;
       state.token = null;
@@ -43,9 +60,10 @@ const authSlice = createSlice({
       localStorage.removeItem('access_token');
       localStorage.removeItem('token_expires_at');
       localStorage.removeItem('last_user_activity');
+      sessionStorage.removeItem('setup_token');
     },
   },
 });
 
-export const { setCredentials, logout } = authSlice.actions;
+export const { setCredentials, setSetupToken, logout } = authSlice.actions;
 export default authSlice.reducer;

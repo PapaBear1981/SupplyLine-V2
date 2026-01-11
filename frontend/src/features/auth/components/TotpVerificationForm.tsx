@@ -1,21 +1,26 @@
-import { Form, Input, Button, Typography, Space, message } from 'antd';
-import { SafetyCertificateOutlined, ArrowLeftOutlined } from '@ant-design/icons';
+import { Form, Input, Button, Typography, message } from 'antd';
+import { SafetyCertificateOutlined, ArrowLeftOutlined, KeyOutlined } from '@ant-design/icons';
+import { motion } from 'framer-motion';
 import { useVerifyTotpMutation } from '../services/authApi';
-import { useAppDispatch } from '@app/hooks';
-import { setCredentials } from '../slices/authSlice';
-import { useNavigate } from 'react-router-dom';
-import { ROUTES } from '@shared/constants/routes';
+import { formVariants, buttonHover, buttonTap } from '../styles/animations';
+import type { LoginResponse } from '../types';
+import './TotpVerificationForm.css';
 
 const { Title, Text, Paragraph } = Typography;
 
 interface TotpVerificationFormProps {
   employeeNumber: string;
   onBack: () => void;
+  onSuccess?: (response: LoginResponse) => void;
+  onUseBackupCode?: () => void;
 }
 
-export const TotpVerificationForm = ({ employeeNumber, onBack }: TotpVerificationFormProps) => {
-  const navigate = useNavigate();
-  const dispatch = useAppDispatch();
+export const TotpVerificationForm = ({
+  employeeNumber,
+  onBack,
+  onSuccess,
+  onUseBackupCode
+}: TotpVerificationFormProps) => {
   const [verifyTotp, { isLoading }] = useVerifyTotpMutation();
 
   const handleSubmit = async (values: { code: string }) => {
@@ -25,9 +30,9 @@ export const TotpVerificationForm = ({ employeeNumber, onBack }: TotpVerificatio
         code: values.code,
       }).unwrap();
 
-      dispatch(setCredentials({ user: result.user, token: result.access_token }));
-      message.success('Welcome back. Launch checklist complete.');
-      navigate(ROUTES.DASHBOARD);
+      if (onSuccess) {
+        onSuccess(result);
+      }
     } catch (error: unknown) {
       if (error && typeof error === 'object' && 'data' in error) {
         const apiError = error as { data?: { error?: string } };
@@ -39,10 +44,15 @@ export const TotpVerificationForm = ({ employeeNumber, onBack }: TotpVerificatio
   };
 
   return (
-    <div className="login-wrapper">
-      <div className="login-header">
-        <Title level={3} style={{ marginBottom: 6 }}>
-          <SafetyCertificateOutlined style={{ marginRight: 8 }} />
+    <motion.div
+      variants={formVariants}
+      initial="hidden"
+      animate="visible"
+      className="totp-verification-container"
+    >
+      <div className="totp-verification-header">
+        <SafetyCertificateOutlined className="totp-icon" />
+        <Title level={2} style={{ marginBottom: 8 }}>
           Two-Factor Authentication
         </Title>
         <Text type="secondary">
@@ -54,74 +64,75 @@ export const TotpVerificationForm = ({ employeeNumber, onBack }: TotpVerificatio
         name="totp-verify"
         onFinish={handleSubmit}
         autoComplete="off"
-        size="large"
         layout="vertical"
         requiredMark={false}
-        className="login-form"
+        className="totp-verification-form"
       >
-        <Space direction="vertical" size="middle" style={{ width: '100%' }}>
-          <Paragraph type="secondary" style={{ marginBottom: 0 }}>
-            Open your authenticator app and enter the code for SupplyLine MRO.
-          </Paragraph>
+        <Paragraph type="secondary" className="totp-instructions">
+          Open your authenticator app (Google Authenticator, Authy, etc.) and enter the code for SupplyLine MRO.
+        </Paragraph>
 
-          <Form.Item
-            label="Verification Code"
-            name="code"
-            rules={[
-              { required: true, message: 'Please enter the 6-digit code' },
-              { len: 6, message: 'Code must be exactly 6 digits' },
-              { pattern: /^\d+$/, message: 'Code must contain only numbers' },
-            ]}
-          >
-            <Input
-              placeholder="000000"
-              maxLength={6}
-              style={{
-                textAlign: 'center',
-                letterSpacing: 8,
-                fontSize: 24,
-                background: 'rgba(15, 35, 55, 0.6)',
-                border: '1px solid rgba(94, 165, 255, 0.25)',
-                color: '#f7fbff',
-              }}
-              styles={{
-                input: {
-                  background: 'transparent',
-                  color: '#f7fbff',
-                  textAlign: 'center',
-                },
-              }}
-              autoFocus
-            />
-          </Form.Item>
+        <Form.Item
+          label="Verification Code"
+          name="code"
+          rules={[
+            { required: true, message: 'Please enter the 6-digit code' },
+            { len: 6, message: 'Code must be exactly 6 digits' },
+            { pattern: /^\d+$/, message: 'Code must contain only numbers' },
+          ]}
+        >
+          <Input
+            placeholder="000000"
+            maxLength={6}
+            className="glass-input totp-code-input"
+            autoFocus
+          />
+        </Form.Item>
 
-          <Form.Item style={{ marginBottom: 0 }}>
+        <Form.Item style={{ marginBottom: 16 }}>
+          <motion.div whileHover={buttonHover} whileTap={buttonTap}>
             <Button
               type="primary"
               htmlType="submit"
               loading={isLoading}
               block
+              size="large"
+              className="glass-button totp-submit-button"
             >
-              Verify
+              Verify Code
             </Button>
-          </Form.Item>
+          </motion.div>
+        </Form.Item>
 
+        {onUseBackupCode && (
+          <div className="totp-backup-code-link">
+            <Button
+              type="link"
+              icon={<KeyOutlined />}
+              onClick={onUseBackupCode}
+              className="backup-code-button"
+            >
+              Use backup code instead
+            </Button>
+          </div>
+        )}
+
+        <div className="totp-back-link">
           <Button
             type="link"
             icon={<ArrowLeftOutlined />}
             onClick={onBack}
-            style={{ padding: 0 }}
           >
             Back to login
           </Button>
-        </Space>
+        </div>
       </Form>
 
-      <div className="login-footnote" style={{ marginTop: 24 }}>
+      <div className="totp-help-text">
         <Text type="secondary">
-          Having trouble? Contact support@supplyline.aero for assistance.
+          Having trouble? Contact <a href="mailto:support@supplyline.aero">support@supplyline.aero</a> for assistance.
         </Text>
       </div>
-    </div>
+    </motion.div>
   );
 };

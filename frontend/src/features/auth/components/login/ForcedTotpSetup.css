@@ -1,0 +1,156 @@
+.forced-totp-setup {
+  max-width: 700px;
+  margin: 0 auto;
+  padding: 24px;
+}
+
+.forced-totp-card {
+  padding: 32px;
+}
+
+.setup-header {
+  text-align: center;
+  margin-bottom: 24px;
+}
+
+.setup-icon {
+  width: 80px;
+  height: 80px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, rgba(94, 165, 255, 0.2) 0%, rgba(94, 165, 255, 0.05) 100%);
+  border: 2px solid rgba(94, 165, 255, 0.3);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 40px;
+  color: var(--login-accent-blue);
+  margin: 0 auto;
+}
+
+.setup-button {
+  width: 100%;
+  margin-top: 24px;
+  padding: 14px 24px;
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.glass-button-secondary {
+  flex: 1;
+  padding: 14px 24px;
+  background: transparent;
+  border: 1px solid var(--login-input-border);
+  border-radius: 8px;
+  color: var(--login-text-primary);
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.glass-button-secondary:hover {
+  border-color: var(--login-input-focus);
+  background: rgba(94, 165, 255, 0.05);
+}
+
+.qr-code-container {
+  display: flex;
+  justify-content: center;
+  padding: 32px;
+  background: rgba(255, 255, 255, 0.5);
+  border-radius: 12px;
+  margin: 16px 0;
+}
+
+.adm-theme-dark .qr-code-container,
+[data-theme='dark'] .qr-code-container {
+  background: rgba(15, 35, 55, 0.3);
+}
+
+.qr-code {
+  max-width: 280px;
+  width: 100%;
+  height: auto;
+  border-radius: 8px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
+}
+
+.verification-input-container {
+  display: flex;
+  justify-content: center;
+  margin: 24px 0;
+}
+
+.verification-input {
+  max-width: 300px;
+  width: 100%;
+  text-align: center;
+  font-size: 32px;
+  font-weight: bold;
+  letter-spacing: 8px;
+  font-family: 'Courier New', monospace;
+  padding: 16px;
+}
+
+.verification-input::placeholder {
+  letter-spacing: 8px;
+  opacity: 0.4;
+}
+
+/* Steps styling */
+.forced-totp-setup .ant-steps {
+  margin-bottom: 32px;
+}
+
+.forced-totp-setup .ant-steps-item-process .ant-steps-item-icon {
+  background: var(--login-accent-blue);
+  border-color: var(--login-accent-blue);
+}
+
+.forced-totp-setup .ant-steps-item-finish .ant-steps-item-icon {
+  border-color: var(--login-accent-blue);
+}
+
+.forced-totp-setup .ant-steps-item-finish .ant-steps-item-icon > .ant-steps-icon {
+  color: var(--login-accent-blue);
+}
+
+/* Mobile responsive */
+@media (max-width: 768px) {
+  .forced-totp-setup {
+    padding: 16px;
+  }
+
+  .forced-totp-card {
+    padding: 24px 16px;
+  }
+
+  .setup-icon {
+    width: 64px;
+    height: 64px;
+    font-size: 32px;
+  }
+
+  .qr-code-container {
+    padding: 24px;
+  }
+
+  .qr-code {
+    max-width: 240px;
+  }
+
+  .verification-input {
+    font-size: 24px;
+    letter-spacing: 4px;
+    padding: 12px;
+  }
+
+  .verification-input::placeholder {
+    letter-spacing: 4px;
+  }
+}
+
+@media (max-width: 576px) {
+  .forced-totp-setup .ant-steps {
+    display: none; /* Hide steps on very small screens to save space */
+  }
+}

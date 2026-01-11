@@ -48,7 +48,14 @@ def verify_totp_code(secret: str, code: str) -> bool:
     """
     totp = pyotp.TOTP(secret)
     # valid_window=1 allows for slight clock drift (30 seconds before/after)
-    return totp.verify(code, valid_window=1)
+    is_valid = totp.verify(code, valid_window=1)
+
+    # Debug logging to diagnose Authy code issues
+    if not is_valid:
+        current_code = totp.now()
+        logger.warning(f"TOTP verification failed - Expected: {current_code}, Received: {code}, Secret: {secret[:8]}...")
+
+    return is_valid
 
 
 def register_totp_routes(app):
@@ -232,9 +239,17 @@ def register_totp_routes(app):
 
             logger.info(f"TOTP enabled for user {user_id}")
 
+            # Generate full JWT tokens now that 2FA is enabled
+            tokens = JWTManager.generate_tokens(user)
+
+            # Return tokens so user is fully authenticated after setup
             return jsonify({
                 "message": "Two-factor authentication has been enabled successfully.",
-                "is_totp_enabled": True
+                "is_totp_enabled": True,
+                "access_token": tokens["access_token"],
+                "refresh_token": tokens["refresh_token"],
+                "user": user.to_dict(include_roles=True, include_permissions=True),
+                "expires_in": 900  # 15 minutes
             }), 200
 
         except Exception as e:

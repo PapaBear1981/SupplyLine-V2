@@ -2,12 +2,7 @@ import { useState } from 'react';
 import { Form, Input, Button, Typography, Alert, Space, message } from 'antd';
 import { SafetyCertificateOutlined, ArrowLeftOutlined, KeyOutlined } from '@ant-design/icons';
 import { motion } from 'framer-motion';
-import { useNavigate } from 'react-router-dom';
-import { useAppDispatch } from '@app/hooks';
-import { setCredentials } from '../slices/authSlice';
 import { useVerifyBackupCodeMutation } from '../services/authApi';
-import { ROUTES } from '@shared/constants/routes';
-import { socketService } from '@services/socket';
 import './BackupCodeForm.css';
 
 const { Title, Text, Paragraph } = Typography;
@@ -15,11 +10,10 @@ const { Title, Text, Paragraph } = Typography;
 interface BackupCodeFormProps {
   employeeNumber: string;
   onBack: () => void;
+  onSuccess: (response: any) => void;
 }
 
-export const BackupCodeForm = ({ employeeNumber, onBack }: BackupCodeFormProps) => {
-  const navigate = useNavigate();
-  const dispatch = useAppDispatch();
+export const BackupCodeForm = ({ employeeNumber, onBack, onSuccess }: BackupCodeFormProps) => {
   const [form] = Form.useForm();
   const [verifyBackupCode, { isLoading }] = useVerifyBackupCodeMutation();
   const [error, setError] = useState<string>('');
@@ -31,22 +25,6 @@ export const BackupCodeForm = ({ employeeNumber, onBack }: BackupCodeFormProps) 
         employee_number: employeeNumber,
         code: values.code.trim().toUpperCase(),
       }).unwrap();
-
-      // Set credentials
-      dispatch(
-        setCredentials({
-          user: result.user,
-          token: result.access_token,
-          expiresIn: result.expires_in,
-        })
-      );
-
-      // Establish WebSocket connection
-      try {
-        socketService.connect(result.access_token);
-      } catch (socketError) {
-        console.warn('WebSocket connection failed:', socketError);
-      }
 
       const codesRemaining = result.codes_remaining || 0;
       if (codesRemaining === 0) {
@@ -61,7 +39,7 @@ export const BackupCodeForm = ({ employeeNumber, onBack }: BackupCodeFormProps) 
         message.success(`Welcome back. ${codesRemaining} backup codes remaining.`);
       }
 
-      navigate(ROUTES.DASHBOARD);
+      onSuccess(result);
     } catch (err: unknown) {
       if (err && typeof err === 'object' && 'status' in err) {
         const apiError = err as { status: number; data?: { error?: string; code?: string } };

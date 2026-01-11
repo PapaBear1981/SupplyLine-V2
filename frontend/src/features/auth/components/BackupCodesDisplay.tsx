@@ -10,7 +10,7 @@ import {
 import { motion } from 'framer-motion';
 import './BackupCodesDisplay.css';
 
-const { Title, Text, Paragraph } = Typography;
+const { Title, Text } = Typography;
 
 interface BackupCodesDisplayProps {
   codes: string[];

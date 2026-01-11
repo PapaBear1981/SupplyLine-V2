@@ -14,8 +14,8 @@
   --login-input-bg: #f7f9fc;
   --login-input-border: #d1d9e6;
   --login-input-focus: #5ea5ff;
-  --login-accent-blue: #5ea5ff;
-  --login-accent-blue-hover: #4a94e8;
+  --login-accent-primary: #5ea5ff;
+  --login-accent-secondary: #4a94e8;
   --login-glass-bg: rgba(255, 255, 255, 0.1);
   --login-glass-border: rgba(94, 165, 255, 0.2);
   --login-shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.06);
@@ -34,8 +34,8 @@
   --login-input-bg: rgba(15, 35, 55, 0.6);
   --login-input-border: rgba(94, 165, 255, 0.25);
   --login-input-focus: #64b5f6;
-  --login-accent-blue: #64b5f6;
-  --login-accent-blue-hover: #5ea5ff;
+  --login-accent-primary: #64b5f6;
+  --login-accent-secondary: #5ea5ff;
   --login-glass-bg: rgba(15, 35, 55, 0.4);
   --login-glass-border: rgba(94, 165, 255, 0.25);
   --login-shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.3);

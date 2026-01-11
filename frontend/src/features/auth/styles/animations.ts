@@ -63,7 +63,7 @@ export const buttonHover = {
   y: -2,
   boxShadow: '0 8px 16px rgba(94, 165, 255, 0.3)',
   transition: {
-    type: 'spring',
+    type: 'spring' as const,
     stiffness: 400,
     damping: 17,
   },
