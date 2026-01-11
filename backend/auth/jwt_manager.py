@@ -40,7 +40,11 @@ class JWTManager:
         """
         now = datetime.now(UTC)
 
-        # Access token payload (short-lived: 15 minutes)
+        # Get access token expiration from session timeout configuration
+        # This ensures JWT tokens expire at the same time as the session inactivity timeout
+        access_token_minutes = current_app.config.get("SESSION_INACTIVITY_TIMEOUT_MINUTES", 30)
+
+        # Access token payload (configurable lifetime matching session timeout)
         access_payload = {
             "user_id": user.id,
             "user_name": user.name,
@@ -49,7 +53,7 @@ class JWTManager:
             "department": user.department,
             "permissions": user.get_effective_permissions(),  # Use effective permissions (role + user-specific)
             "iat": now,
-            "exp": now + timedelta(minutes=15),
+            "exp": now + timedelta(minutes=access_token_minutes),
             "jti": secrets.token_hex(16),  # JWT ID for CSRF validation
             "type": "access"
         }
@@ -68,12 +72,12 @@ class JWTManager:
         access_token = jwt.encode(access_payload, secret_key, algorithm="HS256")
         refresh_token = jwt.encode(refresh_payload, secret_key, algorithm="HS256")
 
-        logger.info(f"JWT tokens generated for user {user.id} ({user.name})")
+        logger.info(f"JWT tokens generated for user {user.id} ({user.name}) with {access_token_minutes} minute expiration")
 
         return {
             "access_token": access_token,
             "refresh_token": refresh_token,
-            "expires_in": 900,  # 15 minutes in seconds
+            "expires_in": access_token_minutes * 60,  # Convert minutes to seconds
             "token_type": "Bearer"
         }
 

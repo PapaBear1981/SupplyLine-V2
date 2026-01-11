@@ -9,6 +9,7 @@ export interface LoginResponse {
   access_token?: string;
   user: User;
   message?: string;
+  expires_in?: number;
 }
 
 export interface AuthState {

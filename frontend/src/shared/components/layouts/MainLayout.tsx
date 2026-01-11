@@ -23,6 +23,8 @@ import { useLogoutMutation } from '@features/auth/services/authApi';
 import { socketService } from '@services/socket';
 import { getMenuItems } from '@shared/constants/navigation';
 import { ROUTES } from '@shared/constants/routes';
+import { useActivityTracker } from '@shared/hooks/useActivityTracker';
+import { SessionExpiryWarning } from '@shared/components/SessionExpiryWarning';
 
 const { Header, Sider, Content } = Layout;
 const { Text } = Typography;
@@ -34,6 +36,9 @@ export const MainLayout = () => {
   const dispatch = useAppDispatch();
   const user = useAppSelector((state) => state.auth.user);
   const [logoutApi] = useLogoutMutation();
+
+  // Track user activity to prevent premature logout
+  useActivityTracker();
 
   // Memoize menu items based on user permissions
   const menuItems = useMemo(() => {
@@ -89,8 +94,10 @@ export const MainLayout = () => {
   ];
 
   return (
-    <Layout style={{ minHeight: '100vh' }}>
-      <Sider
+    <>
+      <SessionExpiryWarning />
+      <Layout style={{ minHeight: '100vh' }}>
+        <Sider
         trigger={null}
         collapsible
         collapsed={collapsed}
@@ -181,5 +188,6 @@ export const MainLayout = () => {
         </Content>
       </Layout>
     </Layout>
+    </>
   );
 };

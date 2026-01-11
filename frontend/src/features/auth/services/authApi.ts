@@ -16,6 +16,12 @@ export const authApi = baseApi.injectEndpoints({
         method: 'POST',
       }),
     }),
+    refreshToken: builder.mutation<LoginResponse, void>({
+      query: () => ({
+        url: '/api/auth/refresh',
+        method: 'POST',
+      }),
+    }),
     getCurrentUser: builder.query<LoginResponse['user'], void>({
       query: () => '/api/auth/me',
       transformResponse: (response: { user: LoginResponse['user'] }) => response.user,
@@ -27,5 +33,6 @@ export const authApi = baseApi.injectEndpoints({
 export const {
   useLoginMutation,
   useLogoutMutation,
+  useRefreshTokenMutation,
   useGetCurrentUserQuery,
 } = authApi;
