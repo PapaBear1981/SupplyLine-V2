@@ -1,0 +1,272 @@
+/**
+ * Glassmorphism styles for SupplyLine Login Page
+ * Provides modern glass effect with depth and transparency
+ */
+
+/* CSS Custom Properties for theming */
+:root {
+  /* Light theme colors */
+  --login-bg-primary: #ffffff;
+  --login-bg-secondary: linear-gradient(135deg, #f0f7ff 0%, #e6f2ff 100%);
+  --login-text-primary: #2c3e50;
+  --login-text-secondary: #595959;
+  --login-text-tertiary: #8c8c8c;
+  --login-input-bg: #f7f9fc;
+  --login-input-border: #d1d9e6;
+  --login-input-focus: #5ea5ff;
+  --login-accent-blue: #5ea5ff;
+  --login-accent-blue-hover: #4a94e8;
+  --login-glass-bg: rgba(255, 255, 255, 0.1);
+  --login-glass-border: rgba(94, 165, 255, 0.2);
+  --login-shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.06);
+  --login-shadow-md: 0 4px 16px rgba(0, 0, 0, 0.08);
+  --login-shadow-lg: 0 8px 32px rgba(0, 0, 0, 0.1);
+}
+
+/* Dark theme colors */
+.adm-theme-dark,
+[data-theme='dark'] {
+  --login-bg-primary: #0f1a2c;
+  --login-bg-secondary: linear-gradient(135deg, #0f1a2c 0%, #0b2f3d 100%);
+  --login-text-primary: #f7fbff;
+  --login-text-secondary: rgba(247, 251, 255, 0.85);
+  --login-text-tertiary: rgba(247, 251, 255, 0.65);
+  --login-input-bg: rgba(15, 35, 55, 0.6);
+  --login-input-border: rgba(94, 165, 255, 0.25);
+  --login-input-focus: #64b5f6;
+  --login-accent-blue: #64b5f6;
+  --login-accent-blue-hover: #5ea5ff;
+  --login-glass-bg: rgba(15, 35, 55, 0.4);
+  --login-glass-border: rgba(94, 165, 255, 0.25);
+  --login-shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.3);
+  --login-shadow-md: 0 4px 16px rgba(0, 0, 0, 0.4);
+  --login-shadow-lg: 0 8px 32px rgba(0, 0, 0, 0.5);
+}
+
+/* Glassmorphism card effect */
+.glass-card {
+  background: var(--login-glass-bg);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border: 1px solid var(--login-glass-border);
+  border-radius: 16px;
+  box-shadow:
+    var(--login-shadow-lg),
+    inset 0 1px 0 rgba(255, 255, 255, 0.1);
+}
+
+/* Enhanced glass card with more depth */
+.glass-card-elevated {
+  background: var(--login-glass-bg);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid var(--login-glass-border);
+  border-radius: 20px;
+  box-shadow:
+    0 8px 32px rgba(0, 0, 0, 0.1),
+    0 16px 64px rgba(0, 0, 0, 0.05),
+    inset 0 1px 0 rgba(255, 255, 255, 0.15);
+}
+
+/* Glassmorphism input field */
+.glass-input {
+  background: var(--login-input-bg);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border: 1px solid var(--login-input-border);
+  border-radius: 8px;
+  color: var(--login-text-primary);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.glass-input:hover {
+  border-color: var(--login-input-focus);
+  box-shadow: 0 0 0 4px rgba(94, 165, 255, 0.05);
+}
+
+.glass-input:focus,
+.glass-input:focus-within {
+  border-color: var(--login-input-focus);
+  box-shadow: 0 0 0 4px rgba(94, 165, 255, 0.1);
+  outline: none;
+}
+
+/* Glassmorphism button */
+.glass-button {
+  background: linear-gradient(135deg, var(--login-accent-blue) 0%, var(--login-accent-blue-hover) 100%);
+  border: none;
+  border-radius: 8px;
+  color: #ffffff;
+  font-weight: 600;
+  box-shadow: var(--login-shadow-md);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.glass-button:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 20px rgba(94, 165, 255, 0.3);
+}
+
+.glass-button:active {
+  transform: translateY(0);
+}
+
+/* Login page background */
+.login-page-bg {
+  min-height: 100vh;
+  background: var(--login-bg-secondary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  position: relative;
+  overflow: hidden;
+}
+
+/* Animated background gradient */
+.login-page-bg::before {
+  content: '';
+  position: absolute;
+  top: -50%;
+  left: -50%;
+  width: 200%;
+  height: 200%;
+  background: radial-gradient(
+    circle at 50% 50%,
+    rgba(94, 165, 255, 0.08) 0%,
+    transparent 50%
+  );
+  animation: rotate-bg 20s linear infinite;
+}
+
+@keyframes rotate-bg {
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
+}
+
+/* Centered container for login forms */
+.login-container {
+  width: 100%;
+  max-width: 480px;
+  position: relative;
+  z-index: 1;
+}
+
+/* Wide container for forms that need more space */
+.login-container-wide {
+  width: 100%;
+  max-width: 700px;
+  position: relative;
+  z-index: 1;
+}
+
+/* Focus glow animation */
+@keyframes focus-glow {
+  0% {
+    box-shadow: 0 0 0 0 rgba(94, 165, 255, 0.4);
+  }
+  100% {
+    box-shadow: 0 0 0 4px rgba(94, 165, 255, 0.1);
+  }
+}
+
+.focus-glow {
+  animation: focus-glow 0.3s ease-out;
+}
+
+/* Fade in up animation */
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.fade-in-up {
+  animation: fadeInUp 0.4s ease-out;
+}
+
+/* Fade in down animation */
+@keyframes fadeInDown {
+  from {
+    opacity: 0;
+    transform: translateY(-20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.fade-in-down {
+  animation: fadeInDown 0.4s ease-out;
+}
+
+/* Scale in animation */
+@keyframes scaleIn {
+  from {
+    opacity: 0;
+    transform: scale(0.9);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.scale-in {
+  animation: scaleIn 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+/* Responsive design */
+@media (max-width: 576px) {
+  .login-page-bg {
+    padding: 16px;
+  }
+
+  .glass-card,
+  .glass-card-elevated {
+    border-radius: 12px;
+  }
+
+  .login-container,
+  .login-container-wide {
+    max-width: 100%;
+  }
+}
+
+/* High contrast mode support */
+@media (prefers-contrast: high) {
+  .glass-card,
+  .glass-card-elevated {
+    border-width: 2px;
+  }
+
+  .glass-input:focus,
+  .glass-input:focus-within {
+    border-width: 2px;
+  }
+}
+
+/* Reduce motion for accessibility */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+
+  .login-page-bg::before {
+    animation: none;
+  }
+}

@@ -12,6 +12,8 @@ export interface LoginResponse {
   expires_in?: number;
   code?: string;
   requires_totp?: boolean;
+  requires_totp_setup?: boolean;
+  setup_token?: string;
   employee_number?: string;
 }
 

@@ -1,0 +1,85 @@
+.theme-toggle-button {
+  position: fixed;
+  top: 24px;
+  right: 24px;
+  z-index: 1000;
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  border: 1px solid rgba(94, 165, 255, 0.2);
+  background: rgba(255, 255, 255, 0.1);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.theme-toggle-button:hover {
+  background: rgba(255, 255, 255, 0.2);
+  box-shadow: 0 4px 16px rgba(94, 165, 255, 0.2);
+}
+
+.theme-toggle-button:active {
+  transform: scale(0.95);
+}
+
+.theme-toggle-icon-container {
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.theme-toggle-icon {
+  font-size: 20px;
+  color: #5ea5ff;
+}
+
+/* Dark theme styles */
+.adm-theme-dark .theme-toggle-button,
+[data-theme='dark'] .theme-toggle-button {
+  border-color: rgba(94, 165, 255, 0.3);
+  background: rgba(15, 35, 55, 0.6);
+}
+
+.adm-theme-dark .theme-toggle-button:hover,
+[data-theme='dark'] .theme-toggle-button:hover {
+  background: rgba(15, 35, 55, 0.8);
+}
+
+.adm-theme-dark .theme-toggle-icon,
+[data-theme='dark'] .theme-toggle-icon {
+  color: #64b5f6;
+}
+
+/* Mobile responsive */
+@media (max-width: 576px) {
+  .theme-toggle-button {
+    top: 16px;
+    right: 16px;
+    width: 40px;
+    height: 40px;
+  }
+
+  .theme-toggle-icon {
+    font-size: 18px;
+  }
+}
+
+/* Accessibility - focus states */
+.theme-toggle-button:focus-visible {
+  outline: 2px solid #5ea5ff;
+  outline-offset: 2px;
+}
+
+/* High contrast mode */
+@media (prefers-contrast: high) {
+  .theme-toggle-button {
+    border-width: 2px;
+  }
+}

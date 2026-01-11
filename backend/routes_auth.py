@@ -134,6 +134,37 @@ def register_auth_routes(app):
                     "employee_number": user.employee_number
                 }), 200
 
+            # MANDATORY 2FA: Check if user needs to set up TOTP (not enabled yet)
+            if hasattr(user, "is_totp_enabled") and not user.is_totp_enabled:
+                # Require TOTP setup before allowing login
+                logger.info(f"TOTP setup required for user {user.id}")
+
+                activity = UserActivity(
+                    user_id=user.id,
+                    activity_type="login_pending_totp_setup",
+                    description="Login pending mandatory TOTP setup",
+                    ip_address=request.remote_addr
+                )
+                db.session.add(activity)
+                db.session.commit()
+
+                # Return a temporary limited token for TOTP setup only
+                # This token can ONLY be used for the TOTP setup endpoint
+                jwt_manager = JWTManager.from_config(current_app.config)
+                setup_token = jwt_manager.create_access_token(
+                    user_id=user.id,
+                    employee_number=user.employee_number
+                )
+
+                return jsonify({
+                    "message": "Two-factor authentication setup required",
+                    "code": "TOTP_SETUP_REQUIRED",
+                    "requires_totp_setup": True,
+                    "setup_token": setup_token,
+                    "user": user.to_dict(),
+                    "employee_number": user.employee_number
+                }), 200
+
             # Enforce password expiry policy (90 days)
             if hasattr(user, "is_password_expired") and user.is_password_expired():
                 user.force_password_change = True
