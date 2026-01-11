@@ -1,0 +1,194 @@
+.totp-verification-container {
+  width: 100%;
+  max-width: 460px;
+  margin: 0 auto;
+}
+
+.totp-verification-header {
+  text-align: center;
+  margin-bottom: 32px;
+}
+
+.totp-icon {
+  font-size: 48px;
+  color: var(--login-accent-primary);
+  margin-bottom: 16px;
+  display: block;
+}
+
+.totp-verification-header .ant-typography {
+  color: var(--login-text-primary);
+}
+
+.totp-verification-form {
+  width: 100%;
+}
+
+.totp-instructions {
+  text-align: center;
+  margin-bottom: 24px;
+  color: var(--login-text-secondary);
+}
+
+.totp-code-input {
+  text-align: center;
+  letter-spacing: 8px;
+  font-size: 24px;
+  font-weight: 600;
+  height: 60px;
+}
+
+.totp-code-input input {
+  text-align: center;
+  letter-spacing: 8px;
+}
+
+.totp-submit-button {
+  height: 48px;
+  font-size: 16px;
+  font-weight: 600;
+  border-radius: 12px;
+  background: var(--login-accent-primary);
+  border: none;
+  box-shadow: 0 4px 12px rgba(94, 165, 255, 0.3);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.totp-submit-button:hover {
+  background: var(--login-accent-secondary);
+  box-shadow: 0 6px 20px rgba(94, 165, 255, 0.4);
+}
+
+.totp-backup-code-link {
+  text-align: center;
+  margin-bottom: 16px;
+}
+
+.backup-code-button {
+  color: var(--login-accent-primary);
+  padding: 0;
+  font-size: 14px;
+  transition: color 0.2s;
+}
+
+.backup-code-button:hover {
+  color: var(--login-accent-secondary);
+}
+
+.totp-back-link {
+  text-align: center;
+  margin-top: 8px;
+}
+
+.totp-back-link .ant-btn-link {
+  color: var(--login-text-tertiary);
+  padding: 0;
+  font-size: 14px;
+  transition: color 0.2s;
+}
+
+.totp-back-link .ant-btn-link:hover {
+  color: var(--login-text-secondary);
+}
+
+.totp-help-text {
+  margin-top: 24px;
+  padding-top: 24px;
+  border-top: 1px solid var(--login-glass-border);
+  text-align: center;
+}
+
+.totp-help-text .ant-typography {
+  color: var(--login-text-secondary);
+  font-size: 13px;
+}
+
+.totp-help-text a {
+  color: var(--login-accent-primary);
+  text-decoration: none;
+  transition: color 0.2s;
+}
+
+.totp-help-text a:hover {
+  color: var(--login-accent-secondary);
+  text-decoration: underline;
+}
+
+/* Mobile responsive */
+@media (max-width: 576px) {
+  .totp-verification-container {
+    max-width: 100%;
+    padding: 0 16px;
+  }
+
+  .totp-verification-header {
+    margin-bottom: 24px;
+  }
+
+  .totp-icon {
+    font-size: 40px;
+    margin-bottom: 12px;
+  }
+
+  .totp-verification-header .ant-typography-h2 {
+    font-size: 24px;
+  }
+
+  .totp-code-input {
+    font-size: 20px;
+    letter-spacing: 6px;
+    height: 52px;
+  }
+
+  .totp-code-input input {
+    letter-spacing: 6px;
+  }
+
+  .totp-submit-button {
+    height: 44px;
+    font-size: 15px;
+  }
+
+  .totp-help-text {
+    margin-top: 20px;
+    padding-top: 20px;
+  }
+}
+
+/* Tablet responsive */
+@media (min-width: 577px) and (max-width: 768px) {
+  .totp-verification-container {
+    max-width: 420px;
+  }
+
+  .totp-code-input {
+    font-size: 22px;
+    letter-spacing: 7px;
+    height: 56px;
+  }
+
+  .totp-code-input input {
+    letter-spacing: 7px;
+  }
+}
+
+/* Focus visible for accessibility */
+.backup-code-button:focus-visible,
+.totp-back-link .ant-btn-link:focus-visible {
+  outline: 2px solid var(--login-accent-primary);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/* High contrast mode */
+@media (prefers-contrast: high) {
+  .backup-code-button,
+  .totp-back-link .ant-btn-link,
+  .totp-help-text a {
+    text-decoration: underline;
+  }
+
+  .totp-submit-button {
+    border: 2px solid var(--login-accent-primary);
+  }
+}

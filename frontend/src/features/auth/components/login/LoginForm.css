@@ -1,0 +1,162 @@
+.login-form-container {
+  width: 100%;
+  max-width: 460px;
+  margin: 0 auto;
+}
+
+.login-form-header {
+  text-align: center;
+  margin-bottom: 32px;
+}
+
+.login-form-header .ant-typography {
+  color: var(--login-text-primary);
+}
+
+.login-form {
+  width: 100%;
+}
+
+.login-form-actions {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 24px;
+}
+
+.forgot-password-link {
+  color: var(--login-accent-primary);
+  font-size: 14px;
+  text-decoration: none;
+  transition: all 0.2s;
+}
+
+.forgot-password-link:hover {
+  color: var(--login-accent-secondary);
+  text-decoration: underline;
+}
+
+.login-submit-button {
+  height: 48px;
+  font-size: 16px;
+  font-weight: 600;
+  border-radius: 12px;
+  background: var(--login-accent-primary);
+  border: none;
+  box-shadow: 0 4px 12px rgba(94, 165, 255, 0.3);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.login-submit-button:hover {
+  background: var(--login-accent-secondary);
+  box-shadow: 0 6px 20px rgba(94, 165, 255, 0.4);
+  transform: translateY(-2px);
+}
+
+.login-submit-button:active {
+  transform: translateY(0);
+}
+
+.login-form-footer {
+  margin-top: 24px;
+  text-align: center;
+  padding-top: 24px;
+  border-top: 1px solid var(--login-glass-border);
+}
+
+.login-form-footer .ant-typography {
+  color: var(--login-text-secondary);
+}
+
+.login-form-footer .ant-btn-link {
+  color: var(--login-accent-primary);
+  font-weight: 500;
+  transition: color 0.2s;
+}
+
+.login-form-footer .ant-btn-link:hover {
+  color: var(--login-accent-secondary);
+}
+
+/* Remember me checkbox styling */
+.login-form .ant-checkbox-wrapper {
+  color: var(--login-text-secondary);
+}
+
+.login-form .ant-checkbox-inner {
+  border-color: var(--login-glass-border);
+  background: transparent;
+  transition: all 0.3s;
+}
+
+.login-form .ant-checkbox-checked .ant-checkbox-inner {
+  background: var(--login-accent-primary);
+  border-color: var(--login-accent-primary);
+}
+
+.login-form .ant-checkbox-wrapper:hover .ant-checkbox-inner {
+  border-color: var(--login-accent-primary);
+}
+
+/* Mobile responsive */
+@media (max-width: 576px) {
+  .login-form-container {
+    max-width: 100%;
+    padding: 0 16px;
+  }
+
+  .login-form-header {
+    margin-bottom: 24px;
+  }
+
+  .login-form-header .ant-typography-h2 {
+    font-size: 24px;
+  }
+
+  .login-form-actions {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
+  }
+
+  .forgot-password-link {
+    margin-left: 0;
+  }
+
+  .login-submit-button {
+    height: 44px;
+    font-size: 15px;
+  }
+
+  .login-form-footer {
+    margin-top: 20px;
+    padding-top: 20px;
+  }
+}
+
+/* Tablet responsive */
+@media (min-width: 577px) and (max-width: 768px) {
+  .login-form-container {
+    max-width: 420px;
+  }
+}
+
+/* High contrast mode */
+@media (prefers-contrast: high) {
+  .forgot-password-link,
+  .login-form-footer .ant-btn-link {
+    text-decoration: underline;
+  }
+
+  .login-submit-button {
+    border: 2px solid var(--login-accent-primary);
+  }
+}
+
+/* Focus visible for accessibility */
+.forgot-password-link:focus-visible,
+.login-form-footer .ant-btn-link:focus-visible {
+  outline: 2px solid var(--login-accent-primary);
+  outline-offset: 2px;
+  border-radius: 4px;
+}

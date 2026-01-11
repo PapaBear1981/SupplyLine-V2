@@ -1,0 +1,37 @@
+import { motion } from 'framer-motion';
+import { Input, Form } from 'antd';
+import type { InputProps } from 'antd';
+import type { Rule } from 'antd/es/form';
+import { inputVariants } from '../../styles/animations';
+import './AnimatedInput.css';
+
+interface AnimatedInputProps extends InputProps {
+  name: string;
+  label?: string;
+  rules?: Rule[];
+  icon?: React.ReactNode;
+}
+
+export const AnimatedInput = ({
+  name,
+  label,
+  rules,
+  icon,
+  type = 'text',
+  ...inputProps
+}: AnimatedInputProps) => {
+  const InputComponent = type === 'password' ? Input.Password : Input;
+
+  return (
+    <motion.div variants={inputVariants} className="animated-input-wrapper">
+      <Form.Item label={label} name={name} rules={rules}>
+        <InputComponent
+          {...inputProps}
+          prefix={icon}
+          className="glass-input animated-input"
+          autoComplete={type === 'password' ? 'current-password' : 'off'}
+        />
+      </Form.Item>
+    </motion.div>
+  );
+};

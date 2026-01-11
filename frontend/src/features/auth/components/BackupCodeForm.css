@@ -1,0 +1,47 @@
+.backup-code-form-wrapper {
+  max-width: 480px;
+  margin: 0 auto;
+}
+
+.backup-code-form-header {
+  margin-bottom: 32px;
+}
+
+.back-button {
+  padding: 4px 0;
+  color: rgba(229, 239, 255, 0.7);
+  margin-bottom: 16px;
+}
+
+.back-button:hover {
+  color: #5ea5ff;
+}
+
+.backup-icon {
+  width: 80px;
+  height: 80px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, rgba(94, 165, 255, 0.2) 0%, rgba(94, 165, 255, 0.05) 100%);
+  border: 2px solid rgba(94, 165, 255, 0.3);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 36px;
+  color: #5ea5ff;
+  margin: 0 auto;
+}
+
+/* Light theme */
+.adm-theme-light .back-button {
+  color: #595959;
+}
+
+.adm-theme-light .back-button:hover {
+  color: #1890ff;
+}
+
+.adm-theme-light .backup-icon {
+  background: linear-gradient(135deg, rgba(24, 144, 255, 0.1) 0%, rgba(24, 144, 255, 0.03) 100%);
+  border: 2px solid rgba(24, 144, 255, 0.2);
+  color: #1890ff;
+}

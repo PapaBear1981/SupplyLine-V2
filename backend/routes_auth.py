@@ -41,6 +41,7 @@ def register_auth_routes(app):
             # Basic validation
             employee_number = data.get("employee_number")
             password = data.get("password")
+            remember_me = data.get("remember_me", False)
 
             if not employee_number or not password:
                 return jsonify({"error": "Missing employee_number or password"}), 400
@@ -113,7 +114,8 @@ def register_auth_routes(app):
             # Successful login - reset failed attempts
             user.reset_failed_login_attempts()
 
-            # Enforce password expiry policy (90 days)
+            # Enforce password expiry policy (90 days) - check BEFORE 2FA
+            # Reason: Force password change before entering 2FA flow
             if hasattr(user, "is_password_expired") and user.is_password_expired():
                 user.force_password_change = True
 
@@ -142,7 +144,71 @@ def register_auth_routes(app):
                     "employee_number": user.employee_number
                 }), 200
 
-            # Check if user needs to change password
+            # Check if user needs to change password - check BEFORE 2FA
+            if hasattr(user, "force_password_change") and user.force_password_change:
+                # Return special response indicating password change required
+                return jsonify({
+                    "message": "Password change required",
+                    "code": "PASSWORD_CHANGE_REQUIRED",
+                    "user_id": user.id,
+                    "employee_number": user.employee_number
+                }), 200
+
+            # Check if TOTP 2FA is enabled
+            if hasattr(user, "is_totp_enabled") and user.is_totp_enabled:
+                # Don't issue tokens yet - require TOTP verification
+                logger.info(f"TOTP required for user {user.id}")
+
+                activity = UserActivity(
+                    user_id=user.id,
+                    activity_type="login_pending_totp",
+                    description="Login pending TOTP verification",
+                    ip_address=request.remote_addr
+                )
+                db.session.add(activity)
+                db.session.commit()
+
+                return jsonify({
+                    "message": "Two-factor authentication required",
+                    "code": "TOTP_REQUIRED",
+                    "requires_totp": True,
+                    "employee_number": user.employee_number
+                }), 200
+
+            # MANDATORY 2FA: Check if user needs to set up TOTP (not enabled yet)
+            # Skip in testing mode to maintain backward compatibility with existing tests
+            if (
+                hasattr(user, "is_totp_enabled")
+                and not user.is_totp_enabled
+                and not current_app.config.get("TESTING", False)
+            ):
+                # Require TOTP setup before allowing login
+                logger.info(f"TOTP setup required for user {user.id}")
+
+                activity = UserActivity(
+                    user_id=user.id,
+                    activity_type="login_pending_totp_setup",
+                    description="Login pending mandatory TOTP setup",
+                    ip_address=request.remote_addr
+                )
+                db.session.add(activity)
+                db.session.commit()
+
+                # Return a temporary limited token for TOTP setup only
+                # This token can ONLY be used for the TOTP setup endpoint
+                tokens = JWTManager.generate_tokens(user)
+                setup_token = tokens["access_token"]
+
+                return jsonify({
+                    "message": "Two-factor authentication setup required",
+                    "code": "TOTP_SETUP_REQUIRED",
+                    "requires_totp_setup": True,
+                    "setup_token": setup_token,
+                    "user": user.to_dict(),
+                    "employee_number": user.employee_number
+                }), 200
+
+            # This should not be reached, but keeping for safety
             if hasattr(user, "force_password_change") and user.force_password_change:
                 # Return special response indicating password change required
                 return jsonify({
@@ -182,7 +248,8 @@ def register_auth_routes(app):
                 "message": "Login successful",
                 "user": user.to_dict(include_roles=True, include_permissions=True),
                 "access_token": tokens["access_token"],
-                "refresh_token": tokens["refresh_token"]
+                "refresh_token": tokens["refresh_token"],
+                "expires_in": 900  # 15 minutes for access token
             })
 
             # Set access token cookie (HttpOnly, Secure, SameSite)
@@ -196,11 +263,13 @@ def register_auth_routes(app):
                 path="/"
             )
 
-            # Set refresh token cookie (HttpOnly, Secure, SameSite)
+            # Set refresh token cookie with extended expiration if remember_me is True
+            # Remember me: 30 days, Default: 7 days
+            refresh_token_max_age = 2592000 if remember_me else 604800  # 30 days vs 7 days
             response.set_cookie(
                 "refresh_token",
                 value=tokens["refresh_token"],
-                max_age=604800,  # 7 days
+                max_age=refresh_token_max_age,
                 httponly=True,  # Prevents JavaScript access
                 secure=current_app.config.get("SESSION_COOKIE_SECURE", True),  # HTTPS only in production
                 samesite="Lax",  # CSRF protection

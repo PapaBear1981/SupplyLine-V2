@@ -10,7 +10,7 @@ import { useAppSelector } from '@app/hooks';
  */
 export const useActivityTracker = () => {
   const isAuthenticated = useAppSelector((state) => state.auth.isAuthenticated);
-  const lastActivityRef = useRef<number>(Date.now());
+  const lastActivityRef = useRef<number>(0);
   const throttleTimerRef = useRef<number | null>(null);
 
   useEffect(() => {

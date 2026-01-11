@@ -8,6 +8,7 @@ import { AdminRoute } from '@features/auth/components/AdminRoute';
 import { PermissionProvider } from '@features/auth/context/PermissionContext';
 import { MobileProvider } from '@shared/contexts/MobileContext';
 import { LoginPage } from '@features/auth/pages/LoginPage';
+import { ForgotPasswordPage } from '@features/auth/pages/ForgotPasswordPage';
 import { DashboardPage } from '@features/dashboard/pages/DashboardPage';
 import { ToolsPage } from '@features/tools/pages/ToolsPage';
 import { ToolCheckoutPage } from '@features/tool-checkout';
@@ -53,6 +54,7 @@ function AppContent() {
               {/* Auth Routes */}
               <Route element={<ResponsiveAuthLayout />}>
                 <Route path={ROUTES.LOGIN} element={<LoginPage />} />
+                <Route path="/forgot-password" element={<ForgotPasswordPage />} />
               </Route>
 
               {/* Protected Routes */}
