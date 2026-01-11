@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 
 const REMEMBER_ME_KEY = 'supplyline_remember_me';
 const EXPIRY_DAYS = 30;
@@ -9,30 +9,6 @@ interface RememberMeData {
 }
 
 export const useRememberMe = () => {
-  const [savedEmployeeNumber, setSavedEmployeeNumber] = useState<string | null>(null);
-
-  // Load saved employee number on mount
-  useEffect(() => {
-    const data = getSavedEmployeeNumber();
-    if (data) {
-      setSavedEmployeeNumber(data);
-    }
-  }, []);
-
-  const saveEmployeeNumber = (employeeNumber: string) => {
-    const data: RememberMeData = {
-      employeeNumber,
-      expiresAt: Date.now() + EXPIRY_DAYS * 24 * 60 * 60 * 1000,
-    };
-
-    try {
-      localStorage.setItem(REMEMBER_ME_KEY, JSON.stringify(data));
-      setSavedEmployeeNumber(employeeNumber);
-    } catch (error) {
-      console.error('Failed to save remember me data:', error);
-    }
-  };
-
   const getSavedEmployeeNumber = (): string | null => {
     try {
       const stored = localStorage.getItem(REMEMBER_ME_KEY);
@@ -52,6 +28,25 @@ export const useRememberMe = () => {
       // Clear corrupted data
       localStorage.removeItem(REMEMBER_ME_KEY);
       return null;
+    }
+  };
+
+  // Load saved employee number using lazy initialization
+  const [savedEmployeeNumber, setSavedEmployeeNumber] = useState<string | null>(() =>
+    getSavedEmployeeNumber()
+  );
+
+  const saveEmployeeNumber = (employeeNumber: string) => {
+    const data: RememberMeData = {
+      employeeNumber,
+      expiresAt: Date.now() + EXPIRY_DAYS * 24 * 60 * 60 * 1000,
+    };
+
+    try {
+      localStorage.setItem(REMEMBER_ME_KEY, JSON.stringify(data));
+      setSavedEmployeeNumber(employeeNumber);
+    } catch (error) {
+      console.error('Failed to save remember me data:', error);
     }
   };
 

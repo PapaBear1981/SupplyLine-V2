@@ -3,6 +3,7 @@ import { Form, Input, Button, Typography, Alert, Space, message } from 'antd';
 import { SafetyCertificateOutlined, ArrowLeftOutlined, KeyOutlined } from '@ant-design/icons';
 import { motion } from 'framer-motion';
 import { useVerifyBackupCodeMutation } from '../services/authApi';
+import type { BackupCodeVerifyResponse } from '../types';
 import './BackupCodeForm.css';
 
 const { Title, Text, Paragraph } = Typography;
@@ -10,7 +11,7 @@ const { Title, Text, Paragraph } = Typography;
 interface BackupCodeFormProps {
   employeeNumber: string;
   onBack: () => void;
-  onSuccess: (response: any) => void;
+  onSuccess: (response: BackupCodeVerifyResponse) => void;
 }
 
 export const BackupCodeForm = ({ employeeNumber, onBack, onSuccess }: BackupCodeFormProps) => {

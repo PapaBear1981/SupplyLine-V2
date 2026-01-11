@@ -158,7 +158,7 @@ idna==3.11
     # via requests
 requests==2.32.3
     # via -r requirements.in
-urllib3==2.6.0
+urllib3==2.6.3
     # via requests
 
 # TOTP Two-Factor Authentication

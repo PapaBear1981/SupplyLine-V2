@@ -2,6 +2,7 @@ import { createApi, fetchBaseQuery } from '@reduxjs/toolkit/query/react';
 import type { BaseQueryFn, FetchArgs, FetchBaseQueryError } from '@reduxjs/toolkit/query';
 import type { RootState } from '@app/store';
 import { logout, setCredentials } from '@features/auth/slices/authSlice';
+import type { User } from '@features/auth/types';
 
 // Track token expiration
 let tokenExpiresAt: number | null = null;
@@ -52,7 +53,7 @@ const baseQueryWithAuth: BaseQueryFn<
       );
 
       if (refreshResult.data) {
-        const data = refreshResult.data as { access_token?: string; user: any; expires_in?: number };
+        const data = refreshResult.data as { access_token?: string; user: User; expires_in?: number };
 
         // Update credentials in Redux store
         api.dispatch(setCredentials({

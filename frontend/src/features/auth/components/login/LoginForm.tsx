@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useEffect } from 'react';
 import { Form, Checkbox, Button, Typography, message } from 'antd';
 import { UserOutlined, LockOutlined } from '@ant-design/icons';
 import { Link } from 'react-router-dom';
@@ -20,13 +20,14 @@ export const LoginForm = ({ onSuccess }: LoginFormProps) => {
   const [form] = Form.useForm();
   const [login, { isLoading }] = useLoginMutation();
   const { savedEmployeeNumber, saveEmployeeNumber, clearRememberMe } = useRememberMe();
-  const [rememberMe, setRememberMe] = useState(false);
 
-  // Pre-fill employee number if saved
+  // Pre-fill employee number and remember me checkbox if saved
   useEffect(() => {
     if (savedEmployeeNumber) {
-      form.setFieldsValue({ employee_number: savedEmployeeNumber });
-      setRememberMe(true);
+      form.setFieldsValue({
+        employee_number: savedEmployeeNumber,
+        remember_me: true
+      });
     }
   }, [savedEmployeeNumber, form]);
 
@@ -106,7 +107,7 @@ export const LoginForm = ({ onSuccess }: LoginFormProps) => {
 
         <div className="login-form-actions">
           <Form.Item name="remember_me" valuePropName="checked" style={{ marginBottom: 0 }}>
-            <Checkbox checked={rememberMe} onChange={(e) => setRememberMe(e.target.checked)}>
+            <Checkbox>
               <Text type="secondary" style={{ fontSize: '14px' }}>
                 Remember me
               </Text>

@@ -40,8 +40,9 @@ export const ForcedTotpSetup = () => {
       const result = await setupTotp().unwrap();
       setQrCode(result.qr_code);
       setCurrentStep('scan');
-    } catch (error: any) {
-      message.error(error?.data?.error || 'Failed to generate QR code');
+    } catch (error: unknown) {
+      const apiError = error as { data?: { error?: string } };
+      message.error(apiError?.data?.error || 'Failed to generate QR code');
     }
   };
 
@@ -62,8 +63,9 @@ export const ForcedTotpSetup = () => {
       setBackupCodes(codesResult.backup_codes);
       setBackupCodesGeneratedAt(codesResult.generated_at);
       setCurrentStep('backup');
-    } catch (error: any) {
-      message.error(error?.data?.error || 'Invalid verification code');
+    } catch (error: unknown) {
+      const apiError = error as { data?: { error?: string } };
+      message.error(apiError?.data?.error || 'Invalid verification code');
     }
   };
 

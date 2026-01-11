@@ -25,11 +25,15 @@ export const SessionExpiryWarning = () => {
     return storedExpiry ? parseInt(storedExpiry, 10) : null;
   }, []);
 
+  // Reset warning when user logs out
   useEffect(() => {
     if (!isAuthenticated) {
-      setShowWarning(false);
-      return;
+      setShowWarning(false); // eslint-disable-line react-hooks/set-state-in-effect -- Valid use case: cleanup state on logout
     }
+  }, [isAuthenticated]);
+
+  useEffect(() => {
+    if (!isAuthenticated) return;
 
     const checkExpiry = () => {
       const expiresAt = getTokenExpiration();

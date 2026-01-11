@@ -487,6 +487,7 @@ def register_totp_routes(app):
         import json
         import secrets
         from datetime import datetime
+
         from werkzeug.security import generate_password_hash
 
         try:
@@ -513,7 +514,7 @@ def register_totp_routes(app):
 
             for _ in range(10):
                 # Generate alphanumeric code (uppercase for readability)
-                code = ''.join(secrets.choice('ABCDEFGHJKLMNPQRSTUVWXYZ23456789') for _ in range(8))
+                code = "".join(secrets.choice("ABCDEFGHJKLMNPQRSTUVWXYZ23456789") for _ in range(8))
                 backup_codes_plain.append(code)
                 backup_codes_hashed.append(generate_password_hash(code))
 
@@ -566,6 +567,7 @@ def register_totp_routes(app):
         """
         import json
         from datetime import timedelta
+
         from werkzeug.security import check_password_hash
 
         try:
