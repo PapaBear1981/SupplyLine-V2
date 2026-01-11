@@ -114,6 +114,46 @@ def register_auth_routes(app):
             # Successful login - reset failed attempts
             user.reset_failed_login_attempts()
 
+            # Enforce password expiry policy (90 days) - check BEFORE 2FA
+            # Reason: Force password change before entering 2FA flow
+            if hasattr(user, "is_password_expired") and user.is_password_expired():
+                user.force_password_change = True
+
+                activity = UserActivity(
+                    user_id=user.id,
+                    activity_type="password_expired",
+                    description="User password expired - change required",
+                    ip_address=request.remote_addr
+                )
+                db.session.add(activity)
+
+                AuditLog.log(
+                    user_id=user.id,
+                    action="password_expired",
+                    resource_type="user",
+                    resource_id=user.id,
+                    details={"name": user.name},
+                    ip_address=request.remote_addr
+                )
+                db.session.commit()
+
+                return jsonify({
+                    "message": "Password change required",
+                    "code": "PASSWORD_CHANGE_REQUIRED",
+                    "user_id": user.id,
+                    "employee_number": user.employee_number
+                }), 200
+
+            # Check if user needs to change password - check BEFORE 2FA
+            if hasattr(user, "force_password_change") and user.force_password_change:
+                # Return special response indicating password change required
+                return jsonify({
+                    "message": "Password change required",
+                    "code": "PASSWORD_CHANGE_REQUIRED",
+                    "user_id": user.id,
+                    "employee_number": user.employee_number
+                }), 200
+
             # Check if TOTP 2FA is enabled
             if hasattr(user, "is_totp_enabled") and user.is_totp_enabled:
                 # Don't issue tokens yet - require TOTP verification
@@ -163,36 +203,7 @@ def register_auth_routes(app):
                     "employee_number": user.employee_number
                 }), 200
 
-            # Enforce password expiry policy (90 days)
-            if hasattr(user, "is_password_expired") and user.is_password_expired():
-                user.force_password_change = True
-
-                activity = UserActivity(
-                    user_id=user.id,
-                    activity_type="password_expired",
-                    description="User password expired - change required",
-                    ip_address=request.remote_addr
-                )
-                db.session.add(activity)
-
-                AuditLog.log(
-                    user_id=user.id,
-                    action="password_expired",
-                    resource_type="user",
-                    resource_id=user.id,
-                    details={"name": user.name},
-                    ip_address=request.remote_addr
-                )
-                db.session.commit()
-
-                return jsonify({
-                    "message": "Password change required",
-                    "code": "PASSWORD_CHANGE_REQUIRED",
-                    "user_id": user.id,
-                    "employee_number": user.employee_number
-                }), 200
-
-            # Check if user needs to change password
+            # This should not be reached, but keeping for safety
             if hasattr(user, "force_password_change") and user.force_password_change:
                 # Return special response indicating password change required
                 return jsonify({
