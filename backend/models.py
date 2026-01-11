@@ -1392,7 +1392,8 @@ class Chemical(db.Model):
         # Master chemical reference and shelf life tracking
         master_chemical_id = db.Column(db.Integer, db.ForeignKey("master_chemicals.id", ondelete="RESTRICT"), nullable=True, index=True)
         expiration_date_override = db.Column(db.Boolean, default=False, nullable=False)
-        received_date = db.Column(db.DateTime, nullable=True)
+        manufacture_date = db.Column(db.DateTime, nullable=True)  # Date chemical was manufactured (for shelf life calculation)
+        received_date = db.Column(db.DateTime, nullable=True)  # Date we received the chemical
     except Exception:
         # If the columns don't exist, we'll create them later with a migration
         pass

@@ -354,7 +354,7 @@ def register_chemical_routes(app):
         except SerialLotValidationError as e:
             raise ValidationError(str(e))
 
-        # Calculate expiration date if not provided
+        # Parse received date (when we got it)
         received_date = data.get("received_date")
         if received_date:
             try:
@@ -363,6 +363,17 @@ def register_chemical_routes(app):
                 raise ValidationError("Invalid received_date format. Use ISO 8601 format.")
         else:
             received_date = datetime.now()
+
+        # Parse manufacture date (for expiration calculation)
+        manufacture_date = data.get("manufacture_date")
+        if manufacture_date:
+            try:
+                manufacture_date = datetime.fromisoformat(manufacture_date.replace('Z', '+00:00'))
+            except Exception:
+                raise ValidationError("Invalid manufacture_date format. Use ISO 8601 format.")
+        else:
+            # Default to received date if not provided
+            manufacture_date = received_date
 
         expiration_date = data.get("expiration_date")
         expiration_override = False
@@ -375,8 +386,8 @@ def register_chemical_routes(app):
                 raise ValidationError("Invalid expiration_date format. Use ISO 8601 format.")
             expiration_override = True
         else:
-            # Auto-calculate from shelf life
-            expiration_date = master_chemical.calculate_expiration_date(received_date)
+            # Auto-calculate from shelf life using MANUFACTURE DATE
+            expiration_date = master_chemical.calculate_expiration_date(manufacture_date)
 
         # Get warehouse settings for minimum stock level (optional)
         warehouse_setting = master_chemical.get_warehouse_settings(warehouse.id)
@@ -397,6 +408,7 @@ def register_chemical_routes(app):
             location=data.get("location", ""),
             status=data.get("status", "available"),
             warehouse_id=warehouse.id,
+            manufacture_date=manufacture_date,
             received_date=received_date,
             expiration_date=expiration_date,
             expiration_date_override=expiration_override,
@@ -414,8 +426,8 @@ def register_chemical_routes(app):
                 item_type="chemical",
                 item_id=chemical.id,
                 user_id=request.current_user["user_id"],
-                quantity=validated_data["quantity"],
-                location=validated_data.get("location", "Unknown"),
+                quantity=data.get("quantity", 0),
+                location=data.get("location", "Unknown"),
                 notes="Initial chemical creation"
             )
         except Exception as e:
@@ -428,8 +440,8 @@ def register_chemical_routes(app):
             resource_type="chemical",
             resource_id=chemical.id,
             details={
-                "part_number": validated_data["part_number"],
-                "lot_number": validated_data["lot_number"],
+                "part_number": master_chemical.part_number,
+                "lot_number": data.get("lot_number"),
                 "warehouse_id": data["warehouse_id"]
             },
             ip_address=request.remote_addr
@@ -440,7 +452,7 @@ def register_chemical_routes(app):
             activity = UserActivity(
                 user_id=request.current_user["user_id"],
                 activity_type="chemical_added",
-                description=f"Added chemical {validated_data['part_number']} - {validated_data['lot_number']}"
+                description=f"Added chemical {master_chemical.part_number} - {data.get('lot_number')}"
             )
             db.session.add(activity)
 

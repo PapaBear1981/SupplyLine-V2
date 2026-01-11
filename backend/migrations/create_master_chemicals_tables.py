@@ -72,6 +72,14 @@ def migrate():
         else:
             print("  - expiration_date_override column already exists")
 
+        if "manufacture_date" not in columns:
+            db.session.execute(text(
+                "ALTER TABLE chemicals ADD COLUMN manufacture_date TIMESTAMP"
+            ))
+            print("  ✓ Added manufacture_date column")
+        else:
+            print("  - manufacture_date column already exists")
+
         if "received_date" not in columns:
             db.session.execute(text(
                 "ALTER TABLE chemicals ADD COLUMN received_date TIMESTAMP"
@@ -318,6 +326,7 @@ def rollback():
         db.session.execute(text("DROP INDEX IF EXISTS idx_chemicals_master_chemical_id"))
         db.session.execute(text("ALTER TABLE chemicals DROP COLUMN IF EXISTS master_chemical_id"))
         db.session.execute(text("ALTER TABLE chemicals DROP COLUMN IF EXISTS expiration_date_override"))
+        db.session.execute(text("ALTER TABLE chemicals DROP COLUMN IF EXISTS manufacture_date"))
         db.session.execute(text("ALTER TABLE chemicals DROP COLUMN IF EXISTS received_date"))
         db.session.commit()
         print("  ✓ Dropped new columns")

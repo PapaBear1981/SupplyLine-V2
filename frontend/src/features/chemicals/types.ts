@@ -91,6 +91,7 @@ export interface Chemical {
   issued_quantity?: number;
   master_chemical_id?: number | null;
   expiration_date_override?: boolean;
+  manufacture_date?: string | null;
   received_date?: string | null;
   master_chemical?: {
     part_number: string;
@@ -107,6 +108,7 @@ export interface ChemicalFormData {
   quantity: number;
   warehouse_id: number;
   location?: string;
+  manufacture_date?: string;
   received_date?: string;
   expiration_date?: string;
   notes?: string;

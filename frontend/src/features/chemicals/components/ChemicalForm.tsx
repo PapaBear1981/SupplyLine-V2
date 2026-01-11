@@ -50,6 +50,9 @@ export const ChemicalForm = ({ form, initialValues, onSubmit, onCancel, loading 
       quantity: initialValues.quantity,
       warehouse_id: initialValues.warehouse_id || undefined,
       location: initialValues.location || undefined,
+      manufacture_date: initialValues.manufacture_date
+        ? dayjs(initialValues.manufacture_date)
+        : undefined,
       received_date: initialValues.received_date
         ? dayjs(initialValues.received_date)
         : undefined,
@@ -90,14 +93,14 @@ export const ChemicalForm = ({ form, initialValues, onSubmit, onCancel, loading 
     }
   };
 
-  const calculateExpirationDate = (mc: MasterChemical, receivedDate?: dayjs.Dayjs) => {
+  const calculateExpirationDate = (mc: MasterChemical, manufactureDate?: dayjs.Dayjs) => {
     if (!mc.shelf_life_days) {
       setCalculatedExpiration(null);
       return;
     }
 
-    const received = receivedDate || form.getFieldValue('received_date') || dayjs();
-    const expiration = received.add(mc.shelf_life_days, 'day');
+    const mfgDate = manufactureDate || form.getFieldValue('manufacture_date') || dayjs();
+    const expiration = mfgDate.add(mc.shelf_life_days, 'day');
     setCalculatedExpiration(expiration);
 
     // Auto-fill if not manually overridden
@@ -106,7 +109,7 @@ export const ChemicalForm = ({ form, initialValues, onSubmit, onCancel, loading 
     }
   };
 
-  const handleReceivedDateChange = (date: dayjs.Dayjs | null) => {
+  const handleManufactureDateChange = (date: dayjs.Dayjs | null) => {
     if (selectedMasterChemical && date) {
       calculateExpirationDate(selectedMasterChemical, date);
     }
@@ -124,6 +127,7 @@ export const ChemicalForm = ({ form, initialValues, onSubmit, onCancel, loading 
       quantity: values.quantity,
       warehouse_id: values.warehouse_id,
       location: values.location,
+      manufacture_date: values.manufacture_date ? values.manufacture_date.toISOString() : undefined,
       received_date: values.received_date ? values.received_date.toISOString() : undefined,
       expiration_date: values.expiration_date ? values.expiration_date.toISOString() : undefined,
       notes: values.notes,
@@ -215,10 +219,17 @@ export const ChemicalForm = ({ form, initialValues, onSubmit, onCancel, loading 
         <Input placeholder="Storage location (e.g., Shelf A-12)" />
       </Form.Item>
 
+      <Form.Item label="Manufacture Date" name="manufacture_date">
+        <DatePicker
+          style={{ width: '100%' }}
+          onChange={handleManufactureDateChange}
+          placeholder="Select manufacture date"
+        />
+      </Form.Item>
+
       <Form.Item label="Received Date" name="received_date">
         <DatePicker
           style={{ width: '100%' }}
-          onChange={handleReceivedDateChange}
           placeholder="Select received date"
         />
       </Form.Item>
@@ -252,7 +263,7 @@ export const ChemicalForm = ({ form, initialValues, onSubmit, onCancel, loading 
         <Alert
           message={`Calculated expiration: ${calculatedExpiration.format('YYYY-MM-DD')} (${
             selectedMasterChemical.shelf_life_days
-          } days from received date)`}
+          } days from manufacture date)`}
           type="info"
           style={{ marginBottom: 16 }}
         />
