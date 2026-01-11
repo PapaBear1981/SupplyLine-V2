@@ -154,6 +154,13 @@ def register_user_request_routes(app):
                 raise ValidationError(f"Invalid priority filter: {', '.join(sorted(invalid_priorities))}")
             query = query.filter(UserRequest.priority.in_(priorities))
 
+        # Source type filtering (filter by RequestItem source_type: manual, chemical_reorder, kit_reorder)
+        source_type_filter = request.args.get("source_type")
+        if source_type_filter:
+            source_types = {value.strip() for value in source_type_filter.split(",") if value.strip()}
+            # Filter requests that have at least one item with any of the specified source types
+            query = query.filter(UserRequest.items.any(RequestItem.source_type.in_(source_types)))
+
         # Buyer filtering
         buyer_id = request.args.get("buyer_id", type=int)
         if buyer_id:
@@ -218,6 +225,10 @@ def register_user_request_routes(app):
             requester_id = current_user.get("user_id")
             if requester_id:
                 query = query.filter(UserRequest.requester_id == requester_id)
+                # Non-buyers (regular users) should only see manual requests, not automatic reorders
+                # Only apply this filter if source_type was not explicitly requested
+                if not source_type_filter:
+                    query = query.filter(UserRequest.items.any(RequestItem.source_type == "manual"))
             else:
                 return jsonify({"error": "Unable to determine requesting user"}), 403
 

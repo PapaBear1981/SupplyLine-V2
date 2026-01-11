@@ -13,6 +13,7 @@ import {
   Empty,
   Badge,
   Tooltip,
+  theme,
 } from 'antd';
 import {
   PlusOutlined,
@@ -34,7 +35,10 @@ import type { ColumnsType } from 'antd/es/table';
 
 dayjs.extend(relativeTime);
 
+const { useToken } = theme;
+
 export const RequestsDashboard: React.FC = () => {
+  const { token } = useToken();
   const navigate = useNavigate();
   const isMobile = useIsMobile();
   const [searchQuery, setSearchQuery] = useState('');
@@ -47,6 +51,7 @@ export const RequestsDashboard: React.FC = () => {
     search: searchQuery || undefined,
     status: statusFilter.length > 0 ? statusFilter.join(',') : undefined,
     priority: priorityFilter.length > 0 ? priorityFilter.join(',') : undefined,
+    source_type: 'manual', // Only show manual requests, not automatic reorders
   };
 
   const { data: requests = [], isLoading, refetch } = useGetRequestsQuery(queryParams);
@@ -179,8 +184,8 @@ export const RequestsDashboard: React.FC = () => {
               <FileTextOutlined style={{ marginRight: 12 }} />
               User Requests
             </h1>
-            <p style={{ margin: '4px 0 0', color: '#8c8c8c' }}>
-              Manage multi-item procurement requests
+            <p style={{ margin: '4px 0 0', color: token.colorTextSecondary }}>
+              Create and manage your manual procurement requests
             </p>
           </Col>
           <Col>

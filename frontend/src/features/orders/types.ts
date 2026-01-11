@@ -395,6 +395,23 @@ export interface CreateRequestMessageRequest {
 }
 
 // ============================================================================
+// Unified View Types (for OrdersDashboard combined view)
+// ============================================================================
+
+export type UnifiedItem = (UserRequest | ProcurementOrder) & {
+  itemType: 'request' | 'order';
+  displayNumber: string;
+};
+
+export interface MarkItemsOrderedFormValues {
+  vendor: string;
+  tracking_number?: string;
+  expected_delivery_date?: string;
+  unit_cost?: number;
+  notes?: string;
+}
+
+// ============================================================================
 // Kit Reorder Requests Types
 // ============================================================================
 
