@@ -3,6 +3,7 @@ import { Form, Input, InputNumber, Select, DatePicker, Button, Space, Alert, Tag
 import type { FormInstance } from 'antd';
 import dayjs from 'dayjs';
 import type { Chemical, ChemicalFormData, MasterChemical } from '../types';
+import { useGetWarehousesQuery } from '@features/warehouses/services/warehousesApi';
 
 const { TextArea } = Input;
 const { Option } = Select;
@@ -22,6 +23,12 @@ export const ChemicalForm = ({ form, initialValues, onSubmit, onCancel, loading 
   const [calculatedExpiration, setCalculatedExpiration] = useState<dayjs.Dayjs | null>(null);
   const [manualExpirationOverride, setManualExpirationOverride] = useState(false);
   const [loadingMasterChemicals, setLoadingMasterChemicals] = useState(false);
+
+  // Fetch warehouses
+  const { data: warehousesData, isLoading: loadingWarehouses } = useGetWarehousesQuery({
+    per_page: 100,
+    include_inactive: false,
+  });
 
   // Fetch master chemicals on mount
   useEffect(() => {
@@ -208,11 +215,27 @@ export const ChemicalForm = ({ form, initialValues, onSubmit, onCancel, loading 
       </Form.Item>
 
       <Form.Item
-        label="Warehouse ID"
+        label="Warehouse"
         name="warehouse_id"
-        rules={[{ required: true, message: 'Warehouse is required' }]}
+        rules={[{ required: true, message: 'Please select a warehouse' }]}
       >
-        <InputNumber style={{ width: '100%' }} min={1} placeholder="Enter warehouse ID" />
+        <Select
+          placeholder="Select warehouse"
+          loading={loadingWarehouses}
+          showSearch
+          optionFilterProp="children"
+          filterOption={(input, option) => {
+            const children = option?.children as React.ReactNode;
+            const childrenStr = String(children);
+            return childrenStr.toLowerCase().includes(input.toLowerCase());
+          }}
+        >
+          {warehousesData?.warehouses.map((warehouse) => (
+            <Option key={warehouse.id} value={warehouse.id}>
+              {warehouse.name}
+            </Option>
+          ))}
+        </Select>
       </Form.Item>
 
       <Form.Item label="Location" name="location">
