@@ -1,11 +1,11 @@
-import { useEffect, useCallback } from 'react';
-import { Form, Input, InputNumber, Select, DatePicker, Button, Space } from 'antd';
+import { useEffect, useCallback, useState } from 'react';
+import { Form, Input, InputNumber, Select, DatePicker, Button, Space, Alert, Tag } from 'antd';
 import type { FormInstance } from 'antd';
 import dayjs from 'dayjs';
-import type { Chemical, ChemicalFormData } from '../types';
+import type { Chemical, ChemicalFormData, MasterChemical } from '../types';
 
-const { Option } = Select;
 const { TextArea } = Input;
+const { Option } = Select;
 
 interface ChemicalFormProps {
   form: FormInstance;
@@ -17,44 +17,116 @@ interface ChemicalFormProps {
 
 export const ChemicalForm = ({ form, initialValues, onSubmit, onCancel, loading }: ChemicalFormProps) => {
   const isEditing = !!initialValues;
+  const [masterChemicals, setMasterChemicals] = useState<MasterChemical[]>([]);
+  const [selectedMasterChemical, setSelectedMasterChemical] = useState<MasterChemical | null>(null);
+  const [calculatedExpiration, setCalculatedExpiration] = useState<dayjs.Dayjs | null>(null);
+  const [manualExpirationOverride, setManualExpirationOverride] = useState(false);
+  const [loadingMasterChemicals, setLoadingMasterChemicals] = useState(false);
+
+  // Fetch master chemicals on mount
+  useEffect(() => {
+    fetchMasterChemicals();
+  }, []);
+
+  const fetchMasterChemicals = async () => {
+    setLoadingMasterChemicals(true);
+    try {
+      const response = await fetch('/api/master-chemicals?per_page=1000&include_inactive=false');
+      const data = await response.json();
+      setMasterChemicals(data.master_chemicals || []);
+    } catch (error) {
+      console.error('Failed to fetch master chemicals:', error);
+    } finally {
+      setLoadingMasterChemicals(false);
+    }
+  };
 
   const getInitialFormValues = useCallback(() => {
     if (!initialValues) return {};
 
     return {
-      part_number: initialValues.part_number,
+      master_chemical_id: initialValues.master_chemical_id || undefined,
       lot_number: initialValues.lot_number,
-      description: initialValues.description || undefined,
-      manufacturer: initialValues.manufacturer || undefined,
       quantity: initialValues.quantity,
-      unit: initialValues.unit,
-      location: initialValues.location || undefined,
-      category: initialValues.category || undefined,
-      status: initialValues.status,
       warehouse_id: initialValues.warehouse_id || undefined,
+      location: initialValues.location || undefined,
+      received_date: initialValues.received_date
+        ? dayjs(initialValues.received_date)
+        : undefined,
       expiration_date: initialValues.expiration_date
         ? dayjs(initialValues.expiration_date)
         : undefined,
-      minimum_stock_level: initialValues.minimum_stock_level || undefined,
       notes: initialValues.notes || undefined,
     };
   }, [initialValues]);
 
-  // Update form when initialValues change (e.g., switching between chemicals)
+  // Update form when initialValues change
   useEffect(() => {
-    form.setFieldsValue(getInitialFormValues());
-  }, [initialValues, form, getInitialFormValues]);
+    const values = getInitialFormValues();
+    form.setFieldsValue(values);
 
-  const handleFinish = (
-    values: ChemicalFormData & {
-      expiration_date?: dayjs.Dayjs;
+    // If editing, load the master chemical
+    if (initialValues?.master_chemical_id) {
+      const mc = masterChemicals.find((m) => m.id === initialValues.master_chemical_id);
+      if (mc) {
+        setSelectedMasterChemical(mc);
+      }
+      // Check if expiration was overridden
+      if (initialValues.expiration_date_override) {
+        setManualExpirationOverride(true);
+      }
     }
-  ) => {
+  }, [initialValues, form, getInitialFormValues, masterChemicals]);
+
+  const handleMasterChemicalChange = (masterChemicalId: number) => {
+    const mc = masterChemicals.find((m) => m.id === masterChemicalId);
+    setSelectedMasterChemical(mc || null);
+
+    if (mc) {
+      // Reset manual override when selecting new master chemical
+      setManualExpirationOverride(false);
+      // Calculate expiration
+      calculateExpirationDate(mc);
+    }
+  };
+
+  const calculateExpirationDate = (mc: MasterChemical, receivedDate?: dayjs.Dayjs) => {
+    if (!mc.shelf_life_days) {
+      setCalculatedExpiration(null);
+      return;
+    }
+
+    const received = receivedDate || form.getFieldValue('received_date') || dayjs();
+    const expiration = received.add(mc.shelf_life_days, 'day');
+    setCalculatedExpiration(expiration);
+
+    // Auto-fill if not manually overridden
+    if (!manualExpirationOverride) {
+      form.setFieldsValue({ expiration_date: expiration });
+    }
+  };
+
+  const handleReceivedDateChange = (date: dayjs.Dayjs | null) => {
+    if (selectedMasterChemical && date) {
+      calculateExpirationDate(selectedMasterChemical, date);
+    }
+  };
+
+  const handleExpirationDateChange = () => {
+    // User manually changed expiration date
+    setManualExpirationOverride(true);
+  };
+
+  const handleFinish = (values: any) => {
     const formData: ChemicalFormData = {
-      ...values,
-      expiration_date: values.expiration_date
-        ? values.expiration_date.toISOString()
-        : undefined,
+      master_chemical_id: values.master_chemical_id,
+      lot_number: values.lot_number,
+      quantity: values.quantity,
+      warehouse_id: values.warehouse_id,
+      location: values.location,
+      received_date: values.received_date ? values.received_date.toISOString() : undefined,
+      expiration_date: values.expiration_date ? values.expiration_date.toISOString() : undefined,
+      notes: values.notes,
     };
     onSubmit(formData);
   };
@@ -68,12 +140,52 @@ export const ChemicalForm = ({ form, initialValues, onSubmit, onCancel, loading 
       autoComplete="off"
     >
       <Form.Item
-        label="Part Number"
-        name="part_number"
-        rules={[{ required: true, message: 'Please enter part number' }]}
+        label="Chemical"
+        name="master_chemical_id"
+        rules={[{ required: true, message: 'Please select a chemical from the master list' }]}
       >
-        <Input placeholder="e.g., CH-001" />
+        <Select
+          showSearch
+          placeholder="Select chemical from master list"
+          optionFilterProp="children"
+          onChange={handleMasterChemicalChange}
+          loading={loadingMasterChemicals}
+          disabled={isEditing}
+          filterOption={(input, option) => {
+            const children = option?.children as React.ReactNode;
+            const childrenStr = String(children);
+            return childrenStr.toLowerCase().includes(input.toLowerCase());
+          }}
+        >
+          {masterChemicals.map((mc) => (
+            <Option key={mc.id} value={mc.id}>
+              {mc.part_number} - {mc.description}
+            </Option>
+          ))}
+        </Select>
       </Form.Item>
+
+      {selectedMasterChemical && (
+        <Alert
+          message={
+            <div>
+              <strong>{selectedMasterChemical.part_number}</strong> - {selectedMasterChemical.description}
+            </div>
+          }
+          description={
+            <div style={{ fontSize: '12px' }}>
+              <div>Manufacturer: {selectedMasterChemical.manufacturer || 'N/A'}</div>
+              <div>Category: {selectedMasterChemical.category}</div>
+              <div>Unit: {selectedMasterChemical.unit}</div>
+              {selectedMasterChemical.shelf_life_days && (
+                <div>Shelf Life: {selectedMasterChemical.shelf_life_days} days</div>
+              )}
+            </div>
+          }
+          type="info"
+          style={{ marginBottom: 16 }}
+        />
+      )}
 
       <Form.Item
         label="Lot Number"
@@ -81,20 +193,6 @@ export const ChemicalForm = ({ form, initialValues, onSubmit, onCancel, loading 
         rules={[{ required: true, message: 'Please enter lot number' }]}
       >
         <Input placeholder="e.g., LOT-123" />
-      </Form.Item>
-
-      <Form.Item
-        label="Description"
-        name="description"
-      >
-        <TextArea rows={3} placeholder="Describe the chemical" />
-      </Form.Item>
-
-      <Form.Item
-        label="Manufacturer"
-        name="manufacturer"
-      >
-        <Input placeholder="Manufacturer name" />
       </Form.Item>
 
       <Form.Item
@@ -106,85 +204,68 @@ export const ChemicalForm = ({ form, initialValues, onSubmit, onCancel, loading 
       </Form.Item>
 
       <Form.Item
-        label="Unit"
-        name="unit"
-        rules={[{ required: true, message: 'Please select a unit' }]}
-      >
-        <Select placeholder="Select unit">
-          <Option value="each">Each</Option>
-          <Option value="ml">Milliliters (ml)</Option>
-          <Option value="l">Liters (l)</Option>
-          <Option value="oz">Ounces (oz)</Option>
-          <Option value="gal">Gallons (gal)</Option>
-        </Select>
-      </Form.Item>
-
-      <Form.Item
-        label="Location"
-        name="location"
-      >
-        <Input placeholder="Storage location" />
-      </Form.Item>
-
-      <Form.Item
-        label="Category"
-        name="category"
-      >
-        <Select placeholder="Select category" allowClear>
-          <Option value="General">General</Option>
-          <Option value="Sealant">Sealant</Option>
-          <Option value="Paint">Paint</Option>
-          <Option value="Adhesive">Adhesive</Option>
-          <Option value="Solvent">Solvent</Option>
-        </Select>
-      </Form.Item>
-
-      <Form.Item
-        label="Status"
-        name="status"
-        initialValue="available"
-      >
-        <Select>
-          <Option value="available">Available</Option>
-          <Option value="low_stock">Low Stock</Option>
-          <Option value="out_of_stock">Out of Stock</Option>
-          <Option value="expired">Expired</Option>
-        </Select>
-      </Form.Item>
-
-      <Form.Item
         label="Warehouse ID"
         name="warehouse_id"
         rules={[{ required: true, message: 'Warehouse is required' }]}
       >
-        <InputNumber style={{ width: '100%' }} min={1} />
+        <InputNumber style={{ width: '100%' }} min={1} placeholder="Enter warehouse ID" />
+      </Form.Item>
+
+      <Form.Item label="Location" name="location">
+        <Input placeholder="Storage location (e.g., Shelf A-12)" />
+      </Form.Item>
+
+      <Form.Item label="Received Date" name="received_date">
+        <DatePicker
+          style={{ width: '100%' }}
+          onChange={handleReceivedDateChange}
+          placeholder="Select received date"
+        />
       </Form.Item>
 
       <Form.Item
-        label="Expiration Date"
+        label={
+          <span>
+            Expiration Date
+            {calculatedExpiration && !manualExpirationOverride && (
+              <Tag color="blue" style={{ marginLeft: 8 }}>
+                Auto-calculated
+              </Tag>
+            )}
+            {manualExpirationOverride && (
+              <Tag color="orange" style={{ marginLeft: 8 }}>
+                Manual override
+              </Tag>
+            )}
+          </span>
+        }
         name="expiration_date"
       >
-        <DatePicker style={{ width: '100%' }} />
+        <DatePicker
+          style={{ width: '100%' }}
+          onChange={handleExpirationDateChange}
+          placeholder="Select expiration date"
+        />
       </Form.Item>
 
-      <Form.Item
-        label="Minimum Stock Level"
-        name="minimum_stock_level"
-      >
-        <InputNumber style={{ width: '100%' }} min={0} />
-      </Form.Item>
+      {calculatedExpiration && selectedMasterChemical?.shelf_life_days && (
+        <Alert
+          message={`Calculated expiration: ${calculatedExpiration.format('YYYY-MM-DD')} (${
+            selectedMasterChemical.shelf_life_days
+          } days from received date)`}
+          type="info"
+          style={{ marginBottom: 16 }}
+        />
+      )}
 
-      <Form.Item
-        label="Notes"
-        name="notes"
-      >
+      <Form.Item label="Notes" name="notes">
         <TextArea rows={2} placeholder="Additional notes" />
       </Form.Item>
 
       <Form.Item>
         <Space>
           <Button type="primary" htmlType="submit" loading={loading}>
-            {isEditing ? 'Update Chemical' : 'Create Chemical'}
+            {isEditing ? 'Update Chemical' : 'Create Chemical Lot'}
           </Button>
           <Button onClick={onCancel}>Cancel</Button>
         </Space>

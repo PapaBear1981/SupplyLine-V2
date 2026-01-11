@@ -13,6 +13,7 @@ import { DashboardPage } from '@features/dashboard/pages/DashboardPage';
 import { ToolsPage } from '@features/tools/pages/ToolsPage';
 import { ToolCheckoutPage } from '@features/tool-checkout';
 import { ChemicalsPage } from '@features/chemicals/pages/ChemicalsPage';
+import { MasterChemicalsPage } from '@features/chemicals/pages/MasterChemicalsPage';
 import { WarehousesPage } from '@features/warehouses/pages/WarehousesPage';
 import { SettingsPage } from '@features/settings/pages/SettingsPage';
 import { ProfilePage } from '@features/profile/pages/ProfilePage';
@@ -65,6 +66,7 @@ function AppContent() {
                   <Route path={ROUTES.TOOL_CHECKOUT} element={<ToolCheckoutPage />} />
                   <Route path={ROUTES.TOOLS} element={<ToolsPage />} />
                   <Route path={ROUTES.CHEMICALS} element={<ChemicalsPage />} />
+                  <Route path={ROUTES.MASTER_CHEMICALS} element={<MasterChemicalsPage />} />
 
                   {/* Kits Routes */}
                   <Route path={ROUTES.KITS} element={<KitsDashboard />} />

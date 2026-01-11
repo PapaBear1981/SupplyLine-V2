@@ -59,6 +59,12 @@ export const ALL_MENU_ITEMS: MenuItemWithPermission[] = [
     permission: 'page.chemicals',
   },
   {
+    key: ROUTES.MASTER_CHEMICALS,
+    icon: <ExperimentOutlined />,
+    label: 'Master Chemicals',
+    permission: 'page.chemicals',
+  },
+  {
     key: ROUTES.KITS,
     icon: <InboxOutlined />,
     label: 'Kits',

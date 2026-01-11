@@ -30,6 +30,7 @@ from routes_calibration import register_calibration_routes
 from routes_channels import register_channels_routes
 from routes_chemical_analytics import register_chemical_analytics_routes
 from routes_chemicals import register_chemical_routes
+from routes_master_chemicals import register_master_chemical_routes
 from routes_database import register_database_routes
 from routes_departments import register_department_routes
 from routes_expendables import expendables_bp
@@ -179,6 +180,9 @@ def register_routes(app):
 
     # Register chemical routes
     register_chemical_routes(app)
+
+    # Register master chemical routes
+    register_master_chemical_routes(app)
 
     # Register chemical analytics routes
     register_chemical_analytics_routes(app)

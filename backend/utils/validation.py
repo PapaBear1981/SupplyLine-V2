@@ -173,6 +173,55 @@ CHEMICAL_SCHEMA = {
     "date_fields": ["expiration_date"]
 }
 
+MASTER_CHEMICAL_SCHEMA = {
+    "required": ["part_number", "description", "unit"],
+    "optional": ["manufacturer", "category", "shelf_life_days", "alternative_part_numbers", "hazard_class", "storage_requirements", "sds_link"],
+    "types": {
+        "part_number": str,
+        "description": str,
+        "manufacturer": str,
+        "category": str,
+        "unit": str,
+        "shelf_life_days": int,
+        "alternative_part_numbers": list,
+        "hazard_class": str,
+        "storage_requirements": str,
+        "sds_link": str,
+    },
+    "constraints": {
+        "part_number": {"max_length": 100, "min_length": 1},
+        "description": {"max_length": 500, "min_length": 1},
+        "manufacturer": {"max_length": 200},
+        "category": {"max_length": 100},
+        "unit": {"choices": ["each", "oz", "ml", "l", "g", "kg", "lb", "gal", "tubes"]},
+        "shelf_life_days": {"min": 1, "max": 7300},  # 1 day to 20 years
+        "hazard_class": {"max_length": 100},
+        "storage_requirements": {"max_length": 500},
+        "sds_link": {"max_length": 500},
+    }
+}
+
+CHEMICAL_WAREHOUSE_SETTING_SCHEMA = {
+    "required": ["master_chemical_id", "warehouse_id"],
+    "optional": ["minimum_stock_level", "maximum_stock_level", "preferred_location", "notes"],
+    "types": {
+        "master_chemical_id": int,
+        "warehouse_id": int,
+        "minimum_stock_level": int,
+        "maximum_stock_level": int,
+        "preferred_location": str,
+        "notes": str,
+    },
+    "constraints": {
+        "master_chemical_id": {"min": 1},
+        "warehouse_id": {"min": 1},
+        "minimum_stock_level": {"min": 0},
+        "maximum_stock_level": {"min": 0},
+        "preferred_location": {"max_length": 200},
+        "notes": {"max_length": 1000},
+    }
+}
+
 USER_SCHEMA = {
     "required": ["name", "employee_number", "department"],
     "optional": ["password", "is_admin", "is_active"],
@@ -303,6 +352,8 @@ def validate_schema(data, schema_name):
     schemas = {
         "tool": TOOL_SCHEMA,
         "chemical": CHEMICAL_SCHEMA,
+        "master_chemical": MASTER_CHEMICAL_SCHEMA,
+        "chemical_warehouse_setting": CHEMICAL_WAREHOUSE_SETTING_SCHEMA,
         "user": USER_SCHEMA,
         "chemical_issuance": CHEMICAL_ISSUANCE_SCHEMA,
         "calibration": CALIBRATION_SCHEMA,
@@ -497,3 +548,31 @@ def validate_warehouse_id(warehouse_id):
         raise ValidationError(f"Warehouse '{warehouse.name}' is inactive and cannot be used")
 
     return warehouse
+
+
+def validate_master_chemical_reference(master_chemical_id):
+    """
+    Validate that master chemical exists and is active.
+
+    Args:
+        master_chemical_id: Master chemical ID to validate
+
+    Returns:
+        MasterChemical: The validated master chemical object
+
+    Raises:
+        ValidationError: If master chemical is invalid or inactive
+    """
+    from models import MasterChemical, db
+
+    if not master_chemical_id:
+        raise ValidationError("Master chemical ID is required")
+
+    master_chemical = db.session.get(MasterChemical, master_chemical_id)
+    if not master_chemical:
+        raise ValidationError(f"Master chemical with ID {master_chemical_id} not found")
+
+    if not master_chemical.is_active:
+        raise ValidationError(f"Master chemical '{master_chemical.part_number}' is inactive and cannot be used")
+
+    return master_chemical

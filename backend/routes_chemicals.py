@@ -10,6 +10,8 @@ from models import (
     Chemical,
     ChemicalIssuance,
     ChemicalReturn,
+    MasterChemical,
+    ChemicalWarehouseSetting,
     ProcurementOrder,
     RequestItem,
     User,
@@ -28,6 +30,7 @@ from utils.validation import (
     validate_lot_number_format,
     validate_schema,
     validate_warehouse_id,
+    validate_master_chemical_reference,
 )
 
 
@@ -44,6 +47,20 @@ def _generate_request_number():
     ).scalar()
     next_number = (result or 0) + 1
     return f"REQ-{next_number:05d}"
+
+
+def get_total_warehouse_stock(master_chemical_id, warehouse_id):
+    """Get total quantity of a master chemical across all lots in a warehouse."""
+    from sqlalchemy import func
+
+    total = db.session.query(func.sum(Chemical.quantity)).filter(
+        Chemical.master_chemical_id == master_chemical_id,
+        Chemical.warehouse_id == warehouse_id,
+        Chemical.is_archived == False,
+        Chemical.status != "expired"
+    ).scalar()
+
+    return total or 0
 
 
 def _generate_order_number():
@@ -81,8 +98,17 @@ def _create_auto_reorder_request(chemical, user_id):
         priority = "high"
         title = f"Restock {chemical.part_number} - Low Stock"
 
-    # Calculate quantity to order (bring back to minimum stock level + buffer)
-    if chemical.minimum_stock_level:
+    # Calculate quantity to order using warehouse settings
+    warehouse_setting = None
+    if chemical.master_chemical:
+        warehouse_setting = chemical.master_chemical.get_warehouse_settings(chemical.warehouse_id)
+
+    if warehouse_setting and warehouse_setting.maximum_stock_level:
+        # Order up to max level
+        current_total = get_total_warehouse_stock(chemical.master_chemical_id, chemical.warehouse_id)
+        quantity_to_order = max(warehouse_setting.maximum_stock_level - current_total, 1)
+    elif chemical.minimum_stock_level:
+        # Fallback to old logic
         quantity_to_order = max(chemical.minimum_stock_level * 2, 1)
     else:
         quantity_to_order = 1
@@ -300,45 +326,82 @@ def register_chemical_routes(app):
         data = request.get_json() or {}
         current_user_id = request.current_user.get("user_id")
 
+        # REQUIRE master_chemical_id for new inventory
+        if not data.get("master_chemical_id"):
+            raise ValidationError("master_chemical_id is required. Please select a chemical from the master list.")
+
+        # Validate master chemical exists and is active
+        master_chemical = validate_master_chemical_reference(data["master_chemical_id"])
+
         # Validate warehouse_id is required
         if not data.get("warehouse_id"):
             raise ValidationError("warehouse_id is required for all chemicals")
 
-        # Validate warehouse exists and is active using validation function
+        # Validate warehouse exists and is active
         warehouse = validate_warehouse_id(data["warehouse_id"])
 
-        # Validate and sanitize input using schema
-        validated_data = validate_schema(data, "chemical")
-
         # Validate lot number format
-        validate_lot_number_format(validated_data["lot_number"])
+        validate_lot_number_format(data.get("lot_number", ""))
 
-        logger.info(f"Creating chemical with part number: {validated_data.get('part_number')} in warehouse {warehouse.name}")
+        logger.info(f"Creating chemical {master_chemical.part_number} (lot {data.get('lot_number')}) in warehouse {warehouse.name}")
 
         # Validate lot number uniqueness across the entire system
         try:
             check_lot_number_unique(
-                validated_data["part_number"],
-                validated_data["lot_number"]
+                master_chemical.part_number,
+                data.get("lot_number")
             )
         except SerialLotValidationError as e:
             raise ValidationError(str(e))
 
-        # Create new chemical - warehouse_id is required
+        # Calculate expiration date if not provided
+        received_date = data.get("received_date")
+        if received_date:
+            try:
+                received_date = datetime.fromisoformat(received_date.replace('Z', '+00:00'))
+            except Exception:
+                raise ValidationError("Invalid received_date format. Use ISO 8601 format.")
+        else:
+            received_date = datetime.now()
+
+        expiration_date = data.get("expiration_date")
+        expiration_override = False
+
+        if expiration_date:
+            # User provided expiration date - mark as override
+            try:
+                expiration_date = datetime.fromisoformat(expiration_date.replace('Z', '+00:00'))
+            except Exception:
+                raise ValidationError("Invalid expiration_date format. Use ISO 8601 format.")
+            expiration_override = True
+        else:
+            # Auto-calculate from shelf life
+            expiration_date = master_chemical.calculate_expiration_date(received_date)
+
+        # Get warehouse settings for minimum stock level (optional)
+        warehouse_setting = master_chemical.get_warehouse_settings(warehouse.id)
+        minimum_stock_level = None
+        if warehouse_setting and warehouse_setting.minimum_stock_level:
+            minimum_stock_level = warehouse_setting.minimum_stock_level
+
+        # Create new chemical with data from master chemical
         chemical = Chemical(
-            part_number=validated_data["part_number"],
-            lot_number=validated_data["lot_number"],
-            description=validated_data.get("description", ""),
-            manufacturer=validated_data.get("manufacturer", ""),
-            quantity=validated_data["quantity"],
-            unit=validated_data["unit"],
-            location=validated_data.get("location", ""),
-            category=validated_data.get("category", "General"),
-            status=validated_data.get("status", "available"),
-            warehouse_id=data["warehouse_id"],  # Required field
-            expiration_date=validated_data.get("expiration_date"),
-            minimum_stock_level=validated_data.get("minimum_stock_level"),
-            notes=validated_data.get("notes", "")
+            master_chemical_id=master_chemical.id,
+            part_number=master_chemical.part_number,  # Copy from master for backward compatibility
+            lot_number=data.get("lot_number"),
+            description=master_chemical.description,  # Copy from master
+            manufacturer=master_chemical.manufacturer,  # Copy from master
+            category=master_chemical.category,  # Copy from master
+            unit=master_chemical.unit,  # Copy from master
+            quantity=data.get("quantity", 0),
+            location=data.get("location", ""),
+            status=data.get("status", "available"),
+            warehouse_id=warehouse.id,
+            received_date=received_date,
+            expiration_date=expiration_date,
+            expiration_date_override=expiration_override,
+            minimum_stock_level=minimum_stock_level,
+            notes=data.get("notes", "")
         )
 
         db.session.add(chemical)
@@ -1250,12 +1313,35 @@ def register_chemical_routes(app):
                 chemical.category = validated_data["category"]
             if "status" in validated_data:
                 chemical.status = validated_data["status"]
-            if "expiration_date" in validated_data:
-                chemical.expiration_date = validated_data["expiration_date"]
             if "minimum_stock_level" in validated_data:
                 chemical.minimum_stock_level = validated_data["minimum_stock_level"]
             if "notes" in validated_data:
                 chemical.notes = validated_data["notes"]
+
+            # Handle expiration_date and received_date with override logic
+            try:
+                # Track if expiration date is manually changed
+                if "expiration_date" in validated_data:
+                    new_expiration = validated_data["expiration_date"]
+                    if new_expiration != chemical.expiration_date:
+                        chemical.expiration_date = new_expiration
+                        chemical.expiration_date_override = True
+
+                # If received_date changes and override is False, recalculate expiration
+                if "received_date" in data:
+                    try:
+                        new_received_date = datetime.fromisoformat(data["received_date"].replace('Z', '+00:00'))
+                        chemical.received_date = new_received_date
+                        # Only recalculate if not overridden
+                        if not chemical.expiration_date_override and chemical.master_chemical:
+                            calculated_expiration = chemical.calculate_expiration_date()
+                            if calculated_expiration:
+                                chemical.expiration_date = calculated_expiration
+                    except Exception as e:
+                        logger.warning(f"Failed to update received_date: {e}")
+            except Exception as e:
+                # If columns don't exist, skip
+                logger.warning(f"Could not update expiration fields: {e}")
 
             # Update reorder status based on new values
             chemical.update_reorder_status()

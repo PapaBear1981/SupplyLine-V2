@@ -153,18 +153,13 @@ export const MobileChemicalsList = () => {
     try {
       const values = await form.validateFields();
       const formData: ChemicalFormData = {
-        part_number: values.part_number,
+        master_chemical_id: values.master_chemical_id,
         lot_number: values.lot_number,
-        description: values.description || undefined,
-        manufacturer: values.manufacturer || undefined,
         quantity: values.quantity,
-        unit: values.unit,
+        warehouse_id: values.warehouse_id,
         location: values.location || undefined,
-        category: values.category || undefined,
-        status: values.status || 'available',
-        warehouse_id: values.warehouse_id || undefined,
+        received_date: values.received_date ? dayjs(values.received_date).format('YYYY-MM-DD') : undefined,
         expiration_date: values.expiration_date ? dayjs(values.expiration_date).format('YYYY-MM-DD') : undefined,
-        minimum_stock_level: values.minimum_stock_level || undefined,
         notes: values.notes || undefined,
       };
 

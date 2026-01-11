@@ -1388,6 +1388,11 @@ class Chemical(db.Model):
 
         # Link to procurement order for integrated order management
         procurement_order_id = db.Column(db.Integer, db.ForeignKey("procurement_orders.id"), nullable=True, index=True)
+
+        # Master chemical reference and shelf life tracking
+        master_chemical_id = db.Column(db.Integer, db.ForeignKey("master_chemicals.id", ondelete="RESTRICT"), nullable=True, index=True)
+        expiration_date_override = db.Column(db.Boolean, default=False, nullable=False)
+        received_date = db.Column(db.DateTime, nullable=True)
     except Exception:
         # If the columns don't exist, we'll create them later with a migration
         pass
@@ -1398,6 +1403,7 @@ class Chemical(db.Model):
     # Relationship to issuance (for issued child lots) - one-to-one
     issuance = db.relationship("ChemicalIssuance", foreign_keys="ChemicalIssuance.chemical_id",
                                uselist=False, lazy="select", viewonly=True)
+    master_chemical = db.relationship("MasterChemical", back_populates="inventory_lots")
 
     def to_dict(self):
         result = {
@@ -1453,6 +1459,27 @@ class Chemical(db.Model):
             result["requested_quantity"] = None
             result["expected_delivery_date"] = None
 
+        # Add master chemical fields if they exist
+        try:
+            result["master_chemical_id"] = self.master_chemical_id
+            result["expiration_date_override"] = self.expiration_date_override
+            result["received_date"] = self.received_date.isoformat() if self.received_date else None
+
+            # Include master chemical info
+            if self.master_chemical:
+                result["master_chemical"] = {
+                    "part_number": self.master_chemical.part_number,
+                    "description": self.master_chemical.description,
+                    "manufacturer": self.master_chemical.manufacturer,
+                    "category": self.master_chemical.category,
+                    "shelf_life_days": self.master_chemical.shelf_life_days,
+                }
+        except Exception:
+            # If the columns don't exist, set default values
+            result["master_chemical_id"] = None
+            result["expiration_date_override"] = False
+            result["received_date"] = None
+
         return result
 
     def is_expired(self):
@@ -1495,6 +1522,19 @@ class Chemical(db.Model):
         if not self.minimum_stock_level:
             return False
         return self.quantity <= self.minimum_stock_level
+
+    def calculate_expiration_date(self):
+        """Calculate expiration date from master chemical shelf life."""
+        try:
+            if not self.master_chemical or not self.master_chemical.shelf_life_days:
+                return None
+            # Use received_date if available, fallback to date_added
+            received = self.received_date or self.date_added
+            if not received:
+                return None
+            return received + timedelta(days=self.master_chemical.shelf_life_days)
+        except Exception:
+            return None
 
 
 class ChemicalIssuance(db.Model):
@@ -1566,6 +1606,138 @@ class ChemicalReturn(db.Model):
             "location": self.location,
             "notes": self.notes,
             "return_date": self.return_date.isoformat() if self.return_date else None,
+        }
+
+
+class MasterChemical(db.Model):
+    """
+    Master Chemical catalog - defines chemical part numbers and specifications.
+    Each master chemical can have multiple lots in inventory across warehouses.
+    """
+    __tablename__ = "master_chemicals"
+
+    id = db.Column(db.Integer, primary_key=True)
+    part_number = db.Column(db.String(100), nullable=False, unique=True, index=True)
+    description = db.Column(db.String(500), nullable=False)
+    manufacturer = db.Column(db.String(200), nullable=True)
+    category = db.Column(db.String(100), nullable=False, default="General")
+    unit = db.Column(db.String(20), nullable=False, default="each")
+
+    # Shelf life
+    shelf_life_days = db.Column(db.Integer, nullable=True)
+
+    # Alternative part numbers (JSON)
+    alternative_part_numbers = db.Column(db.Text, nullable=True)  # JSON array
+
+    # Optional safety data
+    hazard_class = db.Column(db.String(100), nullable=True)
+    storage_requirements = db.Column(db.String(500), nullable=True)
+    sds_link = db.Column(db.String(500), nullable=True)
+
+    # Metadata
+    is_active = db.Column(db.Boolean, nullable=False, default=True, index=True)
+    created_at = db.Column(db.DateTime, default=get_current_time, nullable=False)
+    updated_at = db.Column(db.DateTime, default=get_current_time, onupdate=get_current_time, nullable=False)
+    created_by_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=True)
+
+    # Relationships
+    created_by = db.relationship("User", foreign_keys=[created_by_id])
+    warehouse_settings = db.relationship("ChemicalWarehouseSetting", back_populates="master_chemical", cascade="all, delete-orphan")
+    inventory_lots = db.relationship("Chemical", back_populates="master_chemical", lazy="dynamic")
+
+    def to_dict(self, include_inventory_count=False):
+        """Convert to dictionary representation."""
+        import json
+
+        # Parse alternative part numbers from JSON
+        alternatives = []
+        if self.alternative_part_numbers:
+            try:
+                alternatives = json.loads(self.alternative_part_numbers)
+            except Exception:
+                alternatives = []
+
+        result = {
+            "id": self.id,
+            "part_number": self.part_number,
+            "description": self.description,
+            "manufacturer": self.manufacturer,
+            "category": self.category,
+            "unit": self.unit,
+            "shelf_life_days": self.shelf_life_days,
+            "alternative_part_numbers": alternatives,
+            "hazard_class": self.hazard_class,
+            "storage_requirements": self.storage_requirements,
+            "sds_link": self.sds_link,
+            "is_active": self.is_active,
+            "created_at": self.created_at.isoformat() if self.created_at else None,
+            "updated_at": self.updated_at.isoformat() if self.updated_at else None,
+            "created_by": self.created_by.name if self.created_by else None,
+        }
+
+        if include_inventory_count:
+            # Count active inventory lots
+            result["active_lots_count"] = self.inventory_lots.filter(
+                Chemical.is_archived == False
+            ).count()
+
+        return result
+
+    def get_warehouse_settings(self, warehouse_id):
+        """Get settings for specific warehouse."""
+        return ChemicalWarehouseSetting.query.filter_by(
+            master_chemical_id=self.id,
+            warehouse_id=warehouse_id
+        ).first()
+
+    def calculate_expiration_date(self, received_date):
+        """Calculate expiration date based on shelf life and received date."""
+        if not self.shelf_life_days or not received_date:
+            return None
+        return received_date + timedelta(days=self.shelf_life_days)
+
+
+class ChemicalWarehouseSetting(db.Model):
+    """
+    Warehouse-specific settings for master chemicals (min/max stock levels).
+    """
+    __tablename__ = "chemical_warehouse_settings"
+
+    id = db.Column(db.Integer, primary_key=True)
+    master_chemical_id = db.Column(db.Integer, db.ForeignKey("master_chemicals.id", ondelete="RESTRICT"), nullable=False, index=True)
+    warehouse_id = db.Column(db.Integer, db.ForeignKey("warehouses.id", ondelete="CASCADE"), nullable=False, index=True)
+
+    # Stock levels
+    minimum_stock_level = db.Column(db.Integer, nullable=True)
+    maximum_stock_level = db.Column(db.Integer, nullable=True)
+
+    # Optional settings
+    preferred_location = db.Column(db.String(200), nullable=True)
+    notes = db.Column(db.String(1000), nullable=True)
+
+    # Metadata
+    created_at = db.Column(db.DateTime, default=get_current_time, nullable=False)
+    updated_at = db.Column(db.DateTime, default=get_current_time, onupdate=get_current_time, nullable=False)
+
+    # Relationships
+    master_chemical = db.relationship("MasterChemical", back_populates="warehouse_settings")
+    warehouse = db.relationship("Warehouse")
+
+    # Unique constraint
+    __table_args__ = (
+        db.UniqueConstraint("master_chemical_id", "warehouse_id", name="_master_chemical_warehouse_uc"),
+    )
+
+    def to_dict(self):
+        return {
+            "id": self.id,
+            "master_chemical_id": self.master_chemical_id,
+            "warehouse_id": self.warehouse_id,
+            "warehouse_name": self.warehouse.name if self.warehouse else None,
+            "minimum_stock_level": self.minimum_stock_level,
+            "maximum_stock_level": self.maximum_stock_level,
+            "preferred_location": self.preferred_location,
+            "notes": self.notes,
         }
 
 

@@ -5,6 +5,7 @@ export const ROUTES = {
   TOOLS: '/tools',
   TOOL_CHECKOUT: '/tool-checkout',
   CHEMICALS: '/chemicals',
+  MASTER_CHEMICALS: '/master-chemicals',
   KITS: '/kits',
   WAREHOUSES: '/warehouses',
   REPORTS: '/reports',
