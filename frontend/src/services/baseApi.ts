@@ -123,6 +123,9 @@ export const baseApi = createApi({
     'KitReorder',
     'Permission',
     'SystemSettings',
+    'AIAgent',
+    'AIAlert',
+    'AIConversation',
   ],
   endpoints: () => ({}),
 });
