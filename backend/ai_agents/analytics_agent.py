@@ -55,7 +55,7 @@ class AnalyticsAgent(BaseAgent):
                     Checkout.tool_id,
                     func.count(Checkout.id).label("count"),
                 )
-                .filter(Checkout.checked_out_at >= week_ago)
+                .filter(Checkout.checkout_date >= week_ago)
                 .group_by(Checkout.tool_id)
                 .all()
             )
@@ -112,9 +112,9 @@ class AnalyticsAgent(BaseAgent):
                 db.session.query(
                     ChemicalIssuance.chemical_id,
                     func.count(ChemicalIssuance.id).label("issuance_count"),
-                    func.sum(ChemicalIssuance.quantity_issued).label("total_issued"),
+                    func.sum(ChemicalIssuance.quantity).label("total_issued"),
                 )
-                .filter(ChemicalIssuance.issued_at >= month_ago)
+                .filter(ChemicalIssuance.issue_date >= month_ago)
                 .group_by(ChemicalIssuance.chemical_id)
                 .all()
             )
@@ -136,16 +136,16 @@ class AnalyticsAgent(BaseAgent):
                         round(days_remaining, 1),
                         unit="days",
                         category="analytics",
-                        tags={"chemical_id": chemical.id, "chemical_name": chemical.name},
+                        tags={"chemical_id": chemical.id, "chemical_name": chemical.description},
                     )
 
                     if days_remaining < 14:
                         self.create_alert(
                             severity="warning",
                             category="inventory",
-                            title=f"Chemical Running Low: {chemical.name}",
+                            title=f"Chemical Running Low: {chemical.description}",
                             description=f"At current usage rate ({round(daily_rate, 1)}/day), "
-                                        f"{chemical.name} will be depleted in ~{round(days_remaining)} days. "
+                                        f"{chemical.description} will be depleted in ~{round(days_remaining)} days. "
                                         f"Current stock: {chemical.quantity}.",
                             details={
                                 "chemical_id": chemical.id,
@@ -169,14 +169,14 @@ class AnalyticsAgent(BaseAgent):
 
             # Check for unusually high checkout volume today
             today_checkouts = Checkout.query.filter(
-                Checkout.checked_out_at >= today_start
+                Checkout.checkout_date >= today_start
             ).count()
 
             # Get average daily checkouts from last 30 days
             month_ago = now - timedelta(days=30)
             total_month = Checkout.query.filter(
-                Checkout.checked_out_at >= month_ago,
-                Checkout.checked_out_at < today_start,
+                Checkout.checkout_date >= month_ago,
+                Checkout.checkout_date < today_start,
             ).count()
             avg_daily = total_month / 30 if total_month > 0 else 0
 
@@ -228,7 +228,7 @@ class AnalyticsAgent(BaseAgent):
             )
             self.record_metric("total_chemicals", Chemical.query.count(), unit="count", category="analytics")
             self.record_metric(
-                "active_checkouts", Checkout.query.filter_by(checked_in_at=None).count(),
+                "active_checkouts", Checkout.query.filter_by(return_date=None).count(),
                 unit="count", category="analytics"
             )
             self.record_metric(
@@ -282,8 +282,8 @@ class AnalyticsAgent(BaseAgent):
 
             lines = ["**Usage Trends:**\n"]
             for label, start in periods:
-                checkouts = Checkout.query.filter(Checkout.checked_out_at >= start).count()
-                issuances = ChemicalIssuance.query.filter(ChemicalIssuance.issued_at >= start).count()
+                checkouts = Checkout.query.filter(Checkout.checkout_date >= start).count()
+                issuances = ChemicalIssuance.query.filter(ChemicalIssuance.issue_date >= start).count()
                 lines.append(f"**{label}:**")
                 lines.append(f"  - Tool Checkouts: {checkouts}")
                 lines.append(f"  - Chemical Issuances: {issuances}")
@@ -360,7 +360,7 @@ class AnalyticsAgent(BaseAgent):
                     Checkout.tool_id,
                     func.count(Checkout.id).label("count"),
                 )
-                .filter(Checkout.checked_out_at >= month_ago)
+                .filter(Checkout.checkout_date >= month_ago)
                 .group_by(Checkout.tool_id)
                 .order_by(func.count(Checkout.id).desc())
                 .limit(5)
@@ -379,7 +379,7 @@ class AnalyticsAgent(BaseAgent):
                     ChemicalIssuance.chemical_id,
                     func.count(ChemicalIssuance.id).label("count"),
                 )
-                .filter(ChemicalIssuance.issued_at >= month_ago)
+                .filter(ChemicalIssuance.issue_date >= month_ago)
                 .group_by(ChemicalIssuance.chemical_id)
                 .order_by(func.count(ChemicalIssuance.id).desc())
                 .limit(5)
@@ -390,7 +390,7 @@ class AnalyticsAgent(BaseAgent):
             for item in top_chems:
                 chem = Chemical.query.get(item.chemical_id)
                 if chem:
-                    lines.append(f"  {item.count}x - {chem.name}")
+                    lines.append(f"  {item.count}x - {chem.description}")
 
             if len(top_tools) == 0 and len(top_chems) == 0:
                 return {"response": "Not enough usage data for the last 30 days.", "message_type": "text"}
@@ -411,8 +411,8 @@ class AnalyticsAgent(BaseAgent):
             total_tools = Tool.query.count()
             available_tools = Tool.query.filter_by(status="available").count()
             total_chemicals = Chemical.query.count()
-            active_checkouts = Checkout.query.filter_by(checked_in_at=None).count()
-            weekly_checkouts = Checkout.query.filter(Checkout.checked_out_at >= week_ago).count()
+            active_checkouts = Checkout.query.filter_by(return_date=None).count()
+            weekly_checkouts = Checkout.query.filter(Checkout.checkout_date >= week_ago).count()
             pending_orders = ProcurementOrder.query.filter(
                 ProcurementOrder.status.in_(["pending", "submitted"])
             ).count()

@@ -175,17 +175,20 @@ class DiagnosticAgent(BaseAgent):
                 )
 
             # Check for file descriptor leaks
-            open_files = len(process.open_files())
-            if open_files > 800:
-                self.create_alert(
-                    severity="warning",
-                    category="error",
-                    title="Potential File Descriptor Leak",
-                    description=f"Process has {open_files} open files. This may exhaust OS limits.",
-                    details={"open_files": open_files},
-                )
+            try:
+                open_files = len(process.open_files())
+                if open_files > 800:
+                    self.create_alert(
+                        severity="warning",
+                        category="error",
+                        title="Potential File Descriptor Leak",
+                        description=f"Process has {open_files} open files. This may exhaust OS limits.",
+                        details={"open_files": open_files},
+                    )
+            except (psutil.AccessDenied, IndexError, OSError):
+                pass  # open_files() can fail in some environments
 
-        except (psutil.NoSuchProcess, psutil.AccessDenied):
+        except (psutil.NoSuchProcess, psutil.AccessDenied, IndexError, OSError):
             pass
 
     def _diagnose_error(self, error_type: str, error_message: str) -> dict:

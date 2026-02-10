@@ -29,7 +29,7 @@ def register_ai_routes(app):
 
     @app.route("/api/ai/agents", methods=["GET"])
     @jwt_required
-    def get_ai_agents(current_user):
+    def get_ai_agents():
         """Get all registered AI agents and their status."""
         try:
             from ai_agents.agent_manager import AgentManager
@@ -53,8 +53,9 @@ def register_ai_routes(app):
 
     @app.route("/api/ai/agents/<string:agent_name>/toggle", methods=["POST"])
     @jwt_required
-    def toggle_ai_agent(current_user, agent_name):
+    def toggle_ai_agent(agent_name):
         """Start or stop an AI agent (admin only)."""
+        current_user = request.current_user
         if not current_user.get("is_admin"):
             return jsonify({"error": "Admin access required"}), 403
 
@@ -83,10 +84,11 @@ def register_ai_routes(app):
 
     @app.route("/api/ai/chat", methods=["POST"])
     @jwt_required
-    def ai_chat(current_user):
+    def ai_chat():
         """Send a message to an AI agent and get a response."""
         try:
-            data = request.get_json()
+            current_user = request.current_user
+            data = request.get_json(silent=True)
             if not data:
                 return jsonify({"error": "Request body required"}), 400
 
@@ -162,9 +164,10 @@ def register_ai_routes(app):
 
     @app.route("/api/ai/conversations", methods=["GET"])
     @jwt_required
-    def get_ai_conversations(current_user):
+    def get_ai_conversations():
         """Get user's AI conversations."""
         try:
+            current_user = request.current_user
             user_id = current_user.get("user_id")
             conversations = AIConversation.query.filter_by(
                 user_id=user_id
@@ -179,9 +182,10 @@ def register_ai_routes(app):
 
     @app.route("/api/ai/conversations/<int:conversation_id>/messages", methods=["GET"])
     @jwt_required
-    def get_conversation_messages(current_user, conversation_id):
+    def get_conversation_messages(conversation_id):
         """Get messages for a specific conversation."""
         try:
+            current_user = request.current_user
             user_id = current_user.get("user_id")
             conversation = AIConversation.query.get(conversation_id)
 
@@ -204,7 +208,7 @@ def register_ai_routes(app):
 
     @app.route("/api/ai/alerts", methods=["GET"])
     @jwt_required
-    def get_ai_alerts(current_user):
+    def get_ai_alerts():
         """Get AI alerts with optional filtering."""
         try:
             status_filter = request.args.get("status", "active")
@@ -241,9 +245,10 @@ def register_ai_routes(app):
 
     @app.route("/api/ai/alerts/<int:alert_id>/acknowledge", methods=["POST"])
     @jwt_required
-    def acknowledge_alert(current_user, alert_id):
+    def acknowledge_alert(alert_id):
         """Acknowledge an AI alert."""
         try:
+            current_user = request.current_user
             alert = AIAlert.query.get(alert_id)
             if not alert:
                 return jsonify({"error": "Alert not found"}), 404
@@ -259,9 +264,10 @@ def register_ai_routes(app):
 
     @app.route("/api/ai/alerts/<int:alert_id>/resolve", methods=["POST"])
     @jwt_required
-    def resolve_alert(current_user, alert_id):
+    def resolve_alert(alert_id):
         """Resolve an AI alert."""
         try:
+            current_user = request.current_user
             alert = AIAlert.query.get(alert_id)
             if not alert:
                 return jsonify({"error": "Alert not found"}), 404
@@ -278,7 +284,7 @@ def register_ai_routes(app):
 
     @app.route("/api/ai/alerts/<int:alert_id>/dismiss", methods=["POST"])
     @jwt_required
-    def dismiss_alert(current_user, alert_id):
+    def dismiss_alert(alert_id):
         """Dismiss an AI alert."""
         try:
             alert = AIAlert.query.get(alert_id)
@@ -297,7 +303,7 @@ def register_ai_routes(app):
 
     @app.route("/api/ai/metrics", methods=["GET"])
     @jwt_required
-    def get_ai_metrics(current_user):
+    def get_ai_metrics():
         """Get AI metrics with optional filtering."""
         try:
             category = request.args.get("category")
@@ -326,7 +332,7 @@ def register_ai_routes(app):
 
     @app.route("/api/ai/metrics/summary", methods=["GET"])
     @jwt_required
-    def get_ai_metrics_summary(current_user):
+    def get_ai_metrics_summary():
         """Get a summary of current metrics (latest values per metric name)."""
         try:
             from sqlalchemy import func
@@ -369,7 +375,7 @@ def register_ai_routes(app):
 
     @app.route("/api/ai/actions", methods=["GET"])
     @jwt_required
-    def get_ai_actions(current_user):
+    def get_ai_actions():
         """Get AI action logs."""
         try:
             action_type = request.args.get("action_type")
@@ -393,12 +399,13 @@ def register_ai_routes(app):
 
     @app.route("/api/ai/dashboard", methods=["GET"])
     @jwt_required
-    def get_ai_dashboard(current_user):
+    def get_ai_dashboard():
         """Get comprehensive AI dashboard data."""
         try:
             from ai_agents.agent_manager import AgentManager
             import psutil
 
+            current_user = request.current_user
             manager = AgentManager.get_instance()
 
             # Agent status

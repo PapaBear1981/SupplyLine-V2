@@ -122,13 +122,13 @@ class UserAssistantAgent(BaseAgent):
 
         if any(w in message for w in ["low", "stock", "reorder", "running out"]):
             chemicals = Chemical.query.filter(
-                Chemical.quantity <= Chemical.minimum_quantity
+                Chemical.quantity <= Chemical.minimum_stock_level
             ).all()
             if not chemicals:
                 return {"response": "All chemicals are above minimum stock levels.", "message_type": "text"}
             lines = ["**Low Stock Chemicals:**\n"]
             for c in chemicals[:15]:
-                lines.append(f"- **{c.name}** - Qty: {c.quantity} (Min: {c.minimum_quantity})")
+                lines.append(f"- **{c.description}** - Qty: {c.quantity} (Min: {c.minimum_stock_level})")
             return {"response": "\n".join(lines), "message_type": "text"}
 
         elif any(w in message for w in ["expired", "expiring", "expiration"]):
@@ -144,7 +144,7 @@ class UserAssistantAgent(BaseAgent):
             for c in chemicals[:15]:
                 exp = c.expiration_date.strftime("%Y-%m-%d") if c.expiration_date else "N/A"
                 status = "EXPIRED" if c.expiration_date and c.expiration_date < now else "expiring soon"
-                lines.append(f"- **{c.name}** ({c.part_number or 'N/A'}) - Expires: {exp} [{status}]")
+                lines.append(f"- **{c.description}** ({c.part_number or 'N/A'}) - Expires: {exp} [{status}]")
             return {"response": "\n".join(lines), "message_type": "text"}
 
         else:
@@ -205,14 +205,14 @@ class UserAssistantAgent(BaseAgent):
         from models import UserRequest
 
         if any(w in message for w in ["my", "mine"]):
-            requests = UserRequest.query.filter_by(user_id=user_id).order_by(
+            requests = UserRequest.query.filter_by(requester_id=user_id).order_by(
                 UserRequest.created_at.desc()
             ).limit(10).all()
             if not requests:
                 return {"response": "You have no requests.", "message_type": "text"}
             lines = ["**Your Recent Requests:**\n"]
             for r in requests:
-                lines.append(f"- Request #{r.id} - {r.request_type}: {r.status}")
+                lines.append(f"- Request #{r.id} - {r.title}: {r.status}")
             return {"response": "\n".join(lines), "message_type": "text"}
 
         total = UserRequest.query.count()
@@ -224,7 +224,7 @@ class UserAssistantAgent(BaseAgent):
 
         if any(w in message for w in ["my", "mine", "i have"]):
             checkouts = Checkout.query.filter_by(
-                user_id=user_id, checked_in_at=None
+                user_id=user_id, return_date=None
             ).all()
             if not checkouts:
                 return {"response": "You have no active checkouts.", "message_type": "text"}
@@ -232,10 +232,10 @@ class UserAssistantAgent(BaseAgent):
             for c in checkouts:
                 tool_num = c.tool.tool_number if c.tool else "Unknown"
                 lines.append(f"- **{tool_num}** - Checked out: "
-                             f"{c.checked_out_at.strftime('%Y-%m-%d %H:%M') if c.checked_out_at else 'N/A'}")
+                             f"{c.checkout_date.strftime('%Y-%m-%d %H:%M') if c.checkout_date else 'N/A'}")
             return {"response": "\n".join(lines), "message_type": "text"}
 
-        active = Checkout.query.filter_by(checked_in_at=None).count()
+        active = Checkout.query.filter_by(return_date=None).count()
         return {
             "response": f"There are {active} active checkouts system-wide.\n\nTry: 'Show my checkouts'",
             "message_type": "suggestion",
@@ -272,7 +272,7 @@ class UserAssistantAgent(BaseAgent):
         tools = Tool.query.count()
         available_tools = Tool.query.filter_by(status="available").count()
         chemicals = Chemical.query.count()
-        active_checkouts = Checkout.query.filter_by(checked_in_at=None).count()
+        active_checkouts = Checkout.query.filter_by(return_date=None).count()
         pending_orders = ProcurementOrder.query.filter(
             ProcurementOrder.status.in_(["pending", "submitted"])
         ).count()
@@ -313,11 +313,11 @@ class UserAssistantAgent(BaseAgent):
 
         # Search chemicals
         chemicals = Chemical.query.filter(
-            (Chemical.name.ilike(pattern))
+            (Chemical.description.ilike(pattern))
             | (Chemical.part_number.ilike(pattern))
         ).limit(5).all()
         for c in chemicals:
-            results.append(f"- **Chemical** {c.name}: Qty {c.quantity}")
+            results.append(f"- **Chemical** {c.description}: Qty {c.quantity}")
 
         if not results:
             return {"response": f"No results found for '{search_term}'.", "message_type": "text"}
@@ -377,7 +377,7 @@ class UserAssistantAgent(BaseAgent):
             from models import Chemical
 
             low_stock = Chemical.query.filter(
-                Chemical.quantity <= Chemical.minimum_quantity
+                Chemical.quantity <= Chemical.minimum_stock_level
             ).count()
 
             if low_stock > 0:

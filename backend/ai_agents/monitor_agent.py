@@ -160,17 +160,20 @@ class SystemMonitorAgent(BaseAgent):
             process = psutil.Process()
 
             # Open files
-            open_files = len(process.open_files())
-            self.record_metric("open_files", open_files, unit="count", category="application")
+            try:
+                open_files = len(process.open_files())
+                self.record_metric("open_files", open_files, unit="count", category="application")
 
-            if open_files > 500:
-                self.create_alert(
-                    severity="warning",
-                    category="performance",
-                    title="High Open File Count",
-                    description=f"Application has {open_files} open files. This may indicate a file handle leak.",
-                    details={"open_files": open_files},
-                )
+                if open_files > 500:
+                    self.create_alert(
+                        severity="warning",
+                        category="performance",
+                        title="High Open File Count",
+                        description=f"Application has {open_files} open files. This may indicate a file handle leak.",
+                        details={"open_files": open_files},
+                    )
+            except (psutil.AccessDenied, IndexError, OSError):
+                pass  # open_files() can fail in some environments
 
             # Thread count
             thread_count = process.num_threads()
@@ -190,7 +193,7 @@ class SystemMonitorAgent(BaseAgent):
             rss_mb = round(process_memory.rss / (1024 * 1024), 1)
             self.record_metric("process_rss_mb", rss_mb, unit="MB", category="application")
 
-        except (psutil.NoSuchProcess, psutil.AccessDenied) as e:
+        except (psutil.NoSuchProcess, psutil.AccessDenied, IndexError, OSError) as e:
             logger.debug("Process check failed: %s", e)
 
     def _check_database_health(self):
@@ -319,12 +322,17 @@ class SystemMonitorAgent(BaseAgent):
             mem = psutil.virtual_memory()
             process = psutil.Process()
 
+            try:
+                open_file_count = len(process.open_files())
+            except (psutil.AccessDenied, IndexError, OSError):
+                open_file_count = -1
+
             summary = (
                 f"**System Health Summary**\n\n"
                 f"- **CPU:** {cpu}%\n"
                 f"- **Memory:** {mem.percent}% ({round(mem.available / (1024**2))}MB available)\n"
                 f"- **Threads:** {process.num_threads()}\n"
-                f"- **Open Files:** {len(process.open_files())}\n"
+                f"- **Open Files:** {open_file_count if open_file_count >= 0 else 'N/A'}\n"
                 f"- **Process RSS:** {round(process.memory_info().rss / (1024**2))}MB\n"
             )
 
