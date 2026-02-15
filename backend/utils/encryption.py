@@ -23,19 +23,26 @@ class EncryptionManager:
 
     @classmethod
     def _get_fernet(cls) -> Fernet:
-        """Get or create the Fernet instance using the application's SECRET_KEY."""
+        """Get or create the Fernet instance using the application's SECRET_KEY.
+
+        Raises:
+            RuntimeError: If SECRET_KEY environment variable is not set.
+        """
         if cls._fernet is None:
-            # Get the secret key from environment or Flask config
-            # In production, this should be set via environment variable
+            # Get the secret key from environment
+            # This MUST be set in all environments (development, testing, production)
             secret_key = os.environ.get("SECRET_KEY")
 
             if not secret_key:
-                # Fallback for development/testing - NOT for production
-                logger.warning(
-                    "SECRET_KEY not set in environment. Using insecure fallback. "
-                    "Set SECRET_KEY environment variable for production!"
+                # SECURITY: Fail fast - never use a fallback key
+                # This prevents accidental deployment with insecure defaults
+                error_msg = (
+                    "CRITICAL: SECRET_KEY environment variable is not set. "
+                    "Encryption cannot proceed without a secure key. "
+                    "Set the SECRET_KEY environment variable before starting the application."
                 )
-                secret_key = "dev-secret-key-CHANGE-IN-PRODUCTION"
+                logger.error(error_msg)
+                raise RuntimeError(error_msg)
 
             # Derive a 32-byte Fernet key from the secret key using SHA-256
             # Fernet requires a URL-safe base64-encoded 32-byte key

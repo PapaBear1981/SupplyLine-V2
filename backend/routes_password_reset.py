@@ -4,8 +4,9 @@ from datetime import datetime
 
 from flask import current_app, jsonify, request
 
-from auth import admin_required
+from auth import admin_required, csrf_required
 from models import AuditLog, User, db
+from security.middleware import rate_limit
 
 
 def generate_secure_password(length=12):
@@ -37,7 +38,9 @@ def generate_secure_password(length=12):
 
 def register_password_reset_routes(app):
     @app.route("/api/admin/users/<int:user_id>/reset-password", methods=["POST"])
+    @rate_limit(limit=3, window=3600, per="ip")  # 3 requests per hour per IP
     @admin_required
+    @csrf_required
     def reset_user_password(user_id):
         """
         Reset a user's password to a temporary password

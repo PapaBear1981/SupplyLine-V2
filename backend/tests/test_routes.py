@@ -236,15 +236,12 @@ class TestChemicalRoutes:
         assert "chemicals" in data
         assert isinstance(data["chemicals"], list)
 
-    def test_create_chemical_materials_user(self, client, auth_headers_materials, db_session, test_warehouse):
+    def test_create_chemical_materials_user(self, client, auth_headers_materials, db_session, test_warehouse, test_master_chemical):
         """Test creating chemical as materials user"""
         chemical_data = {
-            "part_number": "C002",
+            "master_chemical_id": test_master_chemical.id,
             "lot_number": "L002",
-            "description": "New Test Chemical",
-            "manufacturer": "Test Manufacturer",
             "quantity": 50.0,
-            "unit": "ml",
             "location": "Storage A",
             "warehouse_id": test_warehouse.id
         }

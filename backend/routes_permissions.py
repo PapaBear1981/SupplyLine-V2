@@ -9,7 +9,7 @@ This module provides API endpoints for managing permissions, including:
 
 from flask import jsonify, request
 
-from auth import admin_required, jwt_required, permission_required
+from auth import admin_required, csrf_required, jwt_required, permission_required
 from models import AuditLog, Permission, User, UserPermission, db
 
 
@@ -82,6 +82,7 @@ def register_permission_routes(app):
 
     @app.route("/api/users/<int:user_id>/permissions", methods=["POST"])
     @permission_required("user.manage")
+    @csrf_required
     def add_user_permission(user_id):
         """
         Grant or deny a specific permission to a user.
@@ -176,6 +177,7 @@ def register_permission_routes(app):
 
     @app.route("/api/users/<int:user_id>/permissions/<int:permission_id>", methods=["DELETE"])
     @permission_required("user.manage")
+    @csrf_required
     def remove_user_permission(user_id, permission_id):
         """Remove a user-specific permission grant/deny"""
         user = User.query.get_or_404(user_id)
@@ -220,6 +222,7 @@ def register_permission_routes(app):
 
     @app.route("/api/users/<int:user_id>/permissions/bulk", methods=["POST"])
     @permission_required("user.manage")
+    @csrf_required
     def bulk_update_user_permissions(user_id):
         """
         Bulk update user-specific permissions.

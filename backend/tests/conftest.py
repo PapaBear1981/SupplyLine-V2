@@ -40,9 +40,13 @@ def app():
     original_db_url = os.environ.get("DATABASE_URL")
     original_flask_env = os.environ.get("FLASK_ENV")
     original_session_type = os.environ.get("SESSION_TYPE")
+    original_secret_key = os.environ.get("SECRET_KEY")
+    original_jwt_secret_key = os.environ.get("JWT_SECRET_KEY")
     os.environ["DATABASE_URL"] = f"sqlite:///{db_path}"
     os.environ["FLASK_ENV"] = "testing"
     os.environ["SESSION_TYPE"] = "filesystem"
+    os.environ["SECRET_KEY"] = "test-secret-key-for-pytest-testing"
+    os.environ["JWT_SECRET_KEY"] = "test-jwt-secret-key-for-pytest-testing"
 
     try:
         global create_app, db, User, Tool, Chemical, UserActivity, AuditLog, JWTManager
@@ -107,6 +111,16 @@ def app():
             os.environ["SESSION_TYPE"] = original_session_type
         else:
             os.environ.pop("SESSION_TYPE", None)
+
+        if original_secret_key is not None:
+            os.environ["SECRET_KEY"] = original_secret_key
+        else:
+            os.environ.pop("SECRET_KEY", None)
+
+        if original_jwt_secret_key is not None:
+            os.environ["JWT_SECRET_KEY"] = original_jwt_secret_key
+        else:
+            os.environ.pop("JWT_SECRET_KEY", None)
 
         os.close(db_fd)
         os.unlink(db_path)
@@ -585,3 +599,21 @@ def test_kit(db_session, test_user):
     db_session.add(kit)
     db_session.commit()
     return kit
+
+
+@pytest.fixture
+def test_master_chemical(db_session):
+    """Create a test master chemical for testing chemical creation"""
+    from models import MasterChemical
+
+    master_chemical = MasterChemical(
+        part_number="C002",
+        description="New Test Chemical",
+        manufacturer="Test Manufacturer",
+        category="Testing",
+        unit="ml",
+        is_active=True
+    )
+    db_session.add(master_chemical)
+    db_session.commit()
+    return master_chemical

@@ -17,6 +17,7 @@ from werkzeug.exceptions import BadRequest
 import utils as password_utils
 from auth import JWTManager, jwt_required
 from models import AuditLog, User, UserActivity, db
+from security.middleware import rate_limit
 
 
 logger = logging.getLogger(__name__)
@@ -26,6 +27,7 @@ def register_auth_routes(app):
     """Register JWT authentication routes"""
 
     @app.route("/api/auth/login", methods=["POST"])
+    @rate_limit(limit=5, window=300, per="ip")  # 5 requests per 5 minutes per IP
     def login():
         """JWT-based login endpoint"""
         try:
@@ -286,6 +288,7 @@ def register_auth_routes(app):
             }), 500
 
     @app.route("/api/auth/refresh", methods=["POST"])
+    @rate_limit(limit=10, window=300, per="user")  # 10 requests per 5 minutes per user
     def refresh_token():
         """Refresh JWT access token using refresh token from HttpOnly cookie"""
         try:
@@ -498,6 +501,7 @@ def register_auth_routes(app):
             }), 500
 
     @app.route("/api/auth/change-password", methods=["POST"])
+    @rate_limit(limit=3, window=3600, per="ip")  # 3 requests per hour per IP
     def auth_change_password():
         """Change password for users with force_password_change flag"""
         try:
