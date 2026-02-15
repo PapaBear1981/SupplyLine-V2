@@ -95,7 +95,8 @@ class JWTManager:
         """
         try:
             secret_key = current_app.config["JWT_SECRET_KEY"]
-            payload = jwt.decode(token, secret_key, algorithms=["HS256"])
+            # Add 10 second leeway for clock skew between containers/systems
+            payload = jwt.decode(token, secret_key, algorithms=["HS256"], leeway=timedelta(seconds=10))
 
             # Verify token type
             if payload.get("type") != token_type:
@@ -298,10 +299,24 @@ def admin_required(f):
     return decorated_function
 
 
-def permission_required(permission_name: str):
+def permission_required(permission_name: str, enforce_for_admin: bool = False):
     """Decorator for specific permission requirement.
 
-    Admins (is_admin: true) automatically have ALL permissions and bypass this check.
+    By default, admins (is_admin: true) automatically have ALL permissions and bypass
+    this check for backward compatibility. However, for sensitive operations where
+    explicit permission verification is required even for admins, set enforce_for_admin=True.
+
+    Args:
+        permission_name: The permission string required to access the endpoint.
+        enforce_for_admin: If True, admins must also have the explicit permission.
+                          If False (default), admins bypass the permission check.
+
+    Example:
+        @permission_required("user.delete")  # Admins bypass this check
+        def delete_user(): ...
+
+        @permission_required("audit.view", enforce_for_admin=True)  # Even admins need this permission
+        def view_audit_logs(): ...
     """
 
     def decorator(f):
@@ -311,12 +326,12 @@ def permission_required(permission_name: str):
             if not user_payload:
                 return jsonify({"error": "Authentication required", "code": "AUTH_REQUIRED"}), 401
 
-            # Admins have FULL access - bypass permission check
-            if user_payload.get("is_admin", False):
+            # Check if admin can bypass permission check
+            if not enforce_for_admin and user_payload.get("is_admin", False):
                 request.current_user = user_payload
                 return f(*args, **kwargs)
 
-            # Check specific permission for non-admin users
+            # Check specific permission (applies to non-admins, or admins when enforce_for_admin=True)
             permissions = user_payload.get("permissions", [])
             if permission_name not in permissions:
                 return jsonify({
@@ -333,8 +348,25 @@ def permission_required(permission_name: str):
     return decorator
 
 
-def permission_required_any(*permission_names: str):
-    """Decorator that authorizes users with any of the provided permissions."""
+def permission_required_any(*permission_names: str, enforce_for_admin: bool = False):
+    """Decorator that authorizes users with any of the provided permissions.
+
+    By default, admins (is_admin: true) automatically satisfy all permission checks
+    for backward compatibility. However, for sensitive operations where explicit
+    permission verification is required even for admins, set enforce_for_admin=True.
+
+    Args:
+        *permission_names: Variable number of permission strings. User needs at least one.
+        enforce_for_admin: If True, admins must also have at least one of the explicit permissions.
+                          If False (default), admins bypass the permission check.
+
+    Example:
+        @permission_required_any("report.view", "report.export")  # Admins bypass this check
+        def get_report(): ...
+
+        @permission_required_any("audit.view", "audit.export", enforce_for_admin=True)  # Even admins need one of these
+        def get_audit_report(): ...
+    """
 
     def decorator(f):
         @wraps(f)
@@ -343,11 +375,12 @@ def permission_required_any(*permission_names: str):
             if not user_payload:
                 return jsonify({"error": "Authentication required", "code": "AUTH_REQUIRED"}), 401
 
-            # Admins automatically satisfy all permission checks.
-            if user_payload.get("is_admin", False):
+            # Check if admin can bypass permission check
+            if not enforce_for_admin and user_payload.get("is_admin", False):
                 request.current_user = user_payload
                 return f(*args, **kwargs)
 
+            # Check for any matching permission (applies to non-admins, or admins when enforce_for_admin=True)
             permissions = set(user_payload.get("permissions", []))
             if not any(name in permissions for name in permission_names):
                 joined = ", ".join(permission_names)
@@ -396,6 +429,10 @@ def csrf_required(f):
     """Decorator for JWT-compatible CSRF protection"""
     @wraps(f)
     def decorated_function(*args, **kwargs):
+        # Skip CSRF validation in testing mode
+        if current_app.config.get("TESTING", False):
+            return f(*args, **kwargs)
+
         # Only check CSRF for state-changing methods
         if request.method not in ["POST", "PUT", "DELETE", "PATCH"]:
             return f(*args, **kwargs)

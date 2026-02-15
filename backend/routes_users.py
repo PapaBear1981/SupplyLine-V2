@@ -1,6 +1,6 @@
 from datetime import datetime
 from flask import Blueprint, jsonify, request
-from auth.jwt_manager import jwt_required as login_required, permission_required
+from auth.jwt_manager import csrf_required, jwt_required as login_required, permission_required
 from models import AuditLog, User, UserActivity, db
 import utils as password_utils
 from utils.error_handler import handle_errors, log_security_event
@@ -14,6 +14,7 @@ def register_user_routes(app):
 
 @users_bp.route("/users", methods=["GET", "POST"])
 @login_required
+@csrf_required
 def users_route():
     current_user_id = request.current_user.get("user_id")
     # Check permissions
@@ -107,6 +108,7 @@ def users_route():
 
 @users_bp.route("/users/<int:id>", methods=["GET", "PUT", "DELETE"])
 @login_required
+@csrf_required
 def user_detail_route(id):
     current_user_id = request.current_user.get("user_id")
     # Check permissions
@@ -200,6 +202,7 @@ def user_detail_route(id):
 
 @users_bp.route("/users/<int:id>/unlock", methods=["POST"])
 @permission_required("user.manage")
+@csrf_required
 def unlock_user_account(id):
     """Unlock a user account that has been locked due to failed login attempts."""
     current_user_id = request.current_user.get("user_id")

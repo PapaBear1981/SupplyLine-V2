@@ -4,7 +4,7 @@ import logging
 from flask import current_app, jsonify, request
 from sqlalchemy.orm import joinedload
 
-from auth import department_required, jwt_required
+from auth import csrf_required, department_required, jwt_required
 from models import (
     AuditLog,
     Chemical,
@@ -20,7 +20,7 @@ from models import (
     Warehouse,
     db,
 )
-from sqlalchemy import text
+from sqlalchemy import func
 from utils.error_handler import ValidationError, handle_errors
 from utils.serial_lot_validation import (
     SerialLotValidationError,
@@ -42,8 +42,17 @@ materials_manager_required = department_required("Materials")
 
 def _generate_request_number():
     """Generate a unique request number in format REQ-00001."""
-    result = db.session.execute(
-        text("SELECT MAX(CAST(SUBSTR(request_number, 5) AS INTEGER)) FROM user_requests WHERE request_number IS NOT NULL")
+    # Use SQLAlchemy ORM expressions instead of raw SQL
+    # Extract the numeric portion after "REQ-" (positions 5 onwards) and find the maximum
+    result = db.session.query(
+        func.max(
+            func.cast(
+                func.substr(UserRequest.request_number, 5),
+                db.Integer
+            )
+        )
+    ).filter(
+        UserRequest.request_number.isnot(None)
     ).scalar()
     next_number = (result or 0) + 1
     return f"REQ-{next_number:05d}"
@@ -65,8 +74,17 @@ def get_total_warehouse_stock(master_chemical_id, warehouse_id):
 
 def _generate_order_number():
     """Generate a unique order number in format ORD-00001."""
-    result = db.session.execute(
-        text("SELECT MAX(CAST(SUBSTR(order_number, 5) AS INTEGER)) FROM procurement_orders WHERE order_number IS NOT NULL")
+    # Use SQLAlchemy ORM expressions instead of raw SQL
+    # Extract the numeric portion after "ORD-" (positions 5 onwards) and find the maximum
+    result = db.session.query(
+        func.max(
+            func.cast(
+                func.substr(ProcurementOrder.order_number, 5),
+                db.Integer
+            )
+        )
+    ).filter(
+        ProcurementOrder.order_number.isnot(None)
     ).scalar()
     next_number = (result or 0) + 1
     return f"ORD-{next_number:05d}"
@@ -321,6 +339,7 @@ def register_chemical_routes(app):
     # Create a new chemical
     @app.route("/api/chemicals", methods=["POST"])
     @materials_manager_required
+    @csrf_required
     @handle_errors
     def create_chemical_route():
         data = request.get_json() or {}
@@ -504,6 +523,7 @@ def register_chemical_routes(app):
     # Issue a chemical
     @app.route("/api/chemicals/<int:id>/issue", methods=["POST"])
     @jwt_required
+    @csrf_required
     @handle_errors
     def chemical_issue_route(id):
         from utils.lot_utils import create_child_chemical
@@ -798,6 +818,7 @@ def register_chemical_routes(app):
     # Process a chemical return
     @app.route("/api/chemicals/<int:id>/return", methods=["POST"])
     @jwt_required
+    @csrf_required
     @handle_errors
     def chemical_return_route(id):
         chemical = Chemical.query.get_or_404(id)
@@ -997,6 +1018,7 @@ def register_chemical_routes(app):
     # Request reorder for a chemical
     @app.route("/api/chemicals/<int:id>/request-reorder", methods=["POST"])
     @materials_manager_required
+    @csrf_required
     def request_chemical_reorder_route(id):
         try:
             # Get the chemical
@@ -1082,6 +1104,7 @@ def register_chemical_routes(app):
     # Mark a chemical as ordered
     @app.route("/api/chemicals/<int:id>/mark-ordered", methods=["POST"])
     @materials_manager_required
+    @csrf_required
     def mark_chemical_as_ordered_route(id):
         try:
             current_user_id = request.current_user.get("user_id")
@@ -1221,6 +1244,7 @@ def register_chemical_routes(app):
     # Get, update, or delete a specific chemical
     @app.route("/api/chemicals/<int:id>", methods=["GET", "PUT", "DELETE"])
     @materials_manager_required
+    @csrf_required
     @handle_errors
     def chemical_detail_route(id):
         current_user_id = request.current_user.get("user_id")
@@ -1425,6 +1449,7 @@ def register_chemical_routes(app):
     # Archive a chemical
     @app.route("/api/chemicals/<int:id>/archive", methods=["POST"])
     @materials_manager_required
+    @csrf_required
     def archive_chemical_route(id):
         try:
             current_user_id = request.current_user.get("user_id")
@@ -1494,6 +1519,7 @@ def register_chemical_routes(app):
     # Unarchive a chemical
     @app.route("/api/chemicals/<int:id>/unarchive", methods=["POST"])
     @materials_manager_required
+    @csrf_required
     def unarchive_chemical_route(id):
         try:
             current_user_id = request.current_user.get("user_id")
@@ -1555,6 +1581,7 @@ def register_chemical_routes(app):
     # Mark a chemical as delivered
     @app.route("/api/chemicals/<int:id>/mark-delivered", methods=["POST"])
     @materials_manager_required
+    @csrf_required
     def mark_chemical_as_delivered_route(id):
         try:
             # Get the chemical

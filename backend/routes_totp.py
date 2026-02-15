@@ -632,16 +632,8 @@ def register_totp_routes(app):
             user.backup_codes = json.dumps(backup_codes_hashed) if backup_codes_hashed else None
             db.session.commit()
 
-            # Generate JWT tokens
-            jwt_manager = JWTManager.from_config(current_app.config)
-            access_token = jwt_manager.create_access_token(
-                user_id=user.id,
-                employee_number=user.employee_number
-            )
-            refresh_token = jwt_manager.create_refresh_token(
-                user_id=user.id,
-                employee_number=user.employee_number
-            )
+            # Generate JWT tokens using the existing JWTManager.generate_tokens method
+            tokens = JWTManager.generate_tokens(user)
 
             # Log the login
             activity = UserActivity(
@@ -667,9 +659,9 @@ def register_totp_routes(app):
             return jsonify({
                 "message": "Login successful",
                 "user": user.to_dict(),
-                "access_token": access_token,
-                "refresh_token": refresh_token,
-                "expires_in": jwt_manager.access_token_expiry.total_seconds(),
+                "access_token": tokens["access_token"],
+                "refresh_token": tokens["refresh_token"],
+                "expires_in": tokens["expires_in"],
                 "codes_remaining": len(backup_codes_hashed)
             }), 200
 

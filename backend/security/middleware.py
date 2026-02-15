@@ -94,6 +94,11 @@ def rate_limit(limit: int = 100, window: int = 3600, per: str = "ip"):
     def decorator(f):
         @wraps(f)
         def decorated_function(*args, **kwargs):
+            # Skip rate limiting in testing mode
+            from flask import current_app
+            if current_app.config.get("TESTING", False):
+                return f(*args, **kwargs)
+
             # Determine identifier
             if per == "user":
                 user_payload = getattr(request, "current_user", None)

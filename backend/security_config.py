@@ -24,19 +24,19 @@ SECURITY_HEADERS = {
 
     # Content Security Policy
     "Content-Security-Policy": (
-        "default-src 'sel'; "
-        "script-src 'sel' 'unsafe-inline' 'unsafe-eval'; "
-        "style-src 'sel' 'unsafe-inline'; "
-        "img-src 'sel' data: https:; "
-        "font-src 'sel' data:; "
-        "connect-src 'sel'; "
+        "default-src 'self'; "
+        "script-src 'self' 'unsafe-inline'; "
+        "style-src 'self' 'unsafe-inline'; "
+        "img-src 'self' data: https:; "
+        "font-src 'self' data:; "
+        "connect-src 'self'; "
         "frame-ancestors 'none'; "
-        "base-uri 'sel'; "
-        "form-action 'sel'; "
+        "base-uri 'self'; "
+        "form-action 'self'; "
         "object-src 'none'; "
-        "media-src 'sel'; "
-        "worker-src 'sel'; "
-        "manifest-src 'sel'"
+        "media-src 'self'; "
+        "worker-src 'self'; "
+        "manifest-src 'self'"
     ),
 
     # Referrer Policy

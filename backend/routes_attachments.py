@@ -58,6 +58,42 @@ def get_file_extension(filename):
     return ""
 
 
+def safe_file_path(base_dir: str, relative_path: str) -> str:
+    """
+    Safely construct a file path ensuring it stays within the base directory.
+
+    This function prevents path traversal attacks by validating that the
+    resolved path is within the allowed base directory.
+
+    Args:
+        base_dir: The base directory that files must stay within
+        relative_path: The relative path to join with base_dir
+
+    Returns:
+        The validated absolute path
+
+    Raises:
+        ValueError: If the resolved path escapes the base directory
+    """
+    # Resolve the base directory to an absolute path
+    base_real = os.path.realpath(base_dir)
+
+    # Construct and resolve the full path
+    full_path = os.path.join(base_dir, relative_path)
+    full_real = os.path.realpath(full_path)
+
+    # Ensure the resolved path starts with the base directory
+    # Use os.sep to ensure proper directory boundary check
+    if not full_real.startswith(base_real + os.sep) and full_real != base_real:
+        logger.warning(
+            f"Path traversal attempt detected: {relative_path} resolved to {full_real}, "
+            f"which is outside base directory {base_real}"
+        )
+        raise ValueError("Invalid file path: path traversal detected")
+
+    return full_real
+
+
 def generate_unique_filename(original_filename):
     """Generate a unique filename to prevent collisions"""
     ext = get_file_extension(original_filename)
@@ -181,8 +217,14 @@ def upload_attachment():
         except FileValidationError as e:
             # File failed malware scan - reject it
             os.remove(file_path)
-            if thumbnail_path and os.path.exists(os.path.join(THUMBNAILS_FOLDER, os.path.basename(thumbnail_path))):
-                os.remove(os.path.join(THUMBNAILS_FOLDER, os.path.basename(thumbnail_path)))
+            if thumbnail_path:
+                try:
+                    # Use safe_file_path to prevent path traversal
+                    safe_thumbnail_path = safe_file_path(THUMBNAILS_FOLDER, os.path.basename(thumbnail_path))
+                    if os.path.exists(safe_thumbnail_path):
+                        os.remove(safe_thumbnail_path)
+                except ValueError:
+                    logger.warning("Skipping thumbnail removal due to invalid path")
             logger.warning(f"File failed malware scan: {e!s}")
             return jsonify({"error": f"File rejected by security scan: {e!s}"}), 400
         except Exception as e:
@@ -338,7 +380,13 @@ def get_thumbnail(attachment_id):
         if not has_access:
             return jsonify({"error": "Access denied"}), 403
 
-        thumbnail_full_path = os.path.join(UPLOAD_FOLDER, attachment.thumbnail_path)
+        # Use safe_file_path to prevent path traversal attacks
+        try:
+            thumbnail_full_path = safe_file_path(UPLOAD_FOLDER, attachment.thumbnail_path)
+        except ValueError:
+            logger.warning(f"Path traversal attempt in thumbnail request for attachment {attachment_id}")
+            return jsonify({"error": "Invalid thumbnail path"}), 400
+
         if not os.path.exists(thumbnail_full_path):
             return jsonify({"error": "Thumbnail not found"}), 404
 

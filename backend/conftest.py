@@ -85,8 +85,12 @@ def app():
     # Configure environment for testing before app creation so Config picks it up
     original_db_url = os.environ.get("DATABASE_URL")
     original_flask_env = os.environ.get("FLASK_ENV")
+    original_secret_key = os.environ.get("SECRET_KEY")
+    original_jwt_secret_key = os.environ.get("JWT_SECRET_KEY")
     os.environ["DATABASE_URL"] = f"sqlite:///{db_path}"
     os.environ["FLASK_ENV"] = "testing"
+    os.environ["SECRET_KEY"] = "test-secret-key-for-pytest-testing"
+    os.environ["JWT_SECRET_KEY"] = "test-jwt-secret-key-for-pytest-testing"
 
     try:
         _ensure_imports()
@@ -115,6 +119,16 @@ def app():
             os.environ["FLASK_ENV"] = original_flask_env
         else:
             os.environ.pop("FLASK_ENV", None)
+
+        if original_secret_key is not None:
+            os.environ["SECRET_KEY"] = original_secret_key
+        else:
+            os.environ.pop("SECRET_KEY", None)
+
+        if original_jwt_secret_key is not None:
+            os.environ["JWT_SECRET_KEY"] = original_jwt_secret_key
+        else:
+            os.environ.pop("JWT_SECRET_KEY", None)
 
         # Dispose of the database engine connection to release the file handle on Windows
         # Explicitly close session and dispose engine to prevent Windows PermissionError
