@@ -423,7 +423,7 @@ const ReorderDetailModal = ({ open, reorderId, onClose }: ReorderDetailModalProp
                     <Text type="secondary">Not created</Text>
                   )}
                 </Descriptions.Item>
-                <Descriptions.Item label="Procurement Orders" span={2}>
+                <Descriptions.Item label="Fulfillment Records" span={2}>
                   {reorder.procurement_orders && reorder.procurement_orders.length > 0 ? (
                     <Space wrap>
                       {reorder.procurement_orders.map((order) => (

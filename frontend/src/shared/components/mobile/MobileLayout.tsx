@@ -42,7 +42,7 @@ const routeNames: Record<string, string> = {
   [ROUTES.TOOLS]: 'Tools',
   [ROUTES.CHEMICALS]: 'Chemicals',
   [ROUTES.KITS]: 'Kits',
-  '/orders': 'Orders',
+  '/orders': 'Fulfillment',
   '/requests': 'Requests',
   [ROUTES.WAREHOUSES]: 'Warehouses',
   [ROUTES.REPORTS]: 'Reports',
@@ -139,10 +139,10 @@ export const MobileLayout = () => {
       return 'New Kit';
     }
     if (path.startsWith('/orders/') && path !== '/orders/new') {
-      return 'Order Details';
+      return 'Fulfillment Details';
     }
     if (path === '/orders/new') {
-      return 'New Order';
+      return 'New Fulfillment Record';
     }
     if (path.startsWith('/requests/') && path !== '/requests/new') {
       return 'Request Details';

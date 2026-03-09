@@ -476,7 +476,7 @@ export const OrdersDashboard: React.FC = () => {
       label: (
         <span>
           <ShoppingCartOutlined />
-          Orders
+          Fulfillment Queue
         </span>
       ),
       children: (
@@ -487,7 +487,7 @@ export const OrdersDashboard: React.FC = () => {
               <Col xs={24} sm={12} lg={6}>
                 <Card>
                   <Statistic
-                    title="Total Orders"
+                    title="Total Fulfillment Items"
                     value={orderAnalytics.total_count}
                     prefix={<InboxOutlined style={{ color: '#1890ff' }} />}
                     valueStyle={{ color: '#1890ff' }}
@@ -537,7 +537,7 @@ export const OrdersDashboard: React.FC = () => {
             <Row gutter={[16, 16]}>
               <Col xs={24} md={8}>
                 <Input
-                  placeholder="Search orders..."
+                  placeholder="Search fulfillment queue..."
                   prefix={<SearchOutlined />}
                   value={orderSearchQuery}
                   onChange={(e) => setOrderSearchQuery(e.target.value)}
@@ -606,12 +606,12 @@ export const OrdersDashboard: React.FC = () => {
               pagination={{
                 pageSize: 20,
                 showSizeChanger: true,
-                showTotal: (total) => `Total ${total} orders`,
+                showTotal: (total) => `Total ${total} fulfillment items`,
               }}
               locale={{
                 emptyText: (
                   <Empty
-                    description="No orders found"
+                    description="No fulfillment items found"
                     image={Empty.PRESENTED_IMAGE_SIMPLE}
                   />
                 ),
@@ -631,10 +631,10 @@ export const OrdersDashboard: React.FC = () => {
           <Col>
             <h1 style={{ margin: 0, fontSize: 28, fontWeight: 600 }}>
               <ShoppingCartOutlined style={{ marginRight: 12 }} />
-              Procurement
+              Fulfillment
             </h1>
             <p style={{ margin: '4px 0 0', color: '#8c8c8c' }}>
-              Process requests and manage procurement orders
+              Review incoming requests and manage fulfillment actions
             </p>
           </Col>
           <Col>
@@ -649,7 +649,7 @@ export const OrdersDashboard: React.FC = () => {
                   onClick={handleCreateOrder}
                   size="large"
                 >
-                  Create Order
+                  Create Fulfillment Record
                 </Button>
               )}
             </Space>

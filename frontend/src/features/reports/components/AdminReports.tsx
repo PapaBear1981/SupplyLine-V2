@@ -282,24 +282,24 @@ export function AdminReports({ dateParams, onReportDataChange }: AdminReportsPro
               </Card>
 
               {/* Order Stats */}
-              <Card title={<><ShoppingCartOutlined /> Order & Request Overview</>} style={{ marginBottom: 24 }}>
+              <Card title={<><ShoppingCartOutlined /> Fulfillment & Request Overview</>} style={{ marginBottom: 24 }}>
                 <Row gutter={[16, 16]}>
                   <Col xs={12} sm={4}>
                     <Statistic
-                      title="Total Orders"
+                      title="Total Fulfillment Items"
                       value={systemData.orders.totalOrders}
                     />
                   </Col>
                   <Col xs={12} sm={4}>
                     <Statistic
-                      title="Pending Orders"
+                      title="Pending Fulfillment"
                       value={systemData.orders.pendingOrders}
                       valueStyle={{ color: '#1890ff' }}
                     />
                   </Col>
                   <Col xs={12} sm={4}>
                     <Statistic
-                      title="Late Orders"
+                      title="Late Fulfillment"
                       value={systemData.orders.lateOrders}
                       valueStyle={{ color: systemData.orders.lateOrders > 0 ? '#ff4d4f' : undefined }}
                     />

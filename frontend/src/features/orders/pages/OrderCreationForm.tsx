@@ -29,11 +29,11 @@ export const OrderCreationForm: React.FC = () => {
         onClick={() => navigate('/orders')}
         style={{ marginBottom: 16 }}
       >
-        Back to Orders
+        Back to Fulfillment
       </Button>
 
-      <Title level={2}>Create New Order</Title>
-      <Text type="secondary">Fill in the details below to create a new procurement order</Text>
+      <Title level={2}>Create Fulfillment Record</Title>
+      <Text type="secondary">Fill in the details below to create a new fulfillment record</Text>
 
       <Card style={{ marginTop: 24, maxWidth: 800 }}>
         <Form form={form} layout="vertical" onFinish={handleSubmit}>
@@ -41,8 +41,8 @@ export const OrderCreationForm: React.FC = () => {
             <Col xs={24} md={16}>
               <Form.Item
                 name="title"
-                label="Order Title"
-                rules={[{ required: true, message: 'Please enter order title' }]}
+                label="Title"
+                rules={[{ required: true, message: 'Please enter a title' }]}
               >
                 <Input placeholder="e.g., Tool Bits for Kit #23" />
               </Form.Item>
@@ -64,7 +64,7 @@ export const OrderCreationForm: React.FC = () => {
           </Form.Item>
 
           <Form.Item name="description" label="Description">
-            <TextArea rows={4} placeholder="Describe what needs to be ordered..." />
+            <TextArea rows={4} placeholder="Describe what needs to be fulfilled..." />
           </Form.Item>
 
           <Row gutter={16}>
@@ -114,7 +114,7 @@ export const OrderCreationForm: React.FC = () => {
           <Form.Item>
             <Space>
               <Button type="primary" htmlType="submit" icon={<SaveOutlined />} loading={isLoading}>
-                Create Order
+                Create Fulfillment Record
               </Button>
               <Button onClick={() => navigate('/orders')}>Cancel</Button>
             </Space>

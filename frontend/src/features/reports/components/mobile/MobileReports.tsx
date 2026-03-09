@@ -425,7 +425,7 @@ export const MobileReports = ({ timeframe, dateParams }: MobileReportsProps) => 
       title: (
         <div className="mobile-reports-tab">
           <ShoppingCartOutlined style={{ fontSize: 18 }} />
-          <span>Orders</span>
+          <span>Fulfillment</span>
         </div>
       ),
       content: renderOrdersTab(),

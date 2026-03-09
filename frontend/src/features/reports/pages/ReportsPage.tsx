@@ -196,7 +196,7 @@ export function ReportsPage() {
       label: (
         <span>
           <ShoppingCartOutlined />
-          Orders & Requests
+          Fulfillment & Requests
         </span>
       ),
       children: (

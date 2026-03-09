@@ -67,7 +67,7 @@ export const ALL_MENU_ITEMS: MenuItemWithPermission[] = [
   {
     key: '/orders',
     icon: <ShoppingCartOutlined />,
-    label: 'Orders',
+    label: 'Fulfillment',
     permission: 'page.orders',
   },
   {

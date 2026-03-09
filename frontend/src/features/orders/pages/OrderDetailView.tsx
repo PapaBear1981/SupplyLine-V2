@@ -301,7 +301,7 @@ export const OrderDetailView: React.FC = () => {
   const tabItems = [
     {
       key: 'details',
-      label: 'Order Details',
+      label: 'Fulfillment Details',
       children: (
         <Card>
           <Descriptions bordered column={2}>
@@ -383,7 +383,7 @@ export const OrderDetailView: React.FC = () => {
           {requestItems.length === 0 ? (
             <Alert
               message="No Request Items"
-              description="This order is not linked to any user request items. It may have been created directly without a request."
+              description="This fulfillment record is not linked to any request items. It may have been created directly without a request."
               type="info"
               showIcon
               icon={<InboxOutlined />}
@@ -442,19 +442,19 @@ export const OrderDetailView: React.FC = () => {
           onClick={() => navigate('/orders')}
           style={{ marginBottom: 16 }}
         >
-          Back to Orders
+          Back to Fulfillment
         </Button>
         <Row justify="space-between" align="middle">
           <Col>
             <Title level={2} style={{ margin: 0 }}>
               Order {order.order_number}
             </Title>
-            <Text type="secondary">View and manage order details</Text>
+            <Text type="secondary">View and manage fulfillment record</Text>
           </Col>
           <Col>
             <Space>
               <Button icon={<EditOutlined />} onClick={handleEdit}>
-                Edit Order
+                Edit Record
               </Button>
               {['new', 'in_progress', 'awaiting_info'].includes(order.status) && (
                 <Button
@@ -485,7 +485,7 @@ export const OrderDetailView: React.FC = () => {
 
       {/* Edit Modal */}
       <Modal
-        title="Edit Order"
+        title="Edit Fulfillment Record"
         open={isEditModalVisible}
         onCancel={() => setIsEditModalVisible(false)}
         footer={null}

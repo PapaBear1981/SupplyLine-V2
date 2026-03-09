@@ -217,7 +217,7 @@ export function OrderReports({ dateParams, onReportDataChange }: OrderReportsPro
   const tabItems = [
     {
       key: 'procurement',
-      label: 'Procurement Orders',
+      label: 'Fulfillment Queue',
       children: (
         <Spin spinning={procurementLoading}>
           {procurementData ? (
@@ -226,7 +226,7 @@ export function OrderReports({ dateParams, onReportDataChange }: OrderReportsPro
                 <Col xs={12} sm={4}>
                   <Card>
                     <Statistic
-                      title="Total Orders"
+                      title="Total Fulfillment Items"
                       value={procurementData.summary.total}
                       prefix={<ShoppingCartOutlined />}
                     />
@@ -284,7 +284,7 @@ export function OrderReports({ dateParams, onReportDataChange }: OrderReportsPro
 
               <Row gutter={[16, 16]} style={{ marginBottom: 24 }}>
                 <Col xs={24} md={8}>
-                  <Card title="Orders by Status">
+                  <Card title="Fulfillment by Status">
                     <div style={{ height: 280 }}>
                       <ResponsiveContainer width="100%" height="100%">
                         <PieChart>
@@ -309,7 +309,7 @@ export function OrderReports({ dateParams, onReportDataChange }: OrderReportsPro
                   </Card>
                 </Col>
                 <Col xs={24} md={8}>
-                  <Card title="Orders by Priority">
+                  <Card title="Fulfillment by Priority">
                     <div style={{ height: 280 }}>
                       <ResponsiveContainer width="100%" height="100%">
                         <BarChart data={procurementData.byPriority}>
@@ -324,7 +324,7 @@ export function OrderReports({ dateParams, onReportDataChange }: OrderReportsPro
                   </Card>
                 </Col>
                 <Col xs={24} md={8}>
-                  <Card title="Orders by Month">
+                  <Card title="Fulfillment by Month">
                     <div style={{ height: 280 }}>
                       <ResponsiveContainer width="100%" height="100%">
                         <LineChart data={procurementData.ordersByMonth}>
@@ -375,7 +375,7 @@ export function OrderReports({ dateParams, onReportDataChange }: OrderReportsPro
                 </Card>
               )}
 
-              <Card title="Procurement Order Details">
+              <Card title="Fulfillment Queue Details">
                 <Table
                   columns={procurementColumns}
                   dataSource={procurementData.orders}
@@ -386,7 +386,7 @@ export function OrderReports({ dateParams, onReportDataChange }: OrderReportsPro
               </Card>
             </>
           ) : (
-            <Empty description="No procurement order data available" />
+            <Empty description="No fulfillment data available" />
           )}
         </Spin>
       ),
