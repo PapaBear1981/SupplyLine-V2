@@ -32,7 +32,7 @@ import './MobileOrdersList.css';
 dayjs.extend(relativeTime);
 
 // Status color mapping
-const statusColors: Record<OrderStatus, string> = {
+const statusColors: Record<string, string> = {
   new: '#1890ff',
   awaiting_info: '#faad14',
   in_progress: '#13c2c2',
@@ -40,6 +40,12 @@ const statusColors: Record<OrderStatus, string> = {
   shipped: '#2f54eb',
   received: '#52c41a',
   cancelled: '#ff4d4f',
+  // Phase 2 statuses
+  assigned: '#13c2c2',
+  sourcing: '#faad14',
+  in_transfer: '#2f54eb',
+  fulfilled: '#52c41a',
+  closed: '#8c8c8c',
 };
 
 // Priority color mapping

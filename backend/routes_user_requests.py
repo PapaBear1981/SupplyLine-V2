@@ -36,20 +36,68 @@ def _generate_order_number():
     next_number = (result or 0) + 1
     return f"ORD-{next_number:05d}"
 
-VALID_ITEM_TYPES = {"tool", "chemical", "expendable", "other"}
-VALID_PRIORITIES = {"low", "normal", "high", "critical"}
+VALID_ITEM_TYPES = {"tool", "chemical", "expendable", "repairable", "other"}
+VALID_ITEM_CLASSES = {"tool", "part", "chemical", "expendable", "repairable", "other"}
+
+# Phase 2 operational priorities
+VALID_PRIORITIES = {
+    "routine", "urgent", "aog",
+    # Legacy values accepted for backward compatibility
+    "low", "normal", "high", "critical",
+}
+
+# Phase 2 operational statuses for requests (mechanics see these)
 VALID_REQUEST_STATUSES = {
     "new",
+    "under_review",
+    "pending_fulfillment",
+    "in_transfer",
+    "awaiting_external_procurement",
+    "partially_fulfilled",
+    "fulfilled",
+    "needs_info",
+    "cancelled",
+    # Legacy values kept for backward compatibility
     "awaiting_info",
     "in_progress",
     "partially_ordered",
     "ordered",
     "partially_received",
     "received",
-    "cancelled",
 }
-VALID_ITEM_STATUSES = {"pending", "ordered", "shipped", "received", "cancelled"}
-CLOSED_STATUSES = {"received", "cancelled"}
+
+VALID_REQUEST_TYPES = {
+    "manual",
+    "kit_replenishment",
+    "warehouse_replenishment",
+    "transfer",
+    "repairable_return",
+}
+
+VALID_SOURCE_TRIGGERS = {
+    "manual",
+    "kit_issuance",
+    "low_stock",
+    "transfer",
+    "return_obligation",
+}
+
+VALID_DESTINATION_TYPES = {
+    "mobile_kit",
+    "warehouse",
+    "person_team",
+    "base_location",
+}
+
+VALID_RETURN_STATUSES = {
+    "issued_core_expected",
+    "in_return_transit",
+    "returned_to_stores",
+    "closed",
+}
+
+VALID_ITEM_STATUSES = {"pending", "ordered", "shipped", "received", "cancelled", "fulfilled", "in_transfer"}
+CLOSED_STATUSES = {"fulfilled", "received", "cancelled"}
 OPEN_STATUSES = VALID_REQUEST_STATUSES - CLOSED_STATUSES
 
 
@@ -154,6 +202,18 @@ def register_user_request_routes(app):
                 raise ValidationError(f"Invalid priority filter: {', '.join(sorted(invalid_priorities))}")
             query = query.filter(UserRequest.priority.in_(priorities))
 
+        # Phase 2: request_type filtering
+        request_type_filter = request.args.get("request_type")
+        if request_type_filter:
+            rtypes = {v.strip() for v in request_type_filter.split(",") if v.strip()}
+            query = query.filter(UserRequest.request_type.in_(rtypes))
+
+        # Phase 2: repairable filtering
+        repairable_filter = request.args.get("repairable")
+        if repairable_filter is not None:
+            repairable_bool = repairable_filter.lower() == "true"
+            query = query.filter(UserRequest.repairable == repairable_bool)
+
         # Buyer filtering
         buyer_id = request.args.get("buyer_id", type=int)
         if buyer_id:
@@ -247,9 +307,27 @@ def register_user_request_routes(app):
             raise ValidationError("Items must be an array")
 
         # Validate priority
-        priority = data.get("priority", "normal")
+        priority = data.get("priority", "routine")
         if priority not in VALID_PRIORITIES:
-            raise ValidationError(f"Invalid priority. Must be one of: {', '.join(sorted(VALID_PRIORITIES))}")
+            raise ValidationError(f"Invalid priority. Must be one of: routine, urgent, aog")
+
+        # Validate request_type
+        request_type = data.get("request_type", "manual")
+        if request_type not in VALID_REQUEST_TYPES:
+            raise ValidationError(f"Invalid request_type. Must be one of: {', '.join(sorted(VALID_REQUEST_TYPES))}")
+
+        # Optional field validation
+        source_trigger = data.get("source_trigger")
+        if source_trigger and source_trigger not in VALID_SOURCE_TRIGGERS:
+            raise ValidationError(f"Invalid source_trigger. Must be one of: {', '.join(sorted(VALID_SOURCE_TRIGGERS))}")
+
+        destination_type = data.get("destination_type")
+        if destination_type and destination_type not in VALID_DESTINATION_TYPES:
+            raise ValidationError(f"Invalid destination_type. Must be one of: {', '.join(sorted(VALID_DESTINATION_TYPES))}")
+
+        item_class = data.get("item_class")
+        if item_class and item_class not in VALID_ITEM_CLASSES:
+            raise ValidationError(f"Invalid item_class. Must be one of: {', '.join(sorted(VALID_ITEM_CLASSES))}")
 
         # Get current user
         current_user = getattr(request, "current_user", {}) or {}
@@ -265,6 +343,16 @@ def register_user_request_routes(app):
             notes=data.get("notes", "").strip() or None,
             expected_due_date=_parse_datetime(data.get("expected_due_date"), "expected_due_date"),
             requester_id=requester_id,
+            # Phase 2 operational context
+            request_type=request_type,
+            source_trigger=source_trigger,
+            destination_type=destination_type,
+            destination_location=data.get("destination_location", "").strip() or None,
+            related_kit_id=data.get("related_kit_id"),
+            item_class=item_class,
+            repairable=bool(data.get("repairable", False)),
+            core_required=bool(data.get("core_required", False)),
+            external_reference=data.get("external_reference", "").strip() or None,
         )
         db.session.add(user_request)
         db.session.flush()  # Get the ID
@@ -396,6 +484,54 @@ def register_user_request_routes(app):
 
         if "expected_due_date" in data:
             user_request.expected_due_date = _parse_datetime(data["expected_due_date"], "expected_due_date")
+
+        # Phase 2 operational context fields (buyers/fulfillment staff can update these)
+        if "request_type" in data:
+            if data["request_type"] not in VALID_REQUEST_TYPES:
+                raise ValidationError(f"Invalid request_type. Must be one of: {', '.join(sorted(VALID_REQUEST_TYPES))}")
+            user_request.request_type = data["request_type"]
+
+        if "source_trigger" in data:
+            val = data["source_trigger"]
+            if val and val not in VALID_SOURCE_TRIGGERS:
+                raise ValidationError(f"Invalid source_trigger. Must be one of: {', '.join(sorted(VALID_SOURCE_TRIGGERS))}")
+            user_request.source_trigger = val or None
+
+        if "destination_type" in data:
+            val = data["destination_type"]
+            if val and val not in VALID_DESTINATION_TYPES:
+                raise ValidationError(f"Invalid destination_type. Must be one of: {', '.join(sorted(VALID_DESTINATION_TYPES))}")
+            user_request.destination_type = val or None
+
+        if "destination_location" in data:
+            user_request.destination_location = (data["destination_location"] or "").strip() or None
+
+        if "related_kit_id" in data:
+            user_request.related_kit_id = data["related_kit_id"]
+
+        if "item_class" in data:
+            val = data["item_class"]
+            if val and val not in VALID_ITEM_CLASSES:
+                raise ValidationError(f"Invalid item_class. Must be one of: {', '.join(sorted(VALID_ITEM_CLASSES))}")
+            user_request.item_class = val or None
+
+        if "repairable" in data:
+            user_request.repairable = bool(data["repairable"])
+
+        if "core_required" in data:
+            user_request.core_required = bool(data["core_required"])
+
+        if "return_status" in data:
+            val = data["return_status"]
+            if val and val not in VALID_RETURN_STATUSES:
+                raise ValidationError(f"Invalid return_status. Must be one of: {', '.join(sorted(VALID_RETURN_STATUSES))}")
+            user_request.return_status = val or None
+
+        if "return_destination" in data:
+            user_request.return_destination = (data["return_destination"] or "").strip() or "Main Warehouse / Stores"
+
+        if "external_reference" in data:
+            user_request.external_reference = (data["external_reference"] or "").strip() or None
 
         db.session.commit()
 

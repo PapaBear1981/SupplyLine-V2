@@ -842,9 +842,23 @@ class ProcurementOrder(db.Model):
     created_at = db.Column(db.DateTime, nullable=False, default=get_current_time)
     updated_at = db.Column(db.DateTime, nullable=False, default=get_current_time, onupdate=get_current_time)
 
+    # Phase 2: fulfillment-action linkage fields
+    # Links this fulfillment action directly to a parent UserRequest
+    request_id = db.Column(db.Integer, db.ForeignKey("user_requests.id"), nullable=True, index=True)
+    # Where the material is sourced from for this action
+    source_location = db.Column(db.String(200), nullable=True)
+    # Type of fulfillment action: stock_fulfillment, transfer, kit_replenishment,
+    # external_procurement, return_tracking
+    fulfillment_action_type = db.Column(db.String(50), nullable=True)
+    # Quantity fulfilled by this specific action (supports split fulfillment)
+    fulfillment_quantity = db.Column(db.Integer, nullable=True)
+    # True = fulfilled from internal stock; False = requires external procurement
+    is_internal_fulfillment = db.Column(db.Boolean, default=False, nullable=False)
+
     requester = db.relationship("User", foreign_keys=[requester_id])
     buyer = db.relationship("User", foreign_keys=[buyer_id])
     kit = db.relationship("Kit", foreign_keys=[kit_id])
+    parent_request = db.relationship("UserRequest", foreign_keys=[request_id], backref="fulfillment_actions")
     messages = db.relationship(
         "ProcurementOrderMessage",
         back_populates="order",
@@ -922,6 +936,12 @@ class ProcurementOrder(db.Model):
             "is_late": self._due_state() == "late",
             "days_overdue": None,
             "days_open": None,
+            # Phase 2 fulfillment-action fields
+            "request_id": self.request_id,
+            "source_location": self.source_location,
+            "fulfillment_action_type": self.fulfillment_action_type,
+            "fulfillment_quantity": self.fulfillment_quantity,
+            "is_internal_fulfillment": self.is_internal_fulfillment,
         }
 
         if self.expected_due_date and not self.is_closed():
@@ -995,8 +1015,10 @@ class UserRequest(db.Model):
     request_number = db.Column(db.String(20), unique=True, nullable=True, index=True)  # REQ-00001
     title = db.Column(db.String(200), nullable=False)
     description = db.Column(db.String(4000), nullable=True)
-    priority = db.Column(db.String(20), nullable=False, default="normal")  # low, normal, high, critical
-    status = db.Column(db.String(50), nullable=False, default="new")  # new, awaiting_info, in_progress, partially_ordered, ordered, partially_received, received, cancelled
+    priority = db.Column(db.String(20), nullable=False, default="routine")  # routine, urgent, aog
+    status = db.Column(db.String(50), nullable=False, default="new")
+    # Phase 2 status values: new, under_review, pending_fulfillment, in_transfer,
+    # awaiting_external_procurement, partially_fulfilled, fulfilled, needs_info, cancelled
     requester_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False, index=True)
     buyer_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=True, index=True)
     notes = db.Column(db.String(4000), nullable=True)
@@ -1005,9 +1027,32 @@ class UserRequest(db.Model):
     created_at = db.Column(db.DateTime, nullable=False, default=get_current_time)
     updated_at = db.Column(db.DateTime, nullable=False, default=get_current_time, onupdate=get_current_time)
 
+    # Phase 2: operational context fields
+    # Request type: manual, kit_replenishment, warehouse_replenishment, transfer, repairable_return
+    request_type = db.Column(db.String(50), nullable=False, default="manual")
+    # What triggered this request: manual, kit_issuance, low_stock, transfer, return_obligation
+    source_trigger = db.Column(db.String(50), nullable=True)
+    # Where material is going: mobile_kit, warehouse, person_team, base_location
+    destination_type = db.Column(db.String(50), nullable=True)
+    # Free-text description of destination
+    destination_location = db.Column(db.String(200), nullable=True)
+    # Optional FK to associated kit
+    related_kit_id = db.Column(db.Integer, db.ForeignKey("kits.id"), nullable=True, index=True)
+    # Item class: tool, part, chemical, expendable, repairable, other
+    item_class = db.Column(db.String(50), nullable=True)
+    # Repairable/core tracking flags
+    repairable = db.Column(db.Boolean, default=False, nullable=False)
+    core_required = db.Column(db.Boolean, default=False, nullable=False)
+    # Return tracking: issued_core_expected, in_return_transit, returned_to_stores, closed
+    return_status = db.Column(db.String(50), nullable=True)
+    return_destination = db.Column(db.String(200), nullable=False, default="Main Warehouse / Stores")
+    # Optional read-only external system reference (not PO logic — operational tracking only)
+    external_reference = db.Column(db.String(200), nullable=True)
+
     # Relationships
     requester = db.relationship("User", foreign_keys=[requester_id])
     buyer = db.relationship("User", foreign_keys=[buyer_id])
+    related_kit = db.relationship("Kit", foreign_keys=[related_kit_id])
     items = db.relationship(
         "RequestItem",
         back_populates="request",
@@ -1021,8 +1066,28 @@ class UserRequest(db.Model):
         lazy="dynamic",
     )
 
-    OPEN_STATUSES = {"new", "awaiting_info", "in_progress", "partially_ordered", "ordered", "partially_received"}
-    CLOSED_STATUSES = {"received", "cancelled"}
+    # Phase 2 statuses (operational language for mechanics and fulfillment staff)
+    OPEN_STATUSES = {
+        "new",
+        "under_review",
+        "pending_fulfillment",
+        "in_transfer",
+        "awaiting_external_procurement",
+        "partially_fulfilled",
+        "needs_info",
+        # Legacy values kept for backward compatibility
+        "awaiting_info",
+        "in_progress",
+        "partially_ordered",
+        "ordered",
+        "partially_received",
+    }
+    CLOSED_STATUSES = {
+        "fulfilled",
+        "cancelled",
+        # Legacy value
+        "received",
+    }
 
     def is_closed(self) -> bool:
         return self.status in self.CLOSED_STATUSES
@@ -1044,41 +1109,49 @@ class UserRequest(db.Model):
         return "on_track"
 
     def update_status_from_items(self):
-        """Update request status based on item statuses."""
+        """Update request status from item statuses using Phase 2 operational vocabulary."""
         if not self.items or self.items.count() == 0:
             return
 
         item_statuses = [item.status for item in self.items.all()]
 
-        # If all items are cancelled, request is cancelled
+        # All items cancelled → request cancelled
         if all(status == "cancelled" for status in item_statuses):
             self.status = "cancelled"
             return
 
-        # Filter out cancelled items for status calculation
+        # Filter out cancelled items for status rollup
         active_statuses = [s for s in item_statuses if s != "cancelled"]
         if not active_statuses:
             self.status = "cancelled"
             return
 
-        # If all active items are received, request is received
-        if all(status == "received" for status in active_statuses):
-            self.status = "received"
-        # If some items are received
-        elif any(status == "received" for status in active_statuses):
-            self.status = "partially_received"
-        # If all active items are ordered or shipped
-        elif all(status in ("ordered", "shipped") for status in active_statuses):
-            self.status = "ordered"
-        # If some items are ordered
-        elif any(status in ("ordered", "shipped") for status in active_statuses):
-            self.status = "partially_ordered"
-        # If any item is in progress
-        elif any(status == "in_progress" for status in active_statuses):
-            self.status = "in_progress"
-        # If awaiting info
+        # Treat legacy item statuses uniformly alongside Phase 2 values
+        fulfilled_statuses = {"received", "fulfilled"}
+        in_transit_statuses = {"ordered", "shipped", "in_transfer"}
+        pending_statuses = {"in_progress", "pending_fulfillment", "sourcing", "assigned"}
+
+        # All active items fulfilled
+        if all(s in fulfilled_statuses for s in active_statuses):
+            self.status = "fulfilled"
+        # Some items fulfilled — partial
+        elif any(s in fulfilled_statuses for s in active_statuses):
+            self.status = "partially_fulfilled"
+        # All items in transit / external
+        elif all(s in in_transit_statuses or s == "awaiting_external_procurement" for s in active_statuses):
+            if any(s == "awaiting_external_procurement" for s in active_statuses):
+                self.status = "awaiting_external_procurement"
+            else:
+                self.status = "in_transfer"
+        # Some items in transit
+        elif any(s in in_transit_statuses for s in active_statuses):
+            self.status = "partially_fulfilled"
+        # Items being worked on
+        elif any(s in pending_statuses for s in active_statuses):
+            self.status = "pending_fulfillment"
+        # Needs clarification
         elif self.needs_more_info:
-            self.status = "awaiting_info"
+            self.status = "needs_info"
         else:
             self.status = "new"
 
@@ -1118,6 +1191,20 @@ class UserRequest(db.Model):
             "days_overdue": None,
             "days_open": None,
             "item_count": self.items.count() if self.items else 0,
+            # Phase 2 operational context fields
+            "request_type": self.request_type,
+            "source_trigger": self.source_trigger,
+            "destination_type": self.destination_type,
+            "destination_location": self.destination_location,
+            "related_kit_id": self.related_kit_id,
+            "item_class": self.item_class,
+            "repairable": self.repairable,
+            "core_required": self.core_required,
+            "return_status": self.return_status,
+            "return_destination": self.return_destination,
+            "external_reference": self.external_reference,
+            # Summarized fulfillment action count for mechanics
+            "fulfillment_action_count": len(self.fulfillment_actions) if hasattr(self, "fulfillment_actions") else 0,
         }
 
         if self.expected_due_date and not self.is_closed():

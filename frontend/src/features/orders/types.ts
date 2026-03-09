@@ -1,4 +1,78 @@
 // ============================================================================
+// Phase 2: Operational workflow types
+// ============================================================================
+
+/** Phase 2 request priorities (operational language) */
+export type RequestPriorityV2 = 'routine' | 'urgent' | 'aog';
+
+/** Phase 2 request statuses (mechanics see these summarized statuses) */
+export type RequestStatusV2 =
+  | 'new'
+  | 'under_review'
+  | 'pending_fulfillment'
+  | 'in_transfer'
+  | 'awaiting_external_procurement'
+  | 'partially_fulfilled'
+  | 'fulfilled'
+  | 'needs_info'
+  | 'cancelled';
+
+/** Phase 2 request types */
+export type RequestType =
+  | 'manual'
+  | 'kit_replenishment'
+  | 'warehouse_replenishment'
+  | 'transfer'
+  | 'repairable_return';
+
+/** Phase 2 source trigger */
+export type SourceTrigger =
+  | 'manual'
+  | 'kit_issuance'
+  | 'low_stock'
+  | 'transfer'
+  | 'return_obligation';
+
+/** Phase 2 destination type */
+export type DestinationType = 'mobile_kit' | 'warehouse' | 'person_team' | 'base_location';
+
+/** Phase 2 item class */
+export type ItemClass = 'tool' | 'part' | 'chemical' | 'expendable' | 'repairable' | 'other';
+
+/** Phase 2 repairable/core return status */
+export type ReturnStatus =
+  | 'issued_core_expected'
+  | 'in_return_transit'
+  | 'returned_to_stores'
+  | 'closed';
+
+/** Phase 2 fulfillment action type */
+export type FulfillmentActionType =
+  | 'stock_fulfillment'
+  | 'transfer'
+  | 'kit_replenishment'
+  | 'external_procurement'
+  | 'return_tracking';
+
+/** Phase 2 fulfillment statuses (fulfillment staff see these) */
+export type FulfillmentStatus =
+  | 'new'
+  | 'assigned'
+  | 'sourcing'
+  | 'in_transfer'
+  | 'awaiting_external_procurement'
+  | 'partially_fulfilled'
+  | 'fulfilled'
+  | 'closed'
+  | 'cancelled'
+  // Legacy values (backward compat)
+  | 'awaiting_info'
+  | 'in_progress'
+  | 'ordered'
+  | 'shipped'
+  | 'received';
+
+// ============================================================================
 // Procurement Orders Types
 // ============================================================================
 
@@ -13,7 +87,13 @@ export type OrderStatus =
   | 'ordered'
   | 'shipped'
   | 'received'
-  | 'cancelled';
+  | 'cancelled'
+  // Phase 2 fulfillment statuses (used in analytics breakdown)
+  | 'assigned'
+  | 'sourcing'
+  | 'in_transfer'
+  | 'fulfilled'
+  | 'closed';
 
 export interface ProcurementOrder {
   id: number;
@@ -61,10 +141,21 @@ export interface ProcurementOrder {
     name: string;
   };
 
+  // Flat name fields (from to_dict())
+  buyer_name?: string;
+  requester_name?: string;
+
   // Calculated fields
   is_late?: boolean;
   days_overdue?: number;
   due_soon?: boolean;
+
+  // Phase 2: fulfillment-action fields
+  request_id?: number;
+  source_location?: string;
+  fulfillment_action_type?: FulfillmentActionType;
+  fulfillment_quantity?: number;
+  is_internal_fulfillment?: boolean;
 }
 
 export interface ProcurementOrderMessage {
@@ -115,6 +206,12 @@ export interface CreateOrderRequest {
   requester_id?: number;
   buyer_id?: number;
   documentation?: File;
+  // Phase 2 fulfillment-action fields
+  request_id?: number;
+  source_location?: string;
+  fulfillment_action_type?: FulfillmentActionType;
+  fulfillment_quantity?: number;
+  is_internal_fulfillment?: boolean;
 }
 
 export interface UpdateOrderRequest {
@@ -134,6 +231,12 @@ export interface UpdateOrderRequest {
   unit?: string;
   needs_more_info?: boolean;
   buyer_id?: number;
+  // Phase 2 fulfillment-action fields
+  request_id?: number;
+  source_location?: string;
+  fulfillment_action_type?: FulfillmentActionType;
+  fulfillment_quantity?: number;
+  is_internal_fulfillment?: boolean;
 }
 
 export interface MarkOrderedRequest {
@@ -182,20 +285,38 @@ export interface CreateOrderMessageRequest {
 // ============================================================================
 
 export type RequestStatus =
+  // Phase 2 statuses (operational language — mechanics see these)
   | 'new'
+  | 'under_review'
+  | 'pending_fulfillment'
+  | 'in_transfer'
+  | 'awaiting_external_procurement'
+  | 'partially_fulfilled'
+  | 'fulfilled'
+  | 'needs_info'
+  | 'cancelled'
+  // Legacy statuses (backward compat with existing data)
   | 'awaiting_info'
   | 'in_progress'
   | 'partially_ordered'
   | 'ordered'
   | 'partially_received'
-  | 'received'
-  | 'cancelled';
+  | 'received';
 
-export type RequestPriority = 'low' | 'normal' | 'high' | 'critical';
+/** Phase 2 operational priorities. Legacy values accepted for backward compat. */
+export type RequestPriority =
+  | 'routine'
+  | 'urgent'
+  | 'aog'
+  // Legacy values
+  | 'low'
+  | 'normal'
+  | 'high'
+  | 'critical';
 
-export type ItemType = 'tool' | 'chemical' | 'expendable' | 'other';
+export type ItemType = 'tool' | 'chemical' | 'expendable' | 'repairable' | 'other';
 
-export type ItemStatus = 'pending' | 'ordered' | 'shipped' | 'received' | 'cancelled';
+export type ItemStatus = 'pending' | 'ordered' | 'shipped' | 'received' | 'cancelled' | 'fulfilled' | 'in_transfer';
 
 export type SourceType = 'manual' | 'chemical_reorder' | 'kit_reorder';
 
@@ -213,6 +334,10 @@ export interface UserRequest {
   expected_due_date?: string; // ISO 8601
   created_at: string; // ISO 8601
   updated_at: string; // ISO 8601
+
+  // Flat name fields (from to_dict())
+  requester_name?: string;
+  buyer_name?: string;
 
   // Relationships
   requester?: {
@@ -234,6 +359,20 @@ export interface UserRequest {
   days_overdue?: number;
   due_soon?: boolean;
   item_count?: number;
+  fulfillment_action_count?: number;
+
+  // Phase 2 operational context fields
+  request_type?: RequestType;
+  source_trigger?: SourceTrigger;
+  destination_type?: DestinationType;
+  destination_location?: string;
+  related_kit_id?: number;
+  item_class?: ItemClass;
+  repairable?: boolean;
+  core_required?: boolean;
+  return_status?: ReturnStatus;
+  return_destination?: string;
+  external_reference?: string;
 }
 
 export interface RequestItem {
@@ -287,6 +426,16 @@ export interface CreateRequestRequest {
   notes?: string;
   expected_due_date?: string;
   items: CreateRequestItemRequest[];
+  // Phase 2 operational context
+  request_type?: RequestType;
+  source_trigger?: SourceTrigger;
+  destination_type?: DestinationType;
+  destination_location?: string;
+  related_kit_id?: number;
+  item_class?: ItemClass;
+  repairable?: boolean;
+  core_required?: boolean;
+  external_reference?: string;
 }
 
 export interface CreateRequestItemRequest {
@@ -305,6 +454,18 @@ export interface UpdateRequestRequest {
   needs_more_info?: boolean;
   expected_due_date?: string;
   buyer_id?: number;
+  // Phase 2 operational context
+  request_type?: RequestType;
+  source_trigger?: SourceTrigger;
+  destination_type?: DestinationType;
+  destination_location?: string;
+  related_kit_id?: number;
+  item_class?: ItemClass;
+  repairable?: boolean;
+  core_required?: boolean;
+  return_status?: ReturnStatus;
+  return_destination?: string;
+  external_reference?: string;
 }
 
 export interface UpdateRequestItemRequest {
@@ -346,6 +507,9 @@ export interface RequestsListParams {
   is_late?: boolean;
   sort?: 'created' | 'due_date';
   limit?: number;
+  // Phase 2 filters
+  request_type?: string; // Comma-separated
+  repairable?: boolean;
 }
 
 export interface RequestAnalytics {

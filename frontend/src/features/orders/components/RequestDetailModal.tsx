@@ -17,12 +17,16 @@ import {
   Form,
   Input,
   Select,
+  Divider,
+  Tooltip,
 } from 'antd';
 import {
   CloseOutlined,
   WarningOutlined,
   InfoCircleOutlined,
   EditOutlined,
+  ToolOutlined,
+  ApartmentOutlined,
 } from '@ant-design/icons';
 import dayjs from 'dayjs';
 import type { ColumnsType } from 'antd/es/table';
@@ -31,11 +35,50 @@ import {
   useUpdateRequestMutation,
   useCancelRequestMutation,
 } from '../services/requestsApi';
-import type { RequestItem } from '../types';
+import { useGetOrdersByRequestQuery } from '../services/ordersApi';
+import type { RequestItem, ProcurementOrder } from '../types';
 import { StatusBadge, PriorityBadge, ItemTypeBadge } from './';
 
 const { Title, Text } = Typography;
 const { TextArea } = Input;
+
+const REQUEST_TYPE_LABELS: Record<string, string> = {
+  manual: 'Manual',
+  kit_replenishment: 'Kit Replenishment',
+  warehouse_replenishment: 'Warehouse Replenishment',
+  transfer: 'Transfer',
+  repairable_return: 'Repairable Return',
+};
+
+const REQUEST_TYPE_COLORS: Record<string, string> = {
+  manual: 'default',
+  kit_replenishment: 'blue',
+  warehouse_replenishment: 'cyan',
+  transfer: 'geekblue',
+  repairable_return: 'purple',
+};
+
+const RETURN_STATUS_LABELS: Record<string, string> = {
+  issued_core_expected: 'Core Expected',
+  in_return_transit: 'In Transit',
+  returned_to_stores: 'Returned to Stores',
+  closed: 'Closed',
+};
+
+const RETURN_STATUS_COLORS: Record<string, string> = {
+  issued_core_expected: 'orange',
+  in_return_transit: 'blue',
+  returned_to_stores: 'green',
+  closed: 'default',
+};
+
+const FULFILLMENT_ACTION_LABELS: Record<string, string> = {
+  issue_from_stock: 'Issue from Stock',
+  transfer_from_kit: 'Transfer from Kit',
+  external_procurement: 'External Procurement',
+  return_to_stock: 'Return to Stock',
+  partial_issue: 'Partial Issue',
+};
 
 interface RequestDetailModalProps {
   open: boolean;
@@ -50,6 +93,11 @@ export const RequestDetailModal = ({ open, requestId, onClose }: RequestDetailMo
   const { data: request, isLoading, error } = useGetRequestQuery(requestId, {
     skip: !open || !requestId,
   });
+
+  const { data: fulfillmentActions = [], isLoading: isLoadingActions } = useGetOrdersByRequestQuery(
+    requestId,
+    { skip: !open || !requestId }
+  );
 
   const [updateRequest, { isLoading: isUpdating }] = useUpdateRequestMutation();
   const [cancelRequest, { isLoading: isCancelling }] = useCancelRequestMutation();
@@ -92,23 +140,18 @@ export const RequestDetailModal = ({ open, requestId, onClose }: RequestDetailMo
   const renderActions = () => {
     if (!request) return null;
 
+    const closedStatuses = ['received', 'cancelled', 'fulfilled', 'closed'];
     const actions: React.ReactElement[] = [];
 
-    // Edit button - available for non-completed requests
-    if (!['received', 'cancelled'].includes(request.status)) {
+    if (!closedStatuses.includes(request.status)) {
       actions.push(
-        <Button
-          key="edit"
-          icon={<EditOutlined />}
-          onClick={handleEdit}
-        >
+        <Button key="edit" icon={<EditOutlined />} onClick={handleEdit}>
           Edit
         </Button>
       );
     }
 
-    // Cancel button - available for non-completed requests
-    if (!['received', 'cancelled'].includes(request.status)) {
+    if (!closedStatuses.includes(request.status)) {
       actions.push(
         <Popconfirm
           key="cancel"
@@ -139,59 +182,77 @@ export const RequestDetailModal = ({ open, requestId, onClose }: RequestDetailMo
             <Text type="secondary">
               {dayjs(request.created_at).format('MMM D, YYYY h:mm A')}
             </Text>
-            <Text>By: {request.requester ? `${request.requester.first_name} ${request.requester.last_name}` : 'Unknown'}</Text>
+            <Text>
+              By:{' '}
+              {request.requester_name ||
+                (request.requester
+                  ? `${request.requester.first_name} ${request.requester.last_name}`
+                  : 'Unknown')}
+            </Text>
           </Space>
         ),
       },
     ];
 
-    // Add status-based timeline items
-    if (request.status === 'awaiting_info') {
+    if (['needs_info', 'awaiting_info'].includes(request.status)) {
       items.push({
         color: 'orange',
         children: (
           <Space direction="vertical" size={0}>
-            <Text strong>Awaiting Information</Text>
-            <Text type="secondary">More information needed</Text>
+            <Text strong>Needs Information</Text>
+            <Text type="secondary">Additional information required</Text>
           </Space>
         ),
       });
     }
 
-    if (['in_progress', 'partially_ordered', 'ordered', 'partially_received', 'received'].includes(request.status)) {
+    if (
+      ['under_review', 'pending_fulfillment', 'in_progress', 'assigned', 'sourcing'].includes(
+        request.status
+      )
+    ) {
       items.push({
         color: 'blue',
         children: (
           <Space direction="vertical" size={0}>
             <Text strong>In Progress</Text>
-            <Text type="secondary">Request being processed</Text>
+            <Text type="secondary">Request being processed by fulfillment staff</Text>
           </Space>
         ),
       });
     }
 
-    if (['partially_ordered', 'ordered', 'partially_received', 'received'].includes(request.status)) {
+    if (['in_transfer', 'ordered', 'shipped'].includes(request.status)) {
       items.push({
-        color: 'blue',
+        color: 'geekblue',
         children: (
           <Space direction="vertical" size={0}>
-            <Text strong>Ordered</Text>
-            <Text type="secondary">Items have been ordered</Text>
-            {request.buyer && <Text>By: {request.buyer.first_name} {request.buyer.last_name}</Text>}
+            <Text strong>In Transfer</Text>
+            <Text type="secondary">Items in transit to destination</Text>
           </Space>
         ),
       });
     }
 
-    if (['partially_received', 'received'].includes(request.status)) {
+    if (['partially_fulfilled', 'partially_ordered', 'partially_received'].includes(request.status)) {
       items.push({
-        color: request.status === 'received' ? 'green' : 'cyan',
+        color: 'lime',
         children: (
           <Space direction="vertical" size={0}>
-            <Text strong>{request.status === 'received' ? 'Received' : 'Partially Received'}</Text>
-            <Text type="secondary">
-              {request.status === 'received' ? 'All items received' : 'Some items received'}
-            </Text>
+            <Text strong>Partially Fulfilled</Text>
+            <Text type="secondary">Some items have been fulfilled</Text>
+          </Space>
+        ),
+      });
+    }
+
+    if (['fulfilled', 'received'].includes(request.status)) {
+      items.push({
+        color: 'green',
+        children: (
+          <Space direction="vertical" size={0}>
+            <Text strong>Fulfilled</Text>
+            <Text type="secondary">All items fulfilled</Text>
           </Space>
         ),
       });
@@ -259,6 +320,82 @@ export const RequestDetailModal = ({ open, requestId, onClose }: RequestDetailMo
     },
   ];
 
+  const fulfillmentColumns: ColumnsType<ProcurementOrder> = [
+    {
+      title: 'Order #',
+      dataIndex: 'order_number',
+      key: 'order_number',
+      width: 120,
+      render: (num: string) => <Text strong>{num}</Text>,
+    },
+    {
+      title: 'Action Type',
+      dataIndex: 'fulfillment_action_type',
+      key: 'fulfillment_action_type',
+      width: 160,
+      render: (type: string) =>
+        type ? (
+          <Tag color="blue">{FULFILLMENT_ACTION_LABELS[type] || type}</Tag>
+        ) : (
+          <Tag>Standard</Tag>
+        ),
+    },
+    {
+      title: 'Source',
+      dataIndex: 'source_location',
+      key: 'source_location',
+      width: 140,
+      ellipsis: true,
+      render: (loc: string) => loc || '-',
+    },
+    {
+      title: 'Qty Fulfilled',
+      dataIndex: 'fulfillment_quantity',
+      key: 'fulfillment_quantity',
+      width: 110,
+      render: (qty: number, record: ProcurementOrder) =>
+        qty != null ? (
+          <Badge
+            count={qty}
+            showZero
+            overflowCount={Infinity}
+            style={{ backgroundColor: '#52c41a' }}
+          />
+        ) : record.quantity ? (
+          <Badge
+            count={record.quantity}
+            showZero
+            overflowCount={Infinity}
+            style={{ backgroundColor: '#1890ff' }}
+          />
+        ) : (
+          '-'
+        ),
+    },
+    {
+      title: 'Status',
+      dataIndex: 'status',
+      key: 'status',
+      width: 140,
+      render: (status: string) => <StatusBadge status={status} />,
+    },
+    {
+      title: 'Assigned To',
+      dataIndex: 'buyer_name',
+      key: 'buyer_name',
+      width: 130,
+      ellipsis: true,
+      render: (name: string) => name || '-',
+    },
+    {
+      title: 'Date',
+      dataIndex: 'created_at',
+      key: 'created_at',
+      width: 110,
+      render: (date: string) => dayjs(date).format('MMM D, YYYY'),
+    },
+  ];
+
   return (
     <>
       <Modal
@@ -272,7 +409,7 @@ export const RequestDetailModal = ({ open, requestId, onClose }: RequestDetailMo
         }
         open={open}
         onCancel={onClose}
-        width={1000}
+        width={1100}
         footer={[
           <Button key="close" onClick={onClose}>
             Close
@@ -298,17 +435,18 @@ export const RequestDetailModal = ({ open, requestId, onClose }: RequestDetailMo
         {request && (
           <Space direction="vertical" style={{ width: '100%' }} size="large">
             {/* Status Alerts */}
-            {request.priority === 'critical' && request.status !== 'received' && (
-              <Alert
-                message="Critical Priority"
-                description="This request has been marked as critical and requires immediate attention."
-                type="error"
-                showIcon
-                icon={<WarningOutlined />}
-              />
-            )}
+            {['aog', 'critical'].includes(request.priority) &&
+              !['fulfilled', 'received', 'cancelled'].includes(request.status) && (
+                <Alert
+                  message="AOG Priority"
+                  description="This request is AOG (Aircraft on Ground) and requires immediate attention."
+                  type="error"
+                  showIcon
+                  icon={<WarningOutlined />}
+                />
+              )}
 
-            {request.needs_more_info && (
+            {['needs_info', 'awaiting_info'].includes(request.status) && (
               <Alert
                 message="Needs More Information"
                 description="Additional information is required to process this request."
@@ -332,10 +470,21 @@ export const RequestDetailModal = ({ open, requestId, onClose }: RequestDetailMo
             <Card title="Request Information">
               <Descriptions bordered column={2}>
                 <Descriptions.Item label="Request Number" span={2}>
-                  <Text strong style={{ fontSize: 16 }}>{request.request_number}</Text>
+                  <Text strong style={{ fontSize: 16 }}>
+                    {request.request_number}
+                  </Text>
                 </Descriptions.Item>
                 <Descriptions.Item label="Title" span={2}>
-                  <Text strong>{request.title}</Text>
+                  <Space>
+                    <Text strong>{request.title}</Text>
+                    {request.repairable && (
+                      <Tooltip title="Repairable item — core return may be required">
+                        <Tag color="purple" icon={<ToolOutlined />}>
+                          Repairable
+                        </Tag>
+                      </Tooltip>
+                    )}
+                  </Space>
                 </Descriptions.Item>
                 <Descriptions.Item label="Status">
                   <StatusBadge status={request.status} type="request" />
@@ -343,16 +492,36 @@ export const RequestDetailModal = ({ open, requestId, onClose }: RequestDetailMo
                 <Descriptions.Item label="Priority">
                   <PriorityBadge priority={request.priority} />
                 </Descriptions.Item>
+                <Descriptions.Item label="Request Type">
+                  {request.request_type ? (
+                    <Tag color={REQUEST_TYPE_COLORS[request.request_type] || 'default'}>
+                      {REQUEST_TYPE_LABELS[request.request_type] || request.request_type}
+                    </Tag>
+                  ) : (
+                    <Tag>Manual</Tag>
+                  )}
+                </Descriptions.Item>
                 <Descriptions.Item label="Requester">
-                  {request.requester
-                    ? `${request.requester.first_name} ${request.requester.last_name}`
-                    : '-'}
+                  {request.requester_name ||
+                    (request.requester
+                      ? `${request.requester.first_name} ${request.requester.last_name}`
+                      : '-')}
                 </Descriptions.Item>
-                <Descriptions.Item label="Buyer">
-                  {request.buyer
-                    ? `${request.buyer.first_name} ${request.buyer.last_name}`
-                    : 'Not assigned'}
-                </Descriptions.Item>
+                {request.destination_location && (
+                  <Descriptions.Item label="Destination">
+                    {request.destination_location}
+                  </Descriptions.Item>
+                )}
+                {request.destination_type && !request.destination_location && (
+                  <Descriptions.Item label="Destination">
+                    {request.destination_type.replace(/_/g, ' ')}
+                  </Descriptions.Item>
+                )}
+                {request.external_reference && (
+                  <Descriptions.Item label="External Reference">
+                    {request.external_reference}
+                  </Descriptions.Item>
+                )}
                 {request.description && (
                   <Descriptions.Item label="Description" span={2}>
                     {request.description}
@@ -364,15 +533,17 @@ export const RequestDetailModal = ({ open, requestId, onClose }: RequestDetailMo
                   </Descriptions.Item>
                 )}
                 {request.expected_due_date && (
-                  <Descriptions.Item label="Expected Due Date" span={2}>
+                  <Descriptions.Item label="Due Date" span={2}>
                     <Space>
                       {dayjs(request.expected_due_date).format('MMM D, YYYY')}
                       {request.is_late && <Tag color="red">Overdue</Tag>}
-                      {request.due_soon && !request.is_late && <Tag color="orange">Due Soon</Tag>}
+                      {request.due_soon && !request.is_late && (
+                        <Tag color="orange">Due Soon</Tag>
+                      )}
                     </Space>
                   </Descriptions.Item>
                 )}
-                <Descriptions.Item label="Created At">
+                <Descriptions.Item label="Created">
                   {dayjs(request.created_at).format('MMM D, YYYY h:mm A')}
                 </Descriptions.Item>
                 <Descriptions.Item label="Last Updated">
@@ -381,13 +552,51 @@ export const RequestDetailModal = ({ open, requestId, onClose }: RequestDetailMo
               </Descriptions>
             </Card>
 
+            {/* Repairable / Core Return */}
+            {(request.repairable || request.return_status) && (
+              <Card
+                title={
+                  <Space>
+                    <ToolOutlined style={{ color: '#722ed1' }} />
+                    <span>Core Return Tracking</span>
+                  </Space>
+                }
+              >
+                <Descriptions bordered column={2}>
+                  <Descriptions.Item label="Return Status">
+                    {request.return_status ? (
+                      <Tag color={RETURN_STATUS_COLORS[request.return_status] || 'default'}>
+                        {RETURN_STATUS_LABELS[request.return_status] || request.return_status}
+                      </Tag>
+                    ) : (
+                      <Tag color="orange">Core Expected</Tag>
+                    )}
+                  </Descriptions.Item>
+                  <Descriptions.Item label="Core Required">
+                    {request.core_required ? (
+                      <Tag color="red">Yes</Tag>
+                    ) : (
+                      <Tag>No</Tag>
+                    )}
+                  </Descriptions.Item>
+                  {request.return_destination && (
+                    <Descriptions.Item label="Return Destination" span={2}>
+                      {request.return_destination}
+                    </Descriptions.Item>
+                  )}
+                </Descriptions>
+              </Card>
+            )}
+
             {/* Items */}
-            <Card title={
-              <Space>
-                <Text strong>Requested Items</Text>
-                <Badge count={request.items?.length || 0} showZero />
-              </Space>
-            }>
+            <Card
+              title={
+                <Space>
+                  <Text strong>Requested Items</Text>
+                  <Badge count={request.items?.length || 0} showZero />
+                </Space>
+              }
+            >
               <Table
                 columns={itemColumns}
                 dataSource={request.items || []}
@@ -396,6 +605,50 @@ export const RequestDetailModal = ({ open, requestId, onClose }: RequestDetailMo
                 size="small"
               />
             </Card>
+
+            {/* Fulfillment Actions */}
+            <Card
+              title={
+                <Space>
+                  <ApartmentOutlined style={{ color: '#1890ff' }} />
+                  <Text strong>Fulfillment Actions</Text>
+                  <Badge
+                    count={fulfillmentActions.length}
+                    showZero
+                    style={{ backgroundColor: fulfillmentActions.length > 0 ? '#1890ff' : undefined }}
+                  />
+                </Space>
+              }
+            >
+              {isLoadingActions ? (
+                <div style={{ textAlign: 'center', padding: 16 }}>
+                  <Spin />
+                </div>
+              ) : fulfillmentActions.length === 0 ? (
+                <Text type="secondary">No fulfillment actions yet for this request.</Text>
+              ) : (
+                <>
+                  {fulfillmentActions.length > 1 && (
+                    <Alert
+                      message={`Split fulfillment: ${fulfillmentActions.length} actions covering this request`}
+                      type="info"
+                      showIcon
+                      style={{ marginBottom: 12 }}
+                    />
+                  )}
+                  <Table
+                    columns={fulfillmentColumns}
+                    dataSource={fulfillmentActions}
+                    rowKey="id"
+                    pagination={false}
+                    size="small"
+                    scroll={{ x: 900 }}
+                  />
+                </>
+              )}
+            </Card>
+
+            <Divider style={{ margin: '0 0 4px' }} />
 
             {/* Timeline */}
             <Card title="Request Timeline">{renderTimeline()}</Card>
@@ -412,12 +665,7 @@ export const RequestDetailModal = ({ open, requestId, onClose }: RequestDetailMo
           <Button key="cancel" onClick={() => setEditModalVisible(false)}>
             Cancel
           </Button>,
-          <Button
-            key="save"
-            type="primary"
-            loading={isUpdating}
-            onClick={handleSaveEdit}
-          >
+          <Button key="save" type="primary" loading={isUpdating} onClick={handleSaveEdit}>
             Save Changes
           </Button>,
         ]}
@@ -436,10 +684,9 @@ export const RequestDetailModal = ({ open, requestId, onClose }: RequestDetailMo
           </Form.Item>
           <Form.Item name="priority" label="Priority">
             <Select>
-              <Select.Option value="low">Low</Select.Option>
-              <Select.Option value="normal">Normal</Select.Option>
-              <Select.Option value="high">High</Select.Option>
-              <Select.Option value="critical">Critical</Select.Option>
+              <Select.Option value="routine">Routine</Select.Option>
+              <Select.Option value="urgent">Urgent</Select.Option>
+              <Select.Option value="aog">AOG</Select.Option>
             </Select>
           </Form.Item>
           <Form.Item name="notes" label="Notes">

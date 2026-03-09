@@ -198,6 +198,60 @@ def create_app():
                 "error_message": str(e)
             })
             raise
+
+        # Auto-apply Phase 2 schema migrations (additive column additions).
+        # Inspector-based checks make this idempotent and safe on every startup.
+        try:
+            from sqlalchemy import inspect as sa_inspect, text as sa_text
+            with app.app_context():
+                inspector = sa_inspect(db.engine)
+                tables = set(inspector.get_table_names())
+
+                def _auto_add_col(table, col_sql, col_name, existing_cols):
+                    if col_name not in existing_cols:
+                        db.session.execute(sa_text(f"ALTER TABLE {table} ADD COLUMN {col_sql}"))
+                        logger.info("Phase 2 auto-migration: added %s.%s", table, col_name)
+
+                if "user_requests" in tables:
+                    req_cols = {c["name"] for c in inspector.get_columns("user_requests")}
+                    _auto_add_col("user_requests", "request_type VARCHAR(50) NOT NULL DEFAULT 'manual'", "request_type", req_cols)
+                    _auto_add_col("user_requests", "source_trigger VARCHAR(50) NULL", "source_trigger", req_cols)
+                    _auto_add_col("user_requests", "destination_type VARCHAR(50) NULL", "destination_type", req_cols)
+                    _auto_add_col("user_requests", "destination_location VARCHAR(200) NULL", "destination_location", req_cols)
+                    _auto_add_col("user_requests", "related_kit_id INTEGER NULL", "related_kit_id", req_cols)
+                    _auto_add_col("user_requests", "item_class VARCHAR(50) NULL", "item_class", req_cols)
+                    _auto_add_col("user_requests", "repairable BOOLEAN NOT NULL DEFAULT 0", "repairable", req_cols)
+                    _auto_add_col("user_requests", "core_required BOOLEAN NOT NULL DEFAULT 0", "core_required", req_cols)
+                    _auto_add_col("user_requests", "return_status VARCHAR(50) NULL", "return_status", req_cols)
+                    _auto_add_col("user_requests", "return_destination VARCHAR(200) NOT NULL DEFAULT 'Main Warehouse / Stores'", "return_destination", req_cols)
+                    _auto_add_col("user_requests", "external_reference VARCHAR(200) NULL", "external_reference", req_cols)
+                    # Migrate legacy priority values (idempotent — only rows with old values are affected)
+                    db.session.execute(sa_text("UPDATE user_requests SET priority = 'routine' WHERE priority IN ('low', 'normal')"))
+                    db.session.execute(sa_text("UPDATE user_requests SET priority = 'urgent' WHERE priority = 'high'"))
+                    db.session.execute(sa_text("UPDATE user_requests SET priority = 'aog' WHERE priority = 'critical'"))
+                    # Migrate legacy status values (idempotent)
+                    db.session.execute(sa_text("UPDATE user_requests SET status = 'needs_info' WHERE status = 'awaiting_info'"))
+                    db.session.execute(sa_text("UPDATE user_requests SET status = 'pending_fulfillment' WHERE status IN ('in_progress', 'ordered')"))
+                    db.session.execute(sa_text("UPDATE user_requests SET status = 'partially_fulfilled' WHERE status IN ('partially_ordered', 'partially_received')"))
+                    db.session.execute(sa_text("UPDATE user_requests SET status = 'fulfilled' WHERE status = 'received'"))
+
+                if "procurement_orders" in tables:
+                    ord_cols = {c["name"] for c in inspector.get_columns("procurement_orders")}
+                    _auto_add_col("procurement_orders", "request_id INTEGER NULL", "request_id", ord_cols)
+                    if "request_id" not in ord_cols:
+                        db.session.execute(sa_text(
+                            "CREATE INDEX IF NOT EXISTS idx_procurement_orders_request_id "
+                            "ON procurement_orders(request_id)"
+                        ))
+                    _auto_add_col("procurement_orders", "source_location VARCHAR(200) NULL", "source_location", ord_cols)
+                    _auto_add_col("procurement_orders", "fulfillment_action_type VARCHAR(50) NULL", "fulfillment_action_type", ord_cols)
+                    _auto_add_col("procurement_orders", "fulfillment_quantity INTEGER NULL", "fulfillment_quantity", ord_cols)
+                    _auto_add_col("procurement_orders", "is_internal_fulfillment BOOLEAN NOT NULL DEFAULT 0", "is_internal_fulfillment", ord_cols)
+
+                db.session.commit()
+                logger.info("Phase 2 auto-migrations verified/applied successfully")
+        except Exception as e:
+            logger.warning("Phase 2 auto-migration warning (non-fatal): %s", str(e))
     else:
         logger.info("Skipping automatic database table creation in testing mode")
 

@@ -2,21 +2,33 @@ import { Tag } from 'antd';
 import type { OrderStatus, RequestStatus, ItemStatus, KitReorderStatus } from '../types';
 
 interface StatusBadgeProps {
-  status: OrderStatus | RequestStatus | ItemStatus | KitReorderStatus;
+  status: OrderStatus | RequestStatus | ItemStatus | KitReorderStatus | string;
   type?: 'order' | 'request' | 'item' | 'kitReorder';
 }
 
 const STATUS_COLORS: Record<string, string> = {
-  // Order statuses
+  // Phase 2 request statuses (operational language for mechanics)
   new: 'blue',
+  under_review: 'cyan',
+  pending_fulfillment: 'gold',
+  in_transfer: 'geekblue',
+  awaiting_external_procurement: 'orange',
+  partially_fulfilled: 'lime',
+  fulfilled: 'green',
+  needs_info: 'volcano',
+  cancelled: 'red',
+
+  // Phase 2 fulfillment statuses (fulfillment staff workspace)
+  assigned: 'cyan',
+  sourcing: 'gold',
+  closed: 'default',
+
+  // Legacy statuses (backward compat with existing data)
   awaiting_info: 'orange',
   in_progress: 'cyan',
   ordered: 'purple',
   shipped: 'geekblue',
   received: 'green',
-  cancelled: 'red',
-
-  // Request statuses
   partially_ordered: 'purple',
   partially_received: 'lime',
 
@@ -25,23 +37,39 @@ const STATUS_COLORS: Record<string, string> = {
 
   // Kit reorder statuses
   approved: 'cyan',
-  fulfilled: 'green',
-  urgent: 'red',
 };
 
 const STATUS_LABELS: Record<string, string> = {
+  // Phase 2 request statuses
   new: 'New',
+  under_review: 'Under Review',
+  pending_fulfillment: 'Pending Fulfillment',
+  in_transfer: 'In Transfer',
+  awaiting_external_procurement: 'Awaiting Procurement',
+  partially_fulfilled: 'Partially Fulfilled',
+  fulfilled: 'Fulfilled',
+  needs_info: 'Needs Info',
+  cancelled: 'Cancelled',
+
+  // Phase 2 fulfillment statuses
+  assigned: 'Assigned',
+  sourcing: 'Sourcing',
+  closed: 'Closed',
+
+  // Legacy statuses
   awaiting_info: 'Awaiting Info',
   in_progress: 'In Progress',
   ordered: 'Ordered',
   shipped: 'Shipped',
   received: 'Received',
-  cancelled: 'Cancelled',
   partially_ordered: 'Partially Ordered',
   partially_received: 'Partially Received',
+
+  // Item statuses
   pending: 'Pending',
+
+  // Kit reorder statuses
   approved: 'Approved',
-  fulfilled: 'Fulfilled',
 };
 
 export const StatusBadge: React.FC<StatusBadgeProps> = ({ status }) => {

@@ -12,6 +12,7 @@ import {
   Statistic,
   Empty,
   Badge,
+  Tag,
   Tooltip,
 } from 'antd';
 import {
@@ -23,16 +24,33 @@ import {
   ExclamationCircleOutlined,
   InboxOutlined,
   EyeOutlined,
+  ToolOutlined,
 } from '@ant-design/icons';
 import dayjs from 'dayjs';
 import relativeTime from 'dayjs/plugin/relativeTime';
 import { useGetRequestsQuery, useGetRequestAnalyticsQuery } from '../services/requestsApi';
 import { StatusBadge, PriorityBadge, MobileRequestsList, RequestDetailModal } from '../components';
 import { useIsMobile } from '@shared/hooks/useMobile';
-import type { UserRequest, RequestStatus, RequestPriority } from '../types';
+import type { UserRequest, RequestStatus, RequestPriority, RequestType } from '../types';
 import type { ColumnsType } from 'antd/es/table';
 
 dayjs.extend(relativeTime);
+
+const REQUEST_TYPE_LABELS: Record<string, string> = {
+  manual: 'Manual',
+  kit_replenishment: 'Kit Replenishment',
+  warehouse_replenishment: 'Warehouse Replenishment',
+  transfer: 'Transfer',
+  repairable_return: 'Repairable Return',
+};
+
+const REQUEST_TYPE_COLORS: Record<string, string> = {
+  manual: 'default',
+  kit_replenishment: 'blue',
+  warehouse_replenishment: 'cyan',
+  transfer: 'geekblue',
+  repairable_return: 'purple',
+};
 
 export const RequestsDashboard: React.FC = () => {
   const navigate = useNavigate();
@@ -40,6 +58,7 @@ export const RequestsDashboard: React.FC = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<RequestStatus[]>([]);
   const [priorityFilter, setPriorityFilter] = useState<RequestPriority[]>([]);
+  const [requestTypeFilter, setRequestTypeFilter] = useState<RequestType[]>([]);
   const [detailModalVisible, setDetailModalVisible] = useState(false);
   const [selectedRequestId, setSelectedRequestId] = useState<number | null>(null);
 
@@ -47,12 +66,12 @@ export const RequestsDashboard: React.FC = () => {
     search: searchQuery || undefined,
     status: statusFilter.length > 0 ? statusFilter.join(',') : undefined,
     priority: priorityFilter.length > 0 ? priorityFilter.join(',') : undefined,
+    request_type: requestTypeFilter.length > 0 ? requestTypeFilter.join(',') : undefined,
   };
 
   const { data: requests = [], isLoading, refetch } = useGetRequestsQuery(queryParams);
   const { data: analytics } = useGetRequestAnalyticsQuery();
 
-  // Render mobile version if on mobile device
   if (isMobile) {
     return <MobileRequestsList />;
   }
@@ -86,20 +105,40 @@ export const RequestsDashboard: React.FC = () => {
       title: 'Title',
       dataIndex: 'title',
       key: 'title',
-      width: 300,
+      width: 260,
       ellipsis: true,
       render: (title: string, record: UserRequest) => (
         <Space direction="vertical" size={0}>
           <span style={{ fontWeight: 500 }}>{title}</span>
-          <Badge count={record.item_count || 0} showZero style={{ fontSize: 11 }} />
+          <Space size={4}>
+            <Badge count={record.item_count || 0} showZero style={{ fontSize: 11 }} />
+            {record.repairable && (
+              <Tooltip title="Repairable item — core return may be required">
+                <Tag color="purple" icon={<ToolOutlined />} style={{ fontSize: 11, margin: 0 }}>
+                  Repairable
+                </Tag>
+              </Tooltip>
+            )}
+          </Space>
         </Space>
       ),
+    },
+    {
+      title: 'Type',
+      dataIndex: 'request_type',
+      key: 'request_type',
+      width: 160,
+      render: (type: RequestType) => {
+        const label = REQUEST_TYPE_LABELS[type] || type || 'Manual';
+        const color = REQUEST_TYPE_COLORS[type] || 'default';
+        return <Tag color={color}>{label}</Tag>;
+      },
     },
     {
       title: 'Status',
       dataIndex: 'status',
       key: 'status',
-      width: 160,
+      width: 170,
       render: (status: RequestStatus) => <StatusBadge status={status} type="request" />,
     },
     {
@@ -110,25 +149,56 @@ export const RequestsDashboard: React.FC = () => {
       render: (priority: RequestPriority) => <PriorityBadge priority={priority} />,
     },
     {
-      title: 'Requester',
-      dataIndex: 'requester',
-      key: 'requester',
-      width: 150,
-      render: (requester: { first_name: string; last_name: string } | undefined) =>
-        requester ? `${requester.first_name} ${requester.last_name}` : '-',
+      title: 'Destination',
+      dataIndex: 'destination_location',
+      key: 'destination_location',
+      width: 160,
+      ellipsis: true,
+      render: (loc: string, record: UserRequest) =>
+        loc || (record.destination_type ? record.destination_type.replace(/_/g, ' ') : '-'),
     },
     {
-      title: 'Items',
-      dataIndex: 'item_count',
-      key: 'item_count',
-      width: 80,
-      render: (count: number) => <Badge count={count || 0} showZero />,
+      title: 'Requester',
+      dataIndex: 'requester_name',
+      key: 'requester_name',
+      width: 140,
+      ellipsis: true,
+      render: (name: string) => name || '-',
+    },
+    {
+      title: 'Core Return',
+      dataIndex: 'return_status',
+      key: 'return_status',
+      width: 140,
+      render: (_: unknown, record: UserRequest) => {
+        if (!record.repairable && !record.return_status) return '-';
+        if (record.return_status) {
+          const labels: Record<string, string> = {
+            issued_core_expected: 'Core Expected',
+            in_return_transit: 'In Transit',
+            returned_to_stores: 'Returned',
+            closed: 'Closed',
+          };
+          const colors: Record<string, string> = {
+            issued_core_expected: 'orange',
+            in_return_transit: 'blue',
+            returned_to_stores: 'green',
+            closed: 'default',
+          };
+          return (
+            <Tag color={colors[record.return_status] || 'default'}>
+              {labels[record.return_status] || record.return_status}
+            </Tag>
+          );
+        }
+        return record.repairable ? <Tag color="orange">Core Expected</Tag> : '-';
+      },
     },
     {
       title: 'Due Date',
       dataIndex: 'expected_due_date',
       key: 'expected_due_date',
-      width: 140,
+      width: 130,
       render: (dueDate: string, record: UserRequest) =>
         dueDate ? (
           <Space direction="vertical" size={0}>
@@ -145,7 +215,7 @@ export const RequestsDashboard: React.FC = () => {
       title: 'Created',
       dataIndex: 'created_at',
       key: 'created_at',
-      width: 120,
+      width: 110,
       render: (createdAt: string) => dayjs(createdAt).format('MMM D, YYYY'),
     },
     {
@@ -177,10 +247,10 @@ export const RequestsDashboard: React.FC = () => {
           <Col>
             <h1 style={{ margin: 0, fontSize: 28, fontWeight: 600 }}>
               <FileTextOutlined style={{ marginRight: 12 }} />
-              User Requests
+              Requests
             </h1>
             <p style={{ margin: '4px 0 0', color: '#8c8c8c' }}>
-              Manage multi-item procurement requests
+              Operational demand — track status of your requests
             </p>
           </Col>
           <Col>
@@ -192,7 +262,7 @@ export const RequestsDashboard: React.FC = () => {
                 onClick={() => navigate('/requests/new')}
                 size="large"
               >
-                Create Request
+                New Request
               </Button>
             </Space>
           </Col>
@@ -213,9 +283,15 @@ export const RequestsDashboard: React.FC = () => {
           <Col xs={24} sm={12} lg={6}>
             <Card>
               <Statistic
-                title="Total Items"
-                value={analytics.total_items}
-                prefix={<FileTextOutlined style={{ color: '#52c41a' }} />}
+                title="Active"
+                value={
+                  (analytics.status_breakdown?.new || 0) +
+                  (analytics.status_breakdown?.pending_fulfillment || 0) +
+                  (analytics.status_breakdown?.under_review || 0) +
+                  (analytics.status_breakdown?.in_transfer || 0) +
+                  (analytics.status_breakdown?.in_progress || 0)
+                }
+                prefix={<FileTextOutlined style={{ color: '#faad14' }} />}
               />
             </Card>
           </Col>
@@ -232,8 +308,11 @@ export const RequestsDashboard: React.FC = () => {
           <Col xs={24} sm={12} lg={6}>
             <Card>
               <Statistic
-                title="Completed"
-                value={analytics.status_breakdown?.received || 0}
+                title="Fulfilled"
+                value={
+                  (analytics.status_breakdown?.fulfilled || 0) +
+                  (analytics.status_breakdown?.received || 0)
+                }
                 prefix={<CheckCircleOutlined style={{ color: '#52c41a' }} />}
               />
             </Card>
@@ -243,7 +322,7 @@ export const RequestsDashboard: React.FC = () => {
 
       <Card style={{ marginBottom: 16 }}>
         <Row gutter={[16, 16]}>
-          <Col xs={24} md={10}>
+          <Col xs={24} md={8}>
             <Input
               placeholder="Search requests..."
               prefix={<SearchOutlined />}
@@ -252,7 +331,7 @@ export const RequestsDashboard: React.FC = () => {
               allowClear
             />
           </Col>
-          <Col xs={24} md={7}>
+          <Col xs={24} md={5}>
             <Select
               mode="multiple"
               placeholder="Filter by Status"
@@ -262,14 +341,17 @@ export const RequestsDashboard: React.FC = () => {
               allowClear
             >
               <Select.Option value="new">New</Select.Option>
-              <Select.Option value="in_progress">In Progress</Select.Option>
-              <Select.Option value="partially_ordered">Partially Ordered</Select.Option>
-              <Select.Option value="ordered">Ordered</Select.Option>
-              <Select.Option value="partially_received">Partially Received</Select.Option>
-              <Select.Option value="received">Received</Select.Option>
+              <Select.Option value="under_review">Under Review</Select.Option>
+              <Select.Option value="pending_fulfillment">Pending Fulfillment</Select.Option>
+              <Select.Option value="in_transfer">In Transfer</Select.Option>
+              <Select.Option value="awaiting_external_procurement">Awaiting Procurement</Select.Option>
+              <Select.Option value="partially_fulfilled">Partially Fulfilled</Select.Option>
+              <Select.Option value="fulfilled">Fulfilled</Select.Option>
+              <Select.Option value="needs_info">Needs Info</Select.Option>
+              <Select.Option value="cancelled">Cancelled</Select.Option>
             </Select>
           </Col>
-          <Col xs={24} md={7}>
+          <Col xs={24} md={5}>
             <Select
               mode="multiple"
               placeholder="Filter by Priority"
@@ -278,10 +360,25 @@ export const RequestsDashboard: React.FC = () => {
               style={{ width: '100%' }}
               allowClear
             >
-              <Select.Option value="low">Low</Select.Option>
-              <Select.Option value="normal">Normal</Select.Option>
-              <Select.Option value="high">High</Select.Option>
-              <Select.Option value="critical">Critical</Select.Option>
+              <Select.Option value="routine">Routine</Select.Option>
+              <Select.Option value="urgent">Urgent</Select.Option>
+              <Select.Option value="aog">AOG</Select.Option>
+            </Select>
+          </Col>
+          <Col xs={24} md={6}>
+            <Select
+              mode="multiple"
+              placeholder="Filter by Type"
+              value={requestTypeFilter}
+              onChange={setRequestTypeFilter}
+              style={{ width: '100%' }}
+              allowClear
+            >
+              <Select.Option value="manual">Manual</Select.Option>
+              <Select.Option value="kit_replenishment">Kit Replenishment</Select.Option>
+              <Select.Option value="warehouse_replenishment">Warehouse Replenishment</Select.Option>
+              <Select.Option value="transfer">Transfer</Select.Option>
+              <Select.Option value="repairable_return">Repairable Return</Select.Option>
             </Select>
           </Col>
         </Row>
@@ -293,7 +390,7 @@ export const RequestsDashboard: React.FC = () => {
           dataSource={requests}
           loading={isLoading}
           rowKey="id"
-          scroll={{ x: 1300 }}
+          scroll={{ x: 1500 }}
           onRow={(record) => ({
             onClick: () => handleViewDetails(record),
             style: { cursor: 'pointer' },

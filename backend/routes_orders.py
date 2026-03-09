@@ -295,6 +295,24 @@ def register_order_routes(app):
 
             documentation_path = f"/api/static/order_documents/{safe_basename}"
 
+        # Phase 2: validate fulfillment_action_type
+        fulfillment_action_type = data.get("fulfillment_action_type")
+        valid_action_types = {
+            "stock_fulfillment", "transfer", "kit_replenishment",
+            "external_procurement", "return_tracking",
+        }
+        if fulfillment_action_type and fulfillment_action_type not in valid_action_types:
+            raise ValidationError(f"Invalid fulfillment_action_type. Must be one of: {', '.join(sorted(valid_action_types))}")
+
+        # Phase 2: validate fulfillment_quantity
+        fulfillment_quantity_value = data.get("fulfillment_quantity")
+        fulfillment_quantity = None
+        if fulfillment_quantity_value is not None and fulfillment_quantity_value != "":
+            try:
+                fulfillment_quantity = int(fulfillment_quantity_value)
+            except (TypeError, ValueError) as exc:
+                raise ValidationError("fulfillment_quantity must be a positive integer") from exc
+
         order = ProcurementOrder(
             title=title,
             order_type=order_type,
@@ -314,6 +332,12 @@ def register_order_routes(app):
             kit_id=kit_id,
             requester_id=requester.id,
             buyer_id=buyer.id if buyer else None,
+            # Phase 2 fulfillment-action fields
+            request_id=data.get("request_id") or None,
+            source_location=(data.get("source_location") or "").strip() or None,
+            fulfillment_action_type=fulfillment_action_type or None,
+            fulfillment_quantity=fulfillment_quantity,
+            is_internal_fulfillment=bool(data.get("is_internal_fulfillment", False)),
         )
 
         db.session.add(order)
@@ -443,6 +467,36 @@ def register_order_routes(app):
             buyer = _load_user(buyer_value, "Buyer") if buyer_value else None
             order.buyer_id = buyer.id if buyer else None
 
+        # Phase 2 fulfillment-action fields
+        if "request_id" in data:
+            order.request_id = data.get("request_id") or None
+
+        if "source_location" in data:
+            order.source_location = (data.get("source_location") or "").strip() or None
+
+        if "fulfillment_action_type" in data:
+            val = data.get("fulfillment_action_type")
+            valid_action_types = {
+                "stock_fulfillment", "transfer", "kit_replenishment",
+                "external_procurement", "return_tracking",
+            }
+            if val and val not in valid_action_types:
+                raise ValidationError(f"Invalid fulfillment_action_type. Must be one of: {', '.join(sorted(valid_action_types))}")
+            order.fulfillment_action_type = val or None
+
+        if "fulfillment_quantity" in data:
+            fq = data.get("fulfillment_quantity")
+            if fq is None or fq == "":
+                order.fulfillment_quantity = None
+            else:
+                try:
+                    order.fulfillment_quantity = int(fq)
+                except (TypeError, ValueError) as exc:
+                    raise ValidationError("fulfillment_quantity must be a positive integer") from exc
+
+        if "is_internal_fulfillment" in data:
+            order.is_internal_fulfillment = bool(data.get("is_internal_fulfillment"))
+
         db.session.commit()
 
         AuditLog.log(
@@ -459,6 +513,19 @@ def register_order_routes(app):
         db.session.commit()
 
         return jsonify(order.to_dict())
+
+    @app.route("/api/orders/by-request/<int:request_id>", methods=["GET"])
+    @orders_or_requests_permission
+    @handle_errors
+    def get_fulfillment_actions_for_request(request_id):
+        """Return all fulfillment actions (procurement orders) linked to a specific request.
+
+        Phase 2: Supports multiple fulfillment actions per request (split fulfillment).
+        """
+        actions = ProcurementOrder.query.filter_by(request_id=request_id).order_by(
+            ProcurementOrder.created_at.desc()
+        ).all()
+        return jsonify([a.to_dict() for a in actions])
 
     @app.route("/api/orders/analytics", methods=["GET"])
     @orders_permission

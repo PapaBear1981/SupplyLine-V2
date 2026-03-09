@@ -227,6 +227,14 @@ export const ordersApi = baseApi.injectEndpoints({
       query: () => '/api/orders/late-alerts',
       providesTags: [{ type: 'Order', id: 'LATE' }],
     }),
+
+    // Phase 2: get all fulfillment actions linked to a specific request
+    getOrdersByRequest: builder.query<ProcurementOrder[], number>({
+      query: (requestId) => `/api/orders/by-request/${requestId}`,
+      providesTags: (_result, _error, requestId) => [
+        { type: 'Order', id: `request-${requestId}` },
+      ],
+    }),
   }),
 });
 
@@ -247,4 +255,5 @@ export const {
   useGetOrderAnalyticsQuery,
   useLazyGetOrdersQuery,
   useGetLateOrdersQuery,
+  useGetOrdersByRequestQuery,
 } = ordersApi;

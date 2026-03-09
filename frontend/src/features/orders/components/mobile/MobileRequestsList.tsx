@@ -29,19 +29,33 @@ import './MobileRequestsList.css';
 dayjs.extend(relativeTime);
 
 // Status color mapping
-const statusColors: Record<RequestStatus, string> = {
+const statusColors: Record<string, string> = {
+  // Phase 2 statuses
   new: '#1890ff',
+  under_review: '#13c2c2',
+  pending_fulfillment: '#faad14',
+  in_transfer: '#2f54eb',
+  awaiting_external_procurement: '#fa8c16',
+  partially_fulfilled: '#a0d911',
+  fulfilled: '#52c41a',
+  needs_info: '#fa541c',
+  cancelled: '#ff4d4f',
+  // Legacy statuses
   awaiting_info: '#faad14',
   in_progress: '#13c2c2',
   partially_ordered: '#722ed1',
   ordered: '#722ed1',
   partially_received: '#95de64',
   received: '#52c41a',
-  cancelled: '#ff4d4f',
 };
 
 // Priority color mapping
-const priorityColors: Record<RequestPriority, string> = {
+const priorityColors: Record<string, string> = {
+  // Phase 2 priorities
+  routine: '#1890ff',
+  urgent: '#fa8c16',
+  aog: '#ff4d4f',
+  // Legacy priorities
   low: '#8c8c8c',
   normal: '#1890ff',
   high: '#faad14',
@@ -50,20 +64,20 @@ const priorityColors: Record<RequestPriority, string> = {
 
 const statusOptions = [
   { label: 'New', value: 'new' },
-  { label: 'Awaiting Info', value: 'awaiting_info' },
-  { label: 'In Progress', value: 'in_progress' },
-  { label: 'Partially Ordered', value: 'partially_ordered' },
-  { label: 'Ordered', value: 'ordered' },
-  { label: 'Partially Received', value: 'partially_received' },
-  { label: 'Received', value: 'received' },
+  { label: 'Under Review', value: 'under_review' },
+  { label: 'Pending Fulfillment', value: 'pending_fulfillment' },
+  { label: 'In Transfer', value: 'in_transfer' },
+  { label: 'Awaiting Procurement', value: 'awaiting_external_procurement' },
+  { label: 'Partially Fulfilled', value: 'partially_fulfilled' },
+  { label: 'Fulfilled', value: 'fulfilled' },
+  { label: 'Needs Info', value: 'needs_info' },
   { label: 'Cancelled', value: 'cancelled' },
 ];
 
 const priorityOptions = [
-  { label: 'Low', value: 'low' },
-  { label: 'Normal', value: 'normal' },
-  { label: 'High', value: 'high' },
-  { label: 'Critical', value: 'critical' },
+  { label: 'Routine', value: 'routine' },
+  { label: 'Urgent', value: 'urgent' },
+  { label: 'AOG', value: 'aog' },
 ];
 
 export const MobileRequestsList = () => {
