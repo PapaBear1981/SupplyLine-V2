@@ -106,9 +106,17 @@ class TestJWTAuthentication:
         assert response.status_code == 200
         data = json.loads(response.data)
 
-        # Tokens are set in cookies, not returned in JSON
+        # Tokens are set in cookies
         assert "access_token" in response.headers.get("Set-Cookie", "")
         assert data["message"] == "Tokens refreshed successfully"
+
+        # Response body includes token data for frontend session timer update
+        assert "access_token" in data
+        assert data["access_token"] is not None
+        assert "user" in data
+        assert data["user"] is not None
+        assert "expires_in" in data
+        assert data["expires_in"] > 0
 
     def test_token_refresh_invalid_token(self, client):
         """Test token refresh with invalid token"""

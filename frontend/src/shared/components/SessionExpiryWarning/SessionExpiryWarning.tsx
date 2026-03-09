@@ -3,6 +3,7 @@ import { Modal, Button, Typography, Progress } from 'antd';
 import { ExclamationCircleOutlined } from '@ant-design/icons';
 import { useAppSelector } from '@app/hooks';
 import { useRefreshTokenMutation } from '@features/auth/services/authApi';
+import { setTokenExpiration } from '@services/baseApi';
 
 const { Text, Title } = Typography;
 
@@ -92,7 +93,11 @@ export const SessionExpiryWarning = () => {
   const handleStayLoggedIn = async () => {
     try {
       // Refresh the token to extend the session
-      await refreshToken().unwrap();
+      const result = await refreshToken().unwrap();
+      // Update the session timer so the warning doesn't reappear immediately
+      if (result.expires_in) {
+        setTokenExpiration(result.expires_in);
+      }
       setShowWarning(false);
     } catch (error) {
       console.error('Failed to refresh token:', error);

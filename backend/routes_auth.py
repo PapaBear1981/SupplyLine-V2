@@ -249,14 +249,14 @@ def register_auth_routes(app):
                 "user": user.to_dict(include_roles=True, include_permissions=True),
                 "access_token": tokens["access_token"],
                 "refresh_token": tokens["refresh_token"],
-                "expires_in": 900  # 15 minutes for access token
+                "expires_in": tokens["expires_in"]  # Actual token lifetime from config
             })
 
             # Set access token cookie (HttpOnly, Secure, SameSite)
             response.set_cookie(
                 "access_token",
                 value=tokens["access_token"],
-                max_age=900,  # 15 minutes
+                max_age=int(tokens["expires_in"]),  # Match actual JWT lifetime
                 httponly=True,  # Prevents JavaScript access
                 secure=current_app.config.get("SESSION_COOKIE_SECURE", True),  # HTTPS only in production
                 samesite="Lax",  # CSRF protection
@@ -314,16 +314,24 @@ def register_auth_routes(app):
 
             logger.info("JWT tokens refreshed successfully")
 
+            # Fetch user for response body (token is already validated above)
+            refresh_payload = JWTManager.verify_token(refresh_token_value, "refresh")
+            user = db.session.get(User, refresh_payload["user_id"]) if refresh_payload else None
+
             # SECURITY: Set new tokens in HttpOnly cookies
+            # Also include token data in response body so frontend can update session timer
             response = jsonify({
-                "message": "Tokens refreshed successfully"
+                "message": "Tokens refreshed successfully",
+                "access_token": new_tokens["access_token"],
+                "user": user.to_dict(include_roles=True, include_permissions=True) if user else None,
+                "expires_in": new_tokens["expires_in"]
             })
 
             # Set new access token cookie
             response.set_cookie(
                 "access_token",
                 value=new_tokens["access_token"],
-                max_age=900,  # 15 minutes
+                max_age=int(new_tokens["expires_in"]),  # Match actual JWT lifetime
                 httponly=True,
                 secure=current_app.config.get("SESSION_COOKIE_SECURE", True),
                 samesite="Lax",
@@ -578,7 +586,7 @@ def register_auth_routes(app):
             response.set_cookie(
                 "access_token",
                 value=tokens["access_token"],
-                max_age=900,  # 15 minutes
+                max_age=int(tokens["expires_in"]),  # Match actual JWT lifetime
                 httponly=True,  # Prevents JavaScript access
                 secure=current_app.config.get("SESSION_COOKIE_SECURE", True),  # HTTPS only in production
                 samesite="Lax",  # CSRF protection
