@@ -16,8 +16,8 @@ from sqlalchemy import text
 # when both are in the same directory. We use importlib to load the .py file directly.
 import importlib.util
 
-# Keep BACKEND_DIR for other uses
-BACKEND_DIR = os.path.dirname(os.path.abspath(__file__))
+# Keep BACKEND_DIR for other uses - parent of tests/ directory = /app
+BACKEND_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 # Lazily imported globals populated once we configure the environment
 create_app = None
