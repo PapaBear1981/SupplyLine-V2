@@ -10,6 +10,7 @@ This module provides JWT-based authentication endpoints including:
 """
 
 import logging
+import os
 
 from flask import current_app, jsonify, request
 from werkzeug.exceptions import BadRequest
@@ -176,11 +177,12 @@ def register_auth_routes(app):
                 }), 200
 
             # MANDATORY 2FA: Check if user needs to set up TOTP (not enabled yet)
-            # Skip in testing mode to maintain backward compatibility with existing tests
+            # Skip in testing mode or if DISABLE_MANDATORY_2FA env var is set
             if (
                 hasattr(user, "is_totp_enabled")
                 and not user.is_totp_enabled
                 and not current_app.config.get("TESTING", False)
+                and os.environ.get("DISABLE_MANDATORY_2FA", "false").lower() != "true"
             ):
                 # Require TOTP setup before allowing login
                 logger.info(f"TOTP setup required for user {user.id}")
