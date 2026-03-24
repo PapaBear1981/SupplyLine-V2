@@ -11,10 +11,13 @@ import pytest
 from sqlalchemy import text
 
 
-# Add the backend directory to the Python path
-BACKEND_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-if BACKEND_DIR not in sys.path:
-    sys.path.insert(0, BACKEND_DIR)
+# Import app module directly to avoid package vs module conflict
+# The issue is that 'app' package (__init__.py) takes precedence over 'app.py' module
+# when both are in the same directory. We use importlib to load the .py file directly.
+import importlib.util
+
+# Keep BACKEND_DIR for other uses
+BACKEND_DIR = os.path.dirname(os.path.abspath(__file__))
 
 # Lazily imported globals populated once we configure the environment
 create_app = None
@@ -48,7 +51,13 @@ def app():
         global create_app, db, User, Tool, Chemical, UserActivity, AuditLog, JWTManager
         global Permission, Role, RolePermission, UserRole
         if create_app is None:
-            from app import create_app as _create_app
+            # Use importlib to load app.py module directly, bypassing package __init__.py
+            import importlib.util
+            app_module_path = os.path.join(BACKEND_DIR, 'app.py')
+            app_spec = importlib.util.spec_from_file_location("app_module", app_module_path)
+            app_module = importlib.util.module_from_spec(app_spec)
+            app_spec.loader.exec_module(app_module)
+            _create_app = app_module.create_app
             from auth import JWTManager as _JWTManager
             from models import (
                 AuditLog as _AuditLog,
