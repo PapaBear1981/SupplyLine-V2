@@ -37,7 +37,11 @@ orders_permission = permission_required("page.orders")
 orders_or_requests_permission = permission_required_any("page.orders", "page.requests")
 
 VALID_ORDER_TYPES = {"tool", "chemical", "expendable", "kit"}
-VALID_PRIORITIES = {"low", "normal", "high", "critical"}
+VALID_PRIORITIES = {
+    "routine", "urgent", "aog",
+    # Legacy values for backward compatibility
+    "low", "normal", "high", "critical",
+}
 VALID_STATUSES = {
     "new",
     "awaiting_info",
@@ -312,6 +316,8 @@ def register_order_routes(app):
                 fulfillment_quantity = int(fulfillment_quantity_value)
             except (TypeError, ValueError) as exc:
                 raise ValidationError("fulfillment_quantity must be a positive integer") from exc
+            if fulfillment_quantity <= 0:
+                raise ValidationError("fulfillment_quantity must be a positive integer")
 
         order = ProcurementOrder(
             title=title,
@@ -493,6 +499,8 @@ def register_order_routes(app):
                     order.fulfillment_quantity = int(fq)
                 except (TypeError, ValueError) as exc:
                     raise ValidationError("fulfillment_quantity must be a positive integer") from exc
+                if order.fulfillment_quantity <= 0:
+                    raise ValidationError("fulfillment_quantity must be a positive integer")
 
         if "is_internal_fulfillment" in data:
             order.is_internal_fulfillment = bool(data.get("is_internal_fulfillment"))

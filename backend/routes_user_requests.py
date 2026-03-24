@@ -28,14 +28,6 @@ logger = logging.getLogger(__name__)
 requests_permission = permission_required_any("page.orders", "page.requests")
 
 
-def _generate_order_number():
-    """Generate a unique order number in format ORD-00001."""
-    result = db.session.execute(
-        text("SELECT MAX(CAST(SUBSTR(order_number, 5) AS INTEGER)) FROM procurement_orders WHERE order_number IS NOT NULL")
-    ).scalar()
-    next_number = (result or 0) + 1
-    return f"ORD-{next_number:05d}"
-
 VALID_ITEM_TYPES = {"tool", "chemical", "expendable", "repairable", "other"}
 VALID_ITEM_CLASSES = {"tool", "part", "chemical", "expendable", "repairable", "other"}
 
@@ -206,6 +198,9 @@ def register_user_request_routes(app):
         request_type_filter = request.args.get("request_type")
         if request_type_filter:
             rtypes = {v.strip() for v in request_type_filter.split(",") if v.strip()}
+            invalid_rtypes = rtypes - VALID_REQUEST_TYPES
+            if invalid_rtypes:
+                raise ValidationError(f"Invalid request_type filter: {', '.join(sorted(invalid_rtypes))}")
             query = query.filter(UserRequest.request_type.in_(rtypes))
 
         # Phase 2: repairable filtering
