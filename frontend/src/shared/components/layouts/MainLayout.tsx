@@ -1,5 +1,6 @@
 import { useState, useMemo } from 'react';
 import { Outlet, useNavigate, useLocation } from 'react-router-dom';
+import { useTheme } from '@features/settings/contexts/ThemeContext';
 import {
   Layout,
   Menu,
@@ -36,6 +37,8 @@ export const MainLayout = () => {
   const dispatch = useAppDispatch();
   const user = useAppSelector((state) => state.auth.user);
   const [logoutApi] = useLogoutMutation();
+  const { themeConfig } = useTheme();
+  const isDark = themeConfig.mode === 'dark';
 
   // Track user activity to prevent premature logout
   useActivityTracker();
@@ -103,6 +106,7 @@ export const MainLayout = () => {
         collapsed={collapsed}
         breakpoint="lg"
         collapsedWidth={0}
+        theme={isDark ? 'dark' : 'light'}
         style={{
           overflow: 'auto',
           height: '100vh',
@@ -119,7 +123,7 @@ export const MainLayout = () => {
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            color: 'white',
+            color: isDark ? 'white' : '#1f1f1f',
             fontSize: collapsed ? 16 : 20,
             fontWeight: 'bold',
           }}
@@ -127,7 +131,7 @@ export const MainLayout = () => {
           {collapsed ? 'SL' : 'SupplyLine'}
         </div>
         <Menu
-          theme="dark"
+          theme={isDark ? 'dark' : 'light'}
           mode="inline"
           selectedKeys={[location.pathname]}
           items={menuItems}
