@@ -18,6 +18,7 @@ from werkzeug.exceptions import BadRequest
 import utils as password_utils
 from auth import JWTManager, jwt_required
 from models import AuditLog, User, UserActivity, db
+from utils.rate_limiter import rate_limit
 
 
 logger = logging.getLogger(__name__)
@@ -27,8 +28,9 @@ def register_auth_routes(app):
     """Register JWT authentication routes"""
 
     @app.route("/api/auth/login", methods=["POST"])
+    @rate_limit(limit=5, window=300, key_func=lambda: f"login:{request.remote_addr}")
     def login():
-        """JWT-based login endpoint"""
+        """JWT-based login endpoint with rate limiting to prevent brute force attacks"""
         try:
             # Get JSON data
             try:
