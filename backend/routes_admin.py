@@ -12,6 +12,7 @@ from auth import admin_required
 from auth.jwt_manager import jwt_required
 from models import Announcement, AuditLog, Department, Role, User, UserRole, db
 from models_messaging import UserPresence
+from utils.decorators import login_required
 
 
 logger = logging.getLogger(__name__)
@@ -63,6 +64,7 @@ def register_admin_routes(app):
 
     # Online Users Count (for any authenticated user)
     @app.route("/api/users/online", methods=["GET"])
+    @login_required
     @jwt_required
     def get_online_users():
         """Get count of currently online users via WebSocket connection."""

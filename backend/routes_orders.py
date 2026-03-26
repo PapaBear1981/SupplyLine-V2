@@ -22,6 +22,7 @@ from models import (
     get_current_time,
 )
 from models_kits import Kit
+from utils.decorators import login_required, owner_or_admin_required
 from utils.error_handler import ValidationError, handle_errors
 from utils.file_validation import (
     ALLOWED_ATTACHMENT_EXTENSIONS,
@@ -112,6 +113,7 @@ def register_order_routes(app):
     """Register procurement order endpoints."""
 
     @app.route("/api/orders", methods=["GET"])
+    @login_required
     @orders_or_requests_permission
     @handle_errors
     def list_orders():
@@ -205,6 +207,7 @@ def register_order_routes(app):
         return jsonify([order.to_dict() for order in orders])
 
     @app.route("/api/orders", methods=["POST"])
+    @login_required
     @orders_or_requests_permission
     @handle_errors
     def create_order():
@@ -383,6 +386,8 @@ def register_order_routes(app):
         return jsonify(order.to_dict(include_messages=include_messages))
 
     @app.route("/api/orders/<int:order_id>", methods=["PUT"])
+    @login_required
+    @owner_or_admin_required(ProcurementOrder, owner_field="requester_id")
     @orders_permission
     @handle_errors
     def update_order(order_id):

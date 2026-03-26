@@ -20,6 +20,7 @@ from models import (
     db,
     get_current_time,
 )
+from utils.decorators import login_required, owner_or_admin_required
 from utils.error_handler import ValidationError, handle_errors
 
 
@@ -160,6 +161,7 @@ def register_user_request_routes(app):
     """Register user request endpoints."""
 
     @app.route("/api/user-requests", methods=["GET"])
+    @login_required
     @requests_permission
     @handle_errors
     def list_user_requests():
@@ -280,6 +282,7 @@ def register_user_request_routes(app):
         return jsonify([req.to_dict(include_items=True) for req in requests_list])
 
     @app.route("/api/user-requests", methods=["POST"])
+    @login_required
     @requests_permission
     @handle_errors
     def create_user_request():
@@ -419,6 +422,8 @@ def register_user_request_routes(app):
         return jsonify(user_request.to_dict(include_items=True, include_messages=include_messages))
 
     @app.route("/api/user-requests/<int:request_id>", methods=["PUT"])
+    @login_required
+    @owner_or_admin_required(UserRequest, owner_field="requester_id")
     @requests_permission
     @handle_errors
     def update_user_request(request_id):
@@ -533,6 +538,8 @@ def register_user_request_routes(app):
         return jsonify(user_request.to_dict(include_items=True))
 
     @app.route("/api/user-requests/<int:request_id>", methods=["DELETE"])
+    @login_required
+    @owner_or_admin_required(UserRequest, owner_field="requester_id")
     @requests_permission
     @handle_errors
     def cancel_user_request(request_id):
