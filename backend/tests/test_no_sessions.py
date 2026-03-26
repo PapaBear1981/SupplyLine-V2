@@ -12,9 +12,15 @@ BACKEND_DIR = os.path.dirname(TESTS_DIR)
 if BACKEND_DIR not in sys.path:
     sys.path.insert(0, BACKEND_DIR)
 
-from app import create_app
+# Use importlib to load app.py as a module instead of app/ package
+app_module_path = os.path.join(BACKEND_DIR, 'app.py')
+app_spec = importlib.util.spec_from_file_location("app_module", app_module_path)
+app_module = importlib.util.module_from_spec(app_spec)
+app_spec.loader.exec_module(app_module)
+create_app = app_module.create_app
+db = app_module.db
+
 from config import Config
-from models import db
 
 # Disable migrations for testing
 import migrate_database_constraints
