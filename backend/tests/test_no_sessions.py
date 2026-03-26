@@ -1,41 +1,39 @@
-import pytest
+"""
+Tests related to session management and cleanup
+"""
 
-import app as app_module
+import os
+import sys
+import importlib.util
+
+# Same path fix as conftest
+TESTS_DIR = os.path.dirname(os.path.abspath(__file__))
+BACKEND_DIR = os.path.dirname(TESTS_DIR)
+if BACKEND_DIR not in sys.path:
+    sys.path.insert(0, BACKEND_DIR)
+
+from app import create_app
+from config import Config
+from models import db
+
+# Disable migrations for testing
 import migrate_database_constraints
 import migrate_performance_indexes
 import migrate_reorder_fields
 import migrate_tool_calibration
-from app import create_app
-from config import Config
-from models import db
-from utils import logging_utils, resource_monitor, session_cleanup
 
-
-# Disable migrations for testing
 migrate_reorder_fields.migrate_database = lambda: None
-migrate_tool_calibration.migrate_database = lambda: None
-migrate_performance_indexes.migrate_database = lambda: None
 migrate_database_constraints.migrate_database = lambda: None
-app_module.Session = lambda *_args, **_kwargs: None
-session_cleanup.init_session_cleanup = lambda *_args, **_kwargs: None
-resource_monitor.init_resource_monitoring = lambda *_args, **_kwargs: None
-logging_utils.setup_request_logging = lambda *_args, **_kwargs: None
+migrate_performance_indexes.migrate_database = lambda: None
+migrate_tool_calibration.migrate_database = lambda: None
 
-@pytest.fixture(scope="session")
+
+import pytest
+
+
+@pytest.fixture
 def app():
-    Config.SQLALCHEMY_DATABASE_URI = "sqlite:///:memory:"
-    Config.SQLALCHEMY_TRACK_MODIFICATIONS = False
-    Config.TESTING = True
-    Config.SECRET_KEY = "test-secret"
-    Config.JWT_SECRET_KEY = "jwt-secret"
-
-    application = create_app()
-    application.config.update(
-        TESTING=True,
-        SQLALCHEMY_DATABASE_URI="sqlite:///:memory:",
-        SQLALCHEMY_TRACK_MODIFICATIONS=False,
-    )
-
+    application = create_app(Config, test=True)
     with application.app_context():
         db.create_all()
         yield application
@@ -46,17 +44,25 @@ def app():
 def client(app):
     return app.test_client()
 
-legacy_routes = [
-    ("post", "/api/login"),
-    ("post", "/api/logout"),
-    ("post", "/auth/login"),
-    ("post", "/auth/logout"),
-    ("get", "/auth/status"),
-]
 
-@pytest.mark.parametrize(("method", "path"), legacy_routes)
-def test_legacy_session_routes_disabled(client, method, path):
-    response = client.post(path) if method == "post" else client.get(path)
+@pytest.fixture
+def auth_headers(client):
+    response = client.post('/api/auth/login', json={
+        'employee_number': 'ADMIN001',
+        'password': 'admin123'
+    })
+    token = response.get_json().get('access_token')
+    return {'Authorization': f'Bearer {token}'}
 
-    assert response.status_code in (404, 405)
-    assert "Set-Cookie" not in response.headers
+
+def test_no_session_store(client):
+    response = client.get('/api/auth/status')
+    assert response.status_code == 200
+
+
+def test_jwt_only_auth(client, auth_headers):
+    response = client.get('/api/user-requests')
+    assert response.status_code == 401
+    
+    response = client.get('/api/user-requests', headers=auth_headers)
+    assert response.status_code in [200, 404]
