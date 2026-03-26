@@ -1,3 +1,4 @@
+import "@shared/styles/aesthetic-improvements.css";
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { ConfigProvider, theme } from 'antd';
 import { ConfigProvider as MobileConfigProvider } from 'antd-mobile';

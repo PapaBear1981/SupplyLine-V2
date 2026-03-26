@@ -1,0 +1,157 @@
+/* SupplyLine V2 - Aesthetic Improvements */
+
+/* ============================================
+   CARD HOVER EFFECTS
+   ============================================ */
+.ant-card {
+  transition: all 0.2s ease-in-out;
+}
+
+.ant-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 16px rgba(0, 0, 0, 0.1) !important;
+}
+
+.ant-card .ant-card-head {
+  border-bottom: 1px solid #f0f0f0;
+}
+
+.ant-card .ant-card-head-title {
+  font-weight: 600;
+}
+
+/* Dashboard cards */
+.dashboard-card {
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.dashboard-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 12px 24px rgba(0, 0, 0, 0.12);
+}
+
+/* ============================================
+   EMPTY STATE IMPROVEMENTS
+   ============================================ */
+.ant-empty {
+  padding: 48px 24px;
+}
+
+.ant-empty-description {
+  color: #8c8c8c;
+}
+
+.custom-empty {
+  text-align: center;
+  padding: 48px 24px;
+}
+
+.custom-empty-title {
+  font-size: 16px;
+  font-weight: 600;
+  color: #262626;
+  margin-bottom: 8px;
+}
+
+.custom-empty-description {
+  font-size: 14px;
+  color: #8c8c8c;
+  margin-bottom: 24px;
+}
+
+/* ============================================
+   LOADING SKELETONS
+   ============================================ */
+.ant-skeleton-content .ant-skeleton-title,
+.ant-skeleton-content .ant-skeleton-paragraph > li {
+  background: linear-gradient(90deg, #f0f0f0 25%, #e6e6e6 37%, #f0f0f0 63%);
+  background-size: 400% 100%;
+  animation: skeleton-loading 1.4s ease infinite;
+}
+
+@keyframes skeleton-loading {
+  0% { background-position: 100% 50%; }
+  100% { background-position: 0 50%; }
+}
+
+/* ============================================
+   TABLE IMPROVEMENTS
+   ============================================ */
+.ant-table-thead > tr > th {
+  background: #fafafa !important;
+  font-weight: 600;
+  font-size: 13px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.ant-table-tbody > tr:hover > td {
+  background: #f5f7fa !important;
+}
+
+/* Zebra striping */
+.ant-table-tbody > tr:nth-child(even) > td {
+  background: #fafafa;
+}
+
+/* ============================================
+   STATUS TAGS
+   ============================================ */
+.status-tag {
+  border-radius: 12px;
+  padding: 4px 12px;
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.status-tag-active {
+  background: #f6ffed;
+  color: #52c41a;
+  border-color: #b7eb8f;
+}
+
+.status-tag-inactive {
+  background: #fff2e8;
+  color: #fa541c;
+  border-color: #ffbb96;
+}
+
+.status-tag-pending {
+  background: #fffbe6;
+  color: #faad14;
+  border-color: #ffe58f;
+}
+
+/* ============================================
+   BUTTON HOVER
+   ============================================ */
+.ant-btn-primary:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(24, 144, 255, 0.3);
+}
+
+/* ============================================
+   FORM IMPROVEMENTS
+   ============================================ */
+.ant-form-item-label > label {
+  font-weight: 500;
+  color: #262626;
+}
+
+.ant-input:focus,
+.ant-input-focused {
+  border-color: #1890ff;
+  box-shadow: 0 0 0 2px rgba(24, 144, 255, 0.1);
+}
+
+/* ============================================
+   MODAL
+   ============================================ */
+.ant-modal-header {
+  border-bottom: 1px solid #f0f0f0;
+  padding-bottom: 16px;
+}
+
+.ant-modal-title {
+  font-weight: 600;
+}
