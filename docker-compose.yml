@@ -11,6 +11,7 @@ services:
       - static_uploads:/app/static
     environment:
       - FLASK_ENV=${FLASK_ENV:-production}
+      - DB_PATH=/database
       - FLASK_DEBUG=${FLASK_DEBUG:-False}
       - FLASK_HOST=${FLASK_HOST:-0.0.0.0}
       - FLASK_PORT=${FLASK_PORT:-5000}
