@@ -114,6 +114,7 @@ export const MainLayout = () => {
           left: 0,
           top: 0,
           bottom: 0,
+          background: isDark ? undefined : '#dbeafe',
         }}
       >
         <div
@@ -136,19 +137,20 @@ export const MainLayout = () => {
           selectedKeys={[location.pathname]}
           items={menuItems}
           onClick={handleMenuClick}
+          style={{ background: isDark ? undefined : '#dbeafe' }}
         />
       </Sider>
       <Layout style={{ marginLeft: collapsed ? 0 : 200 }}>
         <Header
           style={{
             padding: '0 16px',
-            background: colorBgContainer,
+            background: isDark ? colorBgContainer : '#dbeafe',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'space-between',
             position: 'sticky',
             top: 0,
-            zIndex: 1,
+            zIndex: 100,
             boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
           }}
         >
