@@ -94,6 +94,19 @@
   background: #fafafa;
 }
 
+/* Dark mode table overrides */
+html[data-prefers-color-scheme="dark"] .ant-table-thead > tr > th {
+  background: #1d1d1d !important;
+}
+
+html[data-prefers-color-scheme="dark"] .ant-table-tbody > tr:hover > td {
+  background: #2a2a2a !important;
+}
+
+html[data-prefers-color-scheme="dark"] .ant-table-tbody > tr:nth-child(even) > td {
+  background: #1a1a1a;
+}
+
 /* ============================================
    STATUS TAGS
    ============================================ */
