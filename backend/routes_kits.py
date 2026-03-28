@@ -11,7 +11,7 @@ from flask import jsonify, request
 from sqlalchemy import and_, or_
 
 from auth import admin_required, department_required, jwt_required
-from models import AuditLog, Chemical, Tool, Warehouse, WarehouseTransfer, db
+from models import AuditLog, Chemical, Tool, User, Warehouse, WarehouseTransfer, db
 from models_kits import (
     AircraftType,
     Kit,
@@ -29,6 +29,47 @@ logger = logging.getLogger(__name__)
 
 # Decorator for Materials department access
 materials_required = department_required("Materials")
+
+# US country name/abbreviation variants for geocoding restriction
+_US_COUNTRY_VARIANTS = {"us", "usa", "united states", "united states of america", "u.s.", "u.s.a."}
+
+def _geocode_address(address, city, state, zip_code, country):
+    """Geocode an address using Nominatim. Returns (lat, lon) or (None, None)."""
+    from urllib.parse import quote, urlencode
+    import requests as req
+
+    parts = [p for p in [address, city, state, zip_code, country] if p]
+    if not parts:
+        return None, None
+
+    full_address = ", ".join(parts)
+    params = {"q": full_address, "format": "json", "limit": 1}
+
+    # Restrict to US results when the address is in the United States
+    if country and country.strip().lower() in _US_COUNTRY_VARIANTS:
+        params["countrycodes"] = "us"
+
+    try:
+        geocode_url = f"https://nominatim.openstreetmap.org/search?{urlencode(params)}"
+        logger.info(f"Geocoding: {full_address}")
+        response = req.get(
+            geocode_url,
+            headers={"User-Agent": "SupplyLine-MRO-Suite/1.0"},
+            timeout=5
+        )
+        if response.status_code == 200:
+            results = response.json()
+            if results:
+                lat = float(results[0]["lat"])
+                lon = float(results[0]["lon"])
+                logger.info(f"Geocoded '{full_address}' -> ({lat}, {lon})")
+                return lat, lon
+        else:
+            logger.warning(f"Nominatim returned status {response.status_code}")
+    except Exception as e:
+        logger.warning(f"Geocoding failed for '{full_address}': {e!s}")
+
+    return None, None
 
 
 def register_kit_routes(app):
@@ -272,73 +313,61 @@ def register_kit_routes(app):
         if "status" in data:
             kit.status = data["status"]
 
+        # Capture old state before updating location fields
+        address_fields = ["location_address", "location_city", "location_state", "location_zip", "location_country"]
+        old_address_parts = [getattr(kit, f) for f in address_fields if getattr(kit, f)]
+        old_address = ", ".join(old_address_parts) if old_address_parts else None
+        old_lat = kit.latitude
+        old_lon = kit.longitude
+
         # Update location fields
         location_fields = [
             "location_address", "location_city", "location_state",
             "location_zip", "location_country", "latitude",
             "longitude", "location_notes", "trailer_number"
         ]
+        address_changed = False
         for field in location_fields:
             if field in data:
+                if getattr(kit, field) != data[field]:
+                    if field in address_fields:
+                        address_changed = True
                 setattr(kit, field, data[field])
 
-        # Auto-geocode address if lat/lon not provided but address is
-        logger.info(f"Geocoding check - data lat: {data.get('latitude')}, data lon: {data.get('longitude')}")
-        if (not data.get("latitude") or not data.get("longitude")):
-            logger.info("Geocoding condition met - building address")
-            address_parts = []
-            if kit.location_address:
-                address_parts.append(kit.location_address)
-            if kit.location_city:
-                address_parts.append(kit.location_city)
-            if kit.location_state:
-                address_parts.append(kit.location_state)
-            if kit.location_zip:
-                address_parts.append(kit.location_zip)
-            if kit.location_country:
-                address_parts.append(kit.location_country)
+        # Determine if the user explicitly provided NEW coordinates
+        new_lat = data.get("latitude")
+        new_lon = data.get("longitude")
+        user_set_new_coords = (
+            new_lat is not None and new_lon is not None and
+            (new_lat != old_lat or new_lon != old_lon)
+        )
 
-            logger.info(f"Address parts: {address_parts}")
-            if address_parts:
-                full_address = ", ".join(address_parts)
-                logger.info(f"Attempting to geocode: {full_address}")
-                try:
-                    from urllib.parse import quote
-
-                    import requests
-
-                    # Use Nominatim (OpenStreetMap) geocoding service
-                    encoded_address = quote(full_address)
-                    geocode_url = f"https://nominatim.openstreetmap.org/search?q={encoded_address}&format=json&limit=1"
-
-                    logger.info(f"Geocoding URL: {geocode_url}")
-                    response = requests.get(
-                        geocode_url,
-                        headers={"User-Agent": "SupplyLine-MRO-Suite/1.0"},
-                        timeout=5
-                    )
-
-                    logger.info(f"Geocoding response status: {response.status_code}")
-                    if response.status_code == 200:
-                        results = response.json()
-                        logger.info(f"Geocoding results: {results}")
-                        if results and len(results) > 0:
-                            kit.latitude = float(results[0]["lat"])
-                            kit.longitude = float(results[0]["lon"])
-                            logger.info(f"Geocoded address '{full_address}' to ({kit.latitude}, {kit.longitude})")
-                    else:
-                        logger.warning(f"Geocoding API returned status {response.status_code}")
-                except Exception as e:
-                    # Don't fail the update if geocoding fails, just log it
-                    logger.warning(f"Geocoding failed for address '{full_address}': {e!s}")
-                    import traceback
-                    logger.warning(f"Traceback: {traceback.format_exc()}")
-            else:
-                logger.info("No address parts to geocode")
+        # Re-geocode if: address changed and user didn't manually provide new coordinates,
+        # or if lat/lon are missing entirely
+        should_geocode = (address_changed and not user_set_new_coords) or not new_lat or not new_lon
+        if should_geocode:
+            kit.latitude = None
+            kit.longitude = None
+            lat, lon = _geocode_address(
+                kit.location_address, kit.location_city, kit.location_state,
+                kit.location_zip, kit.location_country
+            )
+            if lat is not None:
+                kit.latitude = lat
+                kit.longitude = lon
 
         db.session.commit()
 
-        # Log action
+        # Build new address string after commit for comparison
+        new_address_parts = [getattr(kit, f) for f in address_fields if getattr(kit, f)]
+        new_address = ", ".join(new_address_parts) if new_address_parts else None
+        location_actually_changed = (
+            old_address != new_address or
+            kit.latitude != old_lat or
+            kit.longitude != old_lon
+        )
+
+        # Log general update action
         AuditLog.log(
             user_id=current_user_id,
             action="kit_updated",
@@ -347,6 +376,17 @@ def register_kit_routes(app):
             details={"name": kit.name},
             ip_address=request.remote_addr
         )
+
+        # Log location change so it surfaces in recent activity
+        if location_actually_changed:
+            AuditLog.log(
+                user_id=current_user_id,
+                action="kit_location_updated",
+                resource_type="kit",
+                resource_id=kit.id,
+                details={"name": kit.name, "old_address": old_address, "new_address": new_address},
+                ip_address=request.remote_addr
+            )
 
         return jsonify(kit.to_dict(include_details=True)), 200
 
@@ -503,6 +543,11 @@ def register_kit_routes(app):
         data = request.get_json() or {}
         current_user_id = request.current_user.get("user_id")
 
+        # Capture old address before update
+        address_fields = ["location_address", "location_city", "location_state", "location_zip", "location_country"]
+        old_address_parts = [getattr(kit, f) for f in address_fields if getattr(kit, f)]
+        old_address = ", ".join(old_address_parts) if old_address_parts else None
+
         # Update location fields
         location_fields = [
             "location_address", "location_city", "location_state",
@@ -513,15 +558,31 @@ def register_kit_routes(app):
             if field in data:
                 setattr(kit, field, data[field])
 
+        # Auto-geocode address if lat/lon not explicitly provided
+        if not data.get("latitude") or not data.get("longitude"):
+            kit.latitude = None
+            kit.longitude = None
+            lat, lon = _geocode_address(
+                kit.location_address, kit.location_city, kit.location_state,
+                kit.location_zip, kit.location_country
+            )
+            if lat is not None:
+                kit.latitude = lat
+                kit.longitude = lon
+
         db.session.commit()
 
-        # Log action
+        # Build new address string for logging
+        new_address_parts = [getattr(kit, f) for f in address_fields if getattr(kit, f)]
+        new_address = ", ".join(new_address_parts) if new_address_parts else None
+
+        # Log action with address details so it surfaces in recent activity
         AuditLog.log(
             user_id=current_user_id,
             action="kit_location_updated",
             resource_type="kit",
             resource_id=kit.id,
-            details={"name": kit.name},
+            details={"name": kit.name, "old_address": old_address, "new_address": new_address},
             ip_address=request.remote_addr
         )
 
@@ -2022,6 +2083,35 @@ def register_kit_routes(app):
                 "timestamp": reorder.requested_date.isoformat() if reorder.requested_date else None,
                 "created_at": reorder.requested_date.isoformat() if reorder.requested_date else None,
                 "status": reorder.status
+            })
+
+        # Get recent location updates from AuditLog
+        recent_location_updates = (
+            AuditLog.query
+            .filter(AuditLog.action == "kit_location_updated", AuditLog.resource_type == "kit")
+            .order_by(AuditLog.timestamp.desc())
+            .limit(limit)
+            .all()
+        )
+
+        for log_entry in recent_location_updates:
+            kit = db.session.get(Kit, log_entry.resource_id)
+            if not kit:
+                continue
+            user = db.session.get(User, log_entry.user_id) if log_entry.user_id else None
+            details = log_entry.details or {}
+            old_addr = details.get("old_address") or "unknown"
+            new_addr = details.get("new_address") or "unknown"
+            activities.append({
+                "id": f"move-{log_entry.id}",
+                "type": "move",
+                "description": f"Location updated to {new_addr}",
+                "kit_name": kit.name,
+                "kit_id": kit.id,
+                "details": f"From: {old_addr}",
+                "user_name": user.name if user else "Unknown User",
+                "timestamp": log_entry.timestamp.isoformat() if log_entry.timestamp else None,
+                "created_at": log_entry.timestamp.isoformat() if log_entry.timestamp else None,
             })
 
         # Sort all activities by timestamp (most recent first)

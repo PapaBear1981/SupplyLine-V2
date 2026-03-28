@@ -468,7 +468,7 @@ export type KitWizardResponse =
 // Recent Activity
 export interface KitActivity {
   id: string;
-  type: 'issuance' | 'transfer' | 'reorder';
+  type: 'issuance' | 'transfer' | 'reorder' | 'move';
   description: string;
   kit_name: string;
   kit_id: number;

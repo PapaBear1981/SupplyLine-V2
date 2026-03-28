@@ -5,6 +5,7 @@ import {
   ExportOutlined,
   ShoppingCartOutlined,
   ReloadOutlined,
+  EnvironmentOutlined,
 } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 import dayjs from 'dayjs';
@@ -31,6 +32,8 @@ export const RecentActivity = ({ activities, loading = false, onRefresh }: Recen
         return <SwapOutlined style={{ color: '#722ed1' }} />;
       case 'reorder':
         return <ShoppingCartOutlined style={{ color: '#fa8c16' }} />;
+      case 'move':
+        return <EnvironmentOutlined style={{ color: '#13c2c2' }} />;
       default:
         return <HistoryOutlined />;
     }
@@ -44,6 +47,8 @@ export const RecentActivity = ({ activities, loading = false, onRefresh }: Recen
         return 'purple';
       case 'reorder':
         return 'orange';
+      case 'move':
+        return 'cyan';
       default:
         return 'default';
     }
