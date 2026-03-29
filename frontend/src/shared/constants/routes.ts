@@ -12,4 +12,5 @@ export const ROUTES = {
   ADMIN: '/admin',
   PROFILE: '/profile',
   SETTINGS: '/settings',
+  AI_DASHBOARD: '/ai',
 } as const;

@@ -11,6 +11,7 @@ import {
   SwapOutlined,
   ShoppingCartOutlined,
   FormOutlined,
+  RobotOutlined,
 } from '@ant-design/icons';
 import type { MenuProps } from 'antd';
 import { ROUTES } from './routes';
@@ -93,6 +94,12 @@ export const ALL_MENU_ITEMS: MenuItemWithPermission[] = [
     icon: <UserOutlined />,
     label: 'Users',
     permission: 'page.users',
+  },
+  {
+    key: ROUTES.AI_DASHBOARD,
+    icon: <RobotOutlined />,
+    label: 'AI Agents',
+    // AI Dashboard is accessible to all authenticated users
   },
   {
     key: ROUTES.ADMIN,

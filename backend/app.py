@@ -154,6 +154,10 @@ def create_app():
     from socketio_events import register_socketio_events
     register_socketio_events(app)
 
+    # Register AI WebSocket event handlers
+    from socketio_ai_events import register_ai_socketio_events
+    register_ai_socketio_events(app)
+
     # Get logger after logging is configured
     logger = logging.getLogger(__name__)
 
@@ -185,6 +189,9 @@ def create_app():
     # Setup global error handlers
     from utils.error_handler import setup_global_error_handlers
     setup_global_error_handlers(app)
+
+    # Import AI models so db.create_all() picks up AI tables
+    import models_ai  # noqa: F401
 
     # Create database tables (after all setup is complete)
     if not is_testing_env:
@@ -321,6 +328,26 @@ def create_app():
             logger.info("Scheduled maintenance service initialized")
         except Exception as e:
             logger.error("Error initializing scheduled maintenance service", exc_info=True, extra={
+                "error_message": str(e)
+            })
+
+    # Initialize AI Agent system
+    if not is_testing_env:
+        try:
+            from ai_agents.agent_manager import AgentManager
+
+            logger.info("Initializing AI agent system...")
+            agent_manager = AgentManager.get_instance()
+            agent_manager.init_app(app)
+            agent_manager.start_all()
+
+            # Register cleanup on shutdown
+            atexit.register(agent_manager.stop_all)
+
+            logger.info("AI agent system initialized with %d agents",
+                        len(agent_manager.get_all_agents()))
+        except Exception as e:
+            logger.error("Error initializing AI agent system", exc_info=True, extra={
                 "error_message": str(e)
             })
 

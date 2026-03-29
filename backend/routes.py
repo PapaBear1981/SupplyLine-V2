@@ -21,6 +21,7 @@ from models import (
     db,
 )
 from routes_admin import register_admin_routes
+from routes_ai import register_ai_routes
 from routes_announcements import register_announcement_routes
 from routes_attachments import register_attachments_routes
 from routes_auth import register_auth_routes
@@ -255,6 +256,9 @@ def register_routes(app):
 
     # Register database management routes
     register_database_routes(app)
+
+    # Register AI agent routes
+    register_ai_routes(app)
 
     # Add direct routes for chemicals management
     @app.route("/api/chemicals/reorder-needed", methods=["GET"])

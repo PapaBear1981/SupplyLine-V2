@@ -29,6 +29,7 @@ import {
   RequestCreationForm,
 } from '@features/orders';
 import { ReportsPage } from '@features/reports';
+import { AIDashboardPage, AIChatWidget } from '@features/ai';
 import { ThemeProvider, useTheme } from '@features/settings/contexts/ThemeContext';
 import { COLOR_THEMES } from '@features/settings/types/theme';
 import { ROUTES } from '@shared/constants/routes';
@@ -90,6 +91,9 @@ function AppContent() {
                   <Route path={ROUTES.PROFILE} element={<ProfilePage />} />
                   <Route path={ROUTES.SETTINGS} element={<SettingsPage />} />
 
+                  {/* AI Dashboard */}
+                  <Route path={ROUTES.AI_DASHBOARD} element={<AIDashboardPage />} />
+
                   {/* Admin-only routes - Desktop only on mobile */}
                   <Route element={<AdminRoute />}>
                     <Route path={ROUTES.ADMIN} element={<AdminPageWrapper />} />
@@ -100,6 +104,8 @@ function AppContent() {
               {/* 404 Route */}
               <Route path="*" element={<Navigate to={ROUTES.HOME} replace />} />
             </Routes>
+            {/* Floating AI Chat Widget - available on all pages */}
+            <AIChatWidget />
           </BrowserRouter>
         </div>
       </MobileConfigProvider>
