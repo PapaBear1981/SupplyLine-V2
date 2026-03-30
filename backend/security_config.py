@@ -11,7 +11,7 @@ import tempfile
 # Security Headers Configuration
 SECURITY_HEADERS = {
     # Prevent MIME type sniffing
-    "X-Content-Type-Options": "nosnif",
+    "X-Content-Type-Options": "nosniff",
 
     # Prevent clickjacking
     "X-Frame-Options": "DENY",
@@ -24,19 +24,19 @@ SECURITY_HEADERS = {
 
     # Content Security Policy
     "Content-Security-Policy": (
-        "default-src 'sel'; "
-        "script-src 'sel' 'unsafe-inline' 'unsafe-eval'; "
-        "style-src 'sel' 'unsafe-inline'; "
-        "img-src 'sel' data: https:; "
-        "font-src 'sel' data:; "
-        "connect-src 'sel'; "
+        "default-src 'self'; "
+        "script-src 'self' 'unsafe-inline' 'unsafe-eval'; "
+        "style-src 'self' 'unsafe-inline'; "
+        "img-src 'self' data: https:; "
+        "font-src 'self' data:; "
+        "connect-src 'self'; "
         "frame-ancestors 'none'; "
-        "base-uri 'sel'; "
-        "form-action 'sel'; "
+        "base-uri 'self'; "
+        "form-action 'self'; "
         "object-src 'none'; "
-        "media-src 'sel'; "
-        "worker-src 'sel'; "
-        "manifest-src 'sel'"
+        "media-src 'self'; "
+        "worker-src 'self'; "
+        "manifest-src 'self'"
     ),
 
     # Referrer Policy
@@ -182,8 +182,8 @@ AUDIT_CONFIG = {
 # File Upload Security
 FILE_UPLOAD_CONFIG = {
     "max_file_size": 5 * 1024 * 1024,  # 5MB
-    "allowed_extensions": [".jpg", ".jpeg", ".png", ".gi", ".pd", ".doc", ".docx", ".xls", ".xlsx"],
-    "forbidden_extensions": [".exe", ".bat", ".cmd", ".com", ".pi", ".scr", ".vbs", ".js"],
+    "allowed_extensions": [".jpg", ".jpeg", ".png", ".gif", ".pdf", ".doc", ".docx", ".xls", ".xlsx"],
+    "forbidden_extensions": [".exe", ".bat", ".cmd", ".com", ".pif", ".scr", ".vbs", ".js"],
     "scan_for_malware": True,
     "quarantine_suspicious": True,
     "upload_path": "/secure/uploads/",

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Modal, Form, Input, message, Steps, Typography, Space, Alert, Spin } from 'antd';
 import { SafetyCertificateOutlined, QrcodeOutlined, CheckCircleOutlined } from '@ant-design/icons';
 import {
@@ -27,6 +27,16 @@ export const TotpSetupModal = ({ open, onClose, onSuccess }: TotpSetupModalProps
 
   const [setupTotp, { isLoading: isSettingUp }] = useSetupTotpMutation();
   const [verifyTotpSetup, { isLoading: isVerifying }] = useVerifyTotpSetupMutation();
+  const successTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Cleanup timeout on unmount to prevent memory leak
+  useEffect(() => {
+    return () => {
+      if (successTimeoutRef.current) {
+        clearTimeout(successTimeoutRef.current);
+      }
+    };
+  }, []);
 
   const handleSetupStart = async () => {
     try {
@@ -55,7 +65,7 @@ export const TotpSetupModal = ({ open, onClose, onSuccess }: TotpSetupModalProps
       setCurrentStep(2);
 
       // Call onSuccess after a brief delay to show the success step
-      setTimeout(() => {
+      successTimeoutRef.current = setTimeout(() => {
         onSuccess?.();
         handleClose();
       }, 2000);

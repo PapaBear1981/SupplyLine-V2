@@ -89,10 +89,14 @@ export const UserManagement = () => {
   };
 
   const handleResetPasswordSubmit = async () => {
+    if (!selectedUser) {
+      message.error('No user selected');
+      return;
+    }
     try {
       const values = await resetPasswordForm.validateFields();
       await resetPassword({
-        user_id: selectedUser!.id,
+        user_id: selectedUser.id,
         new_password: values.new_password,
         force_change: values.force_change,
       }).unwrap();
@@ -105,10 +109,14 @@ export const UserManagement = () => {
   };
 
   const handlePermissionsSubmit = async () => {
+    if (!selectedUser) {
+      message.error('No user selected');
+      return;
+    }
     try {
       const values = await permissionsForm.validateFields();
       await updatePermissions({
-        user_id: selectedUser!.id,
+        user_id: selectedUser.id,
         role_ids: values.role_ids,
       }).unwrap();
       message.success('Permissions updated successfully');

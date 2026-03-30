@@ -194,8 +194,8 @@ def handle_kit_message(user_id, data):
         if recipient_id:
             emit("new_kit_message", message_data, room=f"user_{recipient_id}")
         else:
-            # Broadcast to all if no recipient (public message)
-            emit("new_kit_message", message_data, broadcast=True)
+            # Broadcast to kit room only (not all users)
+            emit("new_kit_message", message_data, room=f"kit_{kit_id}")
 
         logger.info("Kit message sent", extra={
             "sender_id": user_id,

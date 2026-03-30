@@ -311,14 +311,19 @@ def _build_item_history(item, item_type, identifier, tracking_number):
 
     # 2. Get inventory transactions
     if item_type in ["tool", "chemical"]:
+        from models import User
+
         transactions = InventoryTransaction.query.filter_by(
             item_type=item_type,
             item_id=item.id
         ).order_by(InventoryTransaction.timestamp.asc()).all()
 
+        # Batch-load all users to avoid N+1 queries
+        trans_user_ids = [t.user_id for t in transactions if t.user_id]
+        trans_users = {u.id: u for u in User.query.filter(User.id.in_(trans_user_ids)).all()} if trans_user_ids else {}
+
         for trans in transactions:
-            from models import User
-            user = db.session.get(User, trans.user_id)
+            user = trans_users.get(trans.user_id)
             history_events.append({
                 "event_type": trans.transaction_type,
                 "timestamp": trans.timestamp.isoformat() if trans.timestamp else None,
@@ -340,9 +345,12 @@ def _build_item_history(item, item_type, identifier, tracking_number):
             WarehouseTransfer.item_id == item.id
         ).order_by(WarehouseTransfer.transfer_date.asc()).all()
 
+        # Batch-load users for warehouse transfers to avoid N+1 queries
+        wt_user_ids = [t.transferred_by_id for t in warehouse_transfers if t.transferred_by_id]
+        wt_users = {u.id: u for u in User.query.filter(User.id.in_(wt_user_ids)).all()} if wt_user_ids else {}
+
         for transfer in warehouse_transfers:
-            from models import User
-            user = db.session.get(User, transfer.transferred_by_id)
+            user = wt_users.get(transfer.transferred_by_id)
 
             # Determine transfer type
             if transfer.from_warehouse_id and transfer.to_warehouse_id:

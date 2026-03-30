@@ -13,7 +13,7 @@ import logging
 import re
 import time
 from collections import defaultdict, deque
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
 from functools import wraps
 
 from flask import g, jsonify, request
@@ -202,7 +202,7 @@ class SecurityMonitor:
             ip_address: Source IP address
         """
         event = {
-            "timestamp": datetime.utcnow(),
+            "timestamp": datetime.now(UTC),
             "type": event_type,
             "details": details,
             "ip_address": ip_address
@@ -211,7 +211,7 @@ class SecurityMonitor:
         self.suspicious_activities[ip_address].append(event)
 
         # Clean old events (keep last 24 hours)
-        cutoff = datetime.utcnow() - timedelta(hours=24)
+        cutoff = datetime.now(UTC) - timedelta(hours=24)
         self.suspicious_activities[ip_address] = [
             e for e in self.suspicious_activities[ip_address]
             if e["timestamp"] > cutoff
@@ -228,7 +228,7 @@ class SecurityMonitor:
         events = self.suspicious_activities[ip_address]
 
         # Count events by type in the last hour
-        one_hour_ago = datetime.utcnow() - timedelta(hours=1)
+        one_hour_ago = datetime.now(UTC) - timedelta(hours=1)
         recent_events = [e for e in events if e["timestamp"] > one_hour_ago]
 
         event_counts = defaultdict(int)

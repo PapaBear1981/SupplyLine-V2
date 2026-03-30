@@ -54,14 +54,19 @@ class RateLimiter:
         bucket["last_refill"] = now
 
     def _cleanup_old_buckets(self):
-        """Remove buckets that haven't been used recently"""
+        """Remove buckets that haven't been used recently."""
         now = time.time()
+        # Quick check without lock to avoid contention on every request
         if now - self.last_cleanup < self.cleanup_interval:
             return
 
         cutoff_time = now - (self.cleanup_interval * 2)  # 2 hours old
 
         with self.lock:
+            # Re-check inside lock to prevent duplicate cleanup
+            if now - self.last_cleanup < self.cleanup_interval:
+                return
+
             old_clients = [
                 client_id for client_id, bucket in self.buckets.items()
                 if bucket["last_refill"] < cutoff_time
@@ -71,9 +76,6 @@ class RateLimiter:
                 del self.buckets[client_id]
 
             self.last_cleanup = now
-
-        if old_clients:
-            print(f"Rate limiter: Cleaned up {len(old_clients)} old client buckets")
 
     def _consume_token(self, client_id):
         """

@@ -7,13 +7,18 @@ import type { User } from '@features/auth/types';
 // Track token expiration
 let tokenExpiresAt: number | null = null;
 let isRefreshing = false;
+let refreshPromise: Promise<void> | null = null;
 
 export const setTokenExpiration = (expiresIn: number) => {
   // Set expiration time (current time + expires_in seconds)
   tokenExpiresAt = Date.now() + expiresIn * 1000;
 
   // Store in localStorage so SessionExpiryWarning can access it
-  localStorage.setItem('token_expires_at', tokenExpiresAt.toString());
+  try {
+    localStorage.setItem('token_expires_at', tokenExpiresAt.toString());
+  } catch {
+    // localStorage may be full or unavailable - token refresh still works in-memory
+  }
 };
 
 const baseQuery = fetchBaseQuery({
@@ -45,34 +50,42 @@ const baseQueryWithAuth: BaseQueryFn<
   if (shouldRefresh && !isRefreshing) {
     isRefreshing = true;
 
-    try {
-      const refreshResult = await baseQuery(
-        { url: '/api/auth/refresh', method: 'POST' },
-        api,
-        extraOptions
-      );
+    refreshPromise = (async () => {
+      try {
+        const refreshResult = await baseQuery(
+          { url: '/api/auth/refresh', method: 'POST' },
+          api,
+          extraOptions
+        );
 
-      if (refreshResult.data) {
-        const data = refreshResult.data as { access_token?: string; user: User; expires_in?: number };
+        if (refreshResult.data) {
+          const data = refreshResult.data as { access_token?: string; user: User; expires_in?: number };
 
-        // Update credentials in Redux store
-        api.dispatch(setCredentials({
-          user: data.user,
-          token: data.access_token ?? null
-        }));
+          // Update credentials in Redux store
+          api.dispatch(setCredentials({
+            user: data.user,
+            token: data.access_token ?? null
+          }));
 
-        // Update token expiration
-        if (data.expires_in) {
-          setTokenExpiration(data.expires_in);
+          // Update token expiration
+          if (data.expires_in) {
+            setTokenExpiration(data.expires_in);
+          }
+
+          console.debug('Token refreshed successfully');
         }
-
-        console.debug('Token refreshed successfully');
+      } catch (error) {
+        console.error('Token refresh failed:', error);
+      } finally {
+        isRefreshing = false;
+        refreshPromise = null;
       }
-    } catch (error) {
-      console.error('Token refresh failed:', error);
-    } finally {
-      isRefreshing = false;
-    }
+    })();
+  }
+
+  // If a refresh is in progress, wait for it before proceeding
+  if (refreshPromise) {
+    await refreshPromise;
   }
 
   const result = await baseQuery(args, api, extraOptions);

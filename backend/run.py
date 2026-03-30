@@ -23,4 +23,5 @@ if __name__ == "__main__":
 
     # Use socketio.run() instead of app.run() for WebSocket support
     # allow_unsafe_werkzeug=True is needed for production deployment
-    socketio.run(app, host=host, port=port, debug=debug_mode, allow_unsafe_werkzeug=True)
+    is_production = os.environ.get("FLASK_ENV") == "production"
+    socketio.run(app, host=host, port=port, debug=debug_mode, allow_unsafe_werkzeug=not is_production)

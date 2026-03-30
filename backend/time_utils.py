@@ -26,9 +26,7 @@ def get_utc_timestamp() -> datetime:
     Returns:
         datetime: Current UTC time as a naive datetime object
     """
-    # For consistency with the application's requirements to use local time,
-    # we'll return the local time instead of UTC time
-    return get_local_timestamp()
+    return datetime.now(UTC).replace(tzinfo=None)
 
 
 def get_local_timestamp() -> datetime:

@@ -81,13 +81,19 @@ export function ReportsPage() {
       return;
     }
 
+    const token = localStorage.getItem('access_token');
+    if (!token) {
+      message.error('Session expired. Please log in again.');
+      return;
+    }
+
     setIsExporting(true);
     try {
       const response = await fetch(`/api/reports/export/${format}`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('access_token')}`,
+          'Authorization': `Bearer ${token}`,
         },
         body: JSON.stringify({
           report_type: currentReportType,
@@ -97,7 +103,8 @@ export function ReportsPage() {
       });
 
       if (!response.ok) {
-        throw new Error('Export failed');
+        const errorText = await response.text().catch(() => '');
+        throw new Error(errorText || `Export failed with status ${response.status}`);
       }
 
       const blob = await response.blob();
