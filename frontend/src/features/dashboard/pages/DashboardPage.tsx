@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import { Row, Col, Spin } from 'antd';
+import { Row, Col, Spin, Alert } from 'antd';
 import {
   ToolOutlined,
   ExperimentOutlined,
@@ -50,14 +50,21 @@ export const DashboardPage = () => {
   const primaryColor = COLOR_THEMES[themeConfig.colorTheme].primary;
 
   // Fetch data
-  const { data: toolsData, isLoading: toolsLoading, refetch: refetchTools } = useGetToolsQuery({ per_page: 1000 });
-  const { data: chemicalsData, isLoading: chemicalsLoading, refetch: refetchChemicals } = useGetChemicalsQuery({ per_page: 1000 });
-  const { data: kitsData, isLoading: kitsLoading, refetch: refetchKits } = useGetKitsQuery();
-  const { data: warehousesData, isLoading: warehousesLoading } = useGetWarehousesQuery();
+  const { data: toolsData, isLoading: toolsLoading, error: toolsError, refetch: refetchTools } = useGetToolsQuery({ per_page: 1000 });
+  const { data: chemicalsData, isLoading: chemicalsLoading, error: chemicalsError, refetch: refetchChemicals } = useGetChemicalsQuery({ per_page: 1000 });
+  const { data: kitsData, isLoading: kitsLoading, error: kitsError, refetch: refetchKits } = useGetKitsQuery();
+  const { data: warehousesData, isLoading: warehousesLoading, error: warehousesError } = useGetWarehousesQuery();
   const { data: onlineUsersData } = useGetOnlineUsersQuery(undefined, { pollingInterval: 30000 }); // Poll every 30 seconds
   const { data: announcements, isLoading: announcementsLoading } = useGetAnnouncementsQuery();
   const { data: recentActivity, isLoading: activityLoading, refetch: refetchActivity } = useGetRecentKitActivityQuery({ limit: 10 });
   const { data: pendingReorders } = useGetReorderReportQuery({ status: 'pending' });
+
+  const failedSections = [
+    toolsError && 'Tools',
+    chemicalsError && 'Chemicals',
+    kitsError && 'Kits',
+    warehousesError && 'Warehouses',
+  ].filter(Boolean) as string[];
 
   // Calculate tool stats
   const toolStats = useMemo(() => {
@@ -236,6 +243,26 @@ export const DashboardPage = () => {
 
   return (
     <div className={styles.dashboard}>
+      {/* Data fetch error banner */}
+      {failedSections.length > 0 && (
+        <Alert
+          type="warning"
+          showIcon
+          message={`Could not load: ${failedSections.join(', ')}`}
+          description="Some dashboard data is unavailable. Stats shown may be incomplete."
+          action={
+            <button
+              style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'inherit', textDecoration: 'underline' }}
+              onClick={() => { refetchTools(); refetchChemicals(); refetchKits(); }}
+            >
+              Retry
+            </button>
+          }
+          style={{ marginBottom: 16 }}
+          closable
+        />
+      )}
+
       {/* Welcome Section */}
       <div className={styles.welcomeSection}>
         <WelcomeCard

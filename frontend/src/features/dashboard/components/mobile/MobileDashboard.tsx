@@ -48,13 +48,20 @@ export const MobileDashboard = () => {
   const [announcementsPopupOpen, setAnnouncementsPopupOpen] = useState(false);
 
   // Fetch data
-  const { data: toolsData, isLoading: toolsLoading } = useGetToolsQuery({ per_page: 1000 });
-  const { data: chemicalsData, isLoading: chemicalsLoading } = useGetChemicalsQuery({ per_page: 1000 });
-  const { data: kitsData, isLoading: kitsLoading } = useGetKitsQuery();
-  const { data: warehousesData, isLoading: warehousesLoading } = useGetWarehousesQuery();
+  const { data: toolsData, isLoading: toolsLoading, error: toolsError, refetch: refetchTools } = useGetToolsQuery({ per_page: 1000 });
+  const { data: chemicalsData, isLoading: chemicalsLoading, error: chemicalsError, refetch: refetchChemicals } = useGetChemicalsQuery({ per_page: 1000 });
+  const { data: kitsData, isLoading: kitsLoading, error: kitsError, refetch: refetchKits } = useGetKitsQuery();
+  const { data: warehousesData, isLoading: warehousesLoading, error: warehousesError } = useGetWarehousesQuery();
   const { data: announcements } = useGetAnnouncementsQuery();
-  const { data: recentActivity, isLoading: activityLoading } = useGetRecentKitActivityQuery({ limit: 5 });
+  const { data: recentActivity, isLoading: activityLoading, error: activityError, refetch: refetchActivity } = useGetRecentKitActivityQuery({ limit: 5 });
   const { data: pendingReorders } = useGetReorderReportQuery({ status: 'pending' });
+
+  const failedSections = [
+    toolsError && 'Tools',
+    chemicalsError && 'Chemicals',
+    kitsError && 'Kits',
+    warehousesError && 'Warehouses',
+  ].filter(Boolean) as string[];
 
   // Calculate tool stats
   const toolStats = useMemo(() => {
@@ -233,6 +240,17 @@ export const MobileDashboard = () => {
         )}
       </div>
 
+      {/* Data fetch error notice */}
+      {failedSections.length > 0 && (
+        <div style={{ marginBottom: 8 }}>
+          <NoticeBar
+            content={`Could not load: ${failedSections.join(', ')}. Tap to retry.`}
+            color="error"
+            onClick={() => { refetchTools(); refetchChemicals(); refetchKits(); }}
+          />
+        </div>
+      )}
+
       {/* Announcement Banner */}
       {topAnnouncement && (
         <div style={{ marginBottom: 16 }}>
@@ -327,6 +345,10 @@ export const MobileDashboard = () => {
       <Card className="activity-card">
         {activityLoading ? (
           <Skeleton.Paragraph lineCount={3} animated />
+        ) : activityError ? (
+          <div className="empty-state">
+            <p>Failed to load activity. <span style={{ color: 'var(--adm-color-primary)', cursor: 'pointer' }} onClick={refetchActivity}>Retry</span></p>
+          </div>
         ) : recentActivity && recentActivity.length > 0 ? (
           <List>
             {recentActivity.slice(0, 5).map((activity, index) => (

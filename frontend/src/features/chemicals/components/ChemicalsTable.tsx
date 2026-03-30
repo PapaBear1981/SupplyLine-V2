@@ -10,6 +10,7 @@ import {
   message,
   Typography,
   Badge,
+  Alert,
 } from 'antd';
 import type { TableProps } from 'antd';
 import {
@@ -41,7 +42,7 @@ export const ChemicalsTable = ({ onView, onEdit, onIssue }: ChemicalsTableProps)
   const [searchQuery, setSearchQuery] = useState('');
   const [committedSearch, setCommittedSearch] = useState('');
 
-  const { data, isLoading, isFetching } = useGetChemicalsQuery({
+  const { data, isLoading, isFetching, error, refetch } = useGetChemicalsQuery({
     page,
     per_page: pageSize,
     q: committedSearch || undefined,
@@ -202,6 +203,16 @@ export const ChemicalsTable = ({ onView, onEdit, onIssue }: ChemicalsTableProps)
 
   return (
     <div>
+      {error && (
+        <Alert
+          type="error"
+          showIcon
+          message="Failed to load chemicals"
+          description="An error occurred while fetching chemicals. Please try again."
+          action={<Button size="small" onClick={refetch}>Retry</Button>}
+          style={{ marginBottom: 16 }}
+        />
+      )}
       <div style={{ marginBottom: 16 }}>
         <Input
           placeholder="Search chemicals..."

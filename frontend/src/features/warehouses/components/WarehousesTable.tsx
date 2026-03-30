@@ -9,6 +9,7 @@ import {
   Popconfirm,
   message,
   Typography,
+  Alert,
 } from 'antd';
 import type { TableProps } from 'antd';
 import {
@@ -39,7 +40,7 @@ export const WarehousesTable = ({ onView, onEdit }: WarehousesTableProps) => {
   const [pageSize, setPageSize] = useState(50);
   const [includeInactive, setIncludeInactive] = useState(false);
 
-  const { data, isLoading, isFetching } = useGetWarehousesQuery({
+  const { data, isLoading, isFetching, error, refetch } = useGetWarehousesQuery({
     page,
     per_page: pageSize,
     include_inactive: includeInactive,
@@ -210,6 +211,16 @@ export const WarehousesTable = ({ onView, onEdit }: WarehousesTableProps) => {
 
   return (
     <div>
+      {error && (
+        <Alert
+          type="error"
+          showIcon
+          message="Failed to load warehouses"
+          description="An error occurred while fetching warehouses. Please try again."
+          action={<Button size="small" onClick={refetch}>Retry</Button>}
+          style={{ marginBottom: 16 }}
+        />
+      )}
       <div style={{ marginBottom: 16, display: 'flex', gap: 16 }}>
         <Input
           placeholder="Search warehouses..."

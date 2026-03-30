@@ -32,6 +32,7 @@ import { ReportsPage } from '@features/reports';
 import { ThemeProvider, useTheme } from '@features/settings/contexts/ThemeContext';
 import { COLOR_THEMES } from '@features/settings/types/theme';
 import { ROUTES } from '@shared/constants/routes';
+import { ErrorBoundary } from '@shared/components/ErrorBoundary';
 
 function AppContent() {
   const { themeConfig } = useTheme();
@@ -109,13 +110,15 @@ function AppContent() {
 
 function App() {
   return (
-    <ThemeProvider>
-      <PermissionProvider>
-        <MobileProvider>
-          <AppContent />
-        </MobileProvider>
-      </PermissionProvider>
-    </ThemeProvider>
+    <ErrorBoundary>
+      <ThemeProvider>
+        <PermissionProvider>
+          <MobileProvider>
+            <AppContent />
+          </MobileProvider>
+        </PermissionProvider>
+      </ThemeProvider>
+    </ErrorBoundary>
   );
 }
 

@@ -8,6 +8,7 @@ import {
   Tooltip,
   Popconfirm,
   message,
+  Alert,
 } from 'antd';
 import type { TableProps } from 'antd';
 import {
@@ -30,7 +31,7 @@ export const ToolsTable = ({ onView, onEdit }: ToolsTableProps) => {
   const [pageSize, setPageSize] = useState(50);
   const [searchQuery, setSearchQuery] = useState('');
 
-  const { data, isLoading, isFetching } = useGetToolsQuery({
+  const { data, isLoading, isFetching, error, refetch } = useGetToolsQuery({
     page,
     per_page: pageSize,
     q: searchQuery || undefined,
@@ -195,6 +196,16 @@ export const ToolsTable = ({ onView, onEdit }: ToolsTableProps) => {
 
   return (
     <div>
+      {error && (
+        <Alert
+          type="error"
+          showIcon
+          message="Failed to load tools"
+          description="An error occurred while fetching tools. Please try again."
+          action={<Button size="small" onClick={refetch}>Retry</Button>}
+          style={{ marginBottom: 16 }}
+        />
+      )}
       <div style={{ marginBottom: 16 }}>
         <Input
           placeholder="Search tools..."

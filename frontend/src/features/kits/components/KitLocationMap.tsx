@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect } from 'react';
-import { Card, Select, Space, Typography, Spin, Empty, Tag, Descriptions, Badge, Button } from 'antd';
+import { Card, Select, Space, Typography, Spin, Empty, Tag, Descriptions, Badge, Button, Alert } from 'antd';
 import { EnvironmentOutlined, ReloadOutlined, InboxOutlined } from '@ant-design/icons';
 import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet';
 import L from 'leaflet';
@@ -171,7 +171,7 @@ export function KitLocationMap({ height = 400 }: KitLocationMapProps) {
   const tileLayerClassName = isDarkMode ? 'kit-map-dark-tiles' : undefined;
   const mapContainerClassName = isDarkMode ? 'kit-map-container-dark' : '';
 
-  const { data: locationsData, isLoading, refetch } = useGetKitLocationsQuery({
+  const { data: locationsData, isLoading, error: locationsError, refetch } = useGetKitLocationsQuery({
     aircraft_type_id: aircraftTypeFilter,
     status: statusFilter,
     with_location_only: false,
@@ -220,6 +220,28 @@ export function KitLocationMap({ height = 400 }: KitLocationMapProps) {
         <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height }}>
           <Spin size="large" />
         </div>
+      </Card>
+    );
+  }
+
+  if (locationsError) {
+    return (
+      <Card
+        title={
+          <Space>
+            <EnvironmentOutlined />
+            <span>Kit Locations</span>
+          </Space>
+        }
+      >
+        <Alert
+          type="error"
+          showIcon
+          message="Failed to load kit locations"
+          description="An error occurred while fetching kit location data."
+          action={<Button size="small" icon={<ReloadOutlined />} onClick={() => refetch()}>Retry</Button>}
+          style={{ margin: 16 }}
+        />
       </Card>
     );
   }
