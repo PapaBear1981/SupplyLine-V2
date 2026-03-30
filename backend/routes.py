@@ -259,22 +259,19 @@ def register_routes(app):
     # Add direct routes for chemicals management
     @app.route("/api/chemicals/reorder-needed", methods=["GET"])
     @materials_manager_required
+    @handle_errors
     def chemicals_reorder_needed_direct_route():
-        try:
-            logger.debug("Chemicals reorder-needed requested", extra={
-                "user_id": request.current_user.get("user_id") if hasattr(request, "current_user") else session.get("user_id"),
-                "department": request.current_user.get("department") if hasattr(request, "current_user") else session.get("department")
-            })
-            # Get chemicals that need to be reordered
-            chemicals = Chemical.query.filter_by(needs_reorder=True, reorder_status="needed").all()
+        logger.debug("Chemicals reorder-needed requested", extra={
+            "user_id": request.current_user.get("user_id") if hasattr(request, "current_user") else session.get("user_id"),
+            "department": request.current_user.get("department") if hasattr(request, "current_user") else session.get("department")
+        })
+        # Get chemicals that need to be reordered
+        chemicals = Chemical.query.filter_by(needs_reorder=True, reorder_status="needed").all()
 
-            # Convert to list of dictionaries
-            result = [c.to_dict() for c in chemicals]
+        # Convert to list of dictionaries
+        result = [c.to_dict() for c in chemicals]
 
-            return jsonify(result)
-        except Exception:
-            logger.exception("Error in chemicals reorder needed route")
-            return jsonify({"error": "An error occurred while fetching chemicals that need reordering"}), 500
+        return jsonify(result)
 
     @app.route("/api/chemicals/on-order", methods=["GET"])
     @materials_manager_required
@@ -292,68 +289,58 @@ def register_routes(app):
 
     @app.route("/api/chemicals/expiring-soon", methods=["GET"])
     @materials_manager_required
+    @handle_errors
     def chemicals_expiring_soon_direct_route():
-        try:
-            logger.debug("Chemicals expiring-soon requested", extra={
-                "user_id": request.current_user.get("user_id"),
-                "department": request.current_user.get("department")
-            })
-            # Get days parameter (default to 30)
-            days = request.args.get("days", 30, type=int)
+        logger.debug("Chemicals expiring-soon requested", extra={
+            "user_id": request.current_user.get("user_id"),
+            "department": request.current_user.get("department")
+        })
+        # Get days parameter (default to 30)
+        days = request.args.get("days", 30, type=int)
 
-            # Get all non-archived chemicals
-            chemicals = Chemical.query.filter_by(is_archived=False).all()
+        # Get all non-archived chemicals
+        chemicals = Chemical.query.filter_by(is_archived=False).all()
 
-            # Filter to only those expiring soon
-            expiring_soon = [c for c in chemicals if c.is_expiring_soon(days)]
+        # Filter to only those expiring soon
+        expiring_soon = [c for c in chemicals if c.is_expiring_soon(days)]
 
-            # Convert to list of dictionaries
-            result = [c.to_dict() for c in expiring_soon]
+        # Convert to list of dictionaries
+        result = [c.to_dict() for c in expiring_soon]
 
-            return jsonify(result)
-        except Exception:
-            logger.exception("Error in chemicals expiring soon route")
-            return jsonify({"error": "An error occurred while fetching chemicals expiring soon"}), 500
+        return jsonify(result)
 
     @app.route("/api/chemicals/archived", methods=["GET"])
     @materials_manager_required
+    @handle_errors
     def archived_chemicals_direct_route():
-        try:
-            # Get query parameters for filtering
-            category = request.args.get("category")
-            reason = request.args.get("reason")
-            search = request.args.get("q")
+        # Get query parameters for filtering
+        category = request.args.get("category")
+        reason = request.args.get("reason")
+        search = request.args.get("q")
 
-            # Start with base query for archived chemicals
-            try:
-                query = Chemical.query.filter(Chemical.is_archived is True)
-            except Exception:
-                # If the column doesn't exist, return an empty list
-                return jsonify([])
+        # Start with base query for archived chemicals
+        query = Chemical.query.filter(Chemical.is_archived == True)  # noqa: E712
 
-            # Apply filters if provided
-            if category:
-                query = query.filter(Chemical.category == category)
-            if reason:
-                query = query.filter(Chemical.archived_reason.ilike(f"%{reason}%"))
-            if search:
-                query = query.filter(
-                    db.or_(
-                        Chemical.part_number.ilike(f"%{search}%"),
-                        Chemical.lot_number.ilike(f"%{search}%"),
-                        Chemical.description.ilike(f"%{search}%"),
-                        Chemical.manufacturer.ilike(f"%{search}%")
-                    )
+        # Apply filters if provided
+        if category:
+            query = query.filter(Chemical.category == category)
+        if reason:
+            query = query.filter(Chemical.archived_reason.ilike(f"%{reason}%"))
+        if search:
+            query = query.filter(
+                db.or_(
+                    Chemical.part_number.ilike(f"%{search}%"),
+                    Chemical.lot_number.ilike(f"%{search}%"),
+                    Chemical.description.ilike(f"%{search}%"),
+                    Chemical.manufacturer.ilike(f"%{search}%")
                 )
+            )
 
-            # Execute query and convert to list of dictionaries
-            chemicals = query.order_by(Chemical.archived_date.desc()).all()
-            result = [c.to_dict() for c in chemicals]
+        # Execute query and convert to list of dictionaries
+        chemicals = query.order_by(Chemical.archived_date.desc()).all()
+        result = [c.to_dict() for c in chemicals]
 
-            return jsonify(result)
-        except Exception:
-            logger.exception("Error in archived chemicals route")
-            return jsonify({"error": "An error occurred while fetching archived chemicals"}), 500
+        return jsonify(result)
 
     # Health check endpoint for Docker
     @app.route("/api/health", methods=["GET"])
