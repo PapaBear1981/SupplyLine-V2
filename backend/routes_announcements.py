@@ -1,5 +1,5 @@
 import logging
-from datetime import UTC, datetime
+from datetime import datetime, timezone
 
 from flask import jsonify, request
 
@@ -35,7 +35,7 @@ def register_announcement_routes(app):
 
             if active_only:
                 # Only show active announcements that haven't expired
-                now = datetime.now(UTC)
+                now = datetime.now(timezone.utc)
                 query = query.filter(Announcement.is_active.is_(True))
                 query = query.filter((Announcement.expiration_date.is_(None)) | (Announcement.expiration_date > now))
 

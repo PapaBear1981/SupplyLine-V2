@@ -1,7 +1,7 @@
 import logging
 import os
 import time
-from datetime import UTC, datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from functools import wraps
 
 from flask import current_app, jsonify, request, session
@@ -435,7 +435,7 @@ def register_routes(app):
             logger.exception("time_utils import failed in time_api_endpoint")
             result = {
                 "status": "ok",
-                "utc_time": datetime.now(UTC).isoformat(),
+                "utc_time": datetime.now(timezone.utc).isoformat(),
                 "local_time": datetime.now().isoformat(),
                 "timezone": str(time.tzname),
                 "using_time_utils": False
@@ -468,7 +468,7 @@ def register_routes(app):
             result = {
                 "status": "ok",
                 "message": "Time test endpoint working (fallback)",
-                "utc_time": datetime.now(UTC).isoformat(),
+                "utc_time": datetime.now(timezone.utc).isoformat(),
                 "local_time": datetime.now().isoformat(),
                 "timezone": str(time.tzname),
                 "using_time_utils": False,
@@ -2132,12 +2132,12 @@ def register_routes(app):
             if jwt_iat:
                 from datetime import datetime
                 # Convert JWT iat (Unix timestamp) to datetime
-                jwt_issued_at = datetime.fromtimestamp(jwt_iat, tz=UTC)
+                jwt_issued_at = datetime.fromtimestamp(jwt_iat, tz=timezone.utc)
 
                 # Ensure password_changed_at is timezone-aware
                 password_changed_at = user.password_changed_at
                 if password_changed_at.tzinfo is None:
-                    password_changed_at = password_changed_at.replace(tzinfo=UTC)
+                    password_changed_at = password_changed_at.replace(tzinfo=timezone.utc)
 
                 # Reject if JWT was issued before the last password change
                 if jwt_issued_at < password_changed_at:

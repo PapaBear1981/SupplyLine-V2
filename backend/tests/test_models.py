@@ -2,7 +2,7 @@
 Tests for database models
 """
 
-from datetime import UTC, datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 from models import Checkout, Chemical, Permission, Role, RolePermission, Tool, User
 
@@ -362,7 +362,7 @@ class TestCheckoutModel:
         checkout = Checkout(
             tool_id=test_tool.id,
             user_id=regular_user.id,
-            expected_return_date=datetime.now(UTC) + timedelta(days=7)
+            expected_return_date=datetime.now(timezone.utc) + timedelta(days=7)
         )
 
         db_session.add(checkout)

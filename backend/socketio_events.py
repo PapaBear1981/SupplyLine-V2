@@ -3,7 +3,7 @@ WebSocket event handlers for real-time messaging features.
 Handles connection, disconnection, messaging, typing indicators, and presence tracking.
 """
 import logging
-from datetime import UTC, datetime
+from datetime import datetime, timezone
 from functools import wraps
 
 from flask import request
@@ -87,7 +87,7 @@ def handle_connect():
             db.session.add(presence)
 
         presence.is_online = True
-        presence.last_activity = datetime.now(UTC)
+        presence.last_activity = datetime.now(timezone.utc)
         presence.socket_id = request.sid
         db.session.commit()
 
@@ -107,7 +107,7 @@ def handle_connect():
         # Broadcast presence update to all users
         emit("user_online", {
             "user_id": user_id,
-            "timestamp": datetime.now(UTC).isoformat()
+            "timestamp": datetime.now(timezone.utc).isoformat()
         }, broadcast=True)
 
         return True
@@ -135,7 +135,7 @@ def handle_disconnect():
             presence = UserPresence.query.filter_by(user_id=user_id).first()
             if presence:
                 presence.is_online = False
-                presence.last_seen = datetime.now(UTC)
+                presence.last_seen = datetime.now(timezone.utc)
                 presence.socket_id = None
                 db.session.commit()
 
@@ -146,7 +146,7 @@ def handle_disconnect():
                 # Broadcast presence update
                 emit("user_offline", {
                     "user_id": user_id,
-                    "timestamp": datetime.now(UTC).isoformat()
+                    "timestamp": datetime.now(timezone.utc).isoformat()
                 }, broadcast=True)
 
     except Exception as e:
@@ -232,7 +232,7 @@ def handle_mark_kit_message_read(user_id, data):
             return
 
         message.is_read = True
-        message.read_date = datetime.now(UTC)
+        message.read_date = datetime.now(timezone.utc)
         db.session.commit()
 
         # Notify sender that message was read
@@ -549,7 +549,7 @@ def handle_update_status(user_id, data):
             db.session.add(presence)
 
         presence.status_message = status_message
-        presence.last_activity = datetime.now(UTC)
+        presence.last_activity = datetime.now(timezone.utc)
         db.session.commit()
 
         # Broadcast status update
@@ -574,10 +574,10 @@ def handle_ping(user_id, data):
     try:
         presence = UserPresence.query.filter_by(user_id=user_id).first()
         if presence:
-            presence.last_activity = datetime.now(UTC)
+            presence.last_activity = datetime.now(timezone.utc)
             db.session.commit()
 
-        emit("pong", {"timestamp": datetime.now(UTC).isoformat()})
+        emit("pong", {"timestamp": datetime.now(timezone.utc).isoformat()})
 
     except Exception as e:
         logger.error(f"Error handling ping: {e!s}")

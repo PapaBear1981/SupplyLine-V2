@@ -4,7 +4,7 @@ API routes for message attachments - upload, download, and management.
 import logging
 import os
 import secrets
-from datetime import UTC, datetime
+from datetime import datetime, timezone
 
 from flask import Blueprint, jsonify, request, send_file
 from PIL import Image
@@ -62,7 +62,7 @@ def generate_unique_filename(original_filename):
     """Generate a unique filename to prevent collisions"""
     ext = get_file_extension(original_filename)
     unique_id = secrets.token_urlsafe(16)
-    timestamp = datetime.now(UTC).strftime("%Y%m%d_%H%M%S")
+    timestamp = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
     return f"{timestamp}_{unique_id}.{ext}" if ext else f"{timestamp}_{unique_id}"
 
 

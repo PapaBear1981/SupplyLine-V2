@@ -1,12 +1,14 @@
-import { test, expect } from '@playwright/test';
+import { expect, Page, test } from '@playwright/test';
 
-const login = async (page: any) => {
+const login = async (page: Page) => {
   await page.goto('/login');
   await page.waitForSelector('.ant-input, .ant-input-affix-wrapper', { timeout: 10000 });
   await page.fill('input[placeholder*="Employee"], input[placeholder*="00421"]', 'ADMIN001');
   await page.fill('input[type="password"]', 'admin123');
   await page.click('button[type="submit"]');
-  await page.waitForTimeout(3000);
+  await page.waitForURL('**/dashboard', { timeout: 10000 }).catch(async () => {
+    await page.waitForLoadState('networkidle');
+  });
 };
 
 test.describe('Dashboard', () => {
