@@ -1,13 +1,16 @@
 import { useState } from 'react';
+import { useIsMobile } from '@shared/hooks/useMobile';
 import { Button, Space, Typography } from 'antd';
 import { PlusOutlined } from '@ant-design/icons';
 import { UsersTable } from '../components/UsersTable';
 import { UserDrawer } from '../components/UserDrawer';
 import type { User } from '../types';
+import { MobileUsersList } from '../components/mobile';
 
 const { Title, Paragraph } = Typography;
 
 export const UsersPage = () => {
+  const isMobile = useIsMobile();
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
   const [drawerMode, setDrawerMode] = useState<'view' | 'edit' | 'create' | null>(null);
 
@@ -30,6 +33,10 @@ export const UsersPage = () => {
     setDrawerMode(null);
     setSelectedUser(null);
   };
+
+  if (isMobile) {
+    return <MobileUsersList />;
+  }
 
   return (
     <div>

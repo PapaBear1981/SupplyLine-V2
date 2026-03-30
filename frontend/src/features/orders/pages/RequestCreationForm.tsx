@@ -1,9 +1,11 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useIsMobile } from '@shared/hooks/useMobile';
 import { Card, Form, Input, Select, Button, Space, message, Typography, Table, Modal, InputNumber } from 'antd';
 import { ArrowLeftOutlined, SaveOutlined, PlusOutlined, DeleteOutlined } from '@ant-design/icons';
 import { useCreateRequestMutation } from '../services/requestsApi';
 import { ItemTypeBadge } from '../components';
+import { MobileRequestCreationForm } from '../components';
 import type { CreateRequestRequest, CreateRequestItemRequest, ItemType } from '../types';
 
 const { Title, Text } = Typography;
@@ -11,6 +13,7 @@ const { TextArea } = Input;
 
 export const RequestCreationForm: React.FC = () => {
   const navigate = useNavigate();
+  const isMobile = useIsMobile();
   const [form] = Form.useForm();
   const [itemForm] = Form.useForm();
   const [items, setItems] = useState<CreateRequestItemRequest[]>([]);
@@ -27,6 +30,11 @@ export const RequestCreationForm: React.FC = () => {
   const handleRemoveItem = (index: number) => {
     setItems(items.filter((_, i) => i !== index));
   };
+
+
+  if (isMobile) {
+    return <MobileRequestCreationForm />;
+  }
 
   const handleSubmit = async (values: Omit<CreateRequestRequest, 'items'>) => {
     if (items.length === 0) {

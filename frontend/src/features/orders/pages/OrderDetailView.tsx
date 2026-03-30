@@ -28,6 +28,7 @@ import {
   InboxOutlined,
 } from '@ant-design/icons';
 import dayjs from 'dayjs';
+import { useIsMobile } from '@shared/hooks/useMobile';
 import {
   useGetOrderQuery,
   useUpdateOrderMutation,
@@ -41,6 +42,7 @@ import {
   useUpdateOrderRequestItemMutation,
 } from '../services/ordersApi';
 import { StatusBadge, PriorityBadge, ItemTypeBadge, MessageThread } from '../components';
+import { MobileOrderDetailView } from '../components';
 import type { UpdateOrderRequest, MarkOrderedRequest, RequestItem } from '../types';
 import type { ColumnsType } from 'antd/es/table';
 
@@ -50,6 +52,7 @@ const { TextArea } = Input;
 export const OrderDetailView: React.FC = () => {
   const { orderId } = useParams<{ orderId: string }>();
   const navigate = useNavigate();
+  const isMobile = useIsMobile();
   const [editForm] = Form.useForm();
   const [orderForm] = Form.useForm();
 
@@ -289,6 +292,11 @@ export const OrderDetailView: React.FC = () => {
       },
     },
   ];
+
+
+  if (isMobile) {
+    return <MobileOrderDetailView />;
+  }
 
   if (isLoading || !order) {
     return (

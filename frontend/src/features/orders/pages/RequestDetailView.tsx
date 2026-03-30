@@ -24,6 +24,7 @@ import {
   EditOutlined,
 } from '@ant-design/icons';
 import dayjs from 'dayjs';
+import { useIsMobile } from '@shared/hooks/useMobile';
 import {
   useGetRequestQuery,
   useUpdateRequestMutation,
@@ -32,6 +33,7 @@ import {
   useMarkRequestMessageAsReadMutation,
 } from '../services/requestsApi';
 import { StatusBadge, PriorityBadge, ItemTypeBadge, MessageThread } from '../components';
+import { MobileRequestDetailView } from '../components';
 import type { UpdateRequestRequest, RequestItem } from '../types';
 import type { ColumnsType } from 'antd/es/table';
 
@@ -41,6 +43,7 @@ const { TextArea } = Input;
 export const RequestDetailView: React.FC = () => {
   const { requestId } = useParams<{ requestId: string }>();
   const navigate = useNavigate();
+  const isMobile = useIsMobile();
   const [editForm] = Form.useForm();
 
   const [isEditModalVisible, setIsEditModalVisible] = useState(false);
@@ -86,6 +89,11 @@ export const RequestDetailView: React.FC = () => {
   const handleMarkMessageRead = async (messageId: number) => {
     await markMessageAsRead(messageId).unwrap();
   };
+
+
+  if (isMobile) {
+    return <MobileRequestDetailView />;
+  }
 
   if (isLoading || !request) {
     return (

@@ -38,6 +38,9 @@ import {
 import dayjs from 'dayjs';
 import {
   useGetKitQuery,
+  useGetKitBoxesQuery,
+  useGetKitItemsQuery,
+  useGetKitIssuancesQuery,
   useDeleteKitMutation,
   useGetKitAlertsQuery,
   useGetKitAnalyticsQuery,
@@ -64,9 +67,13 @@ export const MobileKitDetailPage = () => {
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
 
   const { data: kit, isLoading, error, refetch } = useGetKitQuery(kitId);
+  const { data: boxes = [] } = useGetKitBoxesQuery(kitId, { skip: !kitId });
+  const { data: itemsResponse } = useGetKitItemsQuery({ kitId }, { skip: !kitId });
+  const { data: issuances = [] } = useGetKitIssuancesQuery({ kitId }, { skip: !kitId });
   const { data: alerts } = useGetKitAlertsQuery(kitId);
   const { data: analytics } = useGetKitAnalyticsQuery({ kitId, days: 30 });
   const [deleteKit, { isLoading: isDeleting }] = useDeleteKitMutation();
+  const items = itemsResponse?.items || [];
 
   const handleDelete = async () => {
     const confirmed = await Dialog.confirm({
@@ -324,17 +331,17 @@ export const MobileKitDetailPage = () => {
               <List header="Boxes & Items">
                 <List.Item
                   prefix={<InboxOutlined style={{ fontSize: 20, color: '#1890ff' }} />}
-                  extra={<Badge content={kit.box_count || 0} />}
+                  extra={<Badge content={boxes.length || kit.box_count || 0} />}
                   arrow
-                  onClick={() => {/* TODO: Navigate to boxes */}}
+                  onClick={() => setActiveTab('items')}
                 >
                   Boxes
                 </List.Item>
                 <List.Item
                   prefix={<ToolOutlined style={{ fontSize: 20, color: '#52c41a' }} />}
-                  extra={<Badge content={kit.item_count || 0} />}
+                  extra={<Badge content={items.length || kit.item_count || 0} />}
                   arrow
-                  onClick={() => {/* TODO: Navigate to items */}}
+                  onClick={() => setActiveTab('items')}
                 >
                   All Items
                 </List.Item>
@@ -345,18 +352,48 @@ export const MobileKitDetailPage = () => {
               <List header="Activity">
                 <List.Item
                   prefix={<SwapOutlined style={{ fontSize: 20, color: '#722ed1' }} />}
-                  extra={analytics?.issuances.total || 0}
+                  extra={issuances.length || analytics?.issuances.total || 0}
                   arrow
-                  onClick={() => {/* TODO: Navigate to issuances */}}
+                  onClick={() => setActiveTab('more')}
                 >
                   Issuance History
                 </List.Item>
               </List>
             </Card>
-
-            <div className="coming-soon">
-              <p>Full item management coming soon. Use the desktop view for full functionality.</p>
-            </div>
+            <Card className="info-card" title="Recent Inventory">
+              {items.length === 0 ? (
+                <div className="empty-location">No kit items found.</div>
+              ) : (
+                <List>
+                  {items.slice(0, 8).map((item) => (
+                    <List.Item
+                      key={item.id}
+                      description={`${item.quantity} ${item.unit || 'each'} · ${item.status}`}
+                      extra={item.box_number || 'No box'}
+                    >
+                      {item.part_number || item.description}
+                    </List.Item>
+                  ))}
+                </List>
+              )}
+            </Card>
+            <Card className="info-card" title="Boxes">
+              {boxes.length === 0 ? (
+                <div className="empty-location">No boxes configured.</div>
+              ) : (
+                <List>
+                  {boxes.slice(0, 8).map((box) => (
+                    <List.Item
+                      key={box.id}
+                      description={box.description || box.box_type}
+                      extra={<Badge content={box.item_count || 0} />}
+                    >
+                      {box.box_number}
+                    </List.Item>
+                  ))}
+                </List>
+              )}
+            </Card>
           </div>
         )}
 
@@ -462,9 +499,23 @@ export const MobileKitDetailPage = () => {
               </List>
             </Card>
 
-            <div className="coming-soon">
-              <p>These features are coming soon to mobile. Use the desktop view for full functionality.</p>
-            </div>
+            <Card className="info-card">
+              <List header="Recent Issuances">
+                {issuances.length === 0 ? (
+                  <List.Item>No issuance history found.</List.Item>
+                ) : (
+                  issuances.slice(0, 8).map((issuance) => (
+                    <List.Item
+                      key={issuance.id}
+                      description={`${issuance.quantity} · ${dayjs(issuance.issued_date).format('MMM D, YYYY')}`}
+                      extra={issuance.issuer_name || 'System'}
+                    >
+                      {issuance.part_number || issuance.description}
+                    </List.Item>
+                  ))
+                )}
+              </List>
+            </Card>
           </div>
         )}
       </div>

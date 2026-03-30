@@ -1,0 +1,24 @@
+.mobile-users-list {
+  min-height: 100%;
+}
+
+.mobile-users-controls {
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.mobile-users-tags {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.mobile-users-popup {
+  padding: 12px;
+}
+
+.mobile-users-close {
+  margin-top: 12px;
+}
