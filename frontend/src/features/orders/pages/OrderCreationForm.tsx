@@ -1,7 +1,9 @@
 import { useNavigate } from 'react-router-dom';
+import { useIsMobile } from '@shared/hooks/useMobile';
 import { Card, Form, Input, Select, InputNumber, Button, Space, message, Row, Col, Typography, DatePicker } from 'antd';
 import { ArrowLeftOutlined, SaveOutlined } from '@ant-design/icons';
 import { useCreateOrderMutation } from '../services/ordersApi';
+import { MobileOrderCreationForm } from '../components';
 import type { CreateOrderRequest } from '../types';
 
 const { Title, Text } = Typography;
@@ -9,8 +11,14 @@ const { TextArea } = Input;
 
 export const OrderCreationForm: React.FC = () => {
   const navigate = useNavigate();
+  const isMobile = useIsMobile();
   const [form] = Form.useForm();
   const [createOrder, { isLoading }] = useCreateOrderMutation();
+
+
+  if (isMobile) {
+    return <MobileOrderCreationForm />;
+  }
 
   const handleSubmit = async (values: CreateOrderRequest) => {
     try {
