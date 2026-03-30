@@ -15,6 +15,7 @@ import {
   Tooltip,
   Tabs,
   Badge,
+  Alert,
 } from 'antd';
 import {
   PlusOutlined,
@@ -98,9 +99,9 @@ export const OrdersDashboard: React.FC = () => {
     request_type: requestTypeFilter.length > 0 ? requestTypeFilter.join(',') : undefined,
   };
 
-  const { data: orders = [], isLoading: ordersLoading, refetch: refetchOrders } = useGetOrdersQuery(orderQueryParams);
+  const { data: orders = [], isLoading: ordersLoading, error: ordersError, refetch: refetchOrders } = useGetOrdersQuery(orderQueryParams);
   const { data: orderAnalytics } = useGetOrderAnalyticsQuery();
-  const { data: requests = [], isLoading: requestsLoading, refetch: refetchRequests } = useGetRequestsQuery(requestQueryParams);
+  const { data: requests = [], isLoading: requestsLoading, error: requestsError, refetch: refetchRequests } = useGetRequestsQuery(requestQueryParams);
   const { data: requestAnalytics } = useGetRequestAnalyticsQuery();
 
   // Pending requests that need fulfillment action
@@ -479,6 +480,17 @@ export const OrdersDashboard: React.FC = () => {
             </Row>
           )}
 
+          {requestsError && (
+            <Alert
+              type="error"
+              showIcon
+              message="Failed to load requests"
+              description="An error occurred while fetching requests. Please try again."
+              action={<Button size="small" onClick={refetchRequests}>Retry</Button>}
+              style={{ marginBottom: 16 }}
+            />
+          )}
+
           <Card style={{ marginBottom: 16 }}>
             <Row gutter={[16, 16]}>
               <Col xs={24} md={7}>
@@ -628,6 +640,17 @@ export const OrdersDashboard: React.FC = () => {
                 </Card>
               </Col>
             </Row>
+          )}
+
+          {ordersError && (
+            <Alert
+              type="error"
+              showIcon
+              message="Failed to load fulfillment queue"
+              description="An error occurred while fetching fulfillment actions. Please try again."
+              action={<Button size="small" onClick={refetchOrders}>Retry</Button>}
+              style={{ marginBottom: 16 }}
+            />
           )}
 
           <Card style={{ marginBottom: 16 }}>

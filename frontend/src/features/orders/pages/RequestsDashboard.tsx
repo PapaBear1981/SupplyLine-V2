@@ -14,6 +14,7 @@ import {
   Badge,
   Tag,
   Tooltip,
+  Alert,
 } from 'antd';
 import {
   PlusOutlined,
@@ -69,7 +70,7 @@ export const RequestsDashboard: React.FC = () => {
     request_type: requestTypeFilter.length > 0 ? requestTypeFilter.join(',') : undefined,
   };
 
-  const { data: requests = [], isLoading, refetch } = useGetRequestsQuery(queryParams);
+  const { data: requests = [], isLoading, error: requestsError, refetch } = useGetRequestsQuery(queryParams);
   const { data: analytics } = useGetRequestAnalyticsQuery();
 
   if (isMobile) {
@@ -318,6 +319,17 @@ export const RequestsDashboard: React.FC = () => {
             </Card>
           </Col>
         </Row>
+      )}
+
+      {requestsError && (
+        <Alert
+          type="error"
+          showIcon
+          message="Failed to load requests"
+          description="An error occurred while fetching requests. Please try again."
+          action={<Button size="small" onClick={() => refetch()}>Retry</Button>}
+          style={{ marginBottom: 16 }}
+        />
       )}
 
       <Card style={{ marginBottom: 16 }}>
