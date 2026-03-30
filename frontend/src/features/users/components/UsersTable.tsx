@@ -23,6 +23,7 @@ import {
   UnlockOutlined,
   LockOutlined,
   SafetyOutlined,
+  ReloadOutlined,
 } from '@ant-design/icons';
 import dayjs from 'dayjs';
 import {
@@ -57,7 +58,7 @@ export const UsersTable = ({ onView, onEdit, adminActions }: UsersTableProps) =>
   const [departmentFilter, setDepartmentFilter] = useState<string | null>(null);
   const [adminsOnly, setAdminsOnly] = useState(false);
 
-  const { data: users = [], isLoading, isFetching, error } = useGetUsersQuery(
+  const { data: users = [], isLoading, isFetching, error, refetch } = useGetUsersQuery(
     searchQuery ? { q: searchQuery } : undefined
   );
   const { data: departments, error: departmentsError } = useGetDepartmentsQuery();
@@ -339,6 +340,7 @@ export const UsersTable = ({ onView, onEdit, adminActions }: UsersTableProps) =>
           showIcon
           message="Unable to load users"
           description="Check your permissions or try again later."
+          action={<Button size="small" icon={<ReloadOutlined />} onClick={refetch}>Retry</Button>}
           style={{ marginBottom: 12 }}
         />
       )}

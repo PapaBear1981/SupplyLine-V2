@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Drawer, Descriptions, Tag, Button, Space, Spin, message, Form, Typography, Alert } from 'antd';
-import { EditOutlined, CheckCircleOutlined, CloseCircleOutlined } from '@ant-design/icons';
+import { EditOutlined, CheckCircleOutlined, CloseCircleOutlined, ReloadOutlined } from '@ant-design/icons';
 import dayjs from 'dayjs';
 import {
   useCreateWarehouseMutation,
@@ -30,7 +30,7 @@ export const WarehouseDrawer = ({
   const [mode, setMode] = useState(initialMode);
   const [form] = Form.useForm();
 
-  const { data: warehouse, isLoading, error: warehouseError } = useGetWarehouseQuery(warehouseId!, {
+  const { data: warehouse, isLoading, error: warehouseError, refetch: refetchWarehouse } = useGetWarehouseQuery(warehouseId!, {
     skip: !warehouseId || initialMode === 'create',
   });
 
@@ -174,7 +174,8 @@ export const WarehouseDrawer = ({
           type="error"
           showIcon
           message="Failed to load warehouse"
-          description="An error occurred while fetching warehouse details. Please close and try again."
+          description="An error occurred while fetching warehouse details."
+          action={<Button size="small" icon={<ReloadOutlined />} onClick={refetchWarehouse}>Retry</Button>}
           style={{ margin: 16 }}
         />
       ) : mode === 'view' && !warehouse ? (

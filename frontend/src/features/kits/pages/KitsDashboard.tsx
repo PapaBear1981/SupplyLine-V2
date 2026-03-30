@@ -277,6 +277,7 @@ const KitsDashboard = () => {
                 message="Error loading kits"
                 description="Unable to fetch kits data. Please try again."
                 type="error"
+                action={<Button size="small" icon={<ReloadOutlined />} onClick={() => refetch()}>Retry</Button>}
                 style={{ marginBottom: 16 }}
               />
             )}

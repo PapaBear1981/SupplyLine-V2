@@ -21,6 +21,7 @@ import {
   DeleteOutlined,
   CheckCircleOutlined,
   StopOutlined,
+  ReloadOutlined,
 } from '@ant-design/icons';
 import {
   useGetDepartmentsQuery,
@@ -38,7 +39,7 @@ export const DepartmentManagement = () => {
   const [editingDepartment, setEditingDepartment] = useState<Department | null>(null);
   const [form] = Form.useForm();
 
-  const { data: departments = [], isLoading, error } = useGetDepartmentsQuery();
+  const { data: departments = [], isLoading, error, refetch } = useGetDepartmentsQuery();
   const [createDepartment, { isLoading: isCreating }] = useCreateDepartmentMutation();
   const [updateDepartment, { isLoading: isUpdating }] = useUpdateDepartmentMutation();
   const [deleteDepartment, { isLoading: isDeleting }] = useDeleteDepartmentMutation();
@@ -152,6 +153,7 @@ export const DepartmentManagement = () => {
           showIcon
           message="Failed to load departments"
           description="Please try again later."
+          action={<Button size="small" icon={<ReloadOutlined />} onClick={refetch}>Retry</Button>}
           style={{ marginBottom: 16 }}
         />
       )}

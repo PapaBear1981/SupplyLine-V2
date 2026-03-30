@@ -22,6 +22,7 @@ import {
   CloseCircleFilled,
   TeamOutlined,
   KeyOutlined,
+  ReloadOutlined,
 } from '@ant-design/icons';
 import {
   useGetPermissionCategoriesQuery,
@@ -35,8 +36,8 @@ export const PermissionOverview: React.FC = () => {
   const [searchValue, setSearchValue] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string | undefined>(undefined);
 
-  const { data: categories, isLoading: categoriesLoading, error: categoriesError } = useGetPermissionCategoriesQuery();
-  const { data: matrix, isLoading: matrixLoading, error: matrixError } = useGetPermissionMatrixQuery();
+  const { data: categories, isLoading: categoriesLoading, error: categoriesError, refetch: refetchCategories } = useGetPermissionCategoriesQuery();
+  const { data: matrix, isLoading: matrixLoading, error: matrixError, refetch: refetchMatrix } = useGetPermissionMatrixQuery();
 
   const isLoading = categoriesLoading || matrixLoading;
   const hasError = !!(categoriesError || matrixError);
@@ -171,6 +172,11 @@ export const PermissionOverview: React.FC = () => {
         showIcon
         message="Failed to load permission data"
         description="An error occurred while fetching permission categories or the role matrix. Please try again."
+        action={
+          <Button size="small" icon={<ReloadOutlined />} onClick={() => { refetchCategories(); refetchMatrix(); }}>
+            Retry
+          </Button>
+        }
       />
     );
   }

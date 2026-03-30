@@ -27,6 +27,7 @@ import {
   StopOutlined,
   ApartmentOutlined,
   WarningOutlined,
+  ReloadOutlined,
 } from '@ant-design/icons';
 import {
   useGetAircraftTypesQuery,
@@ -44,7 +45,7 @@ export const AircraftTypeManagement = () => {
   const [editingType, setEditingType] = useState<AircraftType | null>(null);
   const [form] = Form.useForm();
 
-  const { data: aircraftTypes = [], isLoading, error } = useGetAircraftTypesQuery({ include_inactive: true });
+  const { data: aircraftTypes = [], isLoading, error, refetch } = useGetAircraftTypesQuery({ include_inactive: true });
   const [createAircraftType, { isLoading: isCreating }] = useCreateAircraftTypeMutation();
   const [updateAircraftType, { isLoading: isUpdating }] = useUpdateAircraftTypeMutation();
   const [deactivateAircraftType, { isLoading: isDeleting }] = useDeactivateAircraftTypeMutation();
@@ -223,6 +224,7 @@ export const AircraftTypeManagement = () => {
           showIcon
           message="Failed to load aircraft types"
           description="Please try again later."
+          action={<Button size="small" icon={<ReloadOutlined />} onClick={refetch}>Retry</Button>}
           style={{ marginBottom: 16 }}
         />
       )}

@@ -16,6 +16,7 @@ import {
   CheckCircleOutlined,
   EditOutlined,
   UnlockOutlined,
+  ReloadOutlined,
 } from '@ant-design/icons';
 import dayjs from 'dayjs';
 import { UserForm } from './UserForm';
@@ -48,7 +49,7 @@ export const UserDrawer = ({
   const [mode, setMode] = useState(initialMode);
   const [form] = Form.useForm<UserFormValues>();
 
-  const { data: user, isLoading, isFetching, error } = useGetUserQuery(userId!, {
+  const { data: user, isLoading, isFetching, error, refetch: refetchUser } = useGetUserQuery(userId!, {
     skip: !userId || initialMode === 'create',
   });
   const { data: departments, error: departmentsError } = useGetDepartmentsQuery();
@@ -167,6 +168,7 @@ export const UserDrawer = ({
           message="Unable to load user details"
           description="Check your permissions or try again later."
           showIcon
+          action={<Button size="small" icon={<ReloadOutlined />} onClick={refetchUser}>Retry</Button>}
         />
       );
     }

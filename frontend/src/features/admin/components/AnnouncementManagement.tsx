@@ -25,6 +25,7 @@ import {
   StopOutlined,
   WarningOutlined,
   ExclamationCircleOutlined,
+  ReloadOutlined,
 } from '@ant-design/icons';
 import dayjs from 'dayjs';
 import {
@@ -51,7 +52,7 @@ export const AnnouncementManagement = () => {
   const [editingAnnouncement, setEditingAnnouncement] = useState<Announcement | null>(null);
   const [form] = Form.useForm();
 
-  const { data: announcements = [], isLoading, error } = useGetAnnouncementsQuery();
+  const { data: announcements = [], isLoading, error, refetch } = useGetAnnouncementsQuery();
   const { data: departments = [], error: departmentsError } = useGetDepartmentsQuery();
   const [createAnnouncement, { isLoading: isCreating }] = useCreateAnnouncementMutation();
   const [updateAnnouncement, { isLoading: isUpdating }] = useUpdateAnnouncementMutation();
@@ -224,6 +225,7 @@ export const AnnouncementManagement = () => {
           showIcon
           message="Failed to load announcements"
           description="Please try again later."
+          action={<Button size="small" icon={<ReloadOutlined />} onClick={refetch}>Retry</Button>}
           style={{ marginBottom: 16 }}
         />
       )}

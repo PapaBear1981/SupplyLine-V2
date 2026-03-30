@@ -20,6 +20,7 @@ import {
   DeleteOutlined,
   LockOutlined,
   KeyOutlined,
+  ReloadOutlined,
 } from '@ant-design/icons';
 import {
   useGetRolesQuery,
@@ -40,7 +41,7 @@ export const RoleManagement = () => {
   const [selectedRoleForPermissions, setSelectedRoleForPermissions] = useState<UserRole | null>(null);
   const [form] = Form.useForm();
 
-  const { data: roles = [], isLoading, error } = useGetRolesQuery();
+  const { data: roles = [], isLoading, error, refetch } = useGetRolesQuery();
   const [createRole, { isLoading: isCreating }] = useCreateRoleMutation();
   const [updateRole, { isLoading: isUpdating }] = useUpdateRoleMutation();
   const [deleteRole, { isLoading: isDeleting }] = useDeleteRoleMutation();
@@ -174,6 +175,7 @@ export const RoleManagement = () => {
           showIcon
           message="Failed to load roles"
           description="Please try again later."
+          action={<Button size="small" icon={<ReloadOutlined />} onClick={refetch}>Retry</Button>}
           style={{ marginBottom: 16 }}
         />
       )}

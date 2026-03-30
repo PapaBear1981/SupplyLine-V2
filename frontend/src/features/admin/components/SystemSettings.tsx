@@ -25,7 +25,7 @@ import { useGetSecuritySettingsQuery, useUpdateSecuritySettingsMutation } from '
 const { Title, Text, Paragraph } = Typography;
 
 export const SystemSettings = () => {
-  const { data: settings, isLoading, error: settingsError } = useGetSecuritySettingsQuery();
+  const { data: settings, isLoading, error: settingsError, refetch: refetchSettings } = useGetSecuritySettingsQuery();
   const [updateSettings, { isLoading: isUpdating }] = useUpdateSecuritySettingsMutation();
   const [form] = Form.useForm();
   const [hasChanges, setHasChanges] = useState(false);
@@ -70,6 +70,7 @@ export const SystemSettings = () => {
         description="An error occurred while fetching security settings. Please try again."
         type="error"
         showIcon
+        action={<Button icon={<ReloadOutlined />} onClick={refetchSettings}>Retry</Button>}
       />
     );
   }

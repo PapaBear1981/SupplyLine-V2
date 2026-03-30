@@ -20,6 +20,7 @@ import {
   HistoryOutlined,
   InfoCircleOutlined,
   PrinterOutlined,
+  ReloadOutlined,
 } from '@ant-design/icons';
 import dayjs from 'dayjs';
 import {
@@ -47,7 +48,7 @@ export const ToolDrawer = ({ open, mode: initialMode, toolId, onClose, onSuccess
   const [printModalOpen, setPrintModalOpen] = useState(false);
 
   // Fetch tool data if viewing or editing
-  const { data: tool, isLoading, error: toolError } = useGetToolQuery(toolId!, {
+  const { data: tool, isLoading, error: toolError, refetch: refetchTool } = useGetToolQuery(toolId!, {
     skip: !toolId || initialMode === 'create',
   });
 
@@ -293,7 +294,8 @@ export const ToolDrawer = ({ open, mode: initialMode, toolId, onClose, onSuccess
           type="error"
           showIcon
           message="Failed to load tool"
-          description="An error occurred while fetching tool details. Please close and try again."
+          description="An error occurred while fetching tool details."
+          action={<Button size="small" icon={<ReloadOutlined />} onClick={refetchTool}>Retry</Button>}
           style={{ margin: 16 }}
         />
       ) : mode === 'view' && tool ? (

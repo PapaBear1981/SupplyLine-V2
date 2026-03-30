@@ -17,6 +17,7 @@ import {
   WarningOutlined,
   HistoryOutlined,
   PlusOutlined,
+  ReloadOutlined,
 } from '@ant-design/icons';
 import { useGetCheckoutStatsQuery } from '../services/checkoutApi';
 import { QuickCheckoutModal } from '../components/QuickCheckoutModal';
@@ -36,7 +37,7 @@ export const ToolCheckoutPage = () => {
   const [checkinModalOpen, setCheckinModalOpen] = useState(false);
   const [selectedCheckout, setSelectedCheckout] = useState<ToolCheckout | null>(null);
 
-  const { data: stats, isLoading: statsLoading, error: statsError } = useGetCheckoutStatsQuery();
+  const { data: stats, isLoading: statsLoading, error: statsError, refetch: refetchStats } = useGetCheckoutStatsQuery();
 
   // Render mobile version if on mobile device
   if (isMobile) {
@@ -128,6 +129,7 @@ export const ToolCheckoutPage = () => {
           showIcon
           message="Checkout statistics unavailable"
           description="Stats could not be loaded. Checkout and check-in actions still work normally."
+          action={<Button size="small" icon={<ReloadOutlined />} onClick={refetchStats}>Retry</Button>}
           style={{ marginBottom: 16 }}
           closable
         />

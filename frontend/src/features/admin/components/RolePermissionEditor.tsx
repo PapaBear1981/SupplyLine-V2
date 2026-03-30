@@ -13,7 +13,7 @@ import {
   Tooltip,
 } from 'antd';
 import type { TreeProps } from 'antd';
-import { SearchOutlined, LockOutlined, SaveOutlined } from '@ant-design/icons';
+import { SearchOutlined, LockOutlined, SaveOutlined, ReloadOutlined } from '@ant-design/icons';
 import {
   useGetPermissionCategoriesQuery,
   useGetRoleWithPermissionsQuery,
@@ -43,8 +43,8 @@ export const RolePermissionEditor: React.FC<RolePermissionEditorProps> = ({
   const [expandedKeys, setExpandedKeys] = useState<React.Key[]>([]);
   const [autoExpandParent, setAutoExpandParent] = useState(true);
 
-  const { data: categories, isLoading: categoriesLoading, error: categoriesError } = useGetPermissionCategoriesQuery();
-  const { data: roleWithPermissions, isLoading: roleLoading, error: roleError } = useGetRoleWithPermissionsQuery(
+  const { data: categories, isLoading: categoriesLoading, error: categoriesError, refetch: refetchCategories } = useGetPermissionCategoriesQuery();
+  const { data: roleWithPermissions, isLoading: roleLoading, error: roleError, refetch: refetchRole } = useGetRoleWithPermissionsQuery(
     roleId || 0,
     { skip: !roleId }
   );
@@ -217,7 +217,8 @@ export const RolePermissionEditor: React.FC<RolePermissionEditorProps> = ({
           type="error"
           showIcon
           message="Failed to load permissions"
-          description="An error occurred while fetching role permissions. Please close and try again."
+          description="An error occurred while fetching role permissions. Please try again."
+          action={<Button size="small" icon={<ReloadOutlined />} onClick={() => { refetchCategories(); refetchRole(); }}>Retry</Button>}
           style={{ margin: '16px 0' }}
         />
       ) : (

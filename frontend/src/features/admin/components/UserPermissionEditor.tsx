@@ -26,6 +26,7 @@ import {
   CheckCircleOutlined,
   CloseCircleOutlined,
   InfoCircleOutlined,
+  ReloadOutlined,
 } from '@ant-design/icons';
 import {
   useGetPermissionCategoriesQuery,
@@ -57,7 +58,7 @@ export const UserPermissionEditor: React.FC<UserPermissionEditorProps> = ({
   const [addModalOpen, setAddModalOpen] = useState(false);
   const [form] = Form.useForm();
 
-  const { data: categories, isLoading: categoriesLoading, error: categoriesError } = useGetPermissionCategoriesQuery();
+  const { data: categories, isLoading: categoriesLoading, error: categoriesError, refetch: refetchCategories } = useGetPermissionCategoriesQuery();
   const {
     data: userPermissions,
     isLoading: permissionsLoading,
@@ -240,7 +241,8 @@ export const UserPermissionEditor: React.FC<UserPermissionEditorProps> = ({
             type="error"
             showIcon
             message="Failed to load permissions"
-            description="An error occurred while fetching user permissions. Please close and try again."
+            description="An error occurred while fetching user permissions. Please try again."
+            action={<Button size="small" icon={<ReloadOutlined />} onClick={() => { refetchCategories(); refetch(); }}>Retry</Button>}
             style={{ margin: '16px 0' }}
           />
         ) : (
