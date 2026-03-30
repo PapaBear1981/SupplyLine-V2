@@ -57,10 +57,11 @@ export const UserPermissionEditor: React.FC<UserPermissionEditorProps> = ({
   const [addModalOpen, setAddModalOpen] = useState(false);
   const [form] = Form.useForm();
 
-  const { data: categories, isLoading: categoriesLoading } = useGetPermissionCategoriesQuery();
+  const { data: categories, isLoading: categoriesLoading, error: categoriesError } = useGetPermissionCategoriesQuery();
   const {
     data: userPermissions,
     isLoading: permissionsLoading,
+    error: permissionsError,
     refetch,
   } = useGetUserPermissionsQuery(userId || 0, { skip: !userId });
   const [addPermission, { isLoading: isAdding }] = useAddUserPermissionMutation();
@@ -207,6 +208,7 @@ export const UserPermissionEditor: React.FC<UserPermissionEditorProps> = ({
   ];
 
   const isLoading = categoriesLoading || permissionsLoading;
+  const hasError = !!(categoriesError || permissionsError);
 
   return (
     <>
@@ -233,6 +235,14 @@ export const UserPermissionEditor: React.FC<UserPermissionEditorProps> = ({
           <div style={{ textAlign: 'center', padding: 40 }}>
             <Spin size="large" />
           </div>
+        ) : hasError ? (
+          <Alert
+            type="error"
+            showIcon
+            message="Failed to load permissions"
+            description="An error occurred while fetching user permissions. Please close and try again."
+            style={{ margin: '16px 0' }}
+          />
         ) : (
           <Tabs
             defaultActiveKey="specific"

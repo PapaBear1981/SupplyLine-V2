@@ -60,7 +60,7 @@ export const UsersTable = ({ onView, onEdit, adminActions }: UsersTableProps) =>
   const { data: users = [], isLoading, isFetching, error } = useGetUsersQuery(
     searchQuery ? { q: searchQuery } : undefined
   );
-  const { data: departments } = useGetDepartmentsQuery();
+  const { data: departments, error: departmentsError } = useGetDepartmentsQuery();
 
   const [deleteUser, { isLoading: isDeleting }] = useDeleteUserMutation();
   const [updateUser, { isLoading: isUpdating }] = useUpdateUserMutation();

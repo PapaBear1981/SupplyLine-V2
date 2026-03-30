@@ -43,8 +43,8 @@ export const RolePermissionEditor: React.FC<RolePermissionEditorProps> = ({
   const [expandedKeys, setExpandedKeys] = useState<React.Key[]>([]);
   const [autoExpandParent, setAutoExpandParent] = useState(true);
 
-  const { data: categories, isLoading: categoriesLoading } = useGetPermissionCategoriesQuery();
-  const { data: roleWithPermissions, isLoading: roleLoading } = useGetRoleWithPermissionsQuery(
+  const { data: categories, isLoading: categoriesLoading, error: categoriesError } = useGetPermissionCategoriesQuery();
+  const { data: roleWithPermissions, isLoading: roleLoading, error: roleError } = useGetRoleWithPermissionsQuery(
     roleId || 0,
     { skip: !roleId }
   );
@@ -170,6 +170,7 @@ export const RolePermissionEditor: React.FC<RolePermissionEditorProps> = ({
   };
 
   const isLoading = categoriesLoading || roleLoading;
+  const hasError = !!(categoriesError || roleError);
 
   // Count selected permissions
   const selectedCount = checkedKeys.filter((key) => String(key).startsWith('perm-')).length;
@@ -211,6 +212,14 @@ export const RolePermissionEditor: React.FC<RolePermissionEditorProps> = ({
         <div style={{ textAlign: 'center', padding: 40 }}>
           <Spin size="large" />
         </div>
+      ) : hasError ? (
+        <Alert
+          type="error"
+          showIcon
+          message="Failed to load permissions"
+          description="An error occurred while fetching role permissions. Please close and try again."
+          style={{ margin: '16px 0' }}
+        />
       ) : (
         <>
           <Alert

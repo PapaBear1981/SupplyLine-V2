@@ -51,7 +51,7 @@ export const UserDrawer = ({
   const { data: user, isLoading, isFetching, error } = useGetUserQuery(userId!, {
     skip: !userId || initialMode === 'create',
   });
-  const { data: departments } = useGetDepartmentsQuery();
+  const { data: departments, error: departmentsError } = useGetDepartmentsQuery();
 
   const [createUser, { isLoading: isCreating }] = useCreateUserMutation();
   const [updateUser, { isLoading: isUpdating }] = useUpdateUserMutation();

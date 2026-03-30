@@ -9,6 +9,7 @@ import {
   Space,
   Tabs,
   Badge,
+  Alert,
 } from 'antd';
 import {
   SwapOutlined,
@@ -35,7 +36,7 @@ export const ToolCheckoutPage = () => {
   const [checkinModalOpen, setCheckinModalOpen] = useState(false);
   const [selectedCheckout, setSelectedCheckout] = useState<ToolCheckout | null>(null);
 
-  const { data: stats, isLoading: statsLoading } = useGetCheckoutStatsQuery();
+  const { data: stats, isLoading: statsLoading, error: statsError } = useGetCheckoutStatsQuery();
 
   // Render mobile version if on mobile device
   if (isMobile) {
@@ -121,6 +122,16 @@ export const ToolCheckoutPage = () => {
       </div>
 
       {/* Statistics Cards */}
+      {statsError && (
+        <Alert
+          type="warning"
+          showIcon
+          message="Checkout statistics unavailable"
+          description="Stats could not be loaded. Checkout and check-in actions still work normally."
+          style={{ marginBottom: 16 }}
+          closable
+        />
+      )}
       <Row gutter={[16, 16]} style={{ marginBottom: 24 }}>
         <Col xs={12} sm={6}>
           <Card loading={statsLoading}>

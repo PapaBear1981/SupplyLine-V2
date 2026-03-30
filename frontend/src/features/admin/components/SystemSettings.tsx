@@ -25,7 +25,7 @@ import { useGetSecuritySettingsQuery, useUpdateSecuritySettingsMutation } from '
 const { Title, Text, Paragraph } = Typography;
 
 export const SystemSettings = () => {
-  const { data: settings, isLoading } = useGetSecuritySettingsQuery();
+  const { data: settings, isLoading, error: settingsError } = useGetSecuritySettingsQuery();
   const [updateSettings, { isLoading: isUpdating }] = useUpdateSecuritySettingsMutation();
   const [form] = Form.useForm();
   const [hasChanges, setHasChanges] = useState(false);
@@ -63,11 +63,11 @@ export const SystemSettings = () => {
     );
   }
 
-  if (!settings) {
+  if (settingsError || !settings) {
     return (
       <Alert
-        message="Error"
-        description="Failed to load system settings"
+        message="Failed to load system settings"
+        description="An error occurred while fetching security settings. Please try again."
         type="error"
         showIcon
       />

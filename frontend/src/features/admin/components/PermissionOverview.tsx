@@ -35,10 +35,11 @@ export const PermissionOverview: React.FC = () => {
   const [searchValue, setSearchValue] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string | undefined>(undefined);
 
-  const { data: categories, isLoading: categoriesLoading } = useGetPermissionCategoriesQuery();
-  const { data: matrix, isLoading: matrixLoading } = useGetPermissionMatrixQuery();
+  const { data: categories, isLoading: categoriesLoading, error: categoriesError } = useGetPermissionCategoriesQuery();
+  const { data: matrix, isLoading: matrixLoading, error: matrixError } = useGetPermissionMatrixQuery();
 
   const isLoading = categoriesLoading || matrixLoading;
+  const hasError = !!(categoriesError || matrixError);
 
   // Filter permissions based on search and category
   const filteredPermissions = useMemo(() => {
@@ -160,6 +161,17 @@ export const PermissionOverview: React.FC = () => {
       <div style={{ textAlign: 'center', padding: 40 }}>
         <Spin size="large" />
       </div>
+    );
+  }
+
+  if (hasError) {
+    return (
+      <Alert
+        type="error"
+        showIcon
+        message="Failed to load permission data"
+        description="An error occurred while fetching permission categories or the role matrix. Please try again."
+      />
     );
   }
 

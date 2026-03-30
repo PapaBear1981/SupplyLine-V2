@@ -27,7 +27,7 @@ export const UserManagement = () => {
   const [resetPasswordForm] = Form.useForm();
   const [permissionsForm] = Form.useForm();
 
-  const { data: roles = [] } = useGetRolesQuery();
+  const { data: roles = [], error: rolesError } = useGetRolesQuery();
   const [resetPassword, { isLoading: isResetting }] = useResetUserPasswordMutation();
   const [toggleStatus] = useToggleUserStatusMutation();
   const [unlockUser] = useUnlockUserMutation();

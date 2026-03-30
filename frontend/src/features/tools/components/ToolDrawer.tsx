@@ -12,6 +12,7 @@ import {
   Timeline,
   Empty,
   Image,
+  Alert,
 } from 'antd';
 import {
   EditOutlined,
@@ -46,7 +47,7 @@ export const ToolDrawer = ({ open, mode: initialMode, toolId, onClose, onSuccess
   const [printModalOpen, setPrintModalOpen] = useState(false);
 
   // Fetch tool data if viewing or editing
-  const { data: tool, isLoading } = useGetToolQuery(toolId!, {
+  const { data: tool, isLoading, error: toolError } = useGetToolQuery(toolId!, {
     skip: !toolId || initialMode === 'create',
   });
 
@@ -287,6 +288,14 @@ export const ToolDrawer = ({ open, mode: initialMode, toolId, onClose, onSuccess
         <div style={{ textAlign: 'center', padding: 48 }}>
           <Spin size="large" />
         </div>
+      ) : toolError ? (
+        <Alert
+          type="error"
+          showIcon
+          message="Failed to load tool"
+          description="An error occurred while fetching tool details. Please close and try again."
+          style={{ margin: 16 }}
+        />
       ) : mode === 'view' && tool ? (
         <Tabs
           defaultActiveKey="details"

@@ -100,9 +100,9 @@ export const OrdersDashboard: React.FC = () => {
   };
 
   const { data: orders = [], isLoading: ordersLoading, error: ordersError, refetch: refetchOrders } = useGetOrdersQuery(orderQueryParams);
-  const { data: orderAnalytics } = useGetOrderAnalyticsQuery();
+  const { data: orderAnalytics, error: orderAnalyticsError } = useGetOrderAnalyticsQuery();
   const { data: requests = [], isLoading: requestsLoading, error: requestsError, refetch: refetchRequests } = useGetRequestsQuery(requestQueryParams);
-  const { data: requestAnalytics } = useGetRequestAnalyticsQuery();
+  const { data: requestAnalytics, error: requestAnalyticsError } = useGetRequestAnalyticsQuery();
 
   // Pending requests that need fulfillment action
   const pendingRequestsCount = requests.filter(

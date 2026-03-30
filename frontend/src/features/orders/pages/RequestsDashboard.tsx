@@ -71,7 +71,7 @@ export const RequestsDashboard: React.FC = () => {
   };
 
   const { data: requests = [], isLoading, error: requestsError, refetch } = useGetRequestsQuery(queryParams);
-  const { data: analytics } = useGetRequestAnalyticsQuery();
+  const { data: analytics, error: analyticsError } = useGetRequestAnalyticsQuery();
 
   if (isMobile) {
     return <MobileRequestsList />;

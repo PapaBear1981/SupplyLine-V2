@@ -52,7 +52,7 @@ export const AnnouncementManagement = () => {
   const [form] = Form.useForm();
 
   const { data: announcements = [], isLoading, error } = useGetAnnouncementsQuery();
-  const { data: departments = [] } = useGetDepartmentsQuery();
+  const { data: departments = [], error: departmentsError } = useGetDepartmentsQuery();
   const [createAnnouncement, { isLoading: isCreating }] = useCreateAnnouncementMutation();
   const [updateAnnouncement, { isLoading: isUpdating }] = useUpdateAnnouncementMutation();
   const [deleteAnnouncement, { isLoading: isDeleting }] = useDeleteAnnouncementMutation();

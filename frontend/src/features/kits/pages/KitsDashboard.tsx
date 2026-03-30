@@ -43,7 +43,7 @@ const KitsDashboard = () => {
     aircraft_type_id: aircraftTypeFilter,
   });
 
-  const { data: aircraftTypes = [] } = useGetAircraftTypesQuery({});
+  const { data: aircraftTypes = [], error: aircraftTypesError } = useGetAircraftTypesQuery({});
 
   // Render mobile version
   if (isMobile) {

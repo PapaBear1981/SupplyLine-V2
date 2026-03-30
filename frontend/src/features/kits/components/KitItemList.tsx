@@ -10,6 +10,7 @@ import {
   Badge,
   message,
   Tooltip,
+  Alert,
 } from 'antd';
 import {
   PlusOutlined,
@@ -37,7 +38,7 @@ const KitItemList = ({ kitId }: KitItemListProps) => {
   const [detailModalVisible, setDetailModalVisible] = useState(false);
   const [selectedItemId, setSelectedItemId] = useState<number | null>(null);
 
-  const { data: itemsData, isLoading } = useGetKitItemsQuery({
+  const { data: itemsData, isLoading, error: itemsError, refetch } = useGetKitItemsQuery({
     kitId,
     params: {
       box_id: boxFilter,
@@ -267,6 +268,16 @@ const KitItemList = ({ kitId }: KitItemListProps) => {
           </Space>
         }
       >
+        {itemsError && (
+          <Alert
+            type="error"
+            showIcon
+            message="Failed to load kit items"
+            description="An error occurred while fetching kit items."
+            action={<Button size="small" onClick={refetch}>Retry</Button>}
+            style={{ marginBottom: 16 }}
+          />
+        )}
         <Table
           columns={columns}
           dataSource={allItems}
