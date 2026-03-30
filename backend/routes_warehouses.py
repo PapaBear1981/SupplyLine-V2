@@ -272,11 +272,6 @@ def get_warehouse_stats(warehouse_id):
         if not warehouse:
             return jsonify({"error": "Warehouse not found"}), 404
 
-        # Debug: Check direct query
-        tools_count_direct = Tool.query.filter_by(warehouse_id=warehouse_id).count()
-        print(f"DEBUG: Warehouse {warehouse_id} - Direct query tools count: {tools_count_direct}")
-        print(f"DEBUG: Warehouse {warehouse_id} - Relationship tools count: {warehouse.tools.count()}")
-
         # Get counts by category
         tools_by_category = db.session.query(
             Tool.category,
@@ -347,8 +342,15 @@ def get_warehouse_tools(warehouse_id):
         status = request.args.get("status")
         category = request.args.get("category")
         search = request.args.get("search")
-        page = int(request.args.get("page", 1))
-        per_page = int(request.args.get("per_page", 50))
+        try:
+            page = int(request.args.get("page", 1))
+            per_page = int(request.args.get("per_page", 50))
+        except (ValueError, TypeError):
+            return jsonify({"error": "page and per_page must be integers"}), 400
+        if page < 1:
+            page = 1
+        if per_page < 1 or per_page > 200:
+            per_page = 50
 
         # Build query
         query = Tool.query.filter_by(warehouse_id=warehouse_id)
@@ -409,8 +411,15 @@ def get_warehouse_chemicals(warehouse_id):
         status = request.args.get("status")
         category = request.args.get("category")
         search = request.args.get("search")
-        page = int(request.args.get("page", 1))
-        per_page = int(request.args.get("per_page", 50))
+        try:
+            page = int(request.args.get("page", 1))
+            per_page = int(request.args.get("per_page", 50))
+        except (ValueError, TypeError):
+            return jsonify({"error": "page and per_page must be integers"}), 400
+        if page < 1:
+            page = 1
+        if per_page < 1 or per_page > 200:
+            per_page = 50
 
         # Build query
         query = Chemical.query.filter_by(warehouse_id=warehouse_id)

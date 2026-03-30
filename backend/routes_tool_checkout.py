@@ -251,7 +251,7 @@ def register_tool_checkout_routes(app):
                     notes=f"Checked out to {checkout_user.name}"
                 )
             except Exception as e:
-                logger.warning(f"Failed to record checkout transaction: {e}")
+                logger.error(f"Failed to record checkout transaction: {e}", exc_info=True)
 
             # Add audit log
             AuditLog.log(
@@ -302,7 +302,6 @@ def register_tool_checkout_routes(app):
         """
         try:
             data = request.get_json() or {}
-            current_user_id = request.current_user.get("user_id")
             user_payload = request.current_user
             current_user_id = user_payload.get("user_id")
 
@@ -883,7 +882,6 @@ def register_tool_checkout_routes(app):
         """Report damage on an active checkout without returning the tool"""
         try:
             data = request.get_json() or {}
-            current_user_id = request.current_user.get("user_id")
             user_payload = request.current_user
             current_user_id = user_payload.get("user_id")
 

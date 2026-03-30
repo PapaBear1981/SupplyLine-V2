@@ -30,7 +30,14 @@ class EncryptionManager:
             secret_key = os.environ.get("SECRET_KEY")
 
             if not secret_key:
-                # Fallback for development/testing - NOT for production
+                # In production, refuse to start with no key
+                flask_env = os.environ.get("FLASK_ENV", "")
+                if flask_env == "production":
+                    raise RuntimeError(
+                        "SECRET_KEY must be set in production environment. "
+                        "Set SECRET_KEY environment variable."
+                    )
+                # Fallback for development/testing only
                 logger.warning(
                     "SECRET_KEY not set in environment. Using insecure fallback. "
                     "Set SECRET_KEY environment variable for production!"

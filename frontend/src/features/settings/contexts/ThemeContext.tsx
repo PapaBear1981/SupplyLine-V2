@@ -30,7 +30,11 @@ export const ThemeProvider = ({ children }: ThemeProviderProps) => {
   });
 
   useEffect(() => {
-    localStorage.setItem(THEME_STORAGE_KEY, JSON.stringify(themeConfig));
+    try {
+      localStorage.setItem(THEME_STORAGE_KEY, JSON.stringify(themeConfig));
+    } catch {
+      // localStorage may be unavailable - theme still applies for current session
+    }
 
     const { primary: primaryColor, secondary: secondaryColor } = COLOR_THEMES[themeConfig.colorTheme];
     document.documentElement.style.setProperty('--adm-color-primary', primaryColor);

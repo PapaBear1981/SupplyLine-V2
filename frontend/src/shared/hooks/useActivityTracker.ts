@@ -30,7 +30,11 @@ export const useActivityTracker = () => {
         lastActivityRef.current = now;
 
         // Store last activity in localStorage for persistence across page reloads
-        localStorage.setItem('last_user_activity', now.toString());
+        try {
+          localStorage.setItem('last_user_activity', now.toString());
+        } catch {
+          // localStorage may be unavailable
+        }
 
         // Clear any existing throttle timer
         if (throttleTimerRef.current !== null) {
@@ -40,7 +44,11 @@ export const useActivityTracker = () => {
         // Schedule an update for later if we're within the throttle window
         throttleTimerRef.current = window.setTimeout(() => {
           lastActivityRef.current = Date.now();
-          localStorage.setItem('last_user_activity', Date.now().toString());
+          try {
+            localStorage.setItem('last_user_activity', Date.now().toString());
+          } catch {
+            // localStorage may be unavailable
+          }
           throttleTimerRef.current = null;
         }, 30000 - timeSinceLastUpdate);
       }
