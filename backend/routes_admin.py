@@ -2,7 +2,7 @@
 Admin-specific routes for managing users, departments, announcements, and roles
 """
 import logging
-from datetime import UTC, datetime
+from datetime import datetime, timezone
 
 from flask import jsonify, request
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
@@ -31,7 +31,7 @@ def register_admin_routes(app):
             active_users = User.query.filter_by(is_active=True).count()
 
             # Count locked users
-            now = datetime.now(UTC)
+            now = datetime.now(timezone.utc)
             locked_users = User.query.filter(
                 User.account_locked_until > now
             ).count()
@@ -243,7 +243,7 @@ def register_admin_routes(app):
             user.set_password(new_password)
             if force_change:
                 user.force_password_change = True
-            user.password_changed_at = datetime.now(UTC)
+            user.password_changed_at = datetime.now(timezone.utc)
 
             db.session.commit()
 

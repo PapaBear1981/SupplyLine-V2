@@ -14,7 +14,7 @@ This script should be run before E2E tests to ensure a clean, consistent state.
 import logging
 import os
 import sys
-from datetime import UTC, datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 from flask import Flask
 
@@ -38,7 +38,7 @@ logger = logging.getLogger(__name__)
 
 def get_current_time():
     """Get current UTC time"""
-    return datetime.now(UTC)
+    return datetime.now(timezone.utc)
 
 
 def reset_database():

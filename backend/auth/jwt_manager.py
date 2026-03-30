@@ -11,7 +11,7 @@ This module provides JWT-based authentication functionality including:
 import hashlib
 import logging
 import secrets
-from datetime import UTC, datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from functools import wraps
 from typing import Any
 
@@ -38,7 +38,7 @@ class JWTManager:
         Returns:
             Dict containing access_token and refresh_token
         """
-        now = datetime.now(UTC)
+        now = datetime.now(timezone.utc)
 
         # Get access token expiration from session timeout configuration
         # This ensures JWT tokens expire at the same time as the session inactivity timeout
@@ -223,7 +223,7 @@ class JWTManager:
             CSRF token string
         """
         # Create a unique token based on user ID, current time, and token secret
-        timestamp = str(int(datetime.now(UTC).timestamp()))
+        timestamp = str(int(datetime.now(timezone.utc).timestamp()))
         data = f"{user_id}:{timestamp}:{token_secret}"
         csrf_token = hashlib.sha256(data.encode()).hexdigest()[:32]
         return f"{timestamp}:{csrf_token}"
@@ -250,7 +250,7 @@ class JWTManager:
             timestamp = int(timestamp_str)
 
             # Check if token is not too old
-            current_time = int(datetime.now(UTC).timestamp())
+            current_time = int(datetime.now(timezone.utc).timestamp())
             if current_time - timestamp > max_age:
                 logger.warning(f"CSRF token expired for user {user_id}")
                 return False

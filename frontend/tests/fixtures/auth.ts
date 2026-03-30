@@ -1,4 +1,4 @@
-import { test as base } from '@playwright/test';
+import { Page, test as base } from '@playwright/test';
 
 export const TEST_CREDENTIALS = {
   valid: {
@@ -12,11 +12,11 @@ export const TEST_CREDENTIALS = {
 };
 
 export interface AuthenticatedPage {
-  page: any;
+  page: Page;
 };
 
 export const test = base.extend<{ authenticatedPage: AuthenticatedPage }>({
-  authenticatedPage: async ({ page }, use) => {
+  authenticatedPage: async ({ page }, runTest) => {
     // Perform login before tests
     await page.goto('/login');
     await page.fill('input[id="username"], input[name="username"], input[placeholder*="username"], input[placeholder*="Username"]', TEST_CREDENTIALS.valid.username);
@@ -31,7 +31,7 @@ export const test = base.extend<{ authenticatedPage: AuthenticatedPage }>({
       // If not redirected to dashboard, we might still be on login page - that's ok for some tests
     });
     
-    await use({ page });
+    await runTest({ page });
   },
 });
 

@@ -5,7 +5,7 @@ This module provides standardized time handling functions to ensure
 consistent time management across the application.
 """
 
-from datetime import UTC, datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 
 def get_utc_now() -> datetime:
@@ -15,7 +15,7 @@ def get_utc_now() -> datetime:
     Returns:
         datetime: Current UTC time with timezone information
     """
-    return datetime.now(UTC)
+    return datetime.now(timezone.utc)
 
 
 def get_utc_timestamp() -> datetime:
@@ -57,7 +57,7 @@ def format_datetime(dt: datetime | None) -> str | None:
 
     # If the datetime is naive, assume it's UTC
     if dt.tzinfo is None:
-        dt = dt.replace(tzinfo=UTC)
+        dt = dt.replace(tzinfo=timezone.utc)
 
     return dt.isoformat()
 
@@ -83,7 +83,7 @@ def parse_iso_datetime(dt_str: str) -> datetime | None:
         try:
             # Try parsing without timezone info (assume UTC)
             dt = datetime.fromisoformat(dt_str)
-            dt = dt.replace(tzinfo=UTC)
+            dt = dt.replace(tzinfo=timezone.utc)
         except ValueError:
             # Last resort, try a more flexible approach
             formats = [
@@ -95,7 +95,7 @@ def parse_iso_datetime(dt_str: str) -> datetime | None:
             for fmt in formats:
                 try:
                     dt = datetime.strptime(dt_str, fmt)
-                    dt = dt.replace(tzinfo=UTC)
+                    dt = dt.replace(tzinfo=timezone.utc)
                     break
                 except ValueError:
                     continue

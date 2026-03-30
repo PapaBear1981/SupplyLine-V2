@@ -2,14 +2,14 @@
 Enhanced messaging models for real-time chat features.
 Includes channels, message reactions, user presence tracking, and attachment metadata.
 """
-from datetime import UTC, datetime
+from datetime import datetime, timezone
 
 from models import db
 
 
 def get_current_time():
     """Return current time in UTC"""
-    return datetime.now(UTC)
+    return datetime.now(timezone.utc)
 
 
 class Channel(db.Model):
