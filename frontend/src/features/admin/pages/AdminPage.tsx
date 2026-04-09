@@ -8,6 +8,7 @@ import {
   ApartmentOutlined,
   KeyOutlined,
   SettingOutlined,
+  RobotOutlined,
 } from '@ant-design/icons';
 import { AdminOverview } from '../components/AdminOverview';
 import { UserManagement } from '../components/UserManagement';
@@ -17,6 +18,7 @@ import { RoleManagement } from '../components/RoleManagement';
 import { AircraftTypeManagement } from '../components/AircraftTypeManagement';
 import { PermissionOverview } from '../components/PermissionOverview';
 import { SystemSettings } from '../components/SystemSettings';
+import { AISettings } from '../components/AISettings';
 
 const { Title, Paragraph } = Typography;
 
@@ -101,6 +103,16 @@ export const AdminPage = () => {
         </span>
       ),
       children: <SystemSettings />,
+    },
+    {
+      key: 'ai',
+      label: (
+        <span>
+          <RobotOutlined />
+          AI Assistant
+        </span>
+      ),
+      children: <AISettings />,
     },
   ];
 
