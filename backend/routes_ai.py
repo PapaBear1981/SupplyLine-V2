@@ -21,9 +21,10 @@ from models import (
     User,
     UserActivity,
     UserRequest,
+    Warehouse,
     db,
 )
-from models_kits import Kit, KitExpendable, KitItem, KitReorderRequest
+from models_kits import Kit, KitBox, KitExpendable, KitItem, KitReorderRequest, KitTransfer
 from utils.transaction_helper import (
     record_chemical_issuance,
     record_tool_checkout,
@@ -314,6 +315,24 @@ TOOL_DEFINITIONS = [
             "required": [],
         },
     },
+    # ── Location lookup tools ────────────────────────────────────────────────────
+    {
+        "name": "get_warehouses",
+        "description": (
+            "List all warehouses and their current tool and chemical counts. "
+            "Use this to find warehouse names and IDs before initiating a transfer."
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "query": {
+                    "type": "string",
+                    "description": "Optional warehouse name to search for.",
+                },
+            },
+            "required": [],
+        },
+    },
     # ── Write / action tools ────────────────────────────────────────────────────
     # IMPORTANT: Always call with confirmed=false first to show a preview.
     # Only call with confirmed=true after the user explicitly agrees.
@@ -424,6 +443,55 @@ TOOL_DEFINITIONS = [
             "required": [],
         },
     },
+    {
+        "name": "transfer_item",
+        "description": (
+            "Transfer a tool or chemical between any two locations: "
+            "warehouse-to-warehouse, warehouse-to-kit, kit-to-warehouse, or kit-to-kit. "
+            "Call with confirmed=false first to preview. "
+            "Only call with confirmed=true after the user explicitly says yes or confirm."
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "item_query": {
+                    "type": "string",
+                    "description": "Tool description, serial number, or chemical part number / description to find.",
+                },
+                "from_type": {
+                    "type": "string",
+                    "enum": ["warehouse", "kit"],
+                    "description": "Source location type.",
+                },
+                "from_name": {
+                    "type": "string",
+                    "description": "Name of the source warehouse or kit.",
+                },
+                "to_type": {
+                    "type": "string",
+                    "enum": ["warehouse", "kit"],
+                    "description": "Destination location type.",
+                },
+                "to_name": {
+                    "type": "string",
+                    "description": "Name of the destination warehouse or kit.",
+                },
+                "quantity": {
+                    "type": "integer",
+                    "description": "Quantity to transfer. For tools this is always 1.",
+                },
+                "notes": {
+                    "type": "string",
+                    "description": "Optional notes for the transfer record.",
+                },
+                "confirmed": {
+                    "type": "boolean",
+                    "description": "false = preview only (default). true = execute the transfer.",
+                },
+            },
+            "required": [],
+        },
+    },
 ]
 
 
@@ -452,6 +520,8 @@ def _execute_tool(name: str, args: dict, user_id: int | None = None, is_admin: b
             return _tool_get_procurement_orders(**args)
         if name == "get_inventory_summary":
             return _tool_get_inventory_summary()
+        if name == "get_warehouses":
+            return _tool_get_warehouses(**args)
         # Write tools — require authenticated user context
         if name == "checkout_tool":
             return _tool_checkout_tool(**args, _user_id=user_id)
@@ -459,6 +529,8 @@ def _execute_tool(name: str, args: dict, user_id: int | None = None, is_admin: b
             return _tool_return_tool(**args, _user_id=user_id, _is_admin=is_admin)
         if name == "issue_chemical":
             return _tool_issue_chemical(**args, _user_id=user_id)
+        if name == "transfer_item":
+            return _tool_transfer_item(**args, _user_id=user_id)
         return {"error": f"Unknown tool: {name}"}
     except Exception as exc:
         logger.exception("Tool %s failed", name)
@@ -875,6 +947,27 @@ def _tool_get_inventory_summary() -> dict:
     }
 
 
+def _tool_get_warehouses(query: str = "") -> dict:
+    q = Warehouse.query.filter_by(is_active=True)
+    if query:
+        q = q.filter(Warehouse.name.ilike(f"%{query}%"))
+    warehouses = q.order_by(Warehouse.name).all()
+    if not warehouses:
+        return {"result": "No warehouses found."}
+    rows = []
+    for w in warehouses:
+        rows.append({
+            "id": w.id,
+            "name": w.name,
+            "type": w.warehouse_type,
+            "city": w.city,
+            "state": w.state,
+            "tool_count": w.tools.filter_by(status="available").count(),
+            "chemical_count": w.chemicals.filter(Chemical.quantity > 0).count(),
+        })
+    return {"count": len(rows), "warehouses": rows}
+
+
 # ─── Write tool execution ─────────────────────────────────────────────────────
 
 def _tool_checkout_tool(
@@ -1097,6 +1190,305 @@ def _tool_return_tool(
     return {
         "status": "success",
         "message": f"Tool {tool.tool_number} (S/N {tool.serial_number}) returned successfully. Status is now 'available'.",
+    }
+
+
+def _tool_transfer_item(
+    item_query: str = "",
+    from_type: str = "",
+    from_name: str = "",
+    to_type: str = "",
+    to_name: str = "",
+    quantity: int = 1,
+    notes: str = "",
+    confirmed: bool = False,
+    _user_id: int | None = None,
+) -> dict:
+    if not _user_id:
+        return {"error": "Cannot determine current user. Please log in again."}
+    if not item_query:
+        return {"error": "Please specify what item to transfer (name, serial number, or part number)."}
+    if from_type not in ("warehouse", "kit"):
+        return {"error": "from_type must be 'warehouse' or 'kit'. Use get_warehouses or get_kits to find location names."}
+    if to_type not in ("warehouse", "kit"):
+        return {"error": "to_type must be 'warehouse' or 'kit'."}
+    if not from_name:
+        return {"error": "Please specify the source warehouse or kit name."}
+    if not to_name:
+        return {"error": "Please specify the destination warehouse or kit name."}
+
+    # ── Resolve source location ───────────────────────────────────────────────
+    src_warehouse = src_kit = None
+    if from_type == "warehouse":
+        src_warehouse = Warehouse.query.filter(Warehouse.name.ilike(f"%{from_name}%")).first()
+        if not src_warehouse:
+            return {"error": f"Source warehouse '{from_name}' not found. Use get_warehouses to list available warehouses."}
+    else:
+        src_kit = Kit.query.filter(Kit.name.ilike(f"%{from_name}%")).first()
+        if not src_kit:
+            return {"error": f"Source kit '{from_name}' not found. Use get_kits to list available kits."}
+
+    # ── Resolve destination location ──────────────────────────────────────────
+    dst_warehouse = dst_kit = dst_box = None
+    if to_type == "warehouse":
+        dst_warehouse = Warehouse.query.filter(Warehouse.name.ilike(f"%{to_name}%")).first()
+        if not dst_warehouse:
+            return {"error": f"Destination warehouse '{to_name}' not found. Use get_warehouses to list available warehouses."}
+        if dst_warehouse.id == (src_warehouse.id if src_warehouse else None):
+            return {"error": "Source and destination warehouses must be different."}
+    else:
+        dst_kit = Kit.query.filter(Kit.name.ilike(f"%{to_name}%")).first()
+        if not dst_kit:
+            return {"error": f"Destination kit '{to_name}' not found. Use get_kits to list available kits."}
+        if dst_kit.id == (src_kit.id if src_kit else None):
+            return {"error": "Source and destination kits must be different."}
+        # Pick the first available box in the destination kit
+        dst_box = KitBox.query.filter_by(kit_id=dst_kit.id).first()
+        if not dst_box:
+            return {"error": f"Kit '{dst_kit.name}' has no boxes. Cannot transfer items into it."}
+
+    # ── Find the item in the source location ──────────────────────────────────
+    found_item = None   # Tool or Chemical
+    found_kit_item = None  # KitItem (when source is a kit)
+    item_type = None
+
+    if from_type == "warehouse":
+        # Search tools first, then chemicals
+        tool = Tool.query.filter(
+            Tool.warehouse_id == src_warehouse.id,
+            or_(
+                Tool.description.ilike(f"%{item_query}%"),
+                Tool.serial_number.ilike(f"%{item_query}%"),
+                Tool.tool_number.ilike(f"%{item_query}%"),
+            ),
+        ).first()
+        if tool:
+            found_item = tool
+            item_type = "tool"
+            quantity = 1  # tools always transfer as 1
+        else:
+            chem = Chemical.query.filter(
+                Chemical.warehouse_id == src_warehouse.id,
+                or_(
+                    Chemical.description.ilike(f"%{item_query}%"),
+                    Chemical.part_number.ilike(f"%{item_query}%"),
+                ),
+            ).first()
+            if chem:
+                found_item = chem
+                item_type = "chemical"
+    else:
+        # Search kit items
+        kit_item = KitItem.query.filter(
+            KitItem.kit_id == src_kit.id,
+            or_(
+                KitItem.description.ilike(f"%{item_query}%"),
+                KitItem.serial_number.ilike(f"%{item_query}%"),
+                KitItem.part_number.ilike(f"%{item_query}%"),
+            ),
+        ).first()
+        if kit_item:
+            found_kit_item = kit_item
+            item_type = kit_item.item_type
+            if item_type == "tool":
+                quantity = 1
+            found_item = (
+                db.session.get(Tool, kit_item.item_id)
+                if item_type == "tool"
+                else db.session.get(Chemical, kit_item.item_id)
+            )
+
+    if not found_item:
+        src_label = src_warehouse.name if src_warehouse else src_kit.name
+        return {
+            "error": (
+                f"'{item_query}' not found in {src_label}. "
+                f"Use search_tools / search_chemicals / get_kit_contents to locate the item first."
+            )
+        }
+
+    # ── Validate quantity ─────────────────────────────────────────────────────
+    blocking = []
+    if item_type == "chemical":
+        avail = found_item.quantity if from_type == "warehouse" else (found_kit_item.quantity if found_kit_item else 0)
+        if quantity <= 0:
+            blocking.append("Quantity must be greater than 0.")
+        elif quantity > avail:
+            blocking.append(f"Requested quantity ({quantity}) exceeds available stock ({avail} {found_item.unit}).")
+    if item_type == "tool" and from_type == "warehouse":
+        if found_item.status != "available":
+            blocking.append(f"Tool status is '{found_item.status}' — only available tools can be transferred.")
+
+    # ── Build preview ─────────────────────────────────────────────────────────
+    from_label = src_warehouse.name if src_warehouse else src_kit.name
+    to_label = (
+        dst_warehouse.name if dst_warehouse
+        else f"{dst_kit.name} › {dst_box.box_number}"
+    )
+
+    if item_type == "tool":
+        item_label = f"{found_item.description} (S/N {found_item.serial_number})"
+    else:
+        item_label = f"{found_item.description} — P/N {found_item.part_number}, Lot {found_item.lot_number}"
+
+    preview = {
+        "action": "transfer_item",
+        "item": item_label,
+        "item_type": item_type,
+        "quantity": quantity,
+        "unit": getattr(found_item, "unit", "each"),
+        "from": f"{from_type.capitalize()}: {from_label}",
+        "to": f"{to_type.capitalize()}: {to_label}",
+        "notes": notes or None,
+        "blocking_reasons": blocking,
+        "can_proceed": len(blocking) == 0,
+    }
+
+    if not confirmed:
+        preview["status"] = "preview"
+        preview["message"] = (
+            "Ready to transfer. Reply 'confirm' to proceed."
+            if preview["can_proceed"]
+            else "Cannot transfer — see blocking_reasons above."
+        )
+        return preview
+
+    if blocking:
+        return {"error": "Cannot complete this transfer.", "blocking_reasons": blocking}
+
+    # ── Execute transfer ──────────────────────────────────────────────────────
+    user = db.session.get(User, _user_id)
+
+    if from_type == "warehouse" and to_type == "warehouse":
+        # Warehouse → Warehouse: reassign warehouse_id
+        found_item.warehouse_id = dst_warehouse.id
+        transfer = KitTransfer(
+            item_type=item_type,
+            item_id=found_item.id,
+            from_location_type="warehouse",
+            from_location_id=src_warehouse.id,
+            to_location_type="warehouse",
+            to_location_id=dst_warehouse.id,
+            quantity=quantity,
+            transferred_by=_user_id,
+            status="completed",
+            completed_date=datetime.now(),
+            notes=notes or f"AI transfer: {from_label} → {to_label}",
+        )
+
+    elif from_type == "warehouse" and to_type == "kit":
+        # Warehouse → Kit: create KitItem, clear warehouse_id
+        if item_type == "chemical" and quantity < found_item.quantity:
+            from utils.lot_utils import create_child_chemical
+            child = create_child_chemical(
+                parent_chemical=found_item,
+                quantity=quantity,
+                destination_warehouse_id=None,
+            )
+            db.session.add(child)
+            db.session.flush()
+            kit_entry = KitItem(
+                kit_id=dst_kit.id,
+                box_id=dst_box.id,
+                item_type="chemical",
+                item_id=child.id,
+                part_number=child.part_number,
+                lot_number=child.lot_number,
+                description=child.description,
+                quantity=quantity,
+                status="available",
+            )
+            transfer_item_id = child.id
+        else:
+            found_item.warehouse_id = None
+            kit_entry = KitItem(
+                kit_id=dst_kit.id,
+                box_id=dst_box.id,
+                item_type=item_type,
+                item_id=found_item.id,
+                part_number=getattr(found_item, "tool_number", None) or getattr(found_item, "part_number", None),
+                serial_number=getattr(found_item, "serial_number", None),
+                lot_number=getattr(found_item, "lot_number", None),
+                description=found_item.description,
+                quantity=quantity,
+                status="available",
+            )
+            transfer_item_id = found_item.id
+        db.session.add(kit_entry)
+        transfer = KitTransfer(
+            item_type=item_type,
+            item_id=transfer_item_id,
+            from_location_type="warehouse",
+            from_location_id=src_warehouse.id,
+            to_location_type="kit",
+            to_location_id=dst_kit.id,
+            quantity=quantity,
+            transferred_by=_user_id,
+            status="completed",
+            completed_date=datetime.now(),
+            notes=notes or f"AI transfer: {from_label} → {to_label}",
+        )
+
+    elif from_type == "kit" and to_type == "warehouse":
+        # Kit → Warehouse: restore warehouse_id, remove or reduce KitItem
+        if item_type == "tool":
+            found_item.warehouse_id = dst_warehouse.id
+            db.session.delete(found_kit_item)
+        else:
+            # Chemical: restore quantity to warehouse chemical or reduce kit item
+            if found_kit_item.quantity <= quantity:
+                found_item.warehouse_id = dst_warehouse.id
+                db.session.delete(found_kit_item)
+            else:
+                found_kit_item.quantity -= quantity
+                found_item.quantity += quantity
+                found_item.warehouse_id = dst_warehouse.id
+        transfer = KitTransfer(
+            item_type=item_type,
+            item_id=found_item.id,
+            from_location_type="kit",
+            from_location_id=src_kit.id,
+            to_location_type="warehouse",
+            to_location_id=dst_warehouse.id,
+            quantity=quantity,
+            transferred_by=_user_id,
+            status="completed",
+            completed_date=datetime.now(),
+            notes=notes or f"AI transfer: {from_label} → {to_label}",
+        )
+
+    else:
+        # Kit → Kit: move KitItem to new kit/box
+        found_kit_item.kit_id = dst_kit.id
+        found_kit_item.box_id = dst_box.id
+        transfer = KitTransfer(
+            item_type=item_type,
+            item_id=found_item.id if found_item else found_kit_item.item_id,
+            from_location_type="kit",
+            from_location_id=src_kit.id,
+            to_location_type="kit",
+            to_location_id=dst_kit.id,
+            quantity=quantity,
+            transferred_by=_user_id,
+            status="completed",
+            completed_date=datetime.now(),
+            notes=notes or f"AI transfer: {from_label} → {to_label}",
+        )
+
+    db.session.add(transfer)
+    db.session.add(AuditLog(
+        action_type="item_transfer",
+        action_details=(
+            f"AI assistant: {user.name if user else _user_id} transferred "
+            f"{quantity}x {item_label} from {from_label} to {to_label}"
+        ),
+    ))
+    db.session.commit()
+
+    return {
+        "status": "success",
+        "message": f"Transferred {quantity}x {item_label} from {from_label} to {to_label} successfully.",
+        "transfer_id": transfer.id,
     }
 
 
@@ -1419,6 +1811,7 @@ Call these freely whenever you need live data:
 - get_active_checkouts — see who has tools checked out right now
 - get_calibration_status — find overdue or upcoming calibrations
 - search_chemicals — find chemicals by name, part number, or expiration
+- get_warehouses — list warehouses with tool and chemical counts
 - get_kits — list mobile warehouse kits and their locations
 - get_kit_contents — see what is inside a specific kit
 - get_kit_reorders — pending restock requests for kits
@@ -1441,6 +1834,10 @@ Action tools:
 - checkout_tool — check out a tool to the current user
 - return_tool — return (check in) a tool the current user has checked out
 - issue_chemical — issue a quantity of a chemical to the current user
+- transfer_item — move a tool or chemical between any two locations
+    (warehouse→warehouse, warehouse→kit, kit→warehouse, kit→kit)
+    Tip: use get_warehouses and get_kits first to confirm names, then
+    use search_tools / get_kit_contents to confirm the item exists at the source.
 
 ## Guidelines
 - Always use query tools for lookups — never invent serial numbers, names, or quantities.
