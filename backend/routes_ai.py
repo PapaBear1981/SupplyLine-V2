@@ -13,6 +13,7 @@ from models import (
     AuditLog,
     Chemical,
     ChemicalIssuance,
+    ChemicalReturn,
     Checkout,
     ProcurementOrder,
     RequestItem,
@@ -27,6 +28,7 @@ from models import (
 from models_kits import Kit, KitBox, KitExpendable, KitItem, KitReorderRequest, KitTransfer
 from utils.transaction_helper import (
     record_chemical_issuance,
+    record_chemical_return,
     record_tool_checkout,
     record_tool_return,
 )
@@ -492,6 +494,132 @@ TOOL_DEFINITIONS = [
             "required": [],
         },
     },
+    {
+        "name": "get_chemical_issuances",
+        "description": (
+            "List active (unreturned or partially returned) issuances for a chemical. "
+            "Use this to find the issuance_id needed before calling return_chemical."
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "chemical_id": {
+                    "type": "integer",
+                    "description": "ID of the chemical. Use search_chemicals first to find it.",
+                },
+                "part_number": {
+                    "type": "string",
+                    "description": "Filter by part number (partial match).",
+                },
+                "show_all": {
+                    "type": "boolean",
+                    "description": "true = include fully returned issuances. Default false = active only.",
+                },
+            },
+            "required": [],
+        },
+    },
+    {
+        "name": "return_chemical",
+        "description": (
+            "Return a quantity of an issued chemical back to stock. "
+            "Call with confirmed=false first to preview. "
+            "Only call with confirmed=true after the user explicitly says yes or confirm. "
+            "Use get_chemical_issuances to find the issuance_id."
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "chemical_id": {
+                    "type": "integer",
+                    "description": "ID of the chemical to return.",
+                },
+                "issuance_id": {
+                    "type": "integer",
+                    "description": "ID of the issuance record being returned against.",
+                },
+                "quantity": {
+                    "type": "integer",
+                    "description": "Quantity to return. Must not exceed the outstanding issued amount.",
+                },
+                "warehouse_id": {
+                    "type": "integer",
+                    "description": "Warehouse to return the chemical to. Defaults to original warehouse.",
+                },
+                "location": {
+                    "type": "string",
+                    "description": "Shelf or bin location within the warehouse.",
+                },
+                "notes": {
+                    "type": "string",
+                    "description": "Optional notes for the return record.",
+                },
+                "confirmed": {
+                    "type": "boolean",
+                    "description": "false = preview only (default). true = execute the return.",
+                },
+            },
+            "required": [],
+        },
+    },
+    {
+        "name": "request_chemical_reorder",
+        "description": (
+            "Flag a chemical as needing reorder and create a procurement request. "
+            "Requires materials manager role or admin. "
+            "Call with confirmed=false first to preview. "
+            "Only call with confirmed=true after the user explicitly says yes or confirm."
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "chemical_id": {
+                    "type": "integer",
+                    "description": "ID of the chemical to reorder.",
+                },
+                "requested_quantity": {
+                    "type": "integer",
+                    "description": "Quantity to request in the reorder.",
+                },
+                "notes": {
+                    "type": "string",
+                    "description": "Optional notes or justification for the reorder.",
+                },
+                "confirmed": {
+                    "type": "boolean",
+                    "description": "false = preview only (default). true = submit the reorder request.",
+                },
+            },
+            "required": [],
+        },
+    },
+    {
+        "name": "archive_chemical",
+        "description": (
+            "Archive a depleted or expired chemical so it no longer appears in active inventory. "
+            "Requires materials manager role or admin. "
+            "Call with confirmed=false first to preview. "
+            "Only call with confirmed=true after the user explicitly says yes or confirm."
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "chemical_id": {
+                    "type": "integer",
+                    "description": "ID of the chemical to archive.",
+                },
+                "reason": {
+                    "type": "string",
+                    "description": "Required reason for archiving (e.g. expired, depleted, contaminated).",
+                },
+                "confirmed": {
+                    "type": "boolean",
+                    "description": "false = preview only (default). true = execute the archive.",
+                },
+            },
+            "required": [],
+        },
+    },
 ]
 
 
@@ -531,6 +659,14 @@ def _execute_tool(name: str, args: dict, user_id: int | None = None, is_admin: b
             return _tool_issue_chemical(**args, _user_id=user_id)
         if name == "transfer_item":
             return _tool_transfer_item(**args, _user_id=user_id)
+        if name == "get_chemical_issuances":
+            return _tool_get_chemical_issuances(**args)
+        if name == "return_chemical":
+            return _tool_return_chemical(**args, _user_id=user_id)
+        if name == "request_chemical_reorder":
+            return _tool_request_chemical_reorder(**args, _user_id=user_id, _is_admin=is_admin)
+        if name == "archive_chemical":
+            return _tool_archive_chemical(**args, _user_id=user_id, _is_admin=is_admin)
         return {"error": f"Unknown tool: {name}"}
     except Exception as exc:
         logger.exception("Tool %s failed", name)
@@ -1627,6 +1763,372 @@ def _tool_issue_chemical(
     }
 
 
+# ─── Chemical management tools ───────────────────────────────────────────────
+
+def _tool_get_chemical_issuances(
+    chemical_id: int = 0,
+    part_number: str = "",
+    show_all: bool = False,
+) -> dict:
+    q = ChemicalIssuance.query
+    if chemical_id:
+        q = q.filter_by(chemical_id=chemical_id)
+    elif part_number:
+        matching_ids = [
+            c.id for c in Chemical.query.filter(
+                Chemical.part_number.ilike(f"%{part_number}%")
+            ).all()
+        ]
+        if not matching_ids:
+            return {"issuances": [], "count": 0}
+        q = q.filter(ChemicalIssuance.chemical_id.in_(matching_ids))
+
+    issuances = q.order_by(ChemicalIssuance.issue_date.desc()).limit(50).all()
+
+    results = []
+    for iss in issuances:
+        total_returned = sum(r.quantity for r in iss.returns)
+        remaining = iss.quantity - total_returned
+        if not show_all and remaining <= 0:
+            continue
+        chem = db.session.get(Chemical, iss.chemical_id)
+        issued_to = db.session.get(User, iss.user_id)
+        results.append({
+            "issuance_id": iss.id,
+            "chemical_id": iss.chemical_id,
+            "part_number": chem.part_number if chem else None,
+            "lot_number": chem.lot_number if chem else None,
+            "description": chem.description if chem else None,
+            "unit": chem.unit if chem else None,
+            "issued_to": issued_to.name if issued_to else iss.user_id,
+            "issued_quantity": iss.quantity,
+            "returned_quantity": total_returned,
+            "outstanding_quantity": remaining,
+            "location": iss.hangar,
+            "purpose": iss.purpose,
+            "issue_date": iss.issue_date.isoformat() if iss.issue_date else None,
+        })
+        if len(results) >= MAX_RESULTS:
+            break
+
+    return {"issuances": results, "count": len(results)}
+
+
+def _tool_return_chemical(
+    chemical_id: int = 0,
+    issuance_id: int = 0,
+    quantity: int = 0,
+    warehouse_id: int = 0,
+    location: str = "",
+    notes: str = "",
+    confirmed: bool = False,
+    _user_id: int | None = None,
+) -> dict:
+    if not chemical_id or not issuance_id or not quantity:
+        return {"error": "chemical_id, issuance_id, and quantity are all required."}
+    if quantity <= 0:
+        return {"error": "quantity must be greater than zero."}
+
+    chem = db.session.get(Chemical, chemical_id)
+    if not chem:
+        return {"error": f"No chemical found with id {chemical_id}."}
+
+    issuance = db.session.get(ChemicalIssuance, issuance_id)
+    if not issuance or issuance.chemical_id != chemical_id:
+        return {"error": "Issuance does not match the selected chemical."}
+
+    total_returned = sum(r.quantity for r in issuance.returns)
+    outstanding = issuance.quantity - total_returned
+    if quantity > outstanding:
+        return {"error": f"Cannot return more than the outstanding quantity ({outstanding} {chem.unit})."}
+
+    dest_warehouse = None
+    if warehouse_id:
+        dest_warehouse = db.session.get(Warehouse, warehouse_id)
+        if not dest_warehouse:
+            return {"error": f"No warehouse found with id {warehouse_id}."}
+        if not dest_warehouse.is_active:
+            return {"error": f"Warehouse '{dest_warehouse.name}' is inactive."}
+
+    issued_to = db.session.get(User, issuance.user_id)
+    return_location = location or chem.location or ""
+    return_warehouse_name = (dest_warehouse.name if dest_warehouse
+                             else (chem.warehouse.name if chem.warehouse else "original warehouse"))
+
+    preview = {
+        "action": "return_chemical",
+        "chemical": f"{chem.description} (P/N {chem.part_number}, lot {chem.lot_number})",
+        "issuance_id": issuance_id,
+        "originally_issued_to": issued_to.name if issued_to else issuance.user_id,
+        "originally_issued_location": issuance.hangar,
+        "quantity_to_return": quantity,
+        "unit": chem.unit,
+        "return_to_warehouse": return_warehouse_name,
+        "return_location": return_location or "(unchanged)",
+        "new_stock_after_return": (chem.quantity or 0) + quantity,
+    }
+
+    if not confirmed:
+        return {"preview": preview, "confirmed": False,
+                "message": "Review the return details above and confirm to proceed."}
+
+    if not _user_id:
+        return {"error": "Cannot execute return: user identity not available."}
+
+    effective_wh_id = warehouse_id or chem.warehouse_id
+    effective_loc = location or chem.location
+
+    chem.quantity = (chem.quantity or 0) + quantity
+    chem.location = effective_loc
+    chem.warehouse_id = effective_wh_id
+
+    if chem.quantity > 0:
+        chem.status = "available"
+    if chem.minimum_stock_level and chem.quantity <= chem.minimum_stock_level:
+        chem.status = "low_stock"
+
+    try:
+        chem.update_reorder_status()
+    except Exception:
+        pass
+
+    chemical_return = ChemicalReturn(
+        chemical_id=chem.id,
+        issuance_id=issuance_id,
+        returned_by_id=_user_id,
+        quantity=quantity,
+        warehouse_id=effective_wh_id,
+        location=effective_loc,
+        notes=notes or None,
+    )
+    db.session.add(chemical_return)
+
+    try:
+        record_chemical_return(
+            chemical_id=chem.id,
+            user_id=_user_id,
+            quantity=quantity,
+            location_from=issuance.hangar,
+            location_to=effective_loc or return_warehouse_name,
+            notes=notes or None,
+        )
+    except Exception:
+        logger.warning("record_chemical_return failed for chemical %s", chem.id)
+
+    user = db.session.get(User, _user_id)
+    db.session.add(AuditLog(
+        action_type="chemical_return",
+        action_details=(
+            f"AI assistant: {user.name if user else _user_id} returned {quantity} {chem.unit} "
+            f"of {chem.part_number} lot {chem.lot_number} from {issuance.hangar}"
+        ),
+    ))
+    db.session.add(UserActivity(
+        user_id=_user_id,
+        activity_type="chemical_returned",
+        description=(
+            f"Returned {quantity} {chem.unit} of chemical {chem.part_number} - {chem.lot_number}"
+        ),
+    ))
+    db.session.commit()
+
+    return {
+        "status": "success",
+        "message": (
+            f"Returned {quantity} {chem.unit} of {chem.description} "
+            f"(P/N {chem.part_number}, lot {chem.lot_number}). "
+            f"New stock level: {chem.quantity} {chem.unit}."
+        ),
+        "new_stock": chem.quantity,
+    }
+
+
+def _tool_request_chemical_reorder(
+    chemical_id: int = 0,
+    requested_quantity: int = 0,
+    notes: str = "",
+    confirmed: bool = False,
+    _user_id: int | None = None,
+    _is_admin: bool = False,
+) -> dict:
+    if not chemical_id or not requested_quantity:
+        return {"error": "chemical_id and requested_quantity are required."}
+    if requested_quantity <= 0:
+        return {"error": "requested_quantity must be greater than zero."}
+
+    chem = db.session.get(Chemical, chemical_id)
+    if not chem:
+        return {"error": f"No chemical found with id {chemical_id}."}
+
+    # Check permissions — materials_manager or admin
+    user = db.session.get(User, _user_id) if _user_id else None
+    if not _is_admin:
+        has_perm = False
+        if user and user.roles:
+            for role in user.roles:
+                if getattr(role, "name", "").lower() in ("materials_manager", "materials manager", "admin"):
+                    has_perm = True
+                    break
+        if not has_perm and user:
+            # Check permissions list
+            perms = [p.name for p in getattr(user, "permissions", [])]
+            if "materials.manage" in perms or "system.settings" in perms:
+                has_perm = True
+        if not has_perm:
+            return {"error": "Insufficient permissions. Materials manager role or admin required to request reorders."}
+
+    preview = {
+        "action": "request_chemical_reorder",
+        "chemical": f"{chem.description} (P/N {chem.part_number}, lot {chem.lot_number})",
+        "current_stock": chem.quantity,
+        "unit": chem.unit,
+        "requested_quantity": requested_quantity,
+        "current_reorder_status": getattr(chem, "reorder_status", "unknown"),
+        "notes": notes or "(none)",
+    }
+
+    if not confirmed:
+        return {"preview": preview, "confirmed": False,
+                "message": "Review the reorder request above and confirm to submit."}
+
+    if not _user_id:
+        return {"error": "Cannot execute reorder request: user identity not available."}
+
+    chem.needs_reorder = True
+    chem.reorder_status = "needed"
+    chem.reorder_date = datetime.utcnow()
+    chem.requested_quantity = requested_quantity
+
+    if notes:
+        reorder_note = (
+            f"\n[Reorder Request {datetime.utcnow().strftime('%Y-%m-%d %H:%M')} "
+            f"- Qty: {requested_quantity}]: {notes}"
+        )
+        chem.notes = (chem.notes or "") + reorder_note
+
+    try:
+        from utils.unified_requests import create_chemical_reorder_request
+        user_request = create_chemical_reorder_request(
+            chemical=chem,
+            requested_quantity=requested_quantity,
+            requester_id=_user_id,
+            notes=notes,
+        )
+        request_number = user_request.request_number
+    except Exception:
+        logger.exception("Failed to create unified reorder request for chemical %s", chemical_id)
+        request_number = None
+
+    db.session.add(AuditLog(
+        action_type="chemical_reorder_requested",
+        action_details=(
+            f"AI assistant: {user.name if user else _user_id} requested reorder of "
+            f"{chem.part_number} lot {chem.lot_number} (qty {requested_quantity})"
+        ),
+    ))
+    db.session.add(UserActivity(
+        user_id=_user_id,
+        activity_type="chemical_reorder_requested",
+        description=(
+            f"Requested reorder for chemical {chem.part_number} - {chem.lot_number} "
+            f"(Qty: {requested_quantity})"
+            + (f". Request #{request_number}" if request_number else "")
+        ),
+    ))
+    db.session.commit()
+
+    return {
+        "status": "success",
+        "message": (
+            f"Reorder request submitted for {chem.description} "
+            f"(P/N {chem.part_number}, qty {requested_quantity} {chem.unit})."
+            + (f" Request #{request_number} created." if request_number else "")
+        ),
+        "request_number": request_number,
+    }
+
+
+def _tool_archive_chemical(
+    chemical_id: int = 0,
+    reason: str = "",
+    confirmed: bool = False,
+    _user_id: int | None = None,
+    _is_admin: bool = False,
+) -> dict:
+    if not chemical_id:
+        return {"error": "chemical_id is required."}
+    if not reason:
+        return {"error": "reason is required to archive a chemical."}
+
+    chem = db.session.get(Chemical, chemical_id)
+    if not chem:
+        return {"error": f"No chemical found with id {chemical_id}."}
+
+    if getattr(chem, "is_archived", False):
+        return {"error": f"Chemical {chem.part_number} lot {chem.lot_number} is already archived."}
+
+    # Check permissions — materials_manager or admin
+    user = db.session.get(User, _user_id) if _user_id else None
+    if not _is_admin:
+        has_perm = False
+        if user and user.roles:
+            for role in user.roles:
+                if getattr(role, "name", "").lower() in ("materials_manager", "materials manager", "admin"):
+                    has_perm = True
+                    break
+        if not has_perm and user:
+            perms = [p.name for p in getattr(user, "permissions", [])]
+            if "materials.manage" in perms or "system.settings" in perms:
+                has_perm = True
+        if not has_perm:
+            return {"error": "Insufficient permissions. Materials manager role or admin required to archive chemicals."}
+
+    preview = {
+        "action": "archive_chemical",
+        "chemical": f"{chem.description} (P/N {chem.part_number}, lot {chem.lot_number})",
+        "current_stock": chem.quantity,
+        "unit": chem.unit,
+        "expiry_date": chem.expiry_date.isoformat() if getattr(chem, "expiry_date", None) else None,
+        "reason": reason,
+        "warning": "This will remove the chemical from active inventory. It can be unarchived by an admin.",
+    }
+
+    if not confirmed:
+        return {"preview": preview, "confirmed": False,
+                "message": "Review the archive details above and confirm to proceed."}
+
+    if not _user_id:
+        return {"error": "Cannot execute archive: user identity not available."}
+
+    chem.is_archived = True
+    chem.archived_reason = reason
+    chem.archived_date = datetime.utcnow()
+
+    db.session.add(AuditLog(
+        action_type="chemical_archived",
+        action_details=(
+            f"AI assistant: {user.name if user else _user_id} archived chemical "
+            f"{chem.part_number} lot {chem.lot_number} — reason: {reason}"
+        ),
+    ))
+    db.session.add(UserActivity(
+        user_id=_user_id,
+        activity_type="chemical_archived",
+        description=(
+            f"Archived chemical {chem.part_number} - {chem.lot_number}: {reason}"
+        ),
+    ))
+    db.session.commit()
+
+    return {
+        "status": "success",
+        "message": (
+            f"Chemical {chem.description} (P/N {chem.part_number}, lot {chem.lot_number}) "
+            f"has been archived. Reason: {reason}."
+        ),
+    }
+
+
 # ─── Schema converters ────────────────────────────────────────────────────────
 
 def _claude_tools() -> list:
@@ -1811,6 +2313,7 @@ Call these freely whenever you need live data:
 - get_active_checkouts — see who has tools checked out right now
 - get_calibration_status — find overdue or upcoming calibrations
 - search_chemicals — find chemicals by name, part number, or expiration
+- get_chemical_issuances — list active/outstanding chemical issuance records
 - get_warehouses — list warehouses with tool and chemical counts
 - get_kits — list mobile warehouse kits and their locations
 - get_kit_contents — see what is inside a specific kit
@@ -1834,6 +2337,12 @@ Action tools:
 - checkout_tool — check out a tool to the current user
 - return_tool — return (check in) a tool the current user has checked out
 - issue_chemical — issue a quantity of a chemical to the current user
+- return_chemical — return issued chemical quantity back to stock
+    Tip: use get_chemical_issuances first to find the issuance_id.
+- request_chemical_reorder — flag a chemical for reorder and create a procurement request
+    (requires materials manager role or admin)
+- archive_chemical — archive a depleted or expired chemical from active inventory
+    (requires materials manager role or admin)
 - transfer_item — move a tool or chemical between any two locations
     (warehouse→warehouse, warehouse→kit, kit→warehouse, kit→kit)
     Tip: use get_warehouses and get_kits first to confirm names, then
