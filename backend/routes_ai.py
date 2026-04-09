@@ -2,7 +2,7 @@
 
 import json
 import logging
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
 
 import requests
 from flask import jsonify, request
@@ -12,15 +12,23 @@ from auth import jwt_required, permission_required
 from models import (
     AuditLog,
     Chemical,
+    ChemicalIssuance,
     Checkout,
     ProcurementOrder,
     RequestItem,
     Tool,
+    ToolHistory,
     User,
+    UserActivity,
     UserRequest,
     db,
 )
 from models_kits import Kit, KitExpendable, KitItem, KitReorderRequest
+from utils.transaction_helper import (
+    record_chemical_issuance,
+    record_tool_checkout,
+    record_tool_return,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -306,12 +314,122 @@ TOOL_DEFINITIONS = [
             "required": [],
         },
     },
+    # ── Write / action tools ────────────────────────────────────────────────────
+    # IMPORTANT: Always call with confirmed=false first to show a preview.
+    # Only call with confirmed=true after the user explicitly agrees.
+    {
+        "name": "checkout_tool",
+        "description": (
+            "Check out a tool to the current user. "
+            "Call with confirmed=false first to preview. "
+            "Only call with confirmed=true after the user explicitly says yes or confirm."
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "serial_number": {
+                    "type": "string",
+                    "description": "Serial number of the tool to check out.",
+                },
+                "tool_query": {
+                    "type": "string",
+                    "description": "Tool name or description to search by if serial number is unknown.",
+                },
+                "work_order": {
+                    "type": "string",
+                    "description": "Work order number to associate with this checkout (optional).",
+                },
+                "notes": {
+                    "type": "string",
+                    "description": "Optional checkout notes.",
+                },
+                "confirmed": {
+                    "type": "boolean",
+                    "description": "false = preview only (default). true = execute the checkout.",
+                },
+            },
+            "required": [],
+        },
+    },
+    {
+        "name": "return_tool",
+        "description": (
+            "Return (check in) a tool that is currently checked out to the current user. "
+            "Call with confirmed=false first to preview. "
+            "Only call with confirmed=true after the user explicitly says yes or confirm."
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "serial_number": {
+                    "type": "string",
+                    "description": "Serial number of the tool to return.",
+                },
+                "tool_query": {
+                    "type": "string",
+                    "description": "Tool name or description to search by if serial number is unknown.",
+                },
+                "condition": {
+                    "type": "string",
+                    "enum": ["New", "Good", "Fair", "Poor", "Damaged"],
+                    "description": "Tool condition on return (optional).",
+                },
+                "notes": {
+                    "type": "string",
+                    "description": "Optional return notes.",
+                },
+                "confirmed": {
+                    "type": "boolean",
+                    "description": "false = preview only (default). true = execute the return.",
+                },
+            },
+            "required": [],
+        },
+    },
+    {
+        "name": "issue_chemical",
+        "description": (
+            "Issue a quantity of a chemical to the current user. "
+            "Call with confirmed=false first to preview. "
+            "Only call with confirmed=true after the user explicitly says yes or confirm."
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "part_number": {
+                    "type": "string",
+                    "description": "Part number of the chemical to issue.",
+                },
+                "chemical_query": {
+                    "type": "string",
+                    "description": "Chemical name or description if part number is unknown.",
+                },
+                "quantity": {
+                    "type": "integer",
+                    "description": "Quantity to issue.",
+                },
+                "location": {
+                    "type": "string",
+                    "description": "Hangar or work location where the chemical will be used.",
+                },
+                "purpose": {
+                    "type": "string",
+                    "description": "What the chemical will be used for (optional).",
+                },
+                "confirmed": {
+                    "type": "boolean",
+                    "description": "false = preview only (default). true = execute the issuance.",
+                },
+            },
+            "required": [],
+        },
+    },
 ]
 
 
 # ─── Tool execution (DB queries) ──────────────────────────────────────────────
 
-def _execute_tool(name: str, args: dict) -> dict:
+def _execute_tool(name: str, args: dict, user_id: int | None = None, is_admin: bool = False) -> dict:
     """Dispatch a tool call to the appropriate DB query and return a JSON-serialisable dict."""
     try:
         if name == "search_tools":
@@ -334,6 +452,13 @@ def _execute_tool(name: str, args: dict) -> dict:
             return _tool_get_procurement_orders(**args)
         if name == "get_inventory_summary":
             return _tool_get_inventory_summary()
+        # Write tools — require authenticated user context
+        if name == "checkout_tool":
+            return _tool_checkout_tool(**args, _user_id=user_id)
+        if name == "return_tool":
+            return _tool_return_tool(**args, _user_id=user_id, _is_admin=is_admin)
+        if name == "issue_chemical":
+            return _tool_issue_chemical(**args, _user_id=user_id)
         return {"error": f"Unknown tool: {name}"}
     except Exception as exc:
         logger.exception("Tool %s failed", name)
@@ -750,6 +875,366 @@ def _tool_get_inventory_summary() -> dict:
     }
 
 
+# ─── Write tool execution ─────────────────────────────────────────────────────
+
+def _tool_checkout_tool(
+    serial_number: str = "",
+    tool_query: str = "",
+    work_order: str = "",
+    notes: str = "",
+    confirmed: bool = False,
+    _user_id: int | None = None,
+) -> dict:
+    if not _user_id:
+        return {"error": "Cannot determine current user. Please log in again."}
+
+    # Locate the tool
+    tool = None
+    if serial_number:
+        tool = Tool.query.filter(Tool.serial_number.ilike(f"%{serial_number}%")).first()
+    if not tool and tool_query:
+        tool = Tool.query.filter(Tool.description.ilike(f"%{tool_query}%")).first()
+    if not tool:
+        return {"error": "Tool not found. Use search_tools to find the correct tool first."}
+
+    # Evaluate blocking conditions (same rules as the checkout route)
+    blocking = []
+    active_co = Checkout.query.filter_by(tool_id=tool.id, return_date=None).first()
+    if active_co:
+        who = active_co.user.name if active_co.user else "someone"
+        blocking.append(f"Already checked out to {who} since {active_co.checkout_date.strftime('%Y-%m-%d') if active_co.checkout_date else 'unknown date'}.")
+    if tool.requires_calibration and tool.calibration_status == "overdue":
+        blocking.append("Calibration is overdue — tool cannot be issued until recalibrated.")
+    if tool.status == "maintenance":
+        blocking.append(f"Tool is in maintenance: {tool.status_reason or 'no reason recorded'}.")
+    if tool.status == "retired":
+        blocking.append("Tool has been retired from service.")
+    if tool.condition and tool.condition.lower() in ("damaged", "unusable", "broken"):
+        blocking.append(f"Tool condition is '{tool.condition}'.")
+
+    preview = {
+        "action": "checkout_tool",
+        "tool_number": tool.tool_number,
+        "serial_number": tool.serial_number,
+        "description": tool.description,
+        "current_status": tool.status,
+        "location": tool.location,
+        "work_order": work_order or None,
+        "notes": notes or None,
+        "blocking_reasons": blocking,
+        "can_proceed": len(blocking) == 0,
+    }
+
+    if not confirmed:
+        preview["status"] = "preview"
+        if preview["can_proceed"]:
+            preview["message"] = "Ready to check out. Reply 'confirm' to proceed."
+        else:
+            preview["message"] = "Cannot check out this tool — see blocking_reasons above."
+        return preview
+
+    # Execute
+    if blocking:
+        return {"error": "Cannot check out this tool.", "blocking_reasons": blocking}
+
+    expected_return = datetime.now() + timedelta(days=7)
+    user = db.session.get(User, _user_id)
+
+    checkout = Checkout(
+        tool_id=tool.id,
+        user_id=_user_id,
+        expected_return_date=expected_return,
+        checkout_notes=notes or None,
+        condition_at_checkout=tool.condition,
+        work_order=work_order or None,
+    )
+    db.session.add(checkout)
+    old_status = tool.status
+    tool.status = "checked_out"
+    db.session.flush()  # get checkout.id
+
+    history = ToolHistory.create_event(
+        tool_id=tool.id,
+        event_type="checkout",
+        user_id=_user_id,
+        description=f"Checked out to {user.name if user else 'Unknown'} via AI assistant",
+        details={"work_order": work_order, "notes": notes, "source": "ai_assistant"},
+        related_checkout_id=checkout.id,
+        old_status=old_status,
+        new_status="checked_out",
+    )
+    db.session.add(history)
+
+    try:
+        record_tool_checkout(tool_id=tool.id, user_id=_user_id,
+                             expected_return_date=expected_return, notes=notes)
+    except Exception:
+        logger.warning("record_tool_checkout failed for tool %s", tool.id)
+
+    db.session.add(AuditLog(
+        action_type="tool_checkout",
+        action_details=(
+            f"AI assistant: {user.name if user else _user_id} checked out "
+            f"{tool.tool_number} S/N {tool.serial_number}"
+        ),
+    ))
+    db.session.commit()
+
+    return {
+        "status": "success",
+        "message": (
+            f"Tool {tool.tool_number} (S/N {tool.serial_number}) checked out to "
+            f"{user.name if user else 'you'} successfully."
+        ),
+        "checkout_id": checkout.id,
+        "expected_return_date": expected_return.strftime("%Y-%m-%d"),
+    }
+
+
+def _tool_return_tool(
+    serial_number: str = "",
+    tool_query: str = "",
+    condition: str = "",
+    notes: str = "",
+    confirmed: bool = False,
+    _user_id: int | None = None,
+    _is_admin: bool = False,
+) -> dict:
+    if not _user_id:
+        return {"error": "Cannot determine current user. Please log in again."}
+
+    # Find the active checkout
+    checkout = None
+    tool = None
+
+    if serial_number:
+        tool = Tool.query.filter(Tool.serial_number.ilike(f"%{serial_number}%")).first()
+    if not tool and tool_query:
+        tool = Tool.query.filter(Tool.description.ilike(f"%{tool_query}%")).first()
+
+    if tool:
+        checkout = Checkout.query.filter_by(tool_id=tool.id, return_date=None).first()
+    else:
+        # Fall back: find any active checkout for this user matching the query
+        checkout = (
+            Checkout.query
+            .filter_by(user_id=_user_id, return_date=None)
+            .first()
+        )
+        if checkout:
+            tool = checkout.tool
+
+    if not checkout or not tool:
+        return {"error": "No active checkout found for that tool. Use get_active_checkouts to check what you have checked out."}
+
+    # Authorization: only the owner or an admin may return
+    if checkout.user_id != _user_id and not _is_admin:
+        owner = checkout.user.name if checkout.user else "another user"
+        return {"error": f"That tool is checked out to {owner}. You can only return tools checked out to yourself."}
+
+    preview = {
+        "action": "return_tool",
+        "tool_number": tool.tool_number,
+        "serial_number": tool.serial_number,
+        "description": tool.description,
+        "checked_out_to": checkout.user.name if checkout.user else "Unknown",
+        "checkout_date": checkout.checkout_date.strftime("%Y-%m-%d") if checkout.checkout_date else None,
+        "condition_on_return": condition or tool.condition or "Not specified",
+        "notes": notes or None,
+        "can_proceed": True,
+    }
+
+    if not confirmed:
+        preview["status"] = "preview"
+        preview["message"] = "Ready to return this tool. Reply 'confirm' to proceed."
+        return preview
+
+    # Execute return
+    old_status = tool.status
+    checkout.return_date = datetime.now()
+    checkout.condition_at_return = condition or None
+    checkout.return_notes = notes or None
+    checkout.checked_in_by_id = _user_id
+
+    tool.status = "available"
+    if condition:
+        tool.condition = condition
+
+    user = db.session.get(User, _user_id)
+    history = ToolHistory.create_event(
+        tool_id=tool.id,
+        event_type="return",
+        user_id=_user_id,
+        description=f"Returned by {user.name if user else 'Unknown'} via AI assistant",
+        details={
+            "checkout_id": checkout.id,
+            "original_user_id": checkout.user_id,
+            "original_user_name": checkout.user.name if checkout.user else "Unknown",
+            "condition_at_return": condition,
+            "notes": notes,
+            "source": "ai_assistant",
+        },
+        related_checkout_id=checkout.id,
+        old_status=old_status,
+        new_status="available",
+    )
+    db.session.add(history)
+
+    try:
+        record_tool_return(tool_id=tool.id, user_id=_user_id, condition=condition, notes=notes)
+    except Exception:
+        logger.warning("record_tool_return failed for tool %s", tool.id)
+
+    db.session.add(AuditLog(
+        action_type="tool_return",
+        action_details=(
+            f"AI assistant: {user.name if user else _user_id} returned "
+            f"{tool.tool_number} S/N {tool.serial_number}"
+        ),
+    ))
+    db.session.commit()
+
+    return {
+        "status": "success",
+        "message": f"Tool {tool.tool_number} (S/N {tool.serial_number}) returned successfully. Status is now 'available'.",
+    }
+
+
+def _tool_issue_chemical(
+    part_number: str = "",
+    chemical_query: str = "",
+    quantity: int = 0,
+    location: str = "",
+    purpose: str = "",
+    confirmed: bool = False,
+    _user_id: int | None = None,
+) -> dict:
+    if not _user_id:
+        return {"error": "Cannot determine current user. Please log in again."}
+
+    # Locate the chemical
+    chem = None
+    if part_number:
+        chem = Chemical.query.filter(
+            Chemical.part_number.ilike(f"%{part_number}%"),
+            Chemical.quantity > 0,
+        ).first()
+    if not chem and chemical_query:
+        chem = Chemical.query.filter(
+            Chemical.description.ilike(f"%{chemical_query}%"),
+            Chemical.quantity > 0,
+        ).first()
+    if not chem:
+        return {"error": "Chemical not found or out of stock. Use search_chemicals to locate it first."}
+
+    if not quantity or quantity <= 0:
+        return {"error": "Please specify a quantity greater than 0 to issue."}
+    if not location:
+        return {"error": "Please specify the hangar or work location where the chemical will be used."}
+
+    # Validate issuance
+    blocking = []
+    if chem.status == "expired":
+        blocking.append("Chemical lot has expired and cannot be issued.")
+    if chem.quantity <= 0:
+        blocking.append("Chemical is out of stock.")
+    if quantity > chem.quantity:
+        blocking.append(f"Requested quantity ({quantity}) exceeds available stock ({chem.quantity} {chem.unit}).")
+
+    preview = {
+        "action": "issue_chemical",
+        "part_number": chem.part_number,
+        "lot_number": chem.lot_number,
+        "description": chem.description,
+        "available_quantity": chem.quantity,
+        "unit": chem.unit,
+        "quantity_to_issue": quantity,
+        "remaining_after": chem.quantity - quantity if not blocking else "N/A",
+        "location": location,
+        "purpose": purpose or None,
+        "expiration_date": chem.expiration_date.strftime("%Y-%m-%d") if chem.expiration_date else None,
+        "blocking_reasons": blocking,
+        "can_proceed": len(blocking) == 0,
+    }
+
+    if not confirmed:
+        preview["status"] = "preview"
+        if preview["can_proceed"]:
+            preview["message"] = "Ready to issue. Reply 'confirm' to proceed."
+        else:
+            preview["message"] = "Cannot issue this chemical — see blocking_reasons above."
+        return preview
+
+    if blocking:
+        return {"error": "Cannot issue this chemical.", "blocking_reasons": blocking}
+
+    user = db.session.get(User, _user_id)
+    is_partial = quantity < chem.quantity
+
+    if is_partial:
+        from utils.lot_utils import create_child_chemical
+        child = create_child_chemical(
+            parent_chemical=chem,
+            quantity=quantity,
+            destination_warehouse_id=chem.warehouse_id,
+        )
+        db.session.add(child)
+        db.session.flush()
+        issuance = ChemicalIssuance(
+            chemical_id=child.id,
+            user_id=_user_id,
+            quantity=quantity,
+            hangar=location,
+            purpose=purpose or "",
+        )
+        child.quantity = 0
+        child.status = "issued"
+    else:
+        issuance = ChemicalIssuance(
+            chemical_id=chem.id,
+            user_id=_user_id,
+            quantity=quantity,
+            hangar=location,
+            purpose=purpose or "",
+        )
+        chem.quantity -= quantity
+        if chem.quantity <= 0:
+            chem.status = "out_of_stock"
+        elif hasattr(chem, "is_low_stock") and chem.is_low_stock():
+            chem.status = "low_stock"
+
+    db.session.add(issuance)
+
+    try:
+        record_chemical_issuance(
+            chemical_id=chem.id,
+            user_id=_user_id,
+            quantity=quantity,
+            hangar=location,
+            purpose=purpose,
+        )
+    except Exception:
+        logger.warning("record_chemical_issuance failed for chemical %s", chem.id)
+
+    db.session.add(AuditLog(
+        action_type="chemical_issuance",
+        action_details=(
+            f"AI assistant: {user.name if user else _user_id} issued {quantity} {chem.unit} "
+            f"of {chem.part_number} lot {chem.lot_number} to {location}"
+        ),
+    ))
+    db.session.commit()
+
+    return {
+        "status": "success",
+        "message": (
+            f"Issued {quantity} {chem.unit} of {chem.description} "
+            f"(P/N {chem.part_number}, lot {chem.lot_number}) to {location}."
+        ),
+        "remaining_stock": chem.quantity,
+    }
+
+
 # ─── Schema converters ────────────────────────────────────────────────────────
 
 def _claude_tools() -> list:
@@ -781,7 +1266,14 @@ def _openai_tools() -> list:
 
 # ─── Provider agentic loops ───────────────────────────────────────────────────
 
-def _run_claude_loop(api_key: str, model: str, system_prompt: str, messages: list) -> str:
+def _run_claude_loop(
+    api_key: str,
+    model: str,
+    system_prompt: str,
+    messages: list,
+    user_id: int | None = None,
+    is_admin: bool = False,
+) -> str:
     current_messages = [m.copy() for m in messages]
     tools = _claude_tools()
     headers = {
@@ -810,30 +1302,29 @@ def _run_claude_loop(api_key: str, model: str, system_prompt: str, messages: lis
         stop_reason = data.get("stop_reason")
 
         if stop_reason == "end_turn":
-            # Extract the final text response
             for block in data.get("content", []):
                 if block.get("type") == "text":
                     return block["text"]
             return "(No text response)"
 
         if stop_reason == "tool_use":
-            # Execute all requested tool calls
             tool_results = []
             for block in data.get("content", []):
                 if block.get("type") == "tool_use":
-                    tool_output = _execute_tool(block["name"], block.get("input", {}))
+                    tool_output = _execute_tool(
+                        block["name"], block.get("input", {}),
+                        user_id=user_id, is_admin=is_admin,
+                    )
                     tool_results.append({
                         "type": "tool_result",
                         "tool_use_id": block["id"],
                         "content": json.dumps(tool_output),
                     })
 
-            # Append assistant turn + tool results as a user turn (Anthropic format)
             current_messages.append({"role": "assistant", "content": data["content"]})
             current_messages.append({"role": "user", "content": tool_results})
             continue
 
-        # Unexpected stop reason — try to extract any text
         for block in data.get("content", []):
             if block.get("type") == "text":
                 return block["text"]
@@ -848,6 +1339,8 @@ def _run_openai_loop(
     base_url: str,
     system_prompt: str,
     messages: list,
+    user_id: int | None = None,
+    is_admin: bool = False,
 ) -> str:
     current_messages = [{"role": "system", "content": system_prompt}] + [m.copy() for m in messages]
     tools = _openai_tools()
@@ -876,21 +1369,21 @@ def _run_openai_loop(
         finish_reason = choice.get("finish_reason")
         assistant_msg = choice["message"]
 
-        if finish_reason == "stop" or finish_reason == "length":
+        if finish_reason in ("stop", "length"):
             return assistant_msg.get("content") or "(No response)"
 
         if finish_reason == "tool_calls":
-            # Append the assistant message (contains tool_calls)
             current_messages.append(assistant_msg)
-
-            # Execute each tool call and append results
             for tc in assistant_msg.get("tool_calls", []):
                 fn = tc["function"]
                 try:
                     args = json.loads(fn.get("arguments", "{}"))
                 except json.JSONDecodeError:
                     args = {}
-                tool_output = _execute_tool(fn["name"], args)
+                tool_output = _execute_tool(
+                    fn["name"], args,
+                    user_id=user_id, is_admin=is_admin,
+                )
                 current_messages.append({
                     "role": "tool",
                     "tool_call_id": tc["id"],
@@ -898,7 +1391,6 @@ def _run_openai_loop(
                 })
             continue
 
-        # Fallback
         return assistant_msg.get("content") or "(No response)"
 
     return "I reached the maximum number of tool calls without completing the query. Please try a more specific question."
@@ -921,10 +1413,8 @@ def _build_system_prompt(current_user: dict) -> str:
 - Name: {user_name}
 - Role: {user_role}
 
-## Your capabilities
-You have access to live tools that query the database. When users ask about specific tools, chemicals, kits, checkouts, orders, or requests, ALWAYS call the appropriate tool to get accurate data — do not guess or make up records.
-
-Available tools:
+## Query tools (read-only)
+Call these freely whenever you need live data:
 - search_tools — find tools by name, serial number, status, or category
 - get_active_checkouts — see who has tools checked out right now
 - get_calibration_status — find overdue or upcoming calibrations
@@ -936,11 +1426,27 @@ Available tools:
 - get_procurement_orders — purchase orders with vendor and tracking info
 - get_inventory_summary — fresh snapshot of all key counts
 
+## Action tools (write operations — TWO-STEP REQUIRED)
+These tools make real changes to the database. You MUST follow this two-step process:
+
+STEP 1 — Always call with confirmed=false first.
+  The tool returns a preview showing exactly what will happen.
+  Present the preview clearly to the user.
+
+STEP 2 — Only call with confirmed=true after the user explicitly says
+  "yes", "confirm", "go ahead", "do it", or similar.
+  Never execute with confirmed=true unless the user gave clear approval.
+
+Action tools:
+- checkout_tool — check out a tool to the current user
+- return_tool — return (check in) a tool the current user has checked out
+- issue_chemical — issue a quantity of a chemical to the current user
+
 ## Guidelines
-- Always use tools for specific lookups — never invent serial numbers, names, or quantities.
-- Be concise. Present tabular data as a short list, not a raw JSON dump.
-- If a query returns no results, say so clearly and suggest a broader search.
-- For navigation help, mention the relevant menu section (Tools, Chemicals, Kits, Orders, etc.).
+- Always use query tools for lookups — never invent serial numbers, names, or quantities.
+- Be concise. Present data as a short readable list, not raw JSON.
+- If a query returns no results, say so and suggest a broader search.
+- For navigation help, name the relevant menu section (Tools, Chemicals, Kits, Orders, etc.).
 - Do not speculate about data not returned by a tool."""
 
 
@@ -1044,11 +1550,16 @@ def register_ai_routes(app):
 
         system_prompt = _build_system_prompt(request.current_user)
 
+        user_id  = request.current_user.get("user_id")
+        is_admin = request.current_user.get("is_admin", False)
+
         try:
             if provider == "claude":
-                reply = _run_claude_loop(api_key, model, system_prompt, messages)
+                reply = _run_claude_loop(api_key, model, system_prompt, messages,
+                                         user_id=user_id, is_admin=is_admin)
             elif provider in ("openai", "openrouter", "ollama"):
-                reply = _run_openai_loop(api_key, model, base_url, system_prompt, messages)
+                reply = _run_openai_loop(api_key, model, base_url, system_prompt, messages,
+                                         user_id=user_id, is_admin=is_admin)
             else:
                 return jsonify({"error": f"Unsupported provider: {provider}"}), 400
 
