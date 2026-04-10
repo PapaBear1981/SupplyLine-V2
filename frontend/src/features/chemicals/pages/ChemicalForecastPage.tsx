@@ -420,7 +420,7 @@ export const ChemicalForecastPage = () => {
           size="small"
           onClick={() => setFilterMode('all')}
         >
-          All ({data?.forecasts.length ?? 0})
+          All ({data?.forecasts?.length ?? 0})
         </Button>
         <Button
           type={filterMode === 'attention' ? 'primary' : 'default'}
