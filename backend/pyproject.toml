@@ -83,6 +83,7 @@ ignore = [
     "SIM108",  # ternary operator (sometimes if-else is clearer)
     "E402",    # module import not at top (intentional in some cases)
     "A001",    # builtin variable shadowing (common in database code)
+    "A003",    # builtin attribute shadowing (SQLAlchemy `id` primary key column)
     "PT012",   # pytest.raises with multiple statements (common pattern)
     "PT018",   # pytest composite assertion (sometimes necessary)
     "PT019",   # pytest fixture without value (false positive)
