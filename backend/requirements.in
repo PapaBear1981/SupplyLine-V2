@@ -25,8 +25,8 @@ Flask-CORS==6.0.0
 Flask-SocketIO==5.4.1
 
 # JWT Authentication
-# Updated from 2.8.0 to 2.10.1 for security patches
-PyJWT==2.10.1
+# Updated to 2.12.0 to fix CVE-2026-32597 (accepts unknown crit header extensions)
+PyJWT==2.12.0
 Flask-JWT-Extended==4.7.1
 
 # Production Server
@@ -50,7 +50,8 @@ psycopg2-binary==2.9.10
 reportlab==4.2.5
 
 # Professional PDF Label Generation
-WeasyPrint==63.1
+# Updated to 68.0 to fix CVE-2025-68616 (SSRF via arbitrary URL loading)
+WeasyPrint==68.0
 
 # Barcode Generation
 segno==1.6.1  # QR codes and other 2D barcodes
@@ -78,5 +79,7 @@ ruff==0.14.2
 pyright==1.1.390
 
 # TOTP Two-Factor Authentication
+# Updated to 46.0.5 to fix CVE-2026-26007 (subgroup attack on SECT curves)
+cryptography==46.0.5
 pyotp==2.9.0  # Generate and verify TOTP codes
 qrcode[pil]==8.0  # Generate QR codes for authenticator apps

@@ -70,7 +70,7 @@ packaging==25.0
     # via
     #   gunicorn
     #   pytest
-pillow==12.0.0
+pillow==12.1.1
     # via
     #   reportlab
     #   weasyprint
@@ -84,7 +84,7 @@ pycparser==2.23
     # via cffi
 pydyf==0.11.0
     # via weasyprint
-pyjwt==2.10.1
+pyjwt==2.12.0
     # via
     #   -r requirements.in
     #   flask-jwt-extended
@@ -130,7 +130,7 @@ typing-extensions==4.15.0
     # via
     #   pyright
     #   sqlalchemy
-weasyprint==63.1
+weasyprint==68.0
     # via -r requirements.in
 webencodings==0.5.1
     # via
@@ -162,7 +162,7 @@ urllib3==2.6.3
     # via requests
 
 # TOTP Two-Factor Authentication
-cryptography==44.0.0
+cryptography==46.0.5
     # via -r requirements.in
 pyotp==2.9.0
     # via -r requirements.in
