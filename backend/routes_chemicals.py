@@ -1348,6 +1348,7 @@ def register_chemical_routes(app):
                 Chemical.warehouse_id.isnot(None),   # warehouse stock only
             ).all()
         except Exception:
+            logger.warning("is_archived column filter failed in forecast route; falling back to filter_by", exc_info=True)
             active_chems = Chemical.query.filter_by(is_archived=False).all()
 
         if not active_chems:

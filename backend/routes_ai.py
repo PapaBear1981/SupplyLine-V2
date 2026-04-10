@@ -3861,6 +3861,7 @@ def _run_openai_loop(
                 try:
                     args = json.loads(fn.get("arguments", "{}"))
                 except json.JSONDecodeError:
+                    logger.warning("Failed to parse tool arguments for %s: %r", fn.get("name"), fn.get("arguments"))
                     args = {}
                 tool_output = _execute_tool(
                     fn["name"], args,

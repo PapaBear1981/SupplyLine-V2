@@ -458,12 +458,12 @@ export const ChemicalForecastPage = () => {
 
       <ReorderModal row={reorderRow} onClose={() => setReorderRow(null)} />
 
-      {data && (
+      {data?.parameters && (
         <Text type="secondary" style={{ fontSize: 11, display: 'block', marginTop: 8 }}>
           Based on {data.parameters.analysis_window_days}-day consumption history ·
           Lead time {data.parameters.lead_time_days}d ·
           Safety stock {data.parameters.safety_stock_days}d ·
-          Generated {new Date(data.generated_at).toLocaleString()}
+          Generated {new Date(data.generated_at ?? '').toLocaleString()}
         </Text>
       )}
     </div>
