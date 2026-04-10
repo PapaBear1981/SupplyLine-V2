@@ -620,6 +620,159 @@ TOOL_DEFINITIONS = [
             "required": [],
         },
     },
+    # ── Request & fulfillment workflow tools ──────────────────────────────────
+    {
+        "name": "create_request",
+        "description": (
+            "Create a new procurement/fulfillment request for a single item. "
+            "Use add_request_item to add more items afterward. "
+            "Call with confirmed=false first to preview. "
+            "Only call with confirmed=true after the user explicitly says yes or confirm."
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "title": {
+                    "type": "string",
+                    "description": "Short title for the request (e.g. 'Torque wrench P/N 12345').",
+                },
+                "item_description": {
+                    "type": "string",
+                    "description": "What is being requested.",
+                },
+                "item_part_number": {
+                    "type": "string",
+                    "description": "Part number of the item (if known).",
+                },
+                "item_quantity": {
+                    "type": "integer",
+                    "description": "Quantity needed. Defaults to 1.",
+                },
+                "item_type": {
+                    "type": "string",
+                    "enum": ["tool", "chemical", "expendable", "repairable", "other"],
+                    "description": "Category of the item.",
+                },
+                "priority": {
+                    "type": "string",
+                    "enum": ["routine", "urgent", "aog"],
+                    "description": "Request priority. routine = normal, urgent = needed soon, aog = aircraft on ground.",
+                },
+                "notes": {
+                    "type": "string",
+                    "description": "Additional context or justification for the request.",
+                },
+                "confirmed": {
+                    "type": "boolean",
+                    "description": "false = preview only (default). true = submit the request.",
+                },
+            },
+            "required": [],
+        },
+    },
+    {
+        "name": "add_request_item",
+        "description": (
+            "Add one item to an existing open request. "
+            "Use get_fulfillment_requests to find the request_number first. "
+            "Call with confirmed=false to preview, confirmed=true to add."
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "request_number": {
+                    "type": "string",
+                    "description": "Request number (e.g. REQ-00042).",
+                },
+                "item_description": {
+                    "type": "string",
+                    "description": "Description of the item to add.",
+                },
+                "item_part_number": {
+                    "type": "string",
+                    "description": "Part number (if known).",
+                },
+                "item_quantity": {
+                    "type": "integer",
+                    "description": "Quantity needed. Defaults to 1.",
+                },
+                "item_type": {
+                    "type": "string",
+                    "enum": ["tool", "chemical", "expendable", "repairable", "other"],
+                    "description": "Category of the item.",
+                },
+                "confirmed": {
+                    "type": "boolean",
+                    "description": "false = preview only (default). true = add the item.",
+                },
+            },
+            "required": [],
+        },
+    },
+    {
+        "name": "update_request_status",
+        "description": (
+            "Update the status or priority of a request. "
+            "Requires orders permission or admin. "
+            "Call with confirmed=false to preview, confirmed=true to apply. "
+            "Valid statuses: new, under_review, pending_fulfillment, in_transfer, "
+            "awaiting_external_procurement, partially_fulfilled, fulfilled, needs_info, cancelled."
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "request_number": {
+                    "type": "string",
+                    "description": "Request number (e.g. REQ-00042).",
+                },
+                "status": {
+                    "type": "string",
+                    "enum": [
+                        "new", "under_review", "pending_fulfillment", "in_transfer",
+                        "awaiting_external_procurement", "partially_fulfilled",
+                        "fulfilled", "needs_info", "cancelled",
+                    ],
+                    "description": "New status for the request.",
+                },
+                "priority": {
+                    "type": "string",
+                    "enum": ["routine", "urgent", "aog"],
+                    "description": "New priority (optional — omit to leave unchanged).",
+                },
+                "notes": {
+                    "type": "string",
+                    "description": "Optional notes to append to the request.",
+                },
+                "confirmed": {
+                    "type": "boolean",
+                    "description": "false = preview only (default). true = apply the update.",
+                },
+            },
+            "required": [],
+        },
+    },
+    {
+        "name": "mark_items_received",
+        "description": (
+            "Mark all pending or ordered items in a request as received. "
+            "Used when physical goods arrive and need to be acknowledged. "
+            "Call with confirmed=false to preview, confirmed=true to mark received."
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "request_number": {
+                    "type": "string",
+                    "description": "Request number (e.g. REQ-00042).",
+                },
+                "confirmed": {
+                    "type": "boolean",
+                    "description": "false = preview only (default). true = mark items received.",
+                },
+            },
+            "required": [],
+        },
+    },
 ]
 
 
@@ -667,6 +820,14 @@ def _execute_tool(name: str, args: dict, user_id: int | None = None, is_admin: b
             return _tool_request_chemical_reorder(**args, _user_id=user_id, _is_admin=is_admin)
         if name == "archive_chemical":
             return _tool_archive_chemical(**args, _user_id=user_id, _is_admin=is_admin)
+        if name == "create_request":
+            return _tool_create_request(**args, _user_id=user_id)
+        if name == "add_request_item":
+            return _tool_add_request_item(**args, _user_id=user_id)
+        if name == "update_request_status":
+            return _tool_update_request_status(**args, _user_id=user_id, _is_admin=is_admin)
+        if name == "mark_items_received":
+            return _tool_mark_items_received(**args, _user_id=user_id, _is_admin=is_admin)
         return {"error": f"Unknown tool: {name}"}
     except Exception as exc:
         logger.exception("Tool %s failed", name)
@@ -1763,6 +1924,321 @@ def _tool_issue_chemical(
     }
 
 
+# ─── Request & fulfillment workflow tools ────────────────────────────────────
+
+def _lookup_request(request_number: str):
+    """Return a UserRequest by request_number, or None."""
+    return UserRequest.query.filter_by(request_number=request_number).first()
+
+
+def _has_orders_permission(user_id, is_admin: bool) -> bool:
+    if is_admin:
+        return True
+    user = db.session.get(User, user_id) if user_id else None
+    if not user:
+        return False
+    perms = [p.name for p in getattr(user, "permissions", [])]
+    return "page.orders" in perms
+
+
+def _tool_create_request(
+    title: str = "",
+    item_description: str = "",
+    item_part_number: str = "",
+    item_quantity: int = 1,
+    item_type: str = "tool",
+    priority: str = "routine",
+    notes: str = "",
+    confirmed: bool = False,
+    _user_id: int | None = None,
+) -> dict:
+    if not title or not item_description:
+        return {"error": "title and item_description are required."}
+    if item_type not in ("tool", "chemical", "expendable", "repairable", "other"):
+        item_type = "tool"
+    if priority not in ("routine", "urgent", "aog"):
+        priority = "routine"
+    qty = max(1, int(item_quantity) if item_quantity else 1)
+
+    preview = {
+        "action": "create_request",
+        "title": title,
+        "priority": priority,
+        "item_description": item_description,
+        "item_part_number": item_part_number or "(none)",
+        "item_quantity": qty,
+        "item_type": item_type,
+        "notes": notes or "(none)",
+    }
+
+    if not confirmed:
+        return {"preview": preview, "confirmed": False,
+                "message": "Review the request details above and confirm to submit."}
+
+    if not _user_id:
+        return {"error": "Cannot create request: user identity not available."}
+
+    # Generate request number
+    last = UserRequest.query.order_by(UserRequest.id.desc()).first()
+    next_num = (last.id + 1) if last else 1
+    request_number = f"REQ-{next_num:05d}"
+
+    user_req = UserRequest(
+        request_number=request_number,
+        title=title,
+        priority=priority,
+        notes=notes or None,
+        requester_id=_user_id,
+        request_type="manual",
+        source_trigger="manual",
+    )
+    db.session.add(user_req)
+    db.session.flush()
+
+    # Re-derive number from actual ID after flush
+    user_req.request_number = f"REQ-{user_req.id:05d}"
+
+    item = RequestItem(
+        request_id=user_req.id,
+        item_type=item_type,
+        part_number=item_part_number.strip() or None,
+        description=item_description,
+        quantity=qty,
+        unit="each",
+    )
+    db.session.add(item)
+
+    user = db.session.get(User, _user_id)
+    db.session.add(AuditLog(
+        action_type="USER_REQUEST_CREATED",
+        action_details=(
+            f"AI assistant: {user.name if user else _user_id} created request "
+            f"'{title}' ({priority})"
+        ),
+    ))
+    db.session.add(UserActivity(
+        user_id=_user_id,
+        activity_type="user_request_created",
+        description=f"Created request '{title}' with 1 item via AI assistant",
+    ))
+    db.session.commit()
+
+    return {
+        "status": "success",
+        "request_number": user_req.request_number,
+        "message": (
+            f"Request {user_req.request_number} created: '{title}' ({priority}). "
+            f"Item: {item_description} × {qty}. "
+            "Use add_request_item to add more items."
+        ),
+    }
+
+
+def _tool_add_request_item(
+    request_number: str = "",
+    item_description: str = "",
+    item_part_number: str = "",
+    item_quantity: int = 1,
+    item_type: str = "tool",
+    confirmed: bool = False,
+    _user_id: int | None = None,
+) -> dict:
+    if not request_number or not item_description:
+        return {"error": "request_number and item_description are required."}
+
+    user_req = _lookup_request(request_number)
+    if not user_req:
+        return {"error": f"Request {request_number} not found."}
+    if user_req.is_closed():
+        return {"error": f"Request {request_number} is closed ({user_req.status}) and cannot be modified."}
+
+    if item_type not in ("tool", "chemical", "expendable", "repairable", "other"):
+        item_type = "tool"
+    qty = max(1, int(item_quantity) if item_quantity else 1)
+
+    preview = {
+        "action": "add_request_item",
+        "request_number": request_number,
+        "request_title": user_req.title,
+        "item_description": item_description,
+        "item_part_number": item_part_number or "(none)",
+        "item_quantity": qty,
+        "item_type": item_type,
+    }
+
+    if not confirmed:
+        return {"preview": preview, "confirmed": False,
+                "message": "Review the item details above and confirm to add."}
+
+    if not _user_id:
+        return {"error": "Cannot add item: user identity not available."}
+
+    item = RequestItem(
+        request_id=user_req.id,
+        item_type=item_type,
+        part_number=item_part_number.strip() or None,
+        description=item_description,
+        quantity=qty,
+        unit="each",
+    )
+    db.session.add(item)
+    db.session.commit()
+
+    return {
+        "status": "success",
+        "message": (
+            f"Added '{item_description}' × {qty} to request {request_number}."
+        ),
+    }
+
+
+def _tool_update_request_status(
+    request_number: str = "",
+    status: str = "",
+    priority: str = "",
+    notes: str = "",
+    confirmed: bool = False,
+    _user_id: int | None = None,
+    _is_admin: bool = False,
+) -> dict:
+    if not request_number:
+        return {"error": "request_number is required."}
+    if not status and not priority and not notes:
+        return {"error": "At least one of status, priority, or notes must be provided."}
+
+    valid_statuses = {
+        "new", "under_review", "pending_fulfillment", "in_transfer",
+        "awaiting_external_procurement", "partially_fulfilled",
+        "fulfilled", "needs_info", "cancelled",
+    }
+    if status and status not in valid_statuses:
+        return {"error": f"Invalid status '{status}'. Valid values: {', '.join(sorted(valid_statuses))}."}
+    if priority and priority not in ("routine", "urgent", "aog"):
+        return {"error": "Invalid priority. Must be routine, urgent, or aog."}
+
+    user_req = _lookup_request(request_number)
+    if not user_req:
+        return {"error": f"Request {request_number} not found."}
+
+    if not _has_orders_permission(_user_id, _is_admin):
+        return {"error": "Insufficient permissions. Orders permission or admin required to update request status."}
+
+    preview = {
+        "action": "update_request_status",
+        "request_number": request_number,
+        "request_title": user_req.title,
+        "current_status": user_req.status,
+        "new_status": status or "(unchanged)",
+        "current_priority": user_req.priority,
+        "new_priority": priority or "(unchanged)",
+        "notes": notes or "(none)",
+    }
+
+    if not confirmed:
+        return {"preview": preview, "confirmed": False,
+                "message": "Review the update above and confirm to apply."}
+
+    if not _user_id:
+        return {"error": "Cannot update request: user identity not available."}
+
+    if status:
+        user_req.status = status
+    if priority:
+        user_req.priority = priority
+    if notes:
+        user_req.notes = ((user_req.notes + "\n") if user_req.notes else "") + notes
+
+    user = db.session.get(User, _user_id)
+    db.session.add(AuditLog(
+        action_type="USER_REQUEST_UPDATED",
+        action_details=(
+            f"AI assistant: {user.name if user else _user_id} updated request "
+            f"{request_number}"
+            + (f" status → {status}" if status else "")
+            + (f" priority → {priority}" if priority else "")
+        ),
+    ))
+    db.session.commit()
+
+    return {
+        "status": "success",
+        "message": (
+            f"Request {request_number} updated."
+            + (f" Status: {status}." if status else "")
+            + (f" Priority: {priority}." if priority else "")
+        ),
+    }
+
+
+def _tool_mark_items_received(
+    request_number: str = "",
+    confirmed: bool = False,
+    _user_id: int | None = None,
+    _is_admin: bool = False,
+) -> dict:
+    if not request_number:
+        return {"error": "request_number is required."}
+
+    user_req = _lookup_request(request_number)
+    if not user_req:
+        return {"error": f"Request {request_number} not found."}
+
+    if not _has_orders_permission(_user_id, _is_admin):
+        return {"error": "Insufficient permissions. Orders permission or admin required to mark items received."}
+
+    # Find all pending/ordered/in_transit items
+    receivable_statuses = {"pending", "ordered", "shipped", "in_transfer"}
+    items_to_receive = [
+        i for i in user_req.items.all() if i.status in receivable_statuses
+    ]
+
+    if not items_to_receive:
+        return {"error": f"No pending or ordered items found in request {request_number} to mark as received."}
+
+    preview = {
+        "action": "mark_items_received",
+        "request_number": request_number,
+        "request_title": user_req.title,
+        "items_to_mark_received": [
+            {"description": i.description, "quantity": i.quantity, "status": i.status}
+            for i in items_to_receive
+        ],
+    }
+
+    if not confirmed:
+        return {"preview": preview, "confirmed": False,
+                "message": "Review the items above and confirm to mark them received."}
+
+    if not _user_id:
+        return {"error": "Cannot mark items received: user identity not available."}
+
+    for item in items_to_receive:
+        item.status = "received"
+        item.received_date = datetime.utcnow()
+        if not item.received_quantity:
+            item.received_quantity = item.quantity
+
+    user_req.update_status_from_items()
+
+    user = db.session.get(User, _user_id)
+    db.session.add(AuditLog(
+        action_type="REQUEST_ITEMS_RECEIVED",
+        action_details=(
+            f"AI assistant: {user.name if user else _user_id} marked {len(items_to_receive)} "
+            f"item(s) received in request {request_number}"
+        ),
+    ))
+    db.session.commit()
+
+    return {
+        "status": "success",
+        "message": (
+            f"Marked {len(items_to_receive)} item(s) as received in request {request_number}. "
+            f"Request status: {user_req.status}."
+        ),
+    }
+
+
 # ─── Chemical management tools ───────────────────────────────────────────────
 
 def _tool_get_chemical_issuances(
@@ -2347,6 +2823,12 @@ Action tools:
     (warehouse→warehouse, warehouse→kit, kit→warehouse, kit→kit)
     Tip: use get_warehouses and get_kits first to confirm names, then
     use search_tools / get_kit_contents to confirm the item exists at the source.
+- create_request — submit a new procurement/fulfillment request for one item
+- add_request_item — add another item to an existing open request
+- update_request_status — change status or priority of a request
+    (requires orders permission or admin)
+- mark_items_received — acknowledge receipt of all pending/ordered items in a request
+    (requires orders permission or admin)
 
 ## Guidelines
 - Always use query tools for lookups — never invent serial numbers, names, or quantities.
