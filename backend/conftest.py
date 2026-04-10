@@ -3,15 +3,16 @@ Pytest configuration - loaded BEFORE test conftest.py
 This fixes the Python path before any test imports happen.
 """
 
-import sys
 import os
+import sys
+
 
 # Fix path BEFORE pytest loads anything else
 BACKEND_DIR = os.path.dirname(os.path.abspath(__file__))
 
 # Remove '' which causes current dir to be searched first
-while '' in sys.path:
-    sys.path.remove('')
+while "" in sys.path:
+    sys.path.remove("")
 
 # Ensure our backend directory is first so app.py > app/
 if BACKEND_DIR in sys.path:

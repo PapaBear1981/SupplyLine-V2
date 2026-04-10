@@ -69,6 +69,6 @@ def test_no_session_store(client):
 def test_jwt_only_auth(client, auth_headers):
     response = client.get('/api/user-requests')
     assert response.status_code == 401
-    
+
     response = client.get('/api/user-requests', headers=auth_headers)
     assert response.status_code in [200, 404]

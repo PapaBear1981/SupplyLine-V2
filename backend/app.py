@@ -202,7 +202,8 @@ def create_app():
         # Auto-apply Phase 2 schema migrations (additive column additions).
         # Inspector-based checks make this idempotent and safe on every startup.
         try:
-            from sqlalchemy import inspect as sa_inspect, text as sa_text
+            from sqlalchemy import inspect as sa_inspect
+            from sqlalchemy import text as sa_text
             with app.app_context():
                 inspector = sa_inspect(db.engine)
                 tables = set(inspector.get_table_names())

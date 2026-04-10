@@ -35,7 +35,8 @@ _US_COUNTRY_VARIANTS = {"us", "usa", "united states", "united states of america"
 
 def _geocode_address(address, city, state, zip_code, country):
     """Geocode an address using Nominatim. Returns (lat, lon) or (None, None)."""
-    from urllib.parse import quote, urlencode
+    from urllib.parse import urlencode
+
     import requests as req
 
     parts = [p for p in [address, city, state, zip_code, country] if p]

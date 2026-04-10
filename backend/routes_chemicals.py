@@ -1472,11 +1472,10 @@ def register_chemical_routes(app):
                     urgency = "soon"
                 else:
                     urgency = "ok"
+            elif earliest_expiry and (earliest_expiry.date() - now.date()).days <= 30:
+                urgency = "expiry_risk"
             else:
-                if earliest_expiry and (earliest_expiry.date() - now.date()).days <= 30:
-                    urgency = "expiry_risk"
-                else:
-                    urgency = "no_data"
+                urgency = "no_data"
 
             if waste_qty > 0 and urgency == "ok":
                 urgency = "expiry_risk"

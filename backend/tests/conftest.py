@@ -32,7 +32,7 @@ from sqlalchemy import text
 def app():
     application = create_app()
     application.config['TESTING'] = True
-    
+
     with application.app_context():
         db.create_all()
         yield application
