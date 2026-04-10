@@ -80,6 +80,7 @@ OLLAMA_TOOL_NAMES = {
     "return_chemical",
     "create_request",
     "transfer_item",
+    "forecast_chemicals",
 }
 
 
@@ -917,6 +918,39 @@ TOOL_DEFINITIONS = [
             "required": [],
         },
     },
+    # ── Forecasting tools ─────────────────────────────────────────────────────
+    {
+        "name": "forecast_chemicals",
+        "description": (
+            "Consumption-based reorder and expiry forecast for all chemicals. "
+            "Returns urgency-sorted list: critical (reorder now), soon (reorder within safety window), "
+            "expiry_risk (will expire before consumed), ok, no_data (no usage history). "
+            "Use for questions like 'what chemicals need reordering?' or 'what's at risk of expiring?'"
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "analysis_days": {
+                    "type": "integer",
+                    "description": "Days of issuance history to use for consumption rate. Default 90.",
+                },
+                "lead_time_days": {
+                    "type": "integer",
+                    "description": "Typical days from order to receipt. Default 14.",
+                },
+                "safety_stock_days": {
+                    "type": "integer",
+                    "description": "Extra buffer days beyond lead time. Default 14.",
+                },
+                "filter": {
+                    "type": "string",
+                    "enum": ["all", "needs_attention", "expiry_risk"],
+                    "description": "all = everything; needs_attention = critical + soon; expiry_risk = waste risk only.",
+                },
+            },
+            "required": [],
+        },
+    },
     # ── Reporting tools ───────────────────────────────────────────────────────
     {
         "name": "report_tool_activity",
@@ -1082,6 +1116,8 @@ def _execute_tool(name: str, args: dict, user_id: int | None = None, is_admin: b
             return _tool_record_calibration(**args, _user_id=user_id, _is_admin=is_admin)
         if name == "get_request_detail":
             return _tool_get_request_detail(**args)
+        if name == "forecast_chemicals":
+            return _tool_forecast_chemicals(**args)
         if name == "report_tool_activity":
             return _report_tool_activity(**args)
         if name == "report_chemical_health":
@@ -3174,6 +3210,148 @@ def _tool_get_request_detail(request_number: str = "") -> dict:
             }
             for i in items
         ],
+    }
+
+
+# ─── Forecasting tools ────────────────────────────────────────────────────────
+
+def _tool_forecast_chemicals(
+    analysis_days: int = 90,
+    lead_time_days: int = 14,
+    safety_stock_days: int = 14,
+    filter: str = "all",
+) -> dict:
+    analysis_days     = max(7,  min(int(analysis_days),     365))
+    lead_time_days    = max(1,  min(int(lead_time_days),     90))
+    safety_stock_days = max(0,  min(int(safety_stock_days),  90))
+
+    now            = datetime.utcnow()
+    analysis_start = now - timedelta(days=analysis_days)
+
+    try:
+        active_chems = Chemical.query.filter(
+            Chemical.is_archived == False,  # noqa: E712
+            Chemical.warehouse_id.isnot(None),
+        ).all()
+    except Exception:
+        active_chems = Chemical.query.filter_by(is_archived=False).all()
+
+    if not active_chems:
+        return {"result": "No active chemicals found in inventory."}
+
+    chem_ids = {c.id for c in active_chems}
+    pn_map   = {c.id: c.part_number for c in active_chems}
+
+    issuances = ChemicalIssuance.query.filter(
+        ChemicalIssuance.issue_date >= analysis_start,
+    ).all()
+    returns = ChemicalReturn.query.filter(
+        ChemicalReturn.return_date >= analysis_start,
+    ).all()
+
+    # Resolve part_number for child-lot chemicals
+    extra_ids = {i.chemical_id for i in issuances} - chem_ids
+    extra_pns = {}
+    if extra_ids:
+        for c in Chemical.query.filter(Chemical.id.in_(extra_ids)).all():
+            extra_pns[c.id] = c.part_number
+
+    def pn(cid):
+        return pn_map.get(cid) or extra_pns.get(cid)
+
+    issued_by_pn: dict = {}
+    for i in issuances:
+        p = pn(i.chemical_id)
+        if p:
+            issued_by_pn[p] = issued_by_pn.get(p, 0) + i.quantity
+
+    returned_by_pn: dict = {}
+    for r in returns:
+        p = pn(r.chemical_id)
+        if p:
+            returned_by_pn[p] = returned_by_pn.get(p, 0) + r.quantity
+
+    by_pn: dict = {}
+    for c in active_chems:
+        by_pn.setdefault(c.part_number, []).append(c)
+
+    urgency_order = {"critical": 0, "soon": 1, "expiry_risk": 2, "no_data": 3, "ok": 4}
+    rows = []
+
+    for part_number, chems in by_pn.items():
+        total_qty = sum(c.quantity or 0 for c in chems)
+        unit      = chems[0].unit or "each"
+        desc      = chems[0].description or part_number
+
+        expiry_dates    = [c.expiration_date for c in chems if c.expiration_date]
+        earliest_expiry = min(expiry_dates) if expiry_dates else None
+
+        net_issued = max(0, issued_by_pn.get(part_number, 0) - returned_by_pn.get(part_number, 0))
+        daily_rate = net_issued / analysis_days if net_issued > 0 else 0
+
+        days_remaining = (total_qty / daily_rate) if daily_rate > 0 else None
+        depletion_date = (now + timedelta(days=days_remaining)).date() if days_remaining is not None else None
+
+        waste_qty = 0.0
+        if earliest_expiry and daily_rate > 0:
+            dtu = (earliest_expiry.date() - now.date()).days
+            if dtu > 0:
+                expiring_qty = sum(
+                    c.quantity or 0 for c in chems
+                    if c.expiration_date and c.expiration_date <= earliest_expiry + timedelta(days=7)
+                )
+                waste_qty = max(0.0, expiring_qty - daily_rate * dtu)
+
+        if days_remaining is not None:
+            if days_remaining <= lead_time_days:
+                urgency = "critical"
+            elif days_remaining <= lead_time_days + safety_stock_days:
+                urgency = "soon"
+            else:
+                urgency = "ok"
+        else:
+            urgency = "expiry_risk" if (earliest_expiry and (earliest_expiry.date() - now.date()).days <= 30) else "no_data"
+
+        if waste_qty > 0 and urgency == "ok":
+            urgency = "expiry_risk"
+
+        rec_qty = round((lead_time_days + safety_stock_days) * daily_rate) if daily_rate > 0 else None
+
+        rows.append({
+            "part_number":      part_number,
+            "description":      desc,
+            "current_qty":      total_qty,
+            "unit":             unit,
+            "daily_rate":       round(daily_rate, 3),
+            "days_remaining":   round(days_remaining, 1) if days_remaining is not None else None,
+            "depletion_date":   depletion_date.isoformat() if depletion_date else None,
+            "expiry_date":      earliest_expiry.date().isoformat() if earliest_expiry else None,
+            "waste_risk_qty":   round(waste_qty, 1),
+            "urgency":          urgency,
+            "recommended_qty":  rec_qty,
+        })
+
+    rows.sort(key=lambda x: urgency_order.get(x["urgency"], 99))
+
+    if filter == "needs_attention":
+        rows = [r for r in rows if r["urgency"] in ("critical", "soon")]
+    elif filter == "expiry_risk":
+        rows = [r for r in rows if r["urgency"] == "expiry_risk" or r["waste_risk_qty"] > 0]
+
+    summary = {
+        "total":        len(by_pn),
+        "critical":     sum(1 for r in rows if r["urgency"] == "critical"),
+        "soon":         sum(1 for r in rows if r["urgency"] == "soon"),
+        "expiry_risk":  sum(1 for r in rows if r["urgency"] == "expiry_risk"),
+        "ok":           sum(1 for r in rows if r["urgency"] == "ok"),
+        "no_data":      sum(1 for r in rows if r["urgency"] == "no_data"),
+    }
+
+    return {
+        "summary":          summary,
+        "analysis_days":    analysis_days,
+        "lead_time_days":   lead_time_days,
+        "forecasts":        rows[:MAX_RESULTS],
     }
 
 

@@ -11,6 +11,7 @@ import {
   SwapOutlined,
   ShoppingCartOutlined,
   FormOutlined,
+  BarChartOutlined,
 } from '@ant-design/icons';
 import type { MenuProps } from 'antd';
 import { ROUTES } from './routes';
@@ -57,6 +58,19 @@ export const ALL_MENU_ITEMS: MenuItemWithPermission[] = [
     icon: <ExperimentOutlined />,
     label: 'Chemicals',
     permission: 'page.chemicals',
+    children: [
+      {
+        key: ROUTES.CHEMICALS,
+        label: 'Inventory',
+        permission: 'page.chemicals',
+      },
+      {
+        key: ROUTES.CHEMICAL_FORECAST,
+        icon: <BarChartOutlined />,
+        label: 'Forecast',
+        permission: 'page.chemicals',
+      },
+    ],
   },
   {
     key: ROUTES.KITS,

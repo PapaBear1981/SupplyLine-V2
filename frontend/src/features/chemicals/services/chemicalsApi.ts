@@ -6,6 +6,8 @@ import type {
   ChemicalIssuanceResponse,
   ChemicalsListResponse,
   ChemicalsQueryParams,
+  ChemicalForecastParams,
+  ChemicalForecastResponse,
 } from '../types';
 
 export const chemicalsApi = baseApi.injectEndpoints({
@@ -89,6 +91,18 @@ export const chemicalsApi = baseApi.injectEndpoints({
         { type: 'Chemical', id: 'LIST' },
       ],
     }),
+
+    getChemicalForecast: builder.query<ChemicalForecastResponse, ChemicalForecastParams | void>({
+      query: (params) => ({
+        url: '/api/chemicals/forecast',
+        params: {
+          ...(params?.analysis_days && { analysis_days: params.analysis_days }),
+          ...(params?.lead_time_days && { lead_time_days: params.lead_time_days }),
+          ...(params?.safety_stock_days && { safety_stock_days: params.safety_stock_days }),
+        },
+      }),
+      providesTags: [{ type: 'Chemical', id: 'FORECAST' }],
+    }),
   }),
 });
 
@@ -99,4 +113,5 @@ export const {
   useUpdateChemicalMutation,
   useDeleteChemicalMutation,
   useIssueChemicalMutation,
+  useGetChemicalForecastQuery,
 } = chemicalsApi;

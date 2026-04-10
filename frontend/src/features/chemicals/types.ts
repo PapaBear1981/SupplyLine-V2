@@ -105,3 +105,55 @@ export interface ChemicalIssuanceResponse {
   };
   message?: string;
 }
+
+export type ForecastUrgency = 'critical' | 'soon' | 'expiry_risk' | 'ok' | 'no_data';
+
+export interface ChemicalForecastRow {
+  part_number: string;
+  description: string;
+  manufacturer?: string | null;
+  lot_count: number;
+  current_quantity: number;
+  unit: string;
+  daily_consumption_rate: number;
+  weekly_consumption_rate: number;
+  net_issued_in_window: number;
+  analysis_window_days: number;
+  days_of_stock_remaining: number | null;
+  projected_depletion_date: string | null;
+  earliest_expiry_date: string | null;
+  days_until_expiry: number | null;
+  waste_risk_quantity: number;
+  urgency: ForecastUrgency;
+  recommended_order_quantity: number | null;
+  needs_reorder: boolean;
+  current_reorder_status: string | null;
+  chemical_ids: number[];
+}
+
+export interface ChemicalForecastSummary {
+  total_part_numbers: number;
+  critical: number;
+  reorder_soon: number;
+  expiry_risk: number;
+  ok: number;
+  no_history: number;
+  total_waste_risk_qty: number;
+}
+
+export interface ChemicalForecastParams {
+  analysis_days?: number;
+  lead_time_days?: number;
+  safety_stock_days?: number;
+}
+
+export interface ChemicalForecastResponse {
+  forecasts: ChemicalForecastRow[];
+  summary: ChemicalForecastSummary;
+  parameters: {
+    analysis_window_days: number;
+    lead_time_days: number;
+    safety_stock_days: number;
+  };
+  generated_at: string;
+}

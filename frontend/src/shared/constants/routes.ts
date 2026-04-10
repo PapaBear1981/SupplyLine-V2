@@ -12,4 +12,5 @@ export const ROUTES = {
   ADMIN: '/admin',
   PROFILE: '/profile',
   SETTINGS: '/settings',
+  CHEMICAL_FORECAST: '/chemicals/forecast',
 } as const;
