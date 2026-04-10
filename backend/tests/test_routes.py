@@ -395,8 +395,8 @@ class TestUserRoutes:
         assert response.status_code == 200
         data = json.loads(response.data)
 
-        assert data["employee_number"] == "USER001"
-        assert data["name"] == "Test User"
+        assert data["employee_number"] == regular_user.employee_number
+        assert data["name"] == regular_user.name
         assert data["is_admin"] is False
 
     def test_update_profile(self, client, auth_headers_user, regular_user):

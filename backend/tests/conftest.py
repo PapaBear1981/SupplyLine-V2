@@ -240,6 +240,78 @@ def sample_chemical(db_session, test_warehouse):
     return chemical
 
 
+@pytest.fixture
+def test_user(db_session):
+    """Alias for regular_user — used by tests that reference the fixture as 'test_user'."""
+    from models import User
+    emp_num = f"TST{uuid.uuid4().hex[:6].upper()}"
+    user = User(
+        name="Test User",
+        employee_number=emp_num,
+        department="Engineering",
+        is_admin=False,
+        is_active=True,
+    )
+    user.set_password("user123")
+    db_session.add(user)
+    db_session.commit()
+    return user
+
+
+@pytest.fixture
+def test_user_2(db_session):
+    """A second regular user for tests that need two distinct non-admin accounts."""
+    from models import User
+    emp_num = f"TS2{uuid.uuid4().hex[:6].upper()}"
+    user = User(
+        name="Test User 2",
+        employee_number=emp_num,
+        department="Engineering",
+        is_admin=False,
+        is_active=True,
+    )
+    user.set_password("user123")
+    db_session.add(user)
+    db_session.commit()
+    return user
+
+
+@pytest.fixture
+def test_channel(db_session, admin_user):
+    """Create a test messaging channel owned by admin_user."""
+    from models_messaging import Channel
+    name = f"Test Channel {uuid.uuid4().hex[:8]}"
+    channel = Channel(
+        name=name,
+        description="A test channel",
+        channel_type="department",
+        department="Engineering",
+        is_active=True,
+        created_by=admin_user.id,
+    )
+    db_session.add(channel)
+    db_session.commit()
+    return channel
+
+
+@pytest.fixture
+def sample_tool(db_session, test_warehouse):
+    """Alias for test_tool — used by calibration workflow tests."""
+    from models import Tool
+    tool = Tool(
+        tool_number=f"CAL{uuid.uuid4().hex[:6].upper()}",
+        serial_number=f"S{uuid.uuid4().hex[:8].upper()}",
+        description="Sample Tool for Calibration",
+        condition="good",
+        category="Calibration",
+        status="available",
+        warehouse_id=test_warehouse.id,
+    )
+    db_session.add(tool)
+    db_session.commit()
+    return tool
+
+
 # ─── Helpers ─────────────────────────────────────────────────────────────────
 
 
