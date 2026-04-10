@@ -65,13 +65,12 @@ export const AISettings = () => {
   const [updateSettings, { isLoading: isSaving }] = useUpdateAISettingsMutation();
   const [form] = Form.useForm();
   const [hasChanges, setHasChanges] = useState(false);
-  const [selectedProvider, setSelectedProvider] = useState<string>('claude');
+  const selectedProvider: string = Form.useWatch('provider', form) ?? settings?.provider ?? 'claude';
 
   // Sync form when settings load
   useEffect(() => {
     if (settings) {
       const provider = settings.provider || 'claude';
-      setSelectedProvider(provider);
       form.setFieldsValue({
         enabled:  settings.enabled,
         provider,
@@ -83,7 +82,6 @@ export const AISettings = () => {
   }, [settings, form]);
 
   const handleProviderChange = (provider: string) => {
-    setSelectedProvider(provider);
     // Auto-fill default model and base URL when switching providers
     form.setFieldsValue({
       model:    DEFAULT_MODELS[provider]?.[0] || '',
@@ -130,7 +128,6 @@ export const AISettings = () => {
         base_url: settings.base_url,
         api_key:  '',
       });
-      setSelectedProvider(settings.provider);
     }
     setHasChanges(false);
   };

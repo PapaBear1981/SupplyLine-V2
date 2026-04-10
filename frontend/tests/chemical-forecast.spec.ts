@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect, type Page, type Route } from '@playwright/test';
 
 // ── Mock data ─────────────────────────────────────────────────────────────────
 
@@ -105,7 +105,7 @@ const MOCK_FORECAST_RESPONSE = {
  * Redux authSlice initialises with isAuthenticated=true, skipping the login
  * form entirely.  Then route-mock the few API calls the page makes.
  */
-async function setupAuthAndMocks(page: any) {
+async function setupAuthAndMocks(page: Page) {
   // Pre-seed localStorage so the app boots in an authenticated state.
   await page.addInitScript(() => {
     localStorage.setItem('access_token', 'mock-jwt-token-for-playwright');
@@ -115,7 +115,7 @@ async function setupAuthAndMocks(page: any) {
   // Vite proxies /api/* to localhost:5000, so all intercepted URLs use
   // that origin — glob patterns without an explicit hostname miss query
   // strings. One route with url.includes() is the reliable approach.
-  await page.route('**/api/**', (route: any) => {
+  await page.route('**/api/**', (route: Route) => {
     const url = route.request().url();
 
     if (url.includes('/api/auth/me')) {
@@ -149,7 +149,7 @@ async function setupAuthAndMocks(page: any) {
   });
 }
 
-async function gotoForecastPage(page: any) {
+async function gotoForecastPage(page: Page) {
   await setupAuthAndMocks(page);
   await page.goto('/chemicals/forecast');
   // Wait for the forecast data to render — stat cards are the first indicator

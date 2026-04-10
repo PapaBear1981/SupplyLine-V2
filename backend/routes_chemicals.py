@@ -1348,37 +1348,66 @@ def register_chemical_routes(app):
                 Chemical.warehouse_id.isnot(None),   # warehouse stock only
             ).all()
         except Exception:
-            logger.warning("is_archived column filter failed in forecast route; falling back to filter_by", exc_info=True)
-            active_chems = Chemical.query.filter_by(is_archived=False).all()
+            logger.warning(
+                "is_archived column not found in forecast route; querying without archived filter",
+                exc_info=True,
+            )
+            active_chems = Chemical.query.filter(
+                Chemical.warehouse_id.isnot(None),
+            ).all()
 
         if not active_chems:
-            return jsonify({"forecasts": [], "summary": {}, "parameters": {
-                "analysis_window_days": analysis_days,
-                "lead_time_days": lead_time_days,
-                "safety_stock_days": safety_stock_days,
-            }})
+            return jsonify({
+                "forecasts": [],
+                "summary": {
+                    "total_part_numbers": 0,
+                    "critical": 0,
+                    "reorder_soon": 0,
+                    "expiry_risk": 0,
+                    "ok": 0,
+                    "no_history": 0,
+                    "total_waste_risk_qty": 0.0,
+                },
+                "parameters": {
+                    "analysis_window_days": analysis_days,
+                    "lead_time_days": lead_time_days,
+                    "safety_stock_days": safety_stock_days,
+                },
+                "generated_at": datetime.utcnow().isoformat(),
+            })
 
-        chem_ids = {c.id for c in active_chems}
-        pn_map   = {c.id: c.part_number for c in active_chems}
+        active_part_numbers = {c.part_number for c in active_chems}
 
-        # ── 2. Bulk-fetch issuances & returns in the analysis window ────────
-        issuances = ChemicalIssuance.query.filter(
-            ChemicalIssuance.issue_date >= analysis_start,
+        # Build a full id→part_number map that covers child lots (same part_number
+        # but different id, created when lots are split or transferred).
+        all_relevant_chems = Chemical.query.filter(
+            Chemical.part_number.in_(active_part_numbers),
         ).all()
+        pn_map = {c.id: c.part_number for c in all_relevant_chems}
 
-        returns = ChemicalReturn.query.filter(
-            ChemicalReturn.return_date >= analysis_start,
-        ).all()
+        # ── 2. Bulk-fetch issuances & returns for the active part numbers only ─
+        issuances = (
+            ChemicalIssuance.query
+            .join(Chemical, Chemical.id == ChemicalIssuance.chemical_id)
+            .filter(
+                ChemicalIssuance.issue_date >= analysis_start,
+                Chemical.part_number.in_(active_part_numbers),
+            )
+            .all()
+        )
 
-        # Resolve part_number for issuances whose chemical may be a child lot
-        all_iss_chem_ids = {i.chemical_id for i in issuances} - chem_ids
-        extra_chems = {}
-        if all_iss_chem_ids:
-            for c in Chemical.query.filter(Chemical.id.in_(all_iss_chem_ids)).all():
-                extra_chems[c.id] = c.part_number
+        returns = (
+            ChemicalReturn.query
+            .join(Chemical, Chemical.id == ChemicalReturn.chemical_id)
+            .filter(
+                ChemicalReturn.return_date >= analysis_start,
+                Chemical.part_number.in_(active_part_numbers),
+            )
+            .all()
+        )
 
-        def resolve_pn(chemical_id):
-            return pn_map.get(chemical_id) or extra_chems.get(chemical_id)
+        def resolve_pn(chemical_id: int) -> str | None:
+            return pn_map.get(chemical_id)
 
         # Aggregate net consumption per part_number
         issued_by_pn: dict = {}

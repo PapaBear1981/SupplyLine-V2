@@ -139,12 +139,10 @@ const ReorderModal = ({ row, onClose }: ReorderModalProps) => {
           </Select>
         </Form.Item>
         <Form.Item name="notes" label="Notes (optional)">
-          <Form.Item name="notes" noStyle>
-            <input
-              style={{ width: '100%', padding: '4px 11px', border: '1px solid #d9d9d9', borderRadius: 6 }}
-              placeholder="Additional context for procurement..."
-            />
-          </Form.Item>
+          <input
+            style={{ width: '100%', padding: '4px 11px', border: '1px solid #d9d9d9', borderRadius: 6 }}
+            placeholder="Additional context for procurement..."
+          />
         </Form.Item>
         <Form.Item style={{ marginBottom: 0, textAlign: 'right' }}>
           <Space>
@@ -463,7 +461,7 @@ export const ChemicalForecastPage = () => {
           Based on {data.parameters.analysis_window_days}-day consumption history ·
           Lead time {data.parameters.lead_time_days}d ·
           Safety stock {data.parameters.safety_stock_days}d ·
-          Generated {new Date(data.generated_at ?? '').toLocaleString()}
+          {data.generated_at ? `Generated ${new Date(data.generated_at).toLocaleString()}` : ''}
         </Text>
       )}
     </div>

@@ -141,7 +141,7 @@ export const AIAssistant = () => {
 
     try {
       // Send conversation history (skip the welcome message for API calls)
-      const apiMessages = updatedMessages.filter((m) => m !== WELCOME_MESSAGE || messages.length === 1);
+      const apiMessages = updatedMessages.filter((m) => m !== WELCOME_MESSAGE);
       const result = await sendMessage({ messages: apiMessages }).unwrap();
       setMessages((prev) => [...prev, { role: 'assistant', content: result.reply }]);
     } catch (err: unknown) {

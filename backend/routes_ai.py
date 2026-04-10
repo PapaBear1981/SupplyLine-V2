@@ -2117,18 +2117,32 @@ def _tool_transfer_item(
         if item_type == "tool":
             found_item.warehouse_id = dst_warehouse.id
             db.session.delete(found_kit_item)
+            transfer_item_id = found_item.id
         elif item_type == "chemical":
-            # Chemical: restore quantity to warehouse chemical or reduce kit item
             if found_kit_item.quantity <= quantity:
+                # Full return: move the existing Chemical row back to the warehouse.
                 found_item.warehouse_id = dst_warehouse.id
                 db.session.delete(found_kit_item)
+                transfer_item_id = found_item.id
             else:
+                # Partial return: the kit still holds the remaining stock.
+                # Create a new Chemical row for the returned quantity so that
+                # found_item (still referenced by the KitItem) stays in the kit.
+                from utils.lot_utils import create_child_chemical
+                child = create_child_chemical(
+                    parent_chemical=found_item,
+                    quantity=quantity,
+                    destination_warehouse_id=dst_warehouse.id,
+                )
+                db.session.add(child)
+                db.session.flush()
                 found_kit_item.quantity -= quantity
-                found_item.quantity += quantity
-                found_item.warehouse_id = dst_warehouse.id
+                transfer_item_id = child.id
+        else:
+            transfer_item_id = found_item.id if found_item else found_kit_item.item_id
         transfer = KitTransfer(
             item_type=item_type,
-            item_id=found_item.id,
+            item_id=transfer_item_id,
             from_location_type="kit",
             from_location_id=src_kit.id,
             to_location_type="warehouse",
@@ -2141,9 +2155,26 @@ def _tool_transfer_item(
         )
 
     else:
-        # Kit → Kit: move KitItem to new kit/box
-        found_kit_item.kit_id = dst_kit.id
-        found_kit_item.box_id = dst_box.id
+        # Kit → Kit: move KitItem (or partial) to new kit/box
+        if item_type == "chemical" and found_kit_item and quantity < found_kit_item.quantity:
+            # Partial transfer: reduce source KitItem and create a new one at destination
+            found_kit_item.quantity -= quantity
+            new_kit_item = KitItem(
+                kit_id=dst_kit.id,
+                box_id=dst_box.id,
+                item_type="chemical",
+                item_id=found_kit_item.item_id,
+                part_number=found_kit_item.part_number,
+                lot_number=found_kit_item.lot_number,
+                description=found_kit_item.description,
+                quantity=quantity,
+                status="available",
+            )
+            db.session.add(new_kit_item)
+        else:
+            # Full transfer: move the KitItem wholesale
+            found_kit_item.kit_id = dst_kit.id
+            found_kit_item.box_id = dst_box.id
         transfer = KitTransfer(
             item_type=item_type,
             item_id=found_item.id if found_item else found_kit_item.item_id,
@@ -2836,7 +2867,7 @@ def _tool_request_chemical_reorder(
         if not has_perm and user:
             # Check permissions list
             perms = [p.name for p in getattr(user, "permissions", [])]
-            if "materials.manage" in perms or "system.settings" in perms:
+            if "materials.manage" in perms:
                 has_perm = True
         if not has_perm:
             return {"error": "Insufficient permissions. Materials manager role or admin required to request reorders."}
@@ -2942,7 +2973,7 @@ def _tool_archive_chemical(
                     break
         if not has_perm and user:
             perms = [p.name for p in getattr(user, "permissions", [])]
-            if "materials.manage" in perms or "system.settings" in perms:
+            if "materials.manage" in perms:
                 has_perm = True
         if not has_perm:
             return {"error": "Insufficient permissions. Materials manager role or admin required to archive chemicals."}
@@ -3884,16 +3915,13 @@ def _run_openai_loop(
 def _build_system_prompt(current_user: dict) -> str:
     try:
         user_obj = db.session.get(User, current_user.get("user_id"))
-        user_name = user_obj.name if user_obj else "Unknown"
         user_role = "Administrator" if (user_obj and user_obj.is_admin) else "Standard User"
     except Exception:
-        user_name = current_user.get("name", "Unknown")
-        user_role = "Unknown"
+        user_role = "Standard User"
 
     return f"""You are the SupplyLine AI Assistant embedded in the SupplyLine MRO Suite — an inventory management system for aviation/aerospace Maintenance, Repair, and Operations organizations.
 
 ## Current User
-- Name: {user_name}
 - Role: {user_role}
 
 ## Query tools (read-only)
@@ -4103,11 +4131,8 @@ def register_ai_routes(app):
             return jsonify({"error": "AI provider request timed out. Try again."}), 504
         except requests.exceptions.HTTPError as exc:
             status_code = exc.response.status_code if exc.response is not None else 500
-            try:
-                detail = exc.response.json()
-            except Exception:
-                detail = exc.response.text if exc.response is not None else str(exc)
-            logger.error("AI provider HTTP error %s: %s", status_code, detail)
+            logger.error("AI provider HTTP error %s (request-id: %s)", status_code,
+                         exc.response.headers.get("x-request-id", "n/a") if exc.response is not None else "n/a")
             if status_code == 401:
                 return jsonify({"error": "Invalid API key. Check the AI settings."}), 502
             if status_code == 429:
