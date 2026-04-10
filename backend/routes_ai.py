@@ -18,7 +18,9 @@ from models import (
     ProcurementOrder,
     RequestItem,
     Tool,
+    ToolCalibration,
     ToolHistory,
+    ToolServiceRecord,
     User,
     UserActivity,
     UserRequest,
@@ -58,6 +60,27 @@ DEFAULT_BASE_URLS = {
 
 MAX_TOOL_ITERATIONS = 5   # hard cap on agentic loop depth
 MAX_RESULTS = 20          # cap all DB queries to keep responses concise
+
+# Tools available when Ollama (local small model) is the provider.
+# Kept to ~15 essential operations so models like Gemma 4B don't get confused.
+# Claude / OpenAI / OpenRouter always receive the full tool list.
+OLLAMA_TOOL_NAMES = {
+    "search_tools",
+    "get_active_checkouts",
+    "get_calibration_status",
+    "search_chemicals",
+    "get_inventory_summary",
+    "get_kits",
+    "get_kit_contents",
+    "get_warehouses",
+    "get_fulfillment_requests",
+    "checkout_tool",
+    "return_tool",
+    "issue_chemical",
+    "return_chemical",
+    "create_request",
+    "transfer_item",
+}
 
 
 # ─── Tool definitions ─────────────────────────────────────────────────────────
@@ -773,6 +796,127 @@ TOOL_DEFINITIONS = [
             "required": [],
         },
     },
+    # ── Tool service & calibration tools ─────────────────────────────────────
+    {
+        "name": "flag_tool_for_service",
+        "description": (
+            "Remove a tool from active service for maintenance or permanent retirement. "
+            "Requires tool manager role or admin. "
+            "Call with confirmed=false to preview, confirmed=true to execute. "
+            "Use search_tools first to find the tool_id."
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "tool_id": {
+                    "type": "integer",
+                    "description": "ID of the tool to flag.",
+                },
+                "action": {
+                    "type": "string",
+                    "enum": ["maintenance", "retire"],
+                    "description": "maintenance = temporary removal; retire = permanent decommission.",
+                },
+                "reason": {
+                    "type": "string",
+                    "description": "Required reason for removing the tool from service.",
+                },
+                "comments": {
+                    "type": "string",
+                    "description": "Optional additional comments.",
+                },
+                "confirmed": {
+                    "type": "boolean",
+                    "description": "false = preview only (default). true = execute.",
+                },
+            },
+            "required": [],
+        },
+    },
+    {
+        "name": "return_tool_to_service",
+        "description": (
+            "Return a tool from maintenance back to available status. "
+            "Requires tool manager role or admin. "
+            "Call with confirmed=false to preview, confirmed=true to execute."
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "tool_id": {
+                    "type": "integer",
+                    "description": "ID of the tool to return to service.",
+                },
+                "reason": {
+                    "type": "string",
+                    "description": "Required reason / notes for returning tool to service.",
+                },
+                "confirmed": {
+                    "type": "boolean",
+                    "description": "false = preview only (default). true = execute.",
+                },
+            },
+            "required": [],
+        },
+    },
+    {
+        "name": "record_calibration",
+        "description": (
+            "Record a completed calibration for a tool. Updates calibration date and status. "
+            "Requires tool manager role or admin. "
+            "Call with confirmed=false to preview, confirmed=true to record. "
+            "Use search_tools first to find the tool_id."
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "tool_id": {
+                    "type": "integer",
+                    "description": "ID of the tool that was calibrated.",
+                },
+                "calibration_status": {
+                    "type": "string",
+                    "enum": ["pass", "fail", "limited"],
+                    "description": "Result of the calibration.",
+                },
+                "calibration_date": {
+                    "type": "string",
+                    "description": "Date calibration was performed (YYYY-MM-DD). Defaults to today.",
+                },
+                "next_calibration_date": {
+                    "type": "string",
+                    "description": "Next due date (YYYY-MM-DD). Calculated from tool interval if omitted.",
+                },
+                "notes": {
+                    "type": "string",
+                    "description": "Optional calibration notes.",
+                },
+                "confirmed": {
+                    "type": "boolean",
+                    "description": "false = preview only (default). true = record the calibration.",
+                },
+            },
+            "required": [],
+        },
+    },
+    {
+        "name": "get_request_detail",
+        "description": (
+            "Get full details of a single fulfillment request including all items, "
+            "individual item statuses, vendor, tracking numbers, and costs. "
+            "Use get_fulfillment_requests to find the request_number first."
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "request_number": {
+                    "type": "string",
+                    "description": "Request number (e.g. REQ-00042).",
+                },
+            },
+            "required": [],
+        },
+    },
     # ── Reporting tools ───────────────────────────────────────────────────────
     {
         "name": "report_tool_activity",
@@ -930,6 +1074,14 @@ def _execute_tool(name: str, args: dict, user_id: int | None = None, is_admin: b
             return _tool_update_request_status(**args, _user_id=user_id, _is_admin=is_admin)
         if name == "mark_items_received":
             return _tool_mark_items_received(**args, _user_id=user_id, _is_admin=is_admin)
+        if name == "flag_tool_for_service":
+            return _tool_flag_tool_for_service(**args, _user_id=user_id, _is_admin=is_admin)
+        if name == "return_tool_to_service":
+            return _tool_return_tool_to_service(**args, _user_id=user_id, _is_admin=is_admin)
+        if name == "record_calibration":
+            return _tool_record_calibration(**args, _user_id=user_id, _is_admin=is_admin)
+        if name == "get_request_detail":
+            return _tool_get_request_detail(**args)
         if name == "report_tool_activity":
             return _report_tool_activity(**args)
         if name == "report_chemical_health":
@@ -2717,6 +2869,314 @@ def _tool_archive_chemical(
     }
 
 
+# ─── Tool service & calibration tools ────────────────────────────────────────
+
+def _has_tool_manager_permission(user_id, is_admin: bool) -> bool:
+    if is_admin:
+        return True
+    user = db.session.get(User, user_id) if user_id else None
+    if not user:
+        return False
+    # Check role names
+    for role in getattr(user, "roles", []):
+        if getattr(role, "name", "").lower() in ("materials", "tool_manager", "tool manager", "admin"):
+            return True
+    # Check explicit permissions
+    perms = [p.name for p in getattr(user, "permissions", [])]
+    return "page.tools" in perms or "tools.manage" in perms
+
+
+def _tool_flag_tool_for_service(
+    tool_id: int = 0,
+    action: str = "maintenance",
+    reason: str = "",
+    comments: str = "",
+    confirmed: bool = False,
+    _user_id: int | None = None,
+    _is_admin: bool = False,
+) -> dict:
+    if not tool_id or not reason:
+        return {"error": "tool_id and reason are required."}
+    if action not in ("maintenance", "retire"):
+        return {"error": "action must be 'maintenance' or 'retire'."}
+
+    tool = db.session.get(Tool, tool_id)
+    if not tool:
+        return {"error": f"No tool found with id {tool_id}."}
+    if tool.status in ("maintenance", "retired"):
+        return {"error": f"Tool is already out of service (status: {tool.status})."}
+
+    # Check for active checkout
+    active = Checkout.query.filter_by(tool_id=tool_id, return_date=None).first()
+    if active:
+        return {"error": "Cannot flag a tool that is currently checked out. It must be returned first."}
+
+    if not _has_tool_manager_permission(_user_id, _is_admin):
+        return {"error": "Insufficient permissions. Tool manager role or admin required."}
+
+    new_status = "maintenance" if action == "maintenance" else "retired"
+    preview = {
+        "action": "flag_tool_for_service",
+        "tool": f"{tool.description} (S/N {tool.serial_number or tool.tool_number})",
+        "current_status": tool.status,
+        "new_status": new_status,
+        "reason": reason,
+        "comments": comments or "(none)",
+    }
+
+    if not confirmed:
+        return {"preview": preview, "confirmed": False,
+                "message": "Review the details above and confirm to proceed."}
+
+    if not _user_id:
+        return {"error": "Cannot flag tool: user identity not available."}
+
+    action_type = "remove_maintenance" if action == "maintenance" else "remove_permanent"
+    tool.status = new_status
+    tool.status_reason = reason
+
+    db.session.add(ToolServiceRecord(
+        tool_id=tool_id,
+        user_id=_user_id,
+        action_type=action_type,
+        reason=reason,
+        comments=comments or "",
+    ))
+
+    user = db.session.get(User, _user_id)
+    db.session.add(AuditLog(
+        action_type=action_type,
+        action_details=(
+            f"AI assistant: {user.name if user else _user_id} flagged tool "
+            f"{tool.tool_number} as {new_status} — {reason}"
+        ),
+    ))
+    db.session.add(UserActivity(
+        user_id=_user_id,
+        activity_type=action_type,
+        description=f"Flagged tool {tool.tool_number} as {new_status}: {reason}",
+    ))
+    db.session.commit()
+
+    return {
+        "status": "success",
+        "message": (
+            f"Tool {tool.description} (S/N {tool.serial_number or tool.tool_number}) "
+            f"has been set to '{new_status}'. Reason: {reason}."
+        ),
+    }
+
+
+def _tool_return_tool_to_service(
+    tool_id: int = 0,
+    reason: str = "",
+    confirmed: bool = False,
+    _user_id: int | None = None,
+    _is_admin: bool = False,
+) -> dict:
+    if not tool_id or not reason:
+        return {"error": "tool_id and reason are required."}
+
+    tool = db.session.get(Tool, tool_id)
+    if not tool:
+        return {"error": f"No tool found with id {tool_id}."}
+    if tool.status not in ("maintenance", "retired"):
+        return {"error": f"Tool is not out of service (current status: {tool.status})."}
+
+    if not _has_tool_manager_permission(_user_id, _is_admin):
+        return {"error": "Insufficient permissions. Tool manager role or admin required."}
+
+    preview = {
+        "action": "return_tool_to_service",
+        "tool": f"{tool.description} (S/N {tool.serial_number or tool.tool_number})",
+        "current_status": tool.status,
+        "new_status": "available",
+        "reason": reason,
+    }
+
+    if not confirmed:
+        return {"preview": preview, "confirmed": False,
+                "message": "Review the details above and confirm to return this tool to service."}
+
+    if not _user_id:
+        return {"error": "Cannot return tool to service: user identity not available."}
+
+    tool.status = "available"
+    tool.status_reason = None
+
+    db.session.add(ToolServiceRecord(
+        tool_id=tool_id,
+        user_id=_user_id,
+        action_type="return_service",
+        reason=reason,
+        comments="",
+    ))
+
+    user = db.session.get(User, _user_id)
+    db.session.add(AuditLog(
+        action_type="return_service",
+        action_details=(
+            f"AI assistant: {user.name if user else _user_id} returned tool "
+            f"{tool.tool_number} to service — {reason}"
+        ),
+    ))
+    db.session.add(UserActivity(
+        user_id=_user_id,
+        activity_type="return_service",
+        description=f"Returned tool {tool.tool_number} to service: {reason}",
+    ))
+    db.session.commit()
+
+    return {
+        "status": "success",
+        "message": (
+            f"Tool {tool.description} (S/N {tool.serial_number or tool.tool_number}) "
+            f"is now available. Reason: {reason}."
+        ),
+    }
+
+
+def _tool_record_calibration(
+    tool_id: int = 0,
+    calibration_status: str = "pass",
+    calibration_date: str = "",
+    next_calibration_date: str = "",
+    notes: str = "",
+    confirmed: bool = False,
+    _user_id: int | None = None,
+    _is_admin: bool = False,
+) -> dict:
+    if not tool_id:
+        return {"error": "tool_id is required."}
+    if calibration_status not in ("pass", "fail", "limited"):
+        return {"error": "calibration_status must be pass, fail, or limited."}
+
+    tool = db.session.get(Tool, tool_id)
+    if not tool:
+        return {"error": f"No tool found with id {tool_id}."}
+    if not getattr(tool, "requires_calibration", False):
+        return {"error": f"Tool {tool.tool_number} is not flagged as requiring calibration."}
+
+    if not _has_tool_manager_permission(_user_id, _is_admin):
+        return {"error": "Insufficient permissions. Tool manager role or admin required."}
+
+    # Parse dates
+    try:
+        cal_date = datetime.strptime(calibration_date, "%Y-%m-%d") if calibration_date else datetime.utcnow()
+    except ValueError:
+        return {"error": f"Invalid calibration_date format. Use YYYY-MM-DD."}
+
+    next_date = None
+    if next_calibration_date:
+        try:
+            next_date = datetime.strptime(next_calibration_date, "%Y-%m-%d")
+        except ValueError:
+            return {"error": f"Invalid next_calibration_date format. Use YYYY-MM-DD."}
+    elif tool.calibration_frequency_days:
+        next_date = cal_date + timedelta(days=tool.calibration_frequency_days)
+
+    preview = {
+        "action": "record_calibration",
+        "tool": f"{tool.description} (S/N {tool.serial_number or tool.tool_number})",
+        "calibration_date": cal_date.strftime("%Y-%m-%d"),
+        "calibration_status": calibration_status,
+        "next_calibration_date": next_date.strftime("%Y-%m-%d") if next_date else "(not scheduled)",
+        "notes": notes or "(none)",
+    }
+
+    if not confirmed:
+        return {"preview": preview, "confirmed": False,
+                "message": "Review the calibration details above and confirm to record."}
+
+    if not _user_id:
+        return {"error": "Cannot record calibration: user identity not available."}
+
+    cal_record = ToolCalibration(
+        tool_id=tool_id,
+        calibration_date=cal_date,
+        next_calibration_date=next_date,
+        performed_by_user_id=_user_id,
+        calibration_notes=notes or "",
+        calibration_status=calibration_status,
+    )
+    db.session.add(cal_record)
+
+    tool.last_calibration_date = cal_date
+    tool.next_calibration_date = next_date
+    try:
+        tool.update_calibration_status()
+    except Exception:
+        pass
+
+    user = db.session.get(User, _user_id)
+    db.session.add(AuditLog(
+        action_type="tool_calibration",
+        action_details=(
+            f"AI assistant: {user.name if user else _user_id} recorded calibration "
+            f"for {tool.tool_number} — result: {calibration_status}"
+        ),
+    ))
+    db.session.add(UserActivity(
+        user_id=_user_id,
+        activity_type="tool_calibration",
+        description=f"Calibrated tool {tool.tool_number}: {calibration_status}",
+    ))
+    db.session.commit()
+
+    return {
+        "status": "success",
+        "message": (
+            f"Calibration recorded for {tool.description} ({tool.tool_number}): "
+            f"{calibration_status}. "
+            + (f"Next due: {next_date.strftime('%Y-%m-%d')}." if next_date else "No next date scheduled.")
+        ),
+    }
+
+
+def _tool_get_request_detail(request_number: str = "") -> dict:
+    if not request_number:
+        return {"error": "request_number is required."}
+
+    req = _lookup_request(request_number)
+    if not req:
+        return {"error": f"Request {request_number} not found."}
+
+    items = req.items.all()
+    return {
+        "request_number": req.request_number,
+        "title": req.title,
+        "status": req.status,
+        "priority": req.priority,
+        "requester": req.requester.name if req.requester else "Unknown",
+        "buyer": req.buyer.name if req.buyer else None,
+        "created_at": req.created_at.strftime("%Y-%m-%d") if req.created_at else None,
+        "due_date": req.expected_due_date.strftime("%Y-%m-%d") if req.expected_due_date else None,
+        "notes": req.notes,
+        "destination": req.destination_location,
+        "item_count": len(items),
+        "items": [
+            {
+                "id": i.id,
+                "description": i.description,
+                "part_number": i.part_number,
+                "quantity": i.quantity,
+                "unit": i.unit,
+                "type": i.item_type,
+                "status": i.status,
+                "vendor": i.vendor,
+                "tracking_number": i.tracking_number,
+                "ordered_date": i.ordered_date.strftime("%Y-%m-%d") if i.ordered_date else None,
+                "expected_delivery": i.expected_delivery_date.strftime("%Y-%m-%d") if i.expected_delivery_date else None,
+                "received_date": i.received_date.strftime("%Y-%m-%d") if i.received_date else None,
+                "unit_cost": i.unit_cost,
+                "total_cost": i.total_cost,
+                "notes": i.order_notes,
+            }
+            for i in items
+        ],
+    }
+
+
 # ─── Reporting tools ──────────────────────────────────────────────────────────
 
 def _timeframe_start(timeframe: str) -> datetime:
@@ -2971,20 +3431,34 @@ def _report_department_usage(timeframe: str = "month") -> dict:
 
 # ─── Schema converters ────────────────────────────────────────────────────────
 
-def _claude_tools() -> list:
-    """Convert our canonical definitions to Anthropic's tool schema format."""
+def _select_tool_definitions(provider: str) -> list:
+    """Return the appropriate tool definitions list for the given provider.
+
+    Ollama (local small models) gets a curated short list so models like
+    Gemma 4B don't get confused by too many choices.
+    All other providers (Claude, OpenAI, OpenRouter) get the full list.
+    """
+    if provider == "ollama":
+        return [t for t in TOOL_DEFINITIONS if t["name"] in OLLAMA_TOOL_NAMES]
+    return TOOL_DEFINITIONS
+
+
+def _claude_tools(definitions: list | None = None) -> list:
+    """Convert tool definitions to Anthropic's tool schema format."""
+    source = definitions if definitions is not None else TOOL_DEFINITIONS
     return [
         {
             "name": t["name"],
             "description": t["description"],
             "input_schema": t["parameters"],
         }
-        for t in TOOL_DEFINITIONS
+        for t in source
     ]
 
 
-def _openai_tools() -> list:
-    """Convert our canonical definitions to OpenAI's tool schema format."""
+def _openai_tools(definitions: list | None = None) -> list:
+    """Convert tool definitions to OpenAI's tool schema format."""
+    source = definitions if definitions is not None else TOOL_DEFINITIONS
     return [
         {
             "type": "function",
@@ -2994,7 +3468,7 @@ def _openai_tools() -> list:
                 "parameters": t["parameters"],
             },
         }
-        for t in TOOL_DEFINITIONS
+        for t in source
     ]
 
 
@@ -3007,9 +3481,10 @@ def _run_claude_loop(
     messages: list,
     user_id: int | None = None,
     is_admin: bool = False,
+    tool_definitions: list | None = None,
 ) -> str:
     current_messages = [m.copy() for m in messages]
-    tools = _claude_tools()
+    tools = _claude_tools(tool_definitions)
     headers = {
         "x-api-key": api_key,
         "anthropic-version": "2023-06-01",
@@ -3075,9 +3550,10 @@ def _run_openai_loop(
     messages: list,
     user_id: int | None = None,
     is_admin: bool = False,
+    tool_definitions: list | None = None,
 ) -> str:
     current_messages = [{"role": "system", "content": system_prompt}] + [m.copy() for m in messages]
-    tools = _openai_tools()
+    tools = _openai_tools(tool_definitions)
     headers = {"content-type": "application/json"}
     if api_key:
         headers["Authorization"] = f"Bearer {api_key}"
@@ -3195,8 +3671,15 @@ Action tools:
     (warehouse→warehouse, warehouse→kit, kit→warehouse, kit→kit)
     Tip: use get_warehouses and get_kits first to confirm names, then
     use search_tools / get_kit_contents to confirm the item exists at the source.
+- flag_tool_for_service — remove a tool from service for maintenance or permanent retirement
+    (requires tool manager role or admin)
+- return_tool_to_service — bring a tool back from maintenance to available
+    (requires tool manager role or admin)
+- record_calibration — record a completed calibration (pass/fail/limited) for a tool
+    (requires tool manager role or admin)
 - create_request — submit a new procurement/fulfillment request for one item
 - add_request_item — add another item to an existing open request
+- get_request_detail — get full item-level detail on a single request by number
 - update_request_status — change status or priority of a request
     (requires orders permission or admin)
 - mark_items_received — acknowledge receipt of all pending/ordered items in a request
@@ -3313,13 +3796,19 @@ def register_ai_routes(app):
         user_id  = request.current_user.get("user_id")
         is_admin = request.current_user.get("is_admin", False)
 
+        # Select tool set based on provider: Ollama gets a short list for
+        # small-model compatibility; all other providers get the full set.
+        tool_defs = _select_tool_definitions(provider)
+
         try:
             if provider == "claude":
                 reply = _run_claude_loop(api_key, model, system_prompt, messages,
-                                         user_id=user_id, is_admin=is_admin)
+                                         user_id=user_id, is_admin=is_admin,
+                                         tool_definitions=tool_defs)
             elif provider in ("openai", "openrouter", "ollama"):
                 reply = _run_openai_loop(api_key, model, base_url, system_prompt, messages,
-                                         user_id=user_id, is_admin=is_admin)
+                                         user_id=user_id, is_admin=is_admin,
+                                         tool_definitions=tool_defs)
             else:
                 return jsonify({"error": f"Unsupported provider: {provider}"}), 400
 
