@@ -2,7 +2,13 @@
 
 import json
 import logging
-from datetime import date, datetime, timedelta
+import socket
+import threading
+import time
+from collections import defaultdict, deque
+from datetime import datetime, timedelta, timezone
+from ipaddress import ip_address
+from urllib.parse import urlparse
 
 import requests
 from flask import jsonify, request
@@ -11,10 +17,10 @@ from sqlalchemy import or_
 from auth import jwt_required, permission_required
 from models import (
     AuditLog,
+    Checkout,
     Chemical,
     ChemicalIssuance,
     ChemicalReturn,
-    Checkout,
     ProcurementOrder,
     RequestItem,
     Tool,
@@ -27,13 +33,14 @@ from models import (
     Warehouse,
     db,
 )
-from models_kits import Kit, KitBox, KitExpendable, KitIssuance, KitItem, KitReorderRequest, KitTransfer
+from models_kits import Kit, KitBox, KitItem, KitReorderRequest, KitTransfer
 from utils.transaction_helper import (
     record_chemical_issuance,
     record_chemical_return,
     record_tool_checkout,
     record_tool_return,
 )
+
 
 logger = logging.getLogger(__name__)
 
@@ -54,12 +61,18 @@ DEFAULT_MODELS = {
 }
 
 DEFAULT_BASE_URLS = {
+    "openai":     "https://api.openai.com",
     "openrouter": "https://openrouter.ai",
     "ollama":     "http://localhost:11434",
 }
 
 MAX_TOOL_ITERATIONS = 5   # hard cap on agentic loop depth
 MAX_RESULTS = 20          # cap all DB queries to keep responses concise
+AI_CHAT_WINDOW_SECONDS = 60
+AI_CHAT_MAX_REQUESTS_PER_WINDOW = 20
+
+_ai_chat_rate_limit_lock = threading.Lock()
+_ai_chat_request_times: dict[int, deque[float]] = defaultdict(deque)
 
 # Tools available when Ollama (local small model) is the provider.
 # Kept to ~15 essential operations so models like Gemma 4B don't get confused.
@@ -1076,7 +1089,7 @@ def _execute_tool(name: str, args: dict, user_id: int | None = None, is_admin: b
         if name == "get_kit_reorders":
             return _tool_get_kit_reorders(**args)
         if name == "get_fulfillment_requests":
-            return _tool_get_fulfillment_requests(**args)
+            return _tool_get_fulfillment_requests(**args, _user_id=user_id, _is_admin=is_admin)
         if name == "get_procurement_orders":
             return _tool_get_procurement_orders(**args)
         if name == "get_inventory_summary":
@@ -1103,7 +1116,7 @@ def _execute_tool(name: str, args: dict, user_id: int | None = None, is_admin: b
         if name == "create_request":
             return _tool_create_request(**args, _user_id=user_id)
         if name == "add_request_item":
-            return _tool_add_request_item(**args, _user_id=user_id)
+            return _tool_add_request_item(**args, _user_id=user_id, _is_admin=is_admin)
         if name == "update_request_status":
             return _tool_update_request_status(**args, _user_id=user_id, _is_admin=is_admin)
         if name == "mark_items_received":
@@ -1115,7 +1128,7 @@ def _execute_tool(name: str, args: dict, user_id: int | None = None, is_admin: b
         if name == "record_calibration":
             return _tool_record_calibration(**args, _user_id=user_id, _is_admin=is_admin)
         if name == "get_request_detail":
-            return _tool_get_request_detail(**args)
+            return _tool_get_request_detail(**args, _user_id=user_id, _is_admin=is_admin)
         if name == "forecast_chemicals":
             return _tool_forecast_chemicals(**args)
         if name == "report_tool_activity":
@@ -1129,9 +1142,74 @@ def _execute_tool(name: str, args: dict, user_id: int | None = None, is_admin: b
         if name == "report_department_usage":
             return _report_department_usage(**args)
         return {"error": f"Unknown tool: {name}"}
-    except Exception as exc:
+    except Exception:
         logger.exception("Tool %s failed", name)
-        return {"error": str(exc)}
+        return {"error": "Tool execution failed due to an internal error."}
+
+
+def _is_ai_chat_rate_limited(user_id: int | None) -> bool:
+    """Return True if the user exceeded AI chat request rate limits."""
+    if not user_id:
+        return True
+
+    now = time.time()
+    cutoff = now - AI_CHAT_WINDOW_SECONDS
+
+    with _ai_chat_rate_limit_lock:
+        bucket = _ai_chat_request_times[user_id]
+        while bucket and bucket[0] < cutoff:
+            bucket.popleft()
+        if len(bucket) >= AI_CHAT_MAX_REQUESTS_PER_WINDOW:
+            return True
+        bucket.append(now)
+    return False
+
+
+def _hostname_resolves_to_private_network(hostname: str) -> bool:
+    try:
+        infos = socket.getaddrinfo(hostname, None)
+    except socket.gaierror:
+        return False
+
+    for info in infos:
+        ip_str = info[4][0]
+        try:
+            addr = ip_address(ip_str)
+        except ValueError:
+            continue
+        if (
+            addr.is_private
+            or addr.is_loopback
+            or addr.is_link_local
+            or addr.is_reserved
+            or addr.is_multicast
+        ):
+            return True
+    return False
+
+
+def _validate_provider_base_url(provider: str, base_url: str) -> tuple[bool, str | None]:
+    """Validate provider base URL and block local/private targets for hosted providers."""
+    if not base_url:
+        return False, "Base URL is required for this provider."
+
+    parsed = urlparse(base_url)
+    if parsed.scheme not in ("http", "https"):
+        return False, "Base URL must start with http:// or https://."
+    if not parsed.netloc:
+        return False, "Base URL is missing a hostname."
+
+    host = (parsed.hostname or "").strip().lower()
+    if not host:
+        return False, "Base URL hostname is invalid."
+
+    if provider in ("openai", "openrouter"):
+        if host in {"localhost"} or host.endswith(".local"):
+            return False, "Localhost/.local base URLs are not allowed for hosted providers."
+        if _hostname_resolves_to_private_network(host):
+            return False, "Private or loopback network base URLs are not allowed for hosted providers."
+
+    return True, None
 
 
 def _tool_search_tools(
@@ -1199,9 +1277,10 @@ def _tool_get_active_checkouts(
     overdue_only: bool = False,
 ) -> dict:
     q = Checkout.query.filter(Checkout.return_date.is_(None))
+    today = datetime.now(timezone.utc).date()
 
     if overdue_only:
-        q = q.filter(Checkout.expected_return_date < date.today())
+        q = q.filter(Checkout.expected_return_date < today)
 
     checkouts = q.all()
 
@@ -1216,7 +1295,7 @@ def _tool_get_active_checkouts(
 
         is_overdue = (
             co.expected_return_date is not None
-            and co.expected_return_date.date() < date.today()
+            and co.expected_return_date.date() < today
         )
         rows.append({
             "tool_number": tool.tool_number if tool else "Unknown",
@@ -1241,7 +1320,7 @@ def _tool_get_calibration_status(
     filter: str = "all",
     days_ahead: int = 30,
 ) -> dict:
-    today = date.today()
+    today = datetime.now(timezone.utc).date()
     q = Tool.query.filter(Tool.requires_calibration.is_(True))
 
     if filter == "overdue":
@@ -1290,7 +1369,7 @@ def _tool_search_chemicals(
     if status:
         q = q.filter(Chemical.status == status)
     if expiring_within_days:
-        cutoff = date.today() + timedelta(days=expiring_within_days)
+        cutoff = datetime.now(timezone.utc).date() + timedelta(days=expiring_within_days)
         q = q.filter(
             Chemical.expiration_date.isnot(None),
             Chemical.expiration_date <= cutoff,
@@ -1416,8 +1495,15 @@ def _tool_get_fulfillment_requests(
     status: str = "",
     priority: str = "",
     user_name: str = "",
+    _user_id: int | None = None,
+    _is_admin: bool = False,
 ) -> dict:
+    if not _user_id:
+        return {"error": "Cannot determine current user."}
+
     q = UserRequest.query
+    if not _has_orders_permission(_user_id, _is_admin):
+        q = q.filter(UserRequest.requester_id == _user_id)
     if status:
         q = q.filter(UserRequest.status == status)
     if priority:
@@ -1497,7 +1583,7 @@ def _tool_get_procurement_orders(
 
 
 def _tool_get_inventory_summary() -> dict:
-    today = date.today()
+    today = datetime.now(timezone.utc).date()
     return {
         "tools": {
             "total": Tool.query.count(),
@@ -2031,7 +2117,7 @@ def _tool_transfer_item(
         if item_type == "tool":
             found_item.warehouse_id = dst_warehouse.id
             db.session.delete(found_kit_item)
-        else:
+        elif item_type == "chemical":
             # Chemical: restore quantity to warehouse chemical or reduce kit item
             if found_kit_item.quantity <= quantity:
                 found_item.warehouse_id = dst_warehouse.id
@@ -2342,6 +2428,7 @@ def _tool_add_request_item(
     item_type: str = "tool",
     confirmed: bool = False,
     _user_id: int | None = None,
+    _is_admin: bool = False,
 ) -> dict:
     if not request_number or not item_description:
         return {"error": "request_number and item_description are required."}
@@ -2351,6 +2438,10 @@ def _tool_add_request_item(
         return {"error": f"Request {request_number} not found."}
     if user_req.is_closed():
         return {"error": f"Request {request_number} is closed ({user_req.status}) and cannot be modified."}
+    if not _user_id:
+        return {"error": "Cannot add item: user identity not available."}
+    if user_req.requester_id != _user_id and not _has_orders_permission(_user_id, _is_admin):
+        return {"error": "Insufficient permissions. You may only modify your own requests."}
 
     if item_type not in ("tool", "chemical", "expendable", "repairable", "other"):
         item_type = "tool"
@@ -2369,9 +2460,6 @@ def _tool_add_request_item(
     if not confirmed:
         return {"preview": preview, "confirmed": False,
                 "message": "Review the item details above and confirm to add."}
-
-    if not _user_id:
-        return {"error": "Cannot add item: user identity not available."}
 
     item = RequestItem(
         request_id=user_req.id,
@@ -3100,14 +3188,14 @@ def _tool_record_calibration(
     try:
         cal_date = datetime.strptime(calibration_date, "%Y-%m-%d") if calibration_date else datetime.utcnow()
     except ValueError:
-        return {"error": f"Invalid calibration_date format. Use YYYY-MM-DD."}
+        return {"error": "Invalid calibration_date format. Use YYYY-MM-DD."}
 
     next_date = None
     if next_calibration_date:
         try:
             next_date = datetime.strptime(next_calibration_date, "%Y-%m-%d")
         except ValueError:
-            return {"error": f"Invalid next_calibration_date format. Use YYYY-MM-DD."}
+            return {"error": "Invalid next_calibration_date format. Use YYYY-MM-DD."}
     elif tool.calibration_frequency_days:
         next_date = cal_date + timedelta(days=tool.calibration_frequency_days)
 
@@ -3169,13 +3257,21 @@ def _tool_record_calibration(
     }
 
 
-def _tool_get_request_detail(request_number: str = "") -> dict:
+def _tool_get_request_detail(
+    request_number: str = "",
+    _user_id: int | None = None,
+    _is_admin: bool = False,
+) -> dict:
     if not request_number:
         return {"error": "request_number is required."}
 
     req = _lookup_request(request_number)
     if not req:
         return {"error": f"Request {request_number} not found."}
+    if not _user_id:
+        return {"error": "Cannot determine current user."}
+    if req.requester_id != _user_id and not _has_orders_permission(_user_id, _is_admin):
+        return {"error": "Insufficient permissions to view this request."}
 
     items = req.items.all()
     return {
@@ -3375,7 +3471,6 @@ def _report_tool_activity(
     department: str = "",
 ) -> dict:
     start = _timeframe_start(timeframe)
-    now = datetime.utcnow()
 
     q = Checkout.query.filter(Checkout.checkout_date >= start)
     if department:
@@ -3564,7 +3659,6 @@ def _report_procurement_summary(timeframe: str = "month") -> dict:
 
 def _report_department_usage(timeframe: str = "month") -> dict:
     start = _timeframe_start(timeframe)
-    now = datetime.utcnow()
 
     checkouts = (
         Checkout.query
@@ -3669,7 +3763,7 @@ def _run_claude_loop(
         "content-type": "application/json",
     }
 
-    for iteration in range(MAX_TOOL_ITERATIONS):
+    for _iteration in range(MAX_TOOL_ITERATIONS):
         payload = {
             "model": model,
             "max_tokens": 1024,
@@ -3715,7 +3809,7 @@ def _run_claude_loop(
         for block in data.get("content", []):
             if block.get("type") == "text":
                 return block["text"]
-        return "(Unexpected stop reason: {})".format(stop_reason)
+        return f"(Unexpected stop reason: {stop_reason})"
 
     return "I reached the maximum number of tool calls without completing the query. Please try a more specific question."
 
@@ -3736,7 +3830,7 @@ def _run_openai_loop(
     if api_key:
         headers["Authorization"] = f"Bearer {api_key}"
 
-    for iteration in range(MAX_TOOL_ITERATIONS):
+    for _iteration in range(MAX_TOOL_ITERATIONS):
         payload = {
             "model": model,
             "messages": current_messages,
@@ -3920,6 +4014,7 @@ def register_ai_routes(app):
         provider = payload.get("provider", "").strip()
         if provider and provider not in VALID_PROVIDERS:
             return jsonify({"error": f"Invalid provider. Must be one of: {', '.join(VALID_PROVIDERS)}"}), 400
+        effective_provider = provider or _load_ai_config().get("provider", "claude")
 
         if "enabled" in payload:
             _set_setting(AI_ENABLED_KEY, "true" if payload["enabled"] else "false", user_id=user_id)
@@ -3930,6 +4025,9 @@ def register_ai_routes(app):
         if "model" in payload:
             _set_setting(AI_MODEL_KEY, payload["model"], user_id=user_id)
         if "base_url" in payload:
+            ok, error = _validate_provider_base_url(effective_provider, payload["base_url"])
+            if not ok:
+                return jsonify({"error": error}), 400
             _set_setting(AI_BASE_URL_KEY, payload["base_url"], user_id=user_id)
 
         db.session.add(AuditLog(
@@ -3973,6 +4071,13 @@ def register_ai_routes(app):
 
         user_id  = request.current_user.get("user_id")
         is_admin = request.current_user.get("is_admin", False)
+        if _is_ai_chat_rate_limited(user_id):
+            return jsonify({"error": "AI chat rate limit exceeded. Please wait a minute and try again."}), 429
+
+        if provider in ("openai", "openrouter", "ollama"):
+            ok, error = _validate_provider_base_url(provider, base_url)
+            if not ok:
+                return jsonify({"error": error}), 400
 
         # Select tool set based on provider: Ollama gets a short list for
         # small-model compatibility; all other providers get the full set.
