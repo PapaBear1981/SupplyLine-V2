@@ -25,7 +25,7 @@ from models import (
     Warehouse,
     db,
 )
-from models_kits import Kit, KitBox, KitExpendable, KitItem, KitReorderRequest, KitTransfer
+from models_kits import Kit, KitBox, KitExpendable, KitIssuance, KitItem, KitReorderRequest, KitTransfer
 from utils.transaction_helper import (
     record_chemical_issuance,
     record_chemical_return,
@@ -773,6 +773,108 @@ TOOL_DEFINITIONS = [
             "required": [],
         },
     },
+    # ── Reporting tools ───────────────────────────────────────────────────────
+    {
+        "name": "report_tool_activity",
+        "description": (
+            "Summarize tool checkout activity over a timeframe. "
+            "Returns total checkouts, top users, most-checked-out tools, "
+            "average duration, and a breakdown by department."
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "timeframe": {
+                    "type": "string",
+                    "enum": ["day", "week", "month", "quarter", "year"],
+                    "description": "Period to cover. Defaults to month.",
+                },
+                "department": {
+                    "type": "string",
+                    "description": "Filter to a specific department (optional).",
+                },
+            },
+            "required": [],
+        },
+    },
+    {
+        "name": "report_chemical_health",
+        "description": (
+            "Snapshot of chemical stock health: expired, expiring-soon, "
+            "low-stock, and out-of-stock counts. "
+            "Set show_items=true to list the specific chemicals at risk."
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "show_items": {
+                    "type": "boolean",
+                    "description": "true = list individual problem chemicals. Default false = counts only.",
+                },
+                "expiry_days": {
+                    "type": "integer",
+                    "description": "Days ahead to flag as expiring soon. Default 30.",
+                },
+            },
+            "required": [],
+        },
+    },
+    {
+        "name": "report_calibration_summary",
+        "description": (
+            "Calibration compliance report: overdue count, due-soon count, "
+            "and lists of specific tools needing attention. "
+            "Use days_ahead to control how far ahead to look for upcoming calibrations."
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "days_ahead": {
+                    "type": "integer",
+                    "description": "Days ahead to include in 'due soon' list. Default 30.",
+                },
+            },
+            "required": [],
+        },
+    },
+    {
+        "name": "report_procurement_summary",
+        "description": (
+            "Procurement pipeline snapshot: request and PO counts by status, "
+            "AOG/urgent request count, late orders, and top vendors. "
+            "Use timeframe to scope the period."
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "timeframe": {
+                    "type": "string",
+                    "enum": ["week", "month", "quarter", "year", "all"],
+                    "description": "Period to cover. Defaults to month.",
+                },
+            },
+            "required": [],
+        },
+    },
+    {
+        "name": "report_department_usage",
+        "description": (
+            "Tool usage breakdown by department: checkouts per department, "
+            "average checkout duration, and most-used tool category. "
+            "Use timeframe to scope the period."
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "timeframe": {
+                    "type": "string",
+                    "enum": ["week", "month", "quarter", "year"],
+                    "description": "Period to cover. Defaults to month.",
+                },
+            },
+            "required": [],
+        },
+    },
 ]
 
 
@@ -828,6 +930,16 @@ def _execute_tool(name: str, args: dict, user_id: int | None = None, is_admin: b
             return _tool_update_request_status(**args, _user_id=user_id, _is_admin=is_admin)
         if name == "mark_items_received":
             return _tool_mark_items_received(**args, _user_id=user_id, _is_admin=is_admin)
+        if name == "report_tool_activity":
+            return _report_tool_activity(**args)
+        if name == "report_chemical_health":
+            return _report_chemical_health(**args)
+        if name == "report_calibration_summary":
+            return _report_calibration_summary(**args)
+        if name == "report_procurement_summary":
+            return _report_procurement_summary(**args)
+        if name == "report_department_usage":
+            return _report_department_usage(**args)
         return {"error": f"Unknown tool: {name}"}
     except Exception as exc:
         logger.exception("Tool %s failed", name)
@@ -2605,6 +2717,258 @@ def _tool_archive_chemical(
     }
 
 
+# ─── Reporting tools ──────────────────────────────────────────────────────────
+
+def _timeframe_start(timeframe: str) -> datetime:
+    now = datetime.utcnow()
+    mapping = {
+        "day":     timedelta(days=1),
+        "week":    timedelta(weeks=1),
+        "month":   timedelta(days=30),
+        "quarter": timedelta(days=90),
+        "year":    timedelta(days=365),
+        "all":     timedelta(days=36500),
+    }
+    return now - mapping.get(timeframe, timedelta(days=30))
+
+
+def _report_tool_activity(
+    timeframe: str = "month",
+    department: str = "",
+) -> dict:
+    start = _timeframe_start(timeframe)
+    now = datetime.utcnow()
+
+    q = Checkout.query.filter(Checkout.checkout_date >= start)
+    if department:
+        q = q.join(User, Checkout.user_id == User.id).filter(
+            User.department.ilike(f"%{department}%")
+        )
+    checkouts = q.all()
+
+    if not checkouts:
+        return {"result": f"No checkout activity found in the last {timeframe}."}
+
+    total = len(checkouts)
+    active = sum(1 for c in checkouts if c.return_date is None)
+    durations = [
+        max((c.return_date - c.checkout_date).days, 0)
+        for c in checkouts if c.return_date
+    ]
+    avg_duration = round(sum(durations) / len(durations), 1) if durations else None
+
+    # Top 5 users
+    user_counts: dict = {}
+    for c in checkouts:
+        name = c.user.name if c.user else "Unknown"
+        user_counts[name] = user_counts.get(name, 0) + 1
+    top_users = sorted(user_counts.items(), key=lambda x: x[1], reverse=True)[:5]
+
+    # Top 5 tools
+    tool_counts: dict = {}
+    for c in checkouts:
+        label = (c.tool.description or c.tool.tool_number) if c.tool else "Unknown"
+        tool_counts[label] = tool_counts.get(label, 0) + 1
+    top_tools = sorted(tool_counts.items(), key=lambda x: x[1], reverse=True)[:5]
+
+    # By department
+    dept_counts: dict = {}
+    for c in checkouts:
+        dept = (c.user.department or "Unassigned") if c.user else "Unknown"
+        dept_counts[dept] = dept_counts.get(dept, 0) + 1
+    by_dept = sorted(dept_counts.items(), key=lambda x: x[1], reverse=True)
+
+    return {
+        "timeframe": timeframe,
+        "total_checkouts": total,
+        "currently_active": active,
+        "avg_duration_days": avg_duration,
+        "top_users": [{"name": n, "checkouts": v} for n, v in top_users],
+        "top_tools": [{"tool": t, "checkouts": v} for t, v in top_tools],
+        "by_department": [{"department": d, "checkouts": v} for d, v in by_dept],
+    }
+
+
+def _report_chemical_health(
+    show_items: bool = False,
+    expiry_days: int = 30,
+) -> dict:
+    now = datetime.utcnow()
+    expiry_threshold = now + timedelta(days=max(1, expiry_days))
+
+    all_chem = Chemical.query.filter_by(is_archived=False).all() if hasattr(Chemical, "is_archived") else Chemical.query.all()
+
+    expired, expiring, low, out = [], [], [], []
+    for c in all_chem:
+        label = f"{c.description} (P/N {c.part_number}, lot {c.lot_number})"
+        if c.expiration_date and c.expiration_date < now:
+            expired.append({"chemical": label, "expired": c.expiration_date.strftime("%Y-%m-%d"), "qty": c.quantity, "unit": c.unit})
+        elif c.expiration_date and c.expiration_date <= expiry_threshold:
+            days_left = (c.expiration_date - now).days
+            expiring.append({"chemical": label, "expires": c.expiration_date.strftime("%Y-%m-%d"), "days_left": days_left, "qty": c.quantity, "unit": c.unit})
+        if c.status == "low_stock":
+            low.append({"chemical": label, "qty": c.quantity, "min": c.minimum_stock_level, "unit": c.unit})
+        elif c.status == "out_of_stock":
+            out.append({"chemical": label, "unit": c.unit})
+
+    result: dict = {
+        "total_chemicals": len(all_chem),
+        "expired_count": len(expired),
+        "expiring_soon_count": len(expiring),
+        "expiry_window_days": expiry_days,
+        "low_stock_count": len(low),
+        "out_of_stock_count": len(out),
+    }
+    if show_items:
+        result["expired"] = expired[:15]
+        result["expiring_soon"] = sorted(expiring, key=lambda x: x["days_left"])[:15]
+        result["low_stock"] = low[:15]
+        result["out_of_stock"] = out[:15]
+
+    return result
+
+
+def _report_calibration_summary(days_ahead: int = 30) -> dict:
+    now = datetime.utcnow()
+    threshold = now + timedelta(days=max(1, days_ahead))
+
+    calibration_tools = Tool.query.filter(Tool.requires_calibration.is_(True)).all()
+
+    overdue, due_soon, current = [], [], []
+    for t in calibration_tools:
+        label = f"{t.description} (S/N {t.serial_number or t.tool_number})"
+        if t.calibration_status == "overdue":
+            days_past = (
+                -int((t.next_calibration_date - now).days)
+                if t.next_calibration_date else None
+            )
+            overdue.append({"tool": label, "days_overdue": days_past})
+        elif t.calibration_status == "due_soon" or (
+            t.next_calibration_date and now <= t.next_calibration_date <= threshold
+        ):
+            days_left = int((t.next_calibration_date - now).days) if t.next_calibration_date else None
+            due_soon.append({"tool": label, "days_until_due": days_left, "due_date": t.next_calibration_date.strftime("%Y-%m-%d") if t.next_calibration_date else None})
+        else:
+            current.append(t)
+
+    due_soon.sort(key=lambda x: (x["days_until_due"] is None, x["days_until_due"] or 0))
+    overdue.sort(key=lambda x: (x["days_overdue"] is None, -(x["days_overdue"] or 0)))
+
+    return {
+        "total_requiring_calibration": len(calibration_tools),
+        "current": len(current),
+        "due_soon_count": len(due_soon),
+        "overdue_count": len(overdue),
+        "due_within_days": days_ahead,
+        "overdue_tools": overdue[:20],
+        "due_soon_tools": due_soon[:20],
+    }
+
+
+def _report_procurement_summary(timeframe: str = "month") -> dict:
+    start = _timeframe_start(timeframe)
+    now = datetime.utcnow()
+
+    requests = UserRequest.query.filter(UserRequest.created_at >= start).all()
+    orders = ProcurementOrder.query.filter(ProcurementOrder.created_at >= start).all()
+
+    # Request breakdown
+    req_by_status: dict = {}
+    for r in requests:
+        req_by_status[r.status] = req_by_status.get(r.status, 0) + 1
+
+    aog_count = sum(1 for r in requests if r.priority == "aog")
+    urgent_count = sum(1 for r in requests if r.priority == "urgent")
+    open_requests = sum(1 for r in requests if not r.is_closed())
+
+    # PO breakdown
+    po_by_status: dict = {}
+    for o in orders:
+        po_by_status[o.status] = po_by_status.get(o.status, 0) + 1
+
+    late_orders = sum(
+        1 for o in orders
+        if o.expected_due_date and o.expected_due_date < now
+        and o.status not in ("received", "cancelled")
+    )
+
+    # Avg processing time (completed orders)
+    completed = [o for o in orders if o.completed_date and o.created_at]
+    avg_days = None
+    if completed:
+        avg_days = round(sum((o.completed_date - o.created_at).days for o in completed) / len(completed), 1)
+
+    # Top vendors
+    vendor_counts: dict = {}
+    for o in orders:
+        if o.vendor:
+            vendor_counts[o.vendor] = vendor_counts.get(o.vendor, 0) + 1
+    top_vendors = sorted(vendor_counts.items(), key=lambda x: x[1], reverse=True)[:5]
+
+    return {
+        "timeframe": timeframe,
+        "requests": {
+            "total": len(requests),
+            "open": open_requests,
+            "aog": aog_count,
+            "urgent": urgent_count,
+            "by_status": req_by_status,
+        },
+        "procurement_orders": {
+            "total": len(orders),
+            "late": late_orders,
+            "avg_processing_days": avg_days,
+            "by_status": po_by_status,
+        },
+        "top_vendors": [{"vendor": v, "orders": c} for v, c in top_vendors],
+    }
+
+
+def _report_department_usage(timeframe: str = "month") -> dict:
+    start = _timeframe_start(timeframe)
+    now = datetime.utcnow()
+
+    checkouts = (
+        Checkout.query
+        .filter(Checkout.checkout_date >= start)
+        .join(User, Checkout.user_id == User.id)
+        .all()
+    )
+
+    if not checkouts:
+        return {"result": f"No checkout activity found for the last {timeframe}."}
+
+    # Aggregate per department
+    dept_data: dict = {}
+    for c in checkouts:
+        dept = (c.user.department or "Unassigned") if c.user else "Unknown"
+        if dept not in dept_data:
+            dept_data[dept] = {"checkouts": 0, "durations": [], "categories": {}}
+        dept_data[dept]["checkouts"] += 1
+        if c.return_date:
+            dept_data[dept]["durations"].append(max((c.return_date - c.checkout_date).days, 0))
+        cat = (c.tool.category or "General") if c.tool else "Unknown"
+        cats = dept_data[dept]["categories"]
+        cats[cat] = cats.get(cat, 0) + 1
+
+    rows = []
+    for dept, data in sorted(dept_data.items(), key=lambda x: x[1]["checkouts"], reverse=True):
+        avg_dur = round(sum(data["durations"]) / len(data["durations"]), 1) if data["durations"] else None
+        top_cat = max(data["categories"].items(), key=lambda x: x[1])[0] if data["categories"] else None
+        rows.append({
+            "department": dept,
+            "checkouts": data["checkouts"],
+            "avg_duration_days": avg_dur,
+            "top_category": top_cat,
+        })
+
+    return {
+        "timeframe": timeframe,
+        "total_checkouts": len(checkouts),
+        "departments": rows,
+    }
+
+
 # ─── Schema converters ────────────────────────────────────────────────────────
 
 def _claude_tools() -> list:
@@ -2797,6 +3161,14 @@ Call these freely whenever you need live data:
 - get_fulfillment_requests — user RFQs and their status
 - get_procurement_orders — purchase orders with vendor and tracking info
 - get_inventory_summary — fresh snapshot of all key counts
+
+## Reporting tools (aggregated summaries — read-only)
+Use these for trend questions, compliance questions, and management summaries:
+- report_tool_activity — checkout totals, top users, top tools, by-department breakdown for a timeframe
+- report_chemical_health — expired / expiring-soon / low-stock / out-of-stock counts; set show_items=true for the specific chemicals
+- report_calibration_summary — overdue and due-soon counts with lists of specific tools needing attention
+- report_procurement_summary — request and PO counts by status, late orders, avg processing time, top vendors
+- report_department_usage — checkouts per department, avg duration, most-used tool category
 
 ## Action tools (write operations — TWO-STEP REQUIRED)
 These tools make real changes to the database. You MUST follow this two-step process:
