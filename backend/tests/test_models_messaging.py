@@ -4,6 +4,8 @@ Tests Channel, ChannelMember, ChannelMessage, MessageReaction,
 MessageAttachment, AttachmentDownload, UserPresence, and TypingIndicator models.
 """
 
+import uuid
+
 import pytest
 from sqlalchemy.exc import IntegrityError
 
@@ -28,7 +30,7 @@ class TestChannelModel:
         """Test creating a channel"""
         with app.app_context():
             channel = Channel(
-                name="Engineering",
+                name=f"engineering-{uuid.uuid4().hex[:8]}",
                 description="Engineering team channel",
                 channel_type="department",
                 department="Engineering",
@@ -38,15 +40,15 @@ class TestChannelModel:
             db.session.commit()
 
             assert channel.id is not None
-            assert channel.name == "Engineering"
             assert channel.is_active is True
             assert channel.created_date is not None
 
     def test_channel_to_dict(self, app, test_user):
         """Test channel to_dict method"""
         with app.app_context():
+            channel_name = f"test-channel-{uuid.uuid4().hex[:8]}"
             channel = Channel(
-                name="Test Channel",
+                name=channel_name,
                 created_by=test_user.id
             )
             db.session.add(channel)
@@ -54,18 +56,19 @@ class TestChannelModel:
 
             data = channel.to_dict()
             assert data["id"] == channel.id
-            assert data["name"] == "Test Channel"
+            assert data["name"] == channel_name
             assert data["member_count"] == 0
             assert "creator_name" in data
 
     def test_channel_unique_name(self, app, test_user):
         """Test channel name uniqueness constraint"""
         with app.app_context():
-            channel1 = Channel(name="Unique", created_by=test_user.id)
+            unique_name = f"unique-{uuid.uuid4().hex[:8]}"
+            channel1 = Channel(name=unique_name, created_by=test_user.id)
             db.session.add(channel1)
             db.session.commit()
 
-            channel2 = Channel(name="Unique", created_by=test_user.id)
+            channel2 = Channel(name=unique_name, created_by=test_user.id)
             db.session.add(channel2)
 
             with pytest.raises(IntegrityError):
@@ -78,7 +81,7 @@ class TestChannelMemberModel:
     def test_create_member(self, app, test_user):
         """Test creating a channel member"""
         with app.app_context():
-            channel = Channel(name="Test", created_by=test_user.id)
+            channel = Channel(name=f"test-{uuid.uuid4().hex[:8]}", created_by=test_user.id)
             db.session.add(channel)
             db.session.commit()
 
@@ -97,7 +100,7 @@ class TestChannelMemberModel:
     def test_unique_membership(self, app, test_user):
         """Test unique membership constraint"""
         with app.app_context():
-            channel = Channel(name="Test", created_by=test_user.id)
+            channel = Channel(name=f"test-{uuid.uuid4().hex[:8]}", created_by=test_user.id)
             db.session.add(channel)
             db.session.commit()
 
@@ -118,7 +121,7 @@ class TestChannelMessageModel:
     def test_create_message(self, app, test_user):
         """Test creating a channel message"""
         with app.app_context():
-            channel = Channel(name="Test", created_by=test_user.id)
+            channel = Channel(name=f"test-{uuid.uuid4().hex[:8]}", created_by=test_user.id)
             db.session.add(channel)
             db.session.commit()
 
@@ -138,7 +141,7 @@ class TestChannelMessageModel:
     def test_message_threading(self, app, test_user):
         """Test message threading (replies)"""
         with app.app_context():
-            channel = Channel(name="Test", created_by=test_user.id)
+            channel = Channel(name=f"test-{uuid.uuid4().hex[:8]}", created_by=test_user.id)
             db.session.add(channel)
             db.session.commit()
 
@@ -166,7 +169,7 @@ class TestChannelMessageModel:
     def test_message_to_dict(self, app, test_user):
         """Test message to_dict method"""
         with app.app_context():
-            channel = Channel(name="Test", created_by=test_user.id)
+            channel = Channel(name=f"test-{uuid.uuid4().hex[:8]}", created_by=test_user.id)
             db.session.add(channel)
             db.session.commit()
 
@@ -214,7 +217,7 @@ class TestMessageReactionModel:
     def test_create_channel_message_reaction(self, app, test_user):
         """Test creating a reaction on a channel message"""
         with app.app_context():
-            channel = Channel(name="Test", created_by=test_user.id)
+            channel = Channel(name=f"test-{uuid.uuid4().hex[:8]}", created_by=test_user.id)
             db.session.add(channel)
             db.session.commit()
 
@@ -244,7 +247,7 @@ class TestMessageAttachmentModel:
     def test_create_attachment(self, app, test_user):
         """Test creating a message attachment"""
         with app.app_context():
-            channel = Channel(name="Test", created_by=test_user.id)
+            channel = Channel(name=f"test-{uuid.uuid4().hex[:8]}", created_by=test_user.id)
             db.session.add(channel)
             db.session.commit()
 
@@ -276,7 +279,7 @@ class TestMessageAttachmentModel:
     def test_attachment_to_dict(self, app, test_user):
         """Test attachment to_dict method"""
         with app.app_context():
-            channel = Channel(name="Test", created_by=test_user.id)
+            channel = Channel(name=f"test-{uuid.uuid4().hex[:8]}", created_by=test_user.id)
             db.session.add(channel)
             db.session.commit()
 
@@ -313,7 +316,7 @@ class TestAttachmentDownloadModel:
     def test_create_download_record(self, app, test_user):
         """Test creating a download tracking record"""
         with app.app_context():
-            channel = Channel(name="Test", created_by=test_user.id)
+            channel = Channel(name=f"test-{uuid.uuid4().hex[:8]}", created_by=test_user.id)
             db.session.add(channel)
             db.session.commit()
 
@@ -404,7 +407,7 @@ class TestTypingIndicatorModel:
     def test_create_typing_indicator_channel(self, app, test_user):
         """Test creating typing indicator for channel"""
         with app.app_context():
-            channel = Channel(name="Test", created_by=test_user.id)
+            channel = Channel(name=f"test-{uuid.uuid4().hex[:8]}", created_by=test_user.id)
             db.session.add(channel)
             db.session.commit()
 

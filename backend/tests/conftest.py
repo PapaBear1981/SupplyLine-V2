@@ -33,6 +33,16 @@ from sqlalchemy import text
 def app():
     application = create_app()
     application.config['TESTING'] = True
+    # Ensure cryptographic keys are set in testing mode.
+    # Config.validate_production_config() returns early for FLASK_ENV=testing,
+    # leaving SECRET_KEY and JWT_SECRET_KEY as None (from os.environ.get).
+    # jwt.encode() raises "Expected a string value" when the key is None.
+    if not application.config.get('SECRET_KEY'):
+        application.config['SECRET_KEY'] = 'test-secret-key-do-not-use-in-production'
+    if not application.config.get('JWT_SECRET_KEY'):
+        application.config['JWT_SECRET_KEY'] = 'test-jwt-secret-key-do-not-use-in-production'
+    # Disable secure cookies so the test client (HTTP, not HTTPS) can send them back.
+    application.config['SESSION_COOKIE_SECURE'] = False
 
     with application.app_context():
         db.create_all()
@@ -58,7 +68,22 @@ def app():
 
 @pytest.fixture
 def client(app):
-    return app.test_client()
+    # werkzeug 3.x requires the test client used as a context manager
+    # for cookies to be preserved between requests within a single test.
+    # We manually call __enter__/__exit__ so we can suppress the ContextVar
+    # ValueError that occurs in teardown when concurrent tests (spawning
+    # threads that each push a Flask request context) share the same client.
+    c = app.test_client()
+    c.__enter__()
+    try:
+        yield c
+    finally:
+        try:
+            c.__exit__(None, None, None)
+        except ValueError:
+            # Suppress "ContextVar token was created in a different Context"
+            # which happens when multi-threaded tests share the test client.
+            pass
 
 
 @pytest.fixture
@@ -363,6 +388,48 @@ def sample_tool(db_session, test_warehouse):
 
 
 # ─── Helpers ─────────────────────────────────────────────────────────────────
+
+
+@pytest.fixture
+def aircraft_type(db_session):
+    """Create a test aircraft type (get-or-create Q400)."""
+    from models_kits import AircraftType
+    aircraft_type = AircraftType.query.filter_by(name="Q400").first()
+    if not aircraft_type:
+        aircraft_type = AircraftType(name="Q400", description="Test Aircraft", is_active=True)
+        db_session.add(aircraft_type)
+        db_session.commit()
+    return aircraft_type
+
+
+@pytest.fixture
+def test_kit(db_session, admin_user, aircraft_type):
+    """Create a test kit with a unique name."""
+    from models_kits import Kit
+    kit_name = f"TEST-KIT-{uuid.uuid4().hex[:8].upper()}"
+    kit = Kit(
+        name=kit_name,
+        aircraft_type_id=aircraft_type.id,
+        description="Test kit",
+        status="active",
+        created_by=admin_user.id,
+    )
+    db_session.add(kit)
+    db_session.commit()
+    return kit
+
+
+@pytest.fixture(autouse=True)
+def reset_rate_limiter():
+    """Reset the in-memory rate limiter before every test.
+
+    This prevents rate-limit counts from leaking between tests while still
+    allowing individual tests to exercise rate-limiting behaviour within their
+    own execution (e.g. making N requests within one test and expecting a 429
+    on the Nth request).
+    """
+    from utils.rate_limiter import get_rate_limiter
+    get_rate_limiter().reset_all()
 
 
 def assert_status(response, expected_status, message=''):

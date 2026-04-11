@@ -210,7 +210,12 @@ class TestChemicalRoutes:
 
     def test_get_chemicals_materials_user(self, client, auth_headers_materials, test_chemical):
         """Test getting chemicals as materials user"""
-        response = client.get("/api/chemicals", headers=auth_headers_materials)
+        # Search for the specific fixture chemical to avoid pagination issues
+        # (other tests create many chemicals that push fixtures off page 1).
+        response = client.get(
+            f"/api/chemicals?q={test_chemical.part_number}",
+            headers=auth_headers_materials,
+        )
 
         assert response.status_code == 200
         data = json.loads(response.data)
@@ -221,10 +226,9 @@ class TestChemicalRoutes:
         assert isinstance(data["chemicals"], list)
         assert len(data["chemicals"]) >= 1
 
-        # Multiple chemicals can exist, so ensure our fixture is represented
-        # instead of relying on list ordering.
+        # Verify the fixture chemical is present in the search results.
         part_numbers = {chem["part_number"] for chem in data["chemicals"]}
-        assert "C001" in part_numbers
+        assert test_chemical.part_number in part_numbers
 
     def test_get_chemicals_regular_user(self, client, auth_headers_user, test_chemical):
         """Test getting chemicals as regular user"""

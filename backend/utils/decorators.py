@@ -123,6 +123,10 @@ def owner_or_admin_required(model_class, owner_field="user_id"):
             user_id = user_payload.get("user_id")
             is_admin = user_payload.get("is_admin", False)
 
+            # Admins bypass ownership check entirely
+            if is_admin:
+                return f(*args, **kwargs)
+
             # Get resource ID from route kwargs
             model_name = model_class.__name__.lower()
             resource_id = kwargs.get(f"{model_name}_id") or kwargs.get("id")
@@ -135,9 +139,9 @@ def owner_or_admin_required(model_class, owner_field="user_id"):
             if not resource:
                 return jsonify({"error": "Resource not found", "code": "NOT_FOUND"}), 404
 
-            # Check if user is admin or owner
+            # Check if user is owner
             owner_id = getattr(resource, owner_field, None)
-            if not is_admin and owner_id != user_id:
+            if owner_id != user_id:
                 logger.warning(f"Access denied: user {user_id} tried to access resource {resource_id} owned by {owner_id}")
                 return jsonify({"error": "Access denied. You do not have permission to access this resource.", "code": "FORBIDDEN"}), 403
 
