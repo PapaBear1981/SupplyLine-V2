@@ -42,8 +42,10 @@ class TestAircraftTypeModel:
 
     def test_create_aircraft_type(self, db_session):
         """Test creating an aircraft type"""
+        import uuid
+        name = f"TEST-{uuid.uuid4().hex[:8].upper()}"
         aircraft_type = AircraftType(
-            name="Q400",
+            name=name,
             description="Bombardier Q400 turboprop",
             is_active=True
         )
@@ -52,7 +54,7 @@ class TestAircraftTypeModel:
         db_session.commit()
 
         assert aircraft_type.id is not None
-        assert aircraft_type.name == "Q400"
+        assert aircraft_type.name == name
         assert aircraft_type.description == "Bombardier Q400 turboprop"
         assert aircraft_type.is_active is True
         assert aircraft_type.created_at is not None
