@@ -151,7 +151,7 @@ class TestJWTAuthentication:
         data = json.loads(response.data)
 
         assert "user" in data
-        assert data["user"]["employee_number"] == "ADMIN001"
+        assert data["user"]["employee_number"] == admin_user.employee_number
         assert data["user"]["is_admin"] is True
 
     def test_get_current_user_without_token(self, client):
@@ -162,7 +162,7 @@ class TestJWTAuthentication:
         data = json.loads(response.data)
         assert data["error"] == "Authentication required"
 
-    def test_auth_status_authenticated(self, client, auth_headers_admin):
+    def test_auth_status_authenticated(self, client, auth_headers_admin, admin_user):
         """Test auth status when authenticated"""
         response = client.get("/api/auth/status", headers=auth_headers_admin)
 
@@ -171,7 +171,7 @@ class TestJWTAuthentication:
 
         assert data["authenticated"] is True
         assert "user" in data
-        assert data["user"]["employee_number"] == "ADMIN001"
+        assert data["user"]["employee_number"] == admin_user.employee_number
 
     def test_auth_status_unauthenticated(self, client):
         """Test auth status when not authenticated"""

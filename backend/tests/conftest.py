@@ -172,6 +172,56 @@ def auth_headers_return_manager(client, admin_user, jwt_manager):
 
 
 @pytest.fixture
+def user_auth_headers(client, regular_user, jwt_manager):
+    """JWT auth headers for regular_user — alias used by order/security workflow tests."""
+    with client.application.app_context():
+        tokens = jwt_manager.generate_tokens(regular_user)
+    return {"Authorization": f"Bearer {tokens['access_token']}"}
+
+
+@pytest.fixture
+def requests_user(db_session, admin_user):
+    """Non-admin user with page.requests permission only (not page.orders)."""
+    from models import Permission, User, UserPermission
+    emp_num = f"REQ{uuid.uuid4().hex[:6].upper()}"
+    user = User(
+        name="Requests User",
+        employee_number=emp_num,
+        department="Engineering",
+        is_admin=False,
+        is_active=True,
+    )
+    user.set_password("requests123")
+    db_session.add(user)
+    db_session.flush()
+
+    # Get or create the page.requests permission
+    perm = Permission.query.filter_by(name="page.requests").first()
+    if not perm:
+        perm = Permission(name="page.requests", description="Can submit procurement requests")
+        db_session.add(perm)
+        db_session.flush()
+
+    user_perm = UserPermission(
+        user_id=user.id,
+        permission_id=perm.id,
+        grant_type="grant",
+        granted_by=admin_user.id,
+    )
+    db_session.add(user_perm)
+    db_session.commit()
+    return user
+
+
+@pytest.fixture
+def auth_headers_requests_user(client, requests_user, jwt_manager):
+    """JWT auth headers for a user with page.requests permission only."""
+    with client.application.app_context():
+        tokens = jwt_manager.generate_tokens(requests_user)
+    return {"Authorization": f"Bearer {tokens['access_token']}"}
+
+
+@pytest.fixture
 def test_warehouse(db_session):
     """Create a test warehouse with a unique name."""
     from models import Warehouse
