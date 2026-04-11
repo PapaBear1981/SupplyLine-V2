@@ -490,12 +490,15 @@ class TestCreateChildExpendable:
     @pytest.fixture
     def test_kit_with_box(self, db_session, admin_user):
         """Create a test kit with a box."""
-        aircraft_type = AircraftType(name="Test Aircraft", description="Test")
+        import uuid
+        aircraft_name = f"TEST-AC-{uuid.uuid4().hex[:8].upper()}"
+        aircraft_type = AircraftType(name=aircraft_name, description="Test")
         db_session.add(aircraft_type)
         db_session.flush()
 
+        kit_name = f"TEST-KIT-{uuid.uuid4().hex[:8].upper()}"
         kit = Kit(
-            name="Test Kit",
+            name=kit_name,
             aircraft_type_id=aircraft_type.id,
             created_by=admin_user.id,
             status="active"
@@ -658,12 +661,15 @@ class TestKitExpendableValidateTracking:
     @pytest.fixture
     def test_kit_with_box(self, db_session, admin_user):
         """Create a test kit with a box."""
-        aircraft_type = AircraftType(name="Test Aircraft 2", description="Test")
+        import uuid
+        aircraft_name = f"TEST-AC2-{uuid.uuid4().hex[:8].upper()}"
+        aircraft_type = AircraftType(name=aircraft_name, description="Test")
         db_session.add(aircraft_type)
         db_session.flush()
 
+        kit_name = f"TEST-KIT2-{uuid.uuid4().hex[:8].upper()}"
         kit = Kit(
-            name="Test Kit 2",
+            name=kit_name,
             aircraft_type_id=aircraft_type.id,
             created_by=admin_user.id,
             status="active"
