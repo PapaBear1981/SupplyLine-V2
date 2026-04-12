@@ -462,7 +462,9 @@ TOOL_DEFINITIONS = [
     {
         "name": "issue_chemical",
         "description": (
-            "Issue a quantity of a chemical to the current user. "
+            "Issue a quantity of a chemical to a user. "
+            "Materials department users and admins may issue to any user by name or employee number. "
+            "All other users may only issue to themselves — omit recipient_user in that case. "
             "Call with confirmed=false first to preview. "
             "Only call with confirmed=true after the user explicitly says yes or confirm."
         ),
@@ -488,6 +490,14 @@ TOOL_DEFINITIONS = [
                 "purpose": {
                     "type": "string",
                     "description": "What the chemical will be used for (optional).",
+                },
+                "recipient_user": {
+                    "type": "string",
+                    "description": (
+                        "Name, partial name, or employee number of the user receiving the chemical. "
+                        "Only valid for Materials department users and admins. "
+                        "Omit to issue to yourself."
+                    ),
                 },
                 "confirmed": {
                     "type": "boolean",
@@ -2305,11 +2315,48 @@ def _tool_issue_chemical(
     quantity: int = 0,
     location: str = "",
     purpose: str = "",
+    recipient_user: str = "",
     confirmed: bool = False,
     _user_id: int | None = None,
 ) -> dict:
     if not _user_id:
         return {"error": "Cannot determine current user. Please log in again."}
+
+    # Resolve recipient — Materials dept/admin can issue to anyone; others only to themselves
+    actor = db.session.get(User, _user_id)
+    is_materials = actor and (
+        (actor.department or "").lower() == "materials" or actor.is_admin
+    )
+
+    recipient_id = _user_id
+    recipient_name = actor.name if actor else str(_user_id)
+
+    if recipient_user:
+        if not is_materials:
+            return {
+                "error": (
+                    "Only Materials department staff can issue chemicals to other users. "
+                    "You can only issue chemicals to yourself."
+                )
+            }
+        query_str = recipient_user.strip()
+        matches = User.query.filter(
+            User.is_active == True,  # noqa: E712
+            db.or_(
+                User.name.ilike(f"%{query_str}%"),
+                User.employee_number.ilike(query_str),
+            ),
+        ).all()
+        if len(matches) == 0:
+            return {"error": f"No active user found matching '{query_str}'. Please check the name or employee number."}
+        elif len(matches) > 1:
+            names = ", ".join(u.name for u in matches[:8])
+            return {
+                "needs_clarification": True,
+                "question": f"I found {len(matches)} users matching '{query_str}': {names}. Could you be more specific?",
+            }
+        recipient_id = matches[0].id
+        recipient_name = matches[0].name
 
     # Locate the chemical
     chem = None
@@ -2348,6 +2395,7 @@ def _tool_issue_chemical(
         "available_quantity": chem.quantity,
         "unit": chem.unit,
         "quantity_to_issue": quantity,
+        "recipient": recipient_name,
         "remaining_after": chem.quantity - quantity if not blocking else "N/A",
         "location": location,
         "purpose": purpose or None,
@@ -2359,7 +2407,7 @@ def _tool_issue_chemical(
     if not confirmed:
         preview["status"] = "preview"
         if preview["can_proceed"]:
-            preview["message"] = "Ready to issue. Reply 'confirm' to proceed."
+            preview["message"] = f"Ready to issue to {recipient_name}. Reply 'confirm' to proceed."
         else:
             preview["message"] = "Cannot issue this chemical — see blocking_reasons above."
         return preview
@@ -2367,7 +2415,6 @@ def _tool_issue_chemical(
     if blocking:
         return {"error": "Cannot issue this chemical.", "blocking_reasons": blocking}
 
-    user = db.session.get(User, _user_id)
     is_partial = quantity < chem.quantity
 
     if is_partial:
@@ -2381,7 +2428,7 @@ def _tool_issue_chemical(
         db.session.flush()
         issuance = ChemicalIssuance(
             chemical_id=child.id,
-            user_id=_user_id,
+            user_id=recipient_id,
             quantity=quantity,
             hangar=location,
             purpose=purpose or "",
@@ -2391,7 +2438,7 @@ def _tool_issue_chemical(
     else:
         issuance = ChemicalIssuance(
             chemical_id=chem.id,
-            user_id=_user_id,
+            user_id=recipient_id,
             quantity=quantity,
             hangar=location,
             purpose=purpose or "",
@@ -2407,10 +2454,11 @@ def _tool_issue_chemical(
     try:
         record_chemical_issuance(
             chemical_id=chem.id,
-            user_id=_user_id,
+            user_id=_user_id,        # actor (who performed the issuance)
             quantity=quantity,
             hangar=location,
             purpose=purpose,
+            recipient_id=recipient_id,
         )
     except Exception:
         logger.warning("record_chemical_issuance failed for chemical %s", chem.id)
@@ -2418,8 +2466,8 @@ def _tool_issue_chemical(
     db.session.add(AuditLog(
         action_type="chemical_issuance",
         action_details=(
-            f"AI assistant: {user.name if user else _user_id} issued {quantity} {chem.unit} "
-            f"of {chem.part_number} lot {chem.lot_number} to {location}"
+            f"AI assistant: {actor.name if actor else _user_id} issued {quantity} {chem.unit} "
+            f"of {chem.part_number} lot {chem.lot_number} to {recipient_name} at {location}"
         ),
     ))
     db.session.commit()
@@ -2428,7 +2476,7 @@ def _tool_issue_chemical(
         "status": "success",
         "message": (
             f"Issued {quantity} {chem.unit} of {chem.description} "
-            f"(P/N {chem.part_number}, lot {chem.lot_number}) to {location}."
+            f"(P/N {chem.part_number}, lot {chem.lot_number}) to {recipient_name} at {location}."
         ),
         "remaining_stock": chem.quantity,
     }
@@ -4116,7 +4164,9 @@ Action tools:
     If a name is given but the tool returns needs_clarification, ask the user for the full name.
     NEVER default to the current user when a specific person was mentioned but couldn't be resolved.
 - return_tool — return (check in) a tool the current user has checked out
-- issue_chemical — issue a quantity of a chemical to the current user
+- issue_chemical — issue a quantity of a chemical to a user.
+    Materials dept / admin: may issue to any user — provide recipient_user (name or employee number).
+    All other users: may only issue to themselves — omit recipient_user.
 - return_chemical — return issued chemical quantity back to stock
     Tip: use get_chemical_issuances first to find the issuance_id.
 - request_chemical_reorder — flag a chemical for reorder and create a procurement request
