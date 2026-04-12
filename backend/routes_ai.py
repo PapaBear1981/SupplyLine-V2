@@ -62,7 +62,7 @@ DEFAULT_MODELS = {
 
 DEFAULT_BASE_URLS = {
     "openai":     "https://api.openai.com",
-    "openrouter": "https://openrouter.ai",
+    "openrouter": "https://openrouter.ai/api",
     "ollama":     "http://localhost:11434",
 }
 
@@ -3875,8 +3875,17 @@ def _run_openai_loop(
             json=payload,
             timeout=60,
         )
-        resp.raise_for_status()
-        data = resp.json()
+        if not resp.ok:
+            logger.error("OpenAI-compat API error %s: %s", resp.status_code, resp.text[:500])
+            resp.raise_for_status()
+        if not resp.text.strip():
+            logger.error("OpenAI-compat API returned empty body (status %s)", resp.status_code)
+            return "The AI provider returned an empty response. The model may not be available or may not support tool use."
+        try:
+            data = resp.json()
+        except Exception:
+            logger.error("OpenAI-compat API returned non-JSON (status %s): %s", resp.status_code, resp.text[:500])
+            return f"The AI provider returned an unexpected response: {resp.text[:200]}"
 
         choice = data["choices"][0]
         finish_reason = choice.get("finish_reason")
@@ -4095,6 +4104,9 @@ def register_ai_routes(app):
         model        = (model_row.value if model_row and model_row.value else None) or DEFAULT_MODELS.get(provider, "")
         base_url_row = _get_setting(AI_BASE_URL_KEY)
         base_url     = (base_url_row.value if base_url_row and base_url_row.value else None) or DEFAULT_BASE_URLS.get(provider, "")
+        # Normalize OpenRouter base URL — the UI may save the root domain; the API lives under /api
+        if provider == "openrouter" and base_url.rstrip("/") == "https://openrouter.ai":
+            base_url = "https://openrouter.ai/api"
 
         system_prompt = _build_system_prompt(request.current_user)
 

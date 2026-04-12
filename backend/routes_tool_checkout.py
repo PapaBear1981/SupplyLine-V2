@@ -576,6 +576,42 @@ def register_tool_checkout_routes(app):
             return jsonify({"error": str(e)}), 500
 
     # ============================================
+    # Get Due Today Checkouts
+    # ============================================
+    @app.route("/api/tool-checkouts/due-today", methods=["GET"])
+    @permission_required("checkout.view")
+    def get_due_today_checkouts():
+        """Get all active checkouts whose expected return date is today"""
+        try:
+            page = request.args.get("page", 1, type=int)
+            per_page = request.args.get("per_page", 50, type=int)
+
+            now = datetime.now()
+            today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
+            today_end = now.replace(hour=23, minute=59, second=59, microsecond=999999)
+
+            query = Checkout.query.filter(
+                Checkout.return_date.is_(None),
+                Checkout.expected_return_date >= today_start,
+                Checkout.expected_return_date <= today_end,
+            ).order_by(Checkout.expected_return_date.asc())
+
+            total = query.count()
+            checkouts = query.offset((page - 1) * per_page).limit(per_page).all()
+
+            return jsonify({
+                "checkouts": [c.to_dict() for c in checkouts],
+                "total": total,
+                "page": page,
+                "per_page": per_page,
+                "pages": (total + per_page - 1) // per_page,
+            }), 200
+
+        except Exception as e:
+            logger.exception("Error getting due today checkouts")
+            return jsonify({"error": str(e)}), 500
+
+    # ============================================
     # Get Checkout Details
     # ============================================
     @app.route("/api/tool-checkouts/<int:checkout_id>", methods=["GET"])
