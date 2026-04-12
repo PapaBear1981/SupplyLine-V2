@@ -34,42 +34,64 @@ materials_required = department_required("Materials")
 _US_COUNTRY_VARIANTS = {"us", "usa", "united states", "united states of america", "u.s.", "u.s.a."}
 
 def _geocode_address(address, city, state, zip_code, country):
-    """Geocode an address using Nominatim. Returns (lat, lon) or (None, None)."""
+    """Geocode an address using Nominatim. Returns (lat, lon) or (None, None).
+
+    Tries progressively less-specific queries so that a bad street number or
+    unrecognised zip code doesn't prevent the kit from appearing on the map at
+    all (city/state level is better than no pin at all).
+    """
     from urllib.parse import urlencode
 
     import requests as req
 
-    parts = [p for p in [address, city, state, zip_code, country] if p]
-    if not parts:
+    is_us = country and country.strip().lower() in _US_COUNTRY_VARIANTS
+
+    # Build a list of candidate address strings to try, from most to least specific
+    candidates = []
+    if all([address, city, state]):
+        candidates.append(", ".join(p for p in [address, city, state, zip_code, country] if p))
+    if all([city, state]):
+        candidates.append(", ".join(p for p in [city, state, zip_code, country] if p))
+        candidates.append(", ".join(p for p in [city, state, country] if p))
+    if state:
+        candidates.append(", ".join(p for p in [state, country] if p))
+
+    # Deduplicate while preserving order
+    seen = set()
+    unique_candidates = []
+    for c in candidates:
+        if c not in seen:
+            seen.add(c)
+            unique_candidates.append(c)
+
+    if not unique_candidates:
         return None, None
 
-    full_address = ", ".join(parts)
-    params = {"q": full_address, "format": "json", "limit": 1}
+    for query in unique_candidates:
+        params = {"q": query, "format": "json", "limit": 1}
+        if is_us:
+            params["countrycodes"] = "us"
+        try:
+            geocode_url = f"https://nominatim.openstreetmap.org/search?{urlencode(params)}"
+            logger.info("Geocoding attempt: %s", query)
+            response = req.get(
+                geocode_url,
+                headers={"User-Agent": "SupplyLine-MRO-Suite/1.0"},
+                timeout=10,
+            )
+            if response.status_code == 200:
+                results = response.json()
+                if results:
+                    lat = float(results[0]["lat"])
+                    lon = float(results[0]["lon"])
+                    logger.info("Geocoded '%s' -> (%s, %s)", query, lat, lon)
+                    return lat, lon
+            else:
+                logger.warning("Nominatim returned status %s for '%s'", response.status_code, query)
+        except Exception as e:
+            logger.warning("Geocoding failed for '%s': %s", query, e)
 
-    # Restrict to US results when the address is in the United States
-    if country and country.strip().lower() in _US_COUNTRY_VARIANTS:
-        params["countrycodes"] = "us"
-
-    try:
-        geocode_url = f"https://nominatim.openstreetmap.org/search?{urlencode(params)}"
-        logger.info(f"Geocoding: {full_address}")
-        response = req.get(
-            geocode_url,
-            headers={"User-Agent": "SupplyLine-MRO-Suite/1.0"},
-            timeout=5
-        )
-        if response.status_code == 200:
-            results = response.json()
-            if results:
-                lat = float(results[0]["lat"])
-                lon = float(results[0]["lon"])
-                logger.info(f"Geocoded '{full_address}' -> ({lat}, {lon})")
-                return lat, lon
-        else:
-            logger.warning(f"Nominatim returned status {response.status_code}")
-    except Exception as e:
-        logger.warning(f"Geocoding failed for '{full_address}': {e!s}")
-
+    logger.warning("All geocoding attempts failed for address components: %s / %s / %s", address, city, state)
     return None, None
 
 
@@ -347,15 +369,22 @@ def register_kit_routes(app):
         # or if lat/lon are missing entirely
         should_geocode = (address_changed and not user_set_new_coords) or not new_lat or not new_lon
         if should_geocode:
-            kit.latitude = None
-            kit.longitude = None
             lat, lon = _geocode_address(
                 kit.location_address, kit.location_city, kit.location_state,
                 kit.location_zip, kit.location_country
             )
             if lat is not None:
+                # Geocoding succeeded — update coordinates
                 kit.latitude = lat
                 kit.longitude = lon
+            elif address_changed:
+                # Address changed but geocoding failed — clear stale coords rather than
+                # showing a pin at the wrong location; keep coords only if address unchanged
+                kit.latitude = None
+                kit.longitude = None
+                logger.warning(
+                    "Geocoding failed for kit %s after address change — coordinates cleared", kit.id
+                )
 
         db.session.commit()
 
@@ -561,15 +590,22 @@ def register_kit_routes(app):
 
         # Auto-geocode address if lat/lon not explicitly provided
         if not data.get("latitude") or not data.get("longitude"):
-            kit.latitude = None
-            kit.longitude = None
             lat, lon = _geocode_address(
                 kit.location_address, kit.location_city, kit.location_state,
                 kit.location_zip, kit.location_country
             )
             if lat is not None:
+                # Geocoding succeeded — update coordinates
                 kit.latitude = lat
                 kit.longitude = lon
+            else:
+                # Geocoding failed — clear stale coordinates so the pin doesn't
+                # appear at the old (now wrong) location
+                kit.latitude = None
+                kit.longitude = None
+                logger.warning(
+                    "Geocoding failed for kit %s location update — coordinates cleared", kit.id
+                )
 
         db.session.commit()
 
