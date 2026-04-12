@@ -395,8 +395,18 @@ def register_user_request_routes(app):
         db.session.add(activity)
 
         audit = AuditLog(
+            action="created",
             action_type="USER_REQUEST_CREATED",
-            action_details=f"Request '{title}' created by user {requester_id} with {len(items)} items",
+            resource_type="user_request",
+            resource_id=user_request.id,
+            user_id=requester_id,
+            details={
+                "request_number": user_request.request_number,
+                "title": title,
+                "item_count": len(items),
+                "priority": user_request.priority,
+            },
+            ip_address=request.remote_addr,
         )
         db.session.add(audit)
 
@@ -450,6 +460,11 @@ def register_user_request_routes(app):
         data = request.get_json()
         if not data:
             raise ValidationError("Request body is required")
+
+        # Capture old values before any changes for audit logging
+        old_status = user_request.status
+        old_buyer_id = user_request.buyer_id
+        actor_id = current_user.get("user_id")
 
         # Update request fields
         if "title" in data:
@@ -533,6 +548,44 @@ def register_user_request_routes(app):
         if "external_reference" in data:
             user_request.external_reference = (data["external_reference"] or "").strip() or None
 
+        # Audit log: status change
+        new_status = data.get("status")
+        if new_status and new_status != old_status:
+            db.session.add(AuditLog(
+                action="status_changed",
+                resource_type="user_request",
+                resource_id=request_id,
+                user_id=actor_id,
+                details={
+                    "old_status": old_status,
+                    "new_status": new_status,
+                    "request_number": user_request.request_number,
+                    "needs_more_info": data.get("needs_more_info"),
+                    "notes": data.get("notes"),
+                },
+                ip_address=request.remote_addr,
+            ))
+
+        # Audit log: buyer assignment
+        new_buyer_id = data.get("buyer_id")
+        if "buyer_id" in data and new_buyer_id != old_buyer_id:
+            buyer_name = None
+            if new_buyer_id:
+                buyer = db.session.get(User, new_buyer_id)
+                buyer_name = buyer.name if buyer else None
+            db.session.add(AuditLog(
+                action="buyer_assigned",
+                resource_type="user_request",
+                resource_id=request_id,
+                user_id=actor_id,
+                details={
+                    "buyer_id": new_buyer_id,
+                    "buyer_name": buyer_name,
+                    "request_number": user_request.request_number,
+                },
+                ip_address=request.remote_addr,
+            ))
+
         db.session.commit()
 
         return jsonify(user_request.to_dict(include_items=True))
@@ -562,9 +615,15 @@ def register_user_request_routes(app):
             if item.status not in ("received", "cancelled"):
                 item.status = "cancelled"
 
+        actor_id = current_user.get("user_id")
         audit = AuditLog(
+            action="cancelled",
             action_type="USER_REQUEST_CANCELLED",
-            action_details=f"Request {request_id} cancelled",
+            resource_type="user_request",
+            resource_id=request_id,
+            user_id=actor_id,
+            details={"request_number": user_request.request_number},
+            ip_address=request.remote_addr,
         )
         db.session.add(audit)
 
@@ -619,9 +678,20 @@ def register_user_request_routes(app):
         user_request.update_status_from_items()
 
         # Log the cancellation
+        actor_id = (getattr(request, "current_user", {}) or {}).get("user_id")
         audit = AuditLog(
+            action="items_cancelled",
             action_type="REQUEST_ITEMS_CANCELLED",
-            action_details=f"Items {cancelled_items} cancelled in request {request_id}. Reason: {cancellation_reason}",
+            resource_type="user_request",
+            resource_id=request_id,
+            user_id=actor_id,
+            details={
+                "item_ids": cancelled_items,
+                "item_count": len(cancelled_items),
+                "reason": cancellation_reason,
+                "request_number": user_request.request_number,
+            },
+            ip_address=request.remote_addr,
         )
         db.session.add(audit)
 
@@ -958,6 +1028,30 @@ def register_user_request_routes(app):
             )
 
         user_request.update_status_from_items()
+
+        # Audit log: items ordered
+        ordered_summary = [
+            {
+                "item_id": item.id,
+                "description": item.description,
+                "vendor": item.vendor,
+                "tracking_number": item.tracking_number,
+            }
+            for item in request_items_to_update
+        ]
+        db.session.add(AuditLog(
+            action="items_ordered",
+            resource_type="user_request",
+            resource_id=request_id,
+            user_id=current_user.get("user_id"),
+            details={
+                "item_count": len(ordered_summary),
+                "items": ordered_summary,
+                "request_number": user_request.request_number,
+            },
+            ip_address=request.remote_addr,
+        ))
+
         db.session.commit()
 
         response_data = user_request.to_dict(include_items=True)
@@ -1006,6 +1100,26 @@ def register_user_request_routes(app):
                 request_item.received_quantity = request_item.quantity
 
         user_request.update_status_from_items()
+
+        # Audit log: items received
+        received_items_info = []
+        for item_id in item_ids:
+            ri = RequestItem.query.filter_by(id=item_id, request_id=request_id).first()
+            if ri:
+                received_items_info.append({"item_id": ri.id, "description": ri.description})
+        db.session.add(AuditLog(
+            action="items_received",
+            resource_type="user_request",
+            resource_id=request_id,
+            user_id=(getattr(request, "current_user", {}) or {}).get("user_id"),
+            details={
+                "item_count": len(received_items_info),
+                "items": received_items_info,
+                "request_number": user_request.request_number,
+            },
+            ip_address=request.remote_addr,
+        ))
+
         db.session.commit()
 
         return jsonify(user_request.to_dict(include_items=True))
@@ -1102,6 +1216,172 @@ def register_user_request_routes(app):
         db.session.commit()
 
         return jsonify(message.to_dict())
+
+    # Timeline
+    @app.route("/api/user-requests/<int:request_id>/timeline", methods=["GET"])
+    @login_required
+    @requests_permission
+    @handle_errors
+    def get_request_timeline(request_id):
+        """Return a chronological timeline of all events for a request."""
+
+        user_request = db.session.get(UserRequest, request_id)
+        if not user_request:
+            return jsonify({"error": "Request not found"}), 404
+
+        current_user_data = getattr(request, "current_user", {}) or {}
+        if not _user_can_access_request(current_user_data, user_request):
+            return jsonify({"error": "Access denied"}), 403
+
+        # ── Build a cache of user names ──────────────────────────────────────
+        user_id_set = {user_request.requester_id}
+        if user_request.buyer_id:
+            user_id_set.add(user_request.buyer_id)
+
+        audit_rows = AuditLog.query.filter(
+            AuditLog.resource_type == "user_request",
+            AuditLog.resource_id == request_id,
+        ).all()
+        for row in audit_rows:
+            if row.user_id:
+                user_id_set.add(row.user_id)
+
+        messages = user_request.messages.all()
+        for msg in messages:
+            user_id_set.add(msg.sender_id)
+
+        users_by_id = {}
+        for uid in user_id_set:
+            if uid:
+                u = db.session.get(User, uid)
+                if u:
+                    users_by_id[uid] = u.name
+
+        def _user_name(uid):
+            return users_by_id.get(uid, f"User #{uid}") if uid else "System"
+
+        # ── Helper to format an event dict ───────────────────────────────────
+        def _event(event_type, timestamp, user_id, description, details=None):
+            return {
+                "event_type": event_type,
+                "timestamp": timestamp.isoformat() if timestamp else None,
+                "user_id": user_id,
+                "user_name": _user_name(user_id),
+                "description": description,
+                "details": details or {},
+            }
+
+        events = []
+
+        # ── Synthetic creation event ─────────────────────────────────────────
+        events.append(_event(
+            "created",
+            user_request.created_at,
+            user_request.requester_id,
+            f"Request {user_request.request_number} created",
+            {
+                "title": user_request.title,
+                "priority": user_request.priority,
+                "item_count": user_request.items.count(),
+            },
+        ))
+
+        # ── Audit log events ─────────────────────────────────────────────────
+        ACTION_LABELS = {
+            "status_changed": "Status Changed",
+            "buyer_assigned": "Buyer Assigned",
+            "items_ordered": "Items Ordered",
+            "items_received": "Items Received",
+            "items_cancelled": "Items Cancelled",
+            "cancelled": "Request Cancelled",
+        }
+
+        STATUS_DESCRIPTIONS = {
+            "under_review": "Request placed under review",
+            "pending_fulfillment": "Request approved for fulfillment",
+            "in_transfer": "Items in transfer",
+            "awaiting_external_procurement": "Awaiting external procurement",
+            "partially_fulfilled": "Request partially fulfilled",
+            "fulfilled": "Request marked as fulfilled",
+            "needs_info": "More information requested",
+            "cancelled": "Request cancelled",
+        }
+
+        for row in audit_rows:
+            details = row.details or {}
+            action = row.action or ""
+            ts = row.timestamp
+
+            if action == "status_changed":
+                old_s = details.get("old_status", "")
+                new_s = details.get("new_status", "")
+                desc = STATUS_DESCRIPTIONS.get(new_s, f"Status changed to {new_s}")
+                events.append(_event(
+                    "status_changed", ts, row.user_id, desc,
+                    {"old_status": old_s, "new_status": new_s, "notes": details.get("notes")},
+                ))
+
+            elif action == "buyer_assigned":
+                buyer_name = details.get("buyer_name") or _user_name(details.get("buyer_id"))
+                events.append(_event(
+                    "buyer_assigned", ts, row.user_id,
+                    f"Buyer assigned: {buyer_name}",
+                    {"buyer_name": buyer_name, "buyer_id": details.get("buyer_id")},
+                ))
+
+            elif action == "items_ordered":
+                count = details.get("item_count", 0)
+                items_info = details.get("items", [])
+                vendors = list({i.get("vendor") for i in items_info if i.get("vendor")})
+                vendor_str = ", ".join(vendors) if vendors else "unknown vendor"
+                events.append(_event(
+                    "items_ordered", ts, row.user_id,
+                    f"{count} item(s) ordered from {vendor_str}",
+                    {"item_count": count, "vendors": vendors, "items": items_info},
+                ))
+
+            elif action == "items_received":
+                count = details.get("item_count", 0)
+                events.append(_event(
+                    "items_received", ts, row.user_id,
+                    f"{count} item(s) marked as received",
+                    details,
+                ))
+
+            elif action == "items_cancelled":
+                count = details.get("item_count", 0)
+                reason = details.get("reason", "")
+                events.append(_event(
+                    "items_cancelled", ts, row.user_id,
+                    f"{count} item(s) cancelled — {reason}",
+                    details,
+                ))
+
+            elif action == "cancelled":
+                events.append(_event(
+                    "cancelled", ts, row.user_id,
+                    "Request cancelled",
+                    details,
+                ))
+
+        # ── Message events ───────────────────────────────────────────────────
+        for msg in messages:
+            events.append(_event(
+                "message_sent",
+                msg.sent_date,
+                msg.sender_id,
+                f"Message sent: {msg.subject}",
+                {"subject": msg.subject, "message_preview": msg.message[:120] if msg.message else ""},
+            ))
+
+        # ── Sort newest first ────────────────────────────────────────────────
+        events.sort(key=lambda e: e["timestamp"] or "", reverse=True)
+
+        return jsonify({
+            "timeline": events,
+            "total": len(events),
+            "request_number": user_request.request_number,
+        })
 
     # Analytics
     @app.route("/api/user-requests/analytics", methods=["GET"])

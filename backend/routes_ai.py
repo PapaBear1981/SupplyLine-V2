@@ -378,7 +378,10 @@ TOOL_DEFINITIONS = [
     {
         "name": "checkout_tool",
         "description": (
-            "Check out a tool to the current user. "
+            "Check out a tool to a specified user (or the current user if no one is specified). "
+            "If the user says 'check out to John' or 'for Jane Smith', pass that name as checkout_user. "
+            "Do NOT guess or default to the current user if a name was mentioned but could not be resolved — "
+            "instead return the needs_clarification response and ask for the full name. "
             "Call with confirmed=false first to preview. "
             "Only call with confirmed=true after the user explicitly says yes or confirm."
         ),
@@ -392,6 +395,16 @@ TOOL_DEFINITIONS = [
                 "tool_query": {
                     "type": "string",
                     "description": "Tool name or description to search by if serial number is unknown.",
+                },
+                "checkout_user": {
+                    "type": "string",
+                    "description": (
+                        "Name, partial name, or employee number of the user to check the tool out to. "
+                        "Examples: 'John Smith', 'John', 'MNT002'. "
+                        "Omit entirely to check out to the currently logged-in user. "
+                        "If no match is found, an error is returned. "
+                        "If multiple name matches are found, a needs_clarification response is returned — do not default to current user."
+                    ),
                 },
                 "work_order": {
                     "type": "string",
@@ -1656,6 +1669,7 @@ def _tool_get_warehouses(query: str = "") -> dict:
 def _tool_checkout_tool(
     serial_number: str = "",
     tool_query: str = "",
+    checkout_user: str = "",
     work_order: str = "",
     notes: str = "",
     confirmed: bool = False,
@@ -1663,6 +1677,41 @@ def _tool_checkout_tool(
 ) -> dict:
     if not _user_id:
         return {"error": "Cannot determine current user. Please log in again."}
+
+    # ── Resolve who the tool is being checked out to ─────────────────────────
+    target_user_id = _user_id
+    target_user_name = None
+
+    if checkout_user and checkout_user.strip():
+        query_str = checkout_user.strip()
+        matches = User.query.filter(
+            User.is_active == True,  # noqa: E712
+            db.or_(
+                User.name.ilike(f"%{query_str}%"),
+                User.employee_number.ilike(query_str),
+            ),
+        ).all()
+
+        if len(matches) == 0:
+            return {
+                "error": f"There is no active user named '{query_str}' in the system. Please check the name and try again.",
+            }
+        elif len(matches) > 1:
+            names = ", ".join(u.name for u in matches[:8])
+            return {
+                "needs_clarification": True,
+                "question": (
+                    f"I found {len(matches)} users matching '{query_str}': {names}. "
+                    "Could you specify the full name so I can identify the right person?"
+                ),
+            }
+        else:
+            target_user_id = matches[0].id
+            target_user_name = matches[0].name
+
+    if target_user_name is None:
+        current_user_obj = db.session.get(User, _user_id)
+        target_user_name = current_user_obj.name if current_user_obj else "current user"
 
     # Locate the tool
     tool = None
@@ -1695,6 +1744,7 @@ def _tool_checkout_tool(
         "description": tool.description,
         "current_status": tool.status,
         "location": tool.location,
+        "checkout_to": target_user_name,
         "work_order": work_order or None,
         "notes": notes or None,
         "blocking_reasons": blocking,
@@ -1704,7 +1754,7 @@ def _tool_checkout_tool(
     if not confirmed:
         preview["status"] = "preview"
         if preview["can_proceed"]:
-            preview["message"] = "Ready to check out. Reply 'confirm' to proceed."
+            preview["message"] = f"Ready to check out to {target_user_name}. Reply 'confirm' to proceed."
         else:
             preview["message"] = "Cannot check out this tool — see blocking_reasons above."
         return preview
@@ -1714,11 +1764,10 @@ def _tool_checkout_tool(
         return {"error": "Cannot check out this tool.", "blocking_reasons": blocking}
 
     expected_return = datetime.now() + timedelta(days=7)
-    user = db.session.get(User, _user_id)
 
     checkout = Checkout(
         tool_id=tool.id,
-        user_id=_user_id,
+        user_id=target_user_id,
         expected_return_date=expected_return,
         checkout_notes=notes or None,
         condition_at_checkout=tool.condition,
@@ -1732,9 +1781,10 @@ def _tool_checkout_tool(
     history = ToolHistory.create_event(
         tool_id=tool.id,
         event_type="checkout",
-        user_id=_user_id,
-        description=f"Checked out to {user.name if user else 'Unknown'} via AI assistant",
-        details={"work_order": work_order, "notes": notes, "source": "ai_assistant"},
+        user_id=target_user_id,
+        description=f"Checked out to {target_user_name} via AI assistant",
+        details={"work_order": work_order, "notes": notes, "source": "ai_assistant",
+                 "requested_by_user_id": _user_id},
         related_checkout_id=checkout.id,
         old_status=old_status,
         new_status="checked_out",
@@ -1742,7 +1792,7 @@ def _tool_checkout_tool(
     db.session.add(history)
 
     try:
-        record_tool_checkout(tool_id=tool.id, user_id=_user_id,
+        record_tool_checkout(tool_id=tool.id, user_id=target_user_id,
                              expected_return_date=expected_return, notes=notes)
     except Exception:
         logger.warning("record_tool_checkout failed for tool %s", tool.id)
@@ -1750,7 +1800,7 @@ def _tool_checkout_tool(
     db.session.add(AuditLog(
         action_type="tool_checkout",
         action_details=(
-            f"AI assistant: {user.name if user else _user_id} checked out "
+            f"AI assistant: {target_user_name} checked out "
             f"{tool.tool_number} S/N {tool.serial_number}"
         ),
     ))
@@ -1759,8 +1809,8 @@ def _tool_checkout_tool(
     return {
         "status": "success",
         "message": (
-            f"Tool {tool.tool_number} (S/N {tool.serial_number}) checked out to "
-            f"{user.name if user else 'you'} successfully."
+            f"Tool {tool.tool_number} (S/N {tool.serial_number}) successfully checked out to "
+            f"{target_user_name}."
         ),
         "checkout_id": checkout.id,
         "expected_return_date": expected_return.strftime("%Y-%m-%d"),
@@ -3968,7 +4018,9 @@ STEP 2 — Only call with confirmed=true after the user explicitly says
   Never execute with confirmed=true unless the user gave clear approval.
 
 Action tools:
-- checkout_tool — check out a tool to the current user
+- checkout_tool — check out a tool to a specified user (or yourself if no one is mentioned).
+    If a name is given but the tool returns needs_clarification, ask the user for the full name.
+    NEVER default to the current user when a specific person was mentioned but couldn't be resolved.
 - return_tool — return (check in) a tool the current user has checked out
 - issue_chemical — issue a quantity of a chemical to the current user
 - return_chemical — return issued chemical quantity back to stock

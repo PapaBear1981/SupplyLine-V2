@@ -13,6 +13,7 @@ import type {
   RequestsListParams,
   RequestAnalytics,
   CreateRequestMessageRequest,
+  RequestTimelineResponse,
 } from '../types';
 
 export const requestsApi = baseApi.injectEndpoints({
@@ -217,6 +218,18 @@ export const requestsApi = baseApi.injectEndpoints({
     }),
 
     // ========================================================================
+    // Timeline
+    // ========================================================================
+
+    getRequestTimeline: builder.query<RequestTimelineResponse, number>({
+      query: (requestId) => `/api/user-requests/${requestId}/timeline`,
+      providesTags: (_result, _error, requestId) => [
+        { type: 'Request', id: requestId },
+        { type: 'RequestMessage', id: requestId },
+      ],
+    }),
+
+    // ========================================================================
     // Analytics
     // ========================================================================
 
@@ -242,6 +255,7 @@ export const {
   useGetRequestMessagesQuery,
   useCreateRequestMessageMutation,
   useMarkRequestMessageAsReadMutation,
+  useGetRequestTimelineQuery,
   useGetRequestAnalyticsQuery,
   useLazyGetRequestsQuery,
 } = requestsApi;
