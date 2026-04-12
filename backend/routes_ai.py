@@ -17,6 +17,7 @@ from sqlalchemy import or_
 from auth import jwt_required, permission_required
 from models import (
     AuditLog,
+    BugReport,
     Checkout,
     Chemical,
     ChemicalIssuance,
@@ -94,6 +95,7 @@ OLLAMA_TOOL_NAMES = {
     "create_request",
     "transfer_item",
     "forecast_chemicals",
+    "report_bug",
 }
 
 
@@ -1079,6 +1081,45 @@ TOOL_DEFINITIONS = [
             "required": [],
         },
     },
+    {
+        "name": "report_bug",
+        "description": (
+            "Submit a bug report on behalf of the user. "
+            "Use this when a user describes a problem, error, or unexpected behavior in the application. "
+            "Always confirm the details with the user before submitting."
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "title": {
+                    "type": "string",
+                    "description": "Short summary of the bug, e.g. 'Tool check-in modal shows white card in dark mode'.",
+                },
+                "description": {
+                    "type": "string",
+                    "description": "Full description of the problem, including what happened and what was expected.",
+                },
+                "severity": {
+                    "type": "string",
+                    "enum": ["low", "medium", "high", "critical"],
+                    "description": "How severely the bug impacts usability. Defaults to medium.",
+                },
+                "page_context": {
+                    "type": "string",
+                    "description": "The page or feature where the bug occurs, e.g. 'Tool Checkout', 'Fulfillment', 'Admin'.",
+                },
+                "steps_to_reproduce": {
+                    "type": "string",
+                    "description": "Step-by-step instructions to reproduce the bug.",
+                },
+                "confirmed": {
+                    "type": "boolean",
+                    "description": "Set to true only after the user confirms they want to submit the report.",
+                },
+            },
+            "required": ["title", "description"],
+        },
+    },
 ]
 
 
@@ -1154,6 +1195,8 @@ def _execute_tool(name: str, args: dict, user_id: int | None = None, is_admin: b
             return _report_procurement_summary(**args)
         if name == "report_department_usage":
             return _report_department_usage(**args)
+        if name == "report_bug":
+            return _tool_report_bug(**args, _user_id=user_id)
         return {"error": f"Unknown tool: {name}"}
     except Exception:
         logger.exception("Tool %s failed", name)
@@ -3782,6 +3825,57 @@ def _report_department_usage(timeframe: str = "month") -> dict:
     }
 
 
+# ─── Bug reporting tool ───────────────────────────────────────────────────────
+
+def _tool_report_bug(
+    title: str = "",
+    description: str = "",
+    severity: str = "medium",
+    page_context: str = "",
+    steps_to_reproduce: str = "",
+    confirmed: bool = False,
+    _user_id: int | None = None,
+) -> dict:
+    title = title.strip()
+    description = description.strip()
+    if not title or not description:
+        return {"error": "A title and description are required to file a bug report."}
+
+    if severity not in ("low", "medium", "high", "critical"):
+        severity = "medium"
+
+    if not confirmed:
+        return {
+            "preview": True,
+            "message": (
+                f"I'll submit the following bug report:\n\n"
+                f"**Title:** {title}\n"
+                f"**Severity:** {severity}\n"
+                f"**Page/Feature:** {page_context or 'Not specified'}\n\n"
+                f"**Description:** {description}\n\n"
+                + (f"**Steps to Reproduce:** {steps_to_reproduce}\n\n" if steps_to_reproduce else "")
+                + "Shall I go ahead and submit this?"
+            ),
+        }
+
+    report = BugReport(
+        title=title,
+        description=description,
+        severity=severity,
+        status="open",
+        page_context=page_context.strip() or None,
+        steps_to_reproduce=steps_to_reproduce.strip() or None,
+        reported_by_id=_user_id,
+    )
+    db.session.add(report)
+    db.session.commit()
+    return {
+        "success": True,
+        "bug_report_id": report.id,
+        "message": f"Bug report #{report.id} has been submitted. An admin will review it shortly.",
+    }
+
+
 # ─── Schema converters ────────────────────────────────────────────────────────
 
 def _select_tool_definitions(provider: str) -> list:
@@ -4046,6 +4140,10 @@ Action tools:
     (requires orders permission or admin)
 - mark_items_received — acknowledge receipt of all pending/ordered items in a request
     (requires orders permission or admin)
+- report_bug — submit a bug report when a user describes a problem or unexpected behavior.
+    Follow the two-step pattern: preview first (confirmed=false), then submit (confirmed=true).
+    Collect a clear title, description, severity, the page/feature where it happened, and
+    steps to reproduce if the user can provide them.
 
 ## Guidelines
 - Always use query tools for lookups — never invent serial numbers, names, or quantities.

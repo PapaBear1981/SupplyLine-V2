@@ -9,6 +9,7 @@ import {
   KeyOutlined,
   SettingOutlined,
   RobotOutlined,
+  BugOutlined,
 } from '@ant-design/icons';
 import { AdminOverview } from '../components/AdminOverview';
 import { UserManagement } from '../components/UserManagement';
@@ -19,6 +20,7 @@ import { AircraftTypeManagement } from '../components/AircraftTypeManagement';
 import { PermissionOverview } from '../components/PermissionOverview';
 import { SystemSettings } from '../components/SystemSettings';
 import { AISettings } from '../components/AISettings';
+import { BugReportManagement } from '../components/BugReportManagement';
 
 const { Title, Paragraph } = Typography;
 
@@ -113,6 +115,16 @@ export const AdminPage = () => {
         </span>
       ),
       children: <AISettings />,
+    },
+    {
+      key: 'bug-reports',
+      label: (
+        <span>
+          <BugOutlined />
+          Bug Reports
+        </span>
+      ),
+      children: <BugReportManagement />,
     },
   ];
 
