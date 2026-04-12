@@ -6,6 +6,8 @@ import type {
   ChemicalIssuanceResponse,
   ChemicalsListResponse,
   ChemicalsQueryParams,
+  ChemicalForecastParams,
+  ChemicalForecastResponse,
 } from '../types';
 
 export const chemicalsApi = baseApi.injectEndpoints({
@@ -50,7 +52,7 @@ export const chemicalsApi = baseApi.injectEndpoints({
         method: 'POST',
         body,
       }),
-      invalidatesTags: [{ type: 'Chemical', id: 'LIST' }],
+      invalidatesTags: [{ type: 'Chemical', id: 'LIST' }, { type: 'Chemical', id: 'FORECAST' }],
     }),
 
     updateChemical: builder.mutation<Chemical, { id: number; data: Partial<ChemicalFormData> }>(
@@ -63,6 +65,7 @@ export const chemicalsApi = baseApi.injectEndpoints({
         invalidatesTags: (_result, _error, { id }) => [
           { type: 'Chemical', id },
           { type: 'Chemical', id: 'LIST' },
+          { type: 'Chemical', id: 'FORECAST' },
         ],
       }
     ),
@@ -72,7 +75,7 @@ export const chemicalsApi = baseApi.injectEndpoints({
         url: `/api/chemicals/${id}`,
         method: 'DELETE',
       }),
-      invalidatesTags: [{ type: 'Chemical', id: 'LIST' }],
+      invalidatesTags: [{ type: 'Chemical', id: 'LIST' }, { type: 'Chemical', id: 'FORECAST' }],
     }),
 
     issueChemical: builder.mutation<
@@ -87,7 +90,20 @@ export const chemicalsApi = baseApi.injectEndpoints({
       invalidatesTags: (_result, _error, { id }) => [
         { type: 'Chemical', id },
         { type: 'Chemical', id: 'LIST' },
+        { type: 'Chemical', id: 'FORECAST' },
       ],
+    }),
+
+    getChemicalForecast: builder.query<ChemicalForecastResponse, ChemicalForecastParams | void>({
+      query: (params) => ({
+        url: '/api/chemicals/forecast',
+        params: {
+          ...(params?.analysis_days !== undefined && { analysis_days: params.analysis_days }),
+          ...(params?.lead_time_days !== undefined && { lead_time_days: params.lead_time_days }),
+          ...(params?.safety_stock_days !== undefined && { safety_stock_days: params.safety_stock_days }),
+        },
+      }),
+      providesTags: [{ type: 'Chemical', id: 'FORECAST' }],
     }),
   }),
 });
@@ -99,4 +115,5 @@ export const {
   useUpdateChemicalMutation,
   useDeleteChemicalMutation,
   useIssueChemicalMutation,
+  useGetChemicalForecastQuery,
 } = chemicalsApi;

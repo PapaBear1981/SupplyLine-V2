@@ -1,6 +1,10 @@
 #!/usr/bin/env python3
 """
-Script to set admin password to a specific value
+Script to set admin password to a specific value.
+
+Usage:
+    python set_admin_password.py <new_password>
+    ADMIN_PASSWORD=<new_password> python set_admin_password.py
 """
 import os
 import sys
@@ -28,7 +32,6 @@ def set_admin_password(new_password):
 
         print("✅ Admin password updated successfully!")
         print("   Employee Number: ADMIN001")
-        print(f"   New Password: {new_password}")
 
         # Verify it works
         if admin.check_password(new_password):
@@ -38,21 +41,19 @@ def set_admin_password(new_password):
         return False
 
 if __name__ == "__main__":
-    # Set password to Caden1234!
-    new_password = "Caden1234!"
+    # Accept password from CLI arg or environment variable
+    if len(sys.argv) > 1:
+        new_password = sys.argv[1]
+    elif os.environ.get("ADMIN_PASSWORD"):
+        new_password = os.environ["ADMIN_PASSWORD"]
+    else:
+        print("Usage: python set_admin_password.py <new_password>")
+        print("       ADMIN_PASSWORD=<new_password> python set_admin_password.py")
+        sys.exit(1)
 
     print("=" * 60)
     print("Setting Admin Password")
     print("=" * 60)
 
     success = set_admin_password(new_password)
-
-    if success:
-        print("\n" + "=" * 60)
-        print("You can now login with:")
-        print("  Employee Number: ADMIN001")
-        print("  Password: Caden1234!")
-        print("=" * 60)
-
     sys.exit(0 if success else 1)
-

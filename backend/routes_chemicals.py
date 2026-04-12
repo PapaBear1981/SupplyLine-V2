@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timedelta
 import logging
 
 from flask import current_app, jsonify, request
@@ -1323,6 +1323,216 @@ def register_chemical_routes(app):
             logger.info(f"Chemical {id} deleted successfully")
             return jsonify({"message": "Chemical deleted successfully"}), 200
         return None
+
+    @app.route("/api/chemicals/forecast", methods=["GET"])
+    @jwt_required
+    @handle_errors
+    def chemical_forecast_route():
+        """Consumption-based reorder and expiry forecast for all active chemicals."""
+        analysis_days   = request.args.get("analysis_days",   90,  type=int)
+        lead_time_days  = request.args.get("lead_time_days",  14,  type=int)
+        safety_stock_days = request.args.get("safety_stock_days", 14, type=int)
+
+        # Clamp to sane ranges
+        analysis_days     = max(7,  min(analysis_days,   365))
+        lead_time_days    = max(1,  min(lead_time_days,   90))
+        safety_stock_days = max(0,  min(safety_stock_days, 90))
+
+        now            = datetime.utcnow()
+        analysis_start = now - timedelta(days=analysis_days)
+
+        # ── 1. Fetch all active, non-kit chemicals ──────────────────────────
+        try:
+            active_chems = Chemical.query.filter(
+                Chemical.is_archived == False,  # noqa: E712
+                Chemical.warehouse_id.isnot(None),   # warehouse stock only
+            ).all()
+        except Exception:
+            logger.warning(
+                "is_archived column not found in forecast route; querying without archived filter",
+                exc_info=True,
+            )
+            active_chems = Chemical.query.filter(
+                Chemical.warehouse_id.isnot(None),
+            ).all()
+
+        if not active_chems:
+            return jsonify({
+                "forecasts": [],
+                "summary": {
+                    "total_part_numbers": 0,
+                    "critical": 0,
+                    "reorder_soon": 0,
+                    "expiry_risk": 0,
+                    "ok": 0,
+                    "no_history": 0,
+                    "total_waste_risk_qty": 0.0,
+                },
+                "parameters": {
+                    "analysis_window_days": analysis_days,
+                    "lead_time_days": lead_time_days,
+                    "safety_stock_days": safety_stock_days,
+                },
+                "generated_at": datetime.utcnow().isoformat(),
+            })
+
+        active_part_numbers = {c.part_number for c in active_chems}
+
+        # Build a full id→part_number map that covers child lots (same part_number
+        # but different id, created when lots are split or transferred).
+        all_relevant_chems = Chemical.query.filter(
+            Chemical.part_number.in_(active_part_numbers),
+        ).all()
+        pn_map = {c.id: c.part_number for c in all_relevant_chems}
+
+        # ── 2. Bulk-fetch issuances & returns for the active part numbers only ─
+        issuances = (
+            ChemicalIssuance.query
+            .join(Chemical, Chemical.id == ChemicalIssuance.chemical_id)
+            .filter(
+                ChemicalIssuance.issue_date >= analysis_start,
+                Chemical.part_number.in_(active_part_numbers),
+            )
+            .all()
+        )
+
+        returns = (
+            ChemicalReturn.query
+            .join(Chemical, Chemical.id == ChemicalReturn.chemical_id)
+            .filter(
+                ChemicalReturn.return_date >= analysis_start,
+                Chemical.part_number.in_(active_part_numbers),
+            )
+            .all()
+        )
+
+        def resolve_pn(chemical_id: int) -> str | None:
+            return pn_map.get(chemical_id)
+
+        # Aggregate net consumption per part_number
+        issued_by_pn: dict = {}
+        for iss in issuances:
+            pn = resolve_pn(iss.chemical_id)
+            if pn:
+                issued_by_pn[pn] = issued_by_pn.get(pn, 0) + iss.quantity
+
+        returned_by_pn: dict = {}
+        for ret in returns:
+            pn = resolve_pn(ret.chemical_id)
+            if pn:
+                returned_by_pn[pn] = returned_by_pn.get(pn, 0) + ret.quantity
+
+        # ── 3. Group active chemicals by part_number ─────────────────────────
+        by_pn: dict = {}
+        for c in active_chems:
+            by_pn.setdefault(c.part_number, []).append(c)
+
+        # ── 4. Build forecast rows ───────────────────────────────────────────
+        forecasts = []
+        urgency_order = {"critical": 0, "soon": 1, "expiry_risk": 2, "no_data": 3, "ok": 4}
+
+        for part_number, chems in by_pn.items():
+            total_qty   = sum(c.quantity or 0 for c in chems)
+            unit        = chems[0].unit or "each"
+            description = chems[0].description or part_number
+            manufacturer = chems[0].manufacturer
+
+            expiry_dates = [c.expiration_date for c in chems if c.expiration_date]
+            earliest_expiry = min(expiry_dates) if expiry_dates else None
+
+            net_issued = max(0, issued_by_pn.get(part_number, 0) - returned_by_pn.get(part_number, 0))
+            daily_rate = net_issued / analysis_days if analysis_days > 0 and net_issued > 0 else 0
+
+            # Days of stock remaining
+            if daily_rate > 0:
+                days_remaining = total_qty / daily_rate
+            else:
+                days_remaining = None
+
+            depletion_date = (now + timedelta(days=days_remaining)).date() if days_remaining is not None else None
+
+            # Expiry waste risk — estimate quantity that will expire unconsumed
+            waste_qty = 0.0
+            if earliest_expiry:
+                days_until_expiry = (earliest_expiry.date() - now.date()).days
+                if days_until_expiry > 0 and daily_rate > 0:
+                    consumable_before_expiry = daily_rate * days_until_expiry
+                    # Qty in lots expiring on or before earliest_expiry + 1 week
+                    expiring_qty = sum(
+                        c.quantity or 0 for c in chems
+                        if c.expiration_date and c.expiration_date <= earliest_expiry + timedelta(days=7)
+                    )
+                    waste_qty = max(0.0, expiring_qty - consumable_before_expiry)
+
+            # Determine urgency
+            if days_remaining is not None:
+                if days_remaining <= lead_time_days:
+                    urgency = "critical"
+                elif days_remaining <= lead_time_days + safety_stock_days:
+                    urgency = "soon"
+                else:
+                    urgency = "ok"
+            elif earliest_expiry and (earliest_expiry.date() - now.date()).days <= 30:
+                urgency = "expiry_risk"
+            else:
+                urgency = "no_data"
+
+            if waste_qty > 0 and urgency == "ok":
+                urgency = "expiry_risk"
+
+            recommended_qty = (
+                round((lead_time_days + safety_stock_days) * daily_rate)
+                if daily_rate > 0 else None
+            )
+
+            # Current reorder status from DB (use first lot's status)
+            current_reorder_status = getattr(chems[0], "reorder_status", None)
+
+            forecasts.append({
+                "part_number":              part_number,
+                "description":              description,
+                "manufacturer":             manufacturer,
+                "lot_count":                len(chems),
+                "current_quantity":         total_qty,
+                "unit":                     unit,
+                "daily_consumption_rate":   round(daily_rate, 3),
+                "weekly_consumption_rate":  round(daily_rate * 7, 2),
+                "net_issued_in_window":     net_issued,
+                "analysis_window_days":     analysis_days,
+                "days_of_stock_remaining":  round(days_remaining, 1) if days_remaining is not None else None,
+                "projected_depletion_date": depletion_date.isoformat() if depletion_date else None,
+                "earliest_expiry_date":     earliest_expiry.date().isoformat() if earliest_expiry else None,
+                "days_until_expiry":        (earliest_expiry.date() - now.date()).days if earliest_expiry else None,
+                "waste_risk_quantity":      round(waste_qty, 1),
+                "urgency":                  urgency,
+                "recommended_order_quantity": recommended_qty,
+                "needs_reorder":            urgency in ("critical", "soon"),
+                "current_reorder_status":   current_reorder_status,
+                "chemical_ids":             [c.id for c in chems],
+            })
+
+        forecasts.sort(key=lambda x: urgency_order.get(x["urgency"], 99))
+
+        summary = {
+            "total_part_numbers":    len(forecasts),
+            "critical":              sum(1 for f in forecasts if f["urgency"] == "critical"),
+            "reorder_soon":          sum(1 for f in forecasts if f["urgency"] == "soon"),
+            "expiry_risk":           sum(1 for f in forecasts if f["urgency"] == "expiry_risk"),
+            "ok":                    sum(1 for f in forecasts if f["urgency"] == "ok"),
+            "no_history":            sum(1 for f in forecasts if f["urgency"] == "no_data"),
+            "total_waste_risk_qty":  round(sum(f["waste_risk_quantity"] for f in forecasts), 1),
+        }
+
+        return jsonify({
+            "forecasts": forecasts,
+            "summary":   summary,
+            "parameters": {
+                "analysis_window_days": analysis_days,
+                "lead_time_days":       lead_time_days,
+                "safety_stock_days":    safety_stock_days,
+            },
+            "generated_at": now.isoformat(),
+        })
 
     # Archive a chemical
     @app.route("/api/chemicals/<int:id>/archive", methods=["POST"])

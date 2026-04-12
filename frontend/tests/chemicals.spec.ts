@@ -1,6 +1,6 @@
-import { test, expect } from '@playwright/test';
+import { test, expect, type Page } from '@playwright/test';
 
-const login = async (page: any) => {
+const login = async (page: Page) => {
   await page.goto('/login');
   await page.waitForSelector('.ant-input, .ant-input-affix-wrapper', { timeout: 10000 });
   await page.fill('input[placeholder*="Employee"], input[placeholder*="00421"]', 'ADMIN001');

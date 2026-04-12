@@ -145,6 +145,29 @@ export const checkoutApi = baseApi.injectEndpoints({
           : [{ type: 'Checkout' as const, id: 'OVERDUE' }],
     }),
 
+    getDueTodayCheckouts: builder.query<CheckoutListResponse, CheckoutQueryParams | void>({
+      query: (params) => {
+        const queryParams = params ?? {};
+        return {
+          url: '/api/tool-checkouts/due-today',
+          params: {
+            page: queryParams.page || 1,
+            per_page: queryParams.per_page || 50,
+          },
+        };
+      },
+      providesTags: (result) =>
+        result
+          ? [
+              ...result.checkouts.map(({ id }) => ({
+                type: 'Checkout' as const,
+                id,
+              })),
+              { type: 'Checkout' as const, id: 'DUE_TODAY' },
+            ]
+          : [{ type: 'Checkout' as const, id: 'DUE_TODAY' }],
+    }),
+
     getCheckoutDetails: builder.query<ToolCheckout & { tool?: Record<string, unknown>; user?: Record<string, unknown> }, number>({
       query: (checkoutId) => `/api/tool-checkouts/${checkoutId}`,
       providesTags: (_result, _error, checkoutId) => [
@@ -271,6 +294,7 @@ export const {
   useGetActiveCheckoutsQuery,
   useGetMyCheckoutsQuery,
   useGetOverdueCheckoutsQuery,
+  useGetDueTodayCheckoutsQuery,
   useGetCheckoutDetailsQuery,
 
   // History

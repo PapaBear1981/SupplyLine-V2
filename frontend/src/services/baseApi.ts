@@ -123,6 +123,7 @@ export const baseApi = createApi({
     'KitReorder',
     'Permission',
     'SystemSettings',
+    'AISettings',
   ],
   endpoints: () => ({}),
 });

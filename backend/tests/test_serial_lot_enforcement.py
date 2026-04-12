@@ -398,9 +398,11 @@ class TestCreateChildChemical:
     @pytest.fixture
     def parent_chemical(self, db_session, test_warehouse):
         """Create a parent chemical for testing."""
+        import uuid
+        lot_num = f"LOT-PARENT-{uuid.uuid4().hex[:8].upper()}"
         chemical = Chemical(
             part_number="CHEM-PARENT",
-            lot_number="LOT-PARENT-001",
+            lot_number=lot_num,
             description="Parent Chemical",
             manufacturer="Test Mfg",
             quantity=100,
@@ -438,8 +440,8 @@ class TestCreateChildChemical:
         db_session.add(child)
         db_session.commit()
 
-        assert child.lot_number == "LOT-PARENT-001-A"
-        assert child.parent_lot_number == "LOT-PARENT-001"
+        assert child.lot_number == f"{parent_chemical.lot_number}-A"
+        assert child.parent_lot_number == parent_chemical.lot_number
 
     def test_multiple_children_sequential_suffixes(self, app, db_session, parent_chemical, test_warehouse):
         """Multiple children have sequential suffixes."""
@@ -450,9 +452,10 @@ class TestCreateChildChemical:
         db_session.add_all([child1, child2, child3])
         db_session.commit()
 
-        assert child1.lot_number == "LOT-PARENT-001-A"
-        assert child2.lot_number == "LOT-PARENT-001-B"
-        assert child3.lot_number == "LOT-PARENT-001-C"
+        base = parent_chemical.lot_number
+        assert child1.lot_number == f"{base}-A"
+        assert child2.lot_number == f"{base}-B"
+        assert child3.lot_number == f"{base}-C"
 
     def test_parent_sequence_increments(self, app, db_session, parent_chemical, test_warehouse):
         """Parent lot_sequence increments with each child."""
@@ -490,12 +493,15 @@ class TestCreateChildExpendable:
     @pytest.fixture
     def test_kit_with_box(self, db_session, admin_user):
         """Create a test kit with a box."""
-        aircraft_type = AircraftType(name="Test Aircraft", description="Test")
+        import uuid
+        aircraft_name = f"TEST-AC-{uuid.uuid4().hex[:8].upper()}"
+        aircraft_type = AircraftType(name=aircraft_name, description="Test")
         db_session.add(aircraft_type)
         db_session.flush()
 
+        kit_name = f"TEST-KIT-{uuid.uuid4().hex[:8].upper()}"
         kit = Kit(
-            name="Test Kit",
+            name=kit_name,
             aircraft_type_id=aircraft_type.id,
             created_by=admin_user.id,
             status="active"
@@ -517,12 +523,14 @@ class TestCreateChildExpendable:
     @pytest.fixture
     def parent_expendable(self, db_session, test_kit_with_box):
         """Create a parent expendable for testing."""
+        import uuid
         kit, box = test_kit_with_box
+        lot_num = f"LOT-EXP-{uuid.uuid4().hex[:8].upper()}"
         expendable = KitExpendable(
             kit_id=kit.id,
             box_id=box.id,
             part_number="EXP-PARENT",
-            lot_number="LOT-EXP-001",
+            lot_number=lot_num,
             tracking_type="lot",
             description="Parent Expendable",
             quantity=100,
@@ -564,8 +572,8 @@ class TestCreateChildExpendable:
         db_session.add(child)
         db_session.commit()
 
-        assert child.lot_number == "LOT-EXP-001-A"
-        assert child.parent_lot_number == "LOT-EXP-001"
+        assert child.lot_number == f"{parent_expendable.lot_number}-A"
+        assert child.parent_lot_number == parent_expendable.lot_number
 
     def test_serial_tracked_cannot_split(self, app, db_session, test_kit_with_box):
         """Serial-tracked expendables cannot be split."""
@@ -658,12 +666,15 @@ class TestKitExpendableValidateTracking:
     @pytest.fixture
     def test_kit_with_box(self, db_session, admin_user):
         """Create a test kit with a box."""
-        aircraft_type = AircraftType(name="Test Aircraft 2", description="Test")
+        import uuid
+        aircraft_name = f"TEST-AC2-{uuid.uuid4().hex[:8].upper()}"
+        aircraft_type = AircraftType(name=aircraft_name, description="Test")
         db_session.add(aircraft_type)
         db_session.flush()
 
+        kit_name = f"TEST-KIT2-{uuid.uuid4().hex[:8].upper()}"
         kit = Kit(
-            name="Test Kit 2",
+            name=kit_name,
             aircraft_type_id=aircraft_type.id,
             created_by=admin_user.id,
             status="active"
@@ -820,13 +831,17 @@ class TestCrossSystemUniqueness:
 
     def test_chemical_blocks_duplicate_in_kit_expendable(self, app, db_session, admin_user):
         """Chemical blocks if same part+lot exists in KitExpendable."""
-        # Create kit with expendable
-        aircraft_type = AircraftType(name="Test Aircraft 3", description="Test")
+        import uuid
+        # Create kit with expendable using unique names to avoid conflicts with
+        # other tests that use sequential kit names (e.g. test_models_kits.py).
+        ac_name = f"TEST-CROSS-AC-{uuid.uuid4().hex[:8].upper()}"
+        aircraft_type = AircraftType(name=ac_name, description="Test")
         db_session.add(aircraft_type)
         db_session.flush()
 
+        kit_name = f"TEST-CROSS-KIT-{uuid.uuid4().hex[:8].upper()}"
         kit = Kit(
-            name="Test Kit 3",
+            name=kit_name,
             aircraft_type_id=aircraft_type.id,
             created_by=admin_user.id,
             status="active"
@@ -842,11 +857,13 @@ class TestCrossSystemUniqueness:
         db_session.add(box)
         db_session.flush()
 
+        cross_part = f"CROSS-PART-{uuid.uuid4().hex[:6].upper()}"
+        cross_lot = f"CROSS-LOT-{uuid.uuid4().hex[:6].upper()}"
         expendable = KitExpendable(
             kit_id=kit.id,
             box_id=box.id,
-            part_number="CROSS-PART",
-            lot_number="CROSS-LOT",
+            part_number=cross_part,
+            lot_number=cross_lot,
             tracking_type="lot",
             description="Expendable",
             quantity=50,
@@ -859,11 +876,11 @@ class TestCrossSystemUniqueness:
         # Try to validate same part+lot for a Chemical
         with pytest.raises(SerialLotValidationError) as exc_info:
             check_lot_number_unique(
-                part_number="CROSS-PART",
-                lot_number="CROSS-LOT"
+                part_number=cross_part,
+                lot_number=cross_lot
             )
         assert "already exists" in str(exc_info.value)
-        assert "Test Kit 3" in str(exc_info.value)
+        assert kit_name in str(exc_info.value)
 
 
 # Fixture to create auth_headers_user for existing tests compatibility

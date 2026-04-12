@@ -307,7 +307,7 @@ def register_user_request_routes(app):
         # Validate priority
         priority = data.get("priority", "routine")
         if priority not in VALID_PRIORITIES:
-            raise ValidationError(f"Invalid priority. Must be one of: routine, urgent, aog")
+            raise ValidationError("Invalid priority. Must be one of: routine, urgent, aog")
 
         # Validate request_type
         request_type = data.get("request_type", "manual")

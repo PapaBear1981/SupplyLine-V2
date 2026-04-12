@@ -26,6 +26,7 @@ import { getMenuItems } from '@shared/constants/navigation';
 import { ROUTES } from '@shared/constants/routes';
 import { useActivityTracker } from '@shared/hooks/useActivityTracker';
 import { SessionExpiryWarning } from '@shared/components/SessionExpiryWarning';
+import { AIAssistant } from '@features/ai/components/AIAssistant';
 
 const { Header, Sider, Content } = Layout;
 const { Text } = Typography;
@@ -99,6 +100,7 @@ export const MainLayout = () => {
   return (
     <>
       <SessionExpiryWarning />
+      <AIAssistant />
       <Layout style={{ minHeight: '100vh' }}>
         <Sider
         trigger={null}
