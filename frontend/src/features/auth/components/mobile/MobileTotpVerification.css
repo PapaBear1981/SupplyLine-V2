@@ -1,0 +1,69 @@
+.mobile-totp-verification {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 16px;
+  padding: 4px 0;
+}
+
+.mobile-totp-icon {
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 32px;
+  color: var(--login-accent-primary);
+  background: rgba(94, 165, 255, 0.12);
+  border: 1px solid var(--login-glass-border);
+}
+
+.mobile-totp-title {
+  font-size: 22px;
+  font-weight: 700;
+  margin: 0;
+  color: var(--login-text-primary);
+  letter-spacing: -0.3px;
+}
+
+.mobile-totp-subtitle {
+  font-size: 14px;
+  margin: 0 0 12px;
+  color: var(--login-text-secondary);
+  line-height: 1.5;
+}
+
+.mobile-totp-input-wrapper {
+  width: 100%;
+  padding: 12px;
+  background: var(--login-input-bg);
+  border: 1px solid var(--login-input-border);
+  border-radius: 12px;
+  margin-bottom: 8px;
+}
+
+.mobile-totp-input {
+  --font-size: 28px;
+  --text-align: center;
+  --placeholder-color: var(--login-text-tertiary);
+  color: var(--login-text-primary);
+  letter-spacing: 12px;
+  font-family: 'Courier New', monospace;
+  font-weight: 600;
+}
+
+.mobile-totp-input:focus-within {
+  outline: none;
+}
+
+.mobile-totp-secondary-action {
+  color: var(--login-accent-primary) !important;
+  font-weight: 500;
+}
+
+.mobile-totp-back {
+  color: var(--login-text-tertiary) !important;
+  font-size: 13px;
+}
