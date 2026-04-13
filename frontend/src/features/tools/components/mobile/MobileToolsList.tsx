@@ -31,6 +31,7 @@ import dayjs from 'dayjs';
 import { useGetToolsQuery, useCreateToolMutation, useUpdateToolMutation, useDeleteToolMutation } from '../../services/toolsApi';
 import { useGetWarehousesQuery } from '@features/warehouses/services/warehousesApi';
 import type { Tool, ToolStatus, CalibrationStatus, ToolFormData } from '../../types';
+import { MobileToolLabelSheet } from './MobileToolLabelSheet';
 import './MobileToolsList.css';
 
 // Status color mapping
@@ -68,6 +69,7 @@ export const MobileToolsList = () => {
   const [selectedTool, setSelectedTool] = useState<Tool | null>(null);
   const [formMode, setFormMode] = useState<'create' | 'edit'>('create');
   const [page, setPage] = useState(1);
+  const [labelSheetOpen, setLabelSheetOpen] = useState(false);
   const [form] = Form.useForm();
 
   // API queries
@@ -430,10 +432,29 @@ export const MobileToolsList = () => {
               >
                 Go to Checkout
               </Button>
+              <Button
+                block
+                fill="outline"
+                onClick={() => {
+                  setLabelSheetOpen(true);
+                }}
+              >
+                Generate Label
+              </Button>
             </div>
           </div>
         )}
       </Popup>
+
+      {/* Mobile label sheet */}
+      {selectedTool && (
+        <MobileToolLabelSheet
+          visible={labelSheetOpen}
+          onClose={() => setLabelSheetOpen(false)}
+          toolId={selectedTool.id}
+          toolNumber={selectedTool.tool_number}
+        />
+      )}
 
       {/* Tool Form Popup */}
       <Popup
