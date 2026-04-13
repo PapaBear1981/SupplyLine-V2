@@ -12,6 +12,8 @@ export {
   MobileRequestsList,
   MobileOrderDetail,
   MobileOrderCreationForm,
+  MobileRequestDetail,
+  MobileRequestCreationForm,
 } from './components/mobile';
 
 // Services
