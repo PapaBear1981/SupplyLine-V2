@@ -18,9 +18,23 @@ export interface UpdateSecuritySettingsRequest {
   session_timeout_minutes: number;
 }
 
+/**
+ * Public read of the mobile admin toggle. This is returned from the
+ * broadly-readable `GET /api/mobile/settings` endpoint so the payload
+ * deliberately omits updater PII (see _serialize_mobile_settings_public
+ * in backend/routes_security.py).
+ */
 export interface MobileSettings {
   mobile_admin_enabled: boolean;
   source: 'database' | 'config';
+}
+
+/**
+ * Admin-only response returned from the permission-gated
+ * `PUT /api/mobile/settings` endpoint. Includes updater metadata so
+ * the desktop System Settings UI can show who last flipped the switch.
+ */
+export interface MobileSettingsAdmin extends MobileSettings {
   updated_at: string | null;
   updated_by: {
     id: number;
@@ -51,7 +65,7 @@ export const securityApi = baseApi.injectEndpoints({
       query: () => '/api/mobile/settings',
       providesTags: ['SystemSettings'],
     }),
-    updateMobileSettings: builder.mutation<MobileSettings, UpdateMobileSettingsRequest>({
+    updateMobileSettings: builder.mutation<MobileSettingsAdmin, UpdateMobileSettingsRequest>({
       query: (body) => ({
         url: '/api/mobile/settings',
         method: 'PUT',

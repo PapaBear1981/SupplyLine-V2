@@ -15,7 +15,26 @@ from utils.system_settings import (
 )
 
 
-def _serialize_mobile_settings(enabled: bool, setting: SystemSetting | None):
+def _serialize_mobile_settings_public(enabled: bool, setting: SystemSetting | None):
+    """Minimal serializer for the broadly-readable GET endpoint.
+
+    `GET /api/mobile/settings` is authenticated but not permission-gated,
+    so we deliberately omit the updater's identity (name / employee number)
+    to avoid leaking PII to every logged-in account. Mobile clients only
+    need to know whether the toggle is on.
+    """
+    return {
+        "mobile_admin_enabled": enabled,
+        "source": "database" if setting else "config",
+    }
+
+
+def _serialize_mobile_settings_admin(enabled: bool, setting: SystemSetting | None):
+    """Admin-facing serializer returned from the permission-gated PUT.
+
+    Includes the updater's identity so the desktop admin UI can show
+    who last flipped the switch.
+    """
     updated_by = None
     if setting and setting.updated_by:
         updated_by = {
@@ -115,7 +134,7 @@ def register_security_routes(app):
         """
         enabled = get_mobile_admin_enabled()
         setting = SystemSetting.query.filter_by(key=MOBILE_ADMIN_ENABLED_KEY).first()
-        return jsonify(_serialize_mobile_settings(enabled, setting))
+        return jsonify(_serialize_mobile_settings_public(enabled, setting))
 
     @app.route("/api/mobile/settings", methods=["PUT"])
     @permission_required("system.settings")
@@ -145,4 +164,4 @@ def register_security_routes(app):
         if not setting.updated_by and setting.updated_by_id:
             setting.updated_by = db.session.get(User, setting.updated_by_id)
 
-        return jsonify(_serialize_mobile_settings(raw_value, setting)), 200
+        return jsonify(_serialize_mobile_settings_admin(raw_value, setting)), 200

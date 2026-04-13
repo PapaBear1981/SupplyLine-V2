@@ -34,7 +34,11 @@ const { Title, Text, Paragraph } = Typography;
 export const SystemSettings = () => {
   const { data: settings, isLoading } = useGetSecuritySettingsQuery();
   const [updateSettings, { isLoading: isUpdating }] = useUpdateSecuritySettingsMutation();
-  const { data: mobileSettings, isLoading: mobileLoading } = useGetMobileSettingsQuery();
+  const {
+    data: mobileSettings,
+    isLoading: mobileLoading,
+    isError: mobileError,
+  } = useGetMobileSettingsQuery();
   const [updateMobileSettings, { isLoading: isMobileUpdating }] =
     useUpdateMobileSettingsMutation();
   const [form] = Form.useForm();
@@ -283,6 +287,13 @@ export const SystemSettings = () => {
       >
         {mobileLoading ? (
           <Spin />
+        ) : mobileError || !mobileSettings ? (
+          <Alert
+            message="Could not load mobile settings"
+            description="The mobile admin toggle is temporarily unavailable. Refresh this page to try again."
+            type="error"
+            showIcon
+          />
         ) : (
           <Row gutter={[24, 16]} align="middle">
             <Col xs={24} md={16}>
@@ -295,27 +306,21 @@ export const SystemSettings = () => {
                 departments) from phones and tablets. Full system settings and
                 role / permission editing remain desktop-only for safety.
               </Paragraph>
-              {mobileSettings?.updated_by && (
-                <Paragraph type="secondary" style={{ marginBottom: 0, marginTop: 8, fontSize: 12 }}>
-                  Last changed by {mobileSettings.updated_by.name} (
-                  {mobileSettings.updated_by.employee_number})
-                  {mobileSettings.updated_at
-                    ? ` on ${new Date(mobileSettings.updated_at).toLocaleString()}`
-                    : ''}
-                </Paragraph>
-              )}
+              <Paragraph type="secondary" style={{ marginBottom: 0, marginTop: 8, fontSize: 12 }}>
+                Changes to this setting are recorded in the audit log.
+              </Paragraph>
             </Col>
             <Col xs={24} md={8} style={{ textAlign: 'right' }}>
               <Space direction="vertical" size="small" align="end">
                 <Switch
-                  checked={Boolean(mobileSettings?.mobile_admin_enabled)}
+                  checked={mobileSettings.mobile_admin_enabled}
                   loading={isMobileUpdating}
                   onChange={handleMobileAdminToggle}
                   checkedChildren="Enabled"
                   unCheckedChildren="Disabled"
                 />
                 <Text type="secondary" style={{ fontSize: 12 }}>
-                  {mobileSettings?.mobile_admin_enabled
+                  {mobileSettings.mobile_admin_enabled
                     ? 'Mobile admin menu is visible to admins'
                     : 'Mobile admin menu is hidden'}
                 </Text>
