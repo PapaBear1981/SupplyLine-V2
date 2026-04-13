@@ -8,6 +8,7 @@ import { setCredentials } from '../../slices/authSlice';
 import { socketService } from '@services/socket';
 import { ROUTES } from '@shared/constants/routes';
 import type { LoginRequest } from '../../types';
+import '../../styles/glassmorphism.css';
 import './MobileLoginForm.css';
 
 export const MobileLoginForm = () => {
@@ -68,7 +69,8 @@ export const MobileLoginForm = () => {
   };
 
   return (
-    <div className="mobile-login-form">
+    <div className="mobile-login-bg">
+      <div className="mobile-login-form glass-card-elevated scale-in">
       <div className="mobile-login-header">
         <h1 className="mobile-login-title">Welcome back</h1>
         <p className="mobile-login-subtitle">
@@ -156,6 +158,7 @@ export const MobileLoginForm = () => {
           Stay ahead of supply gaps with kit readiness alerts, mission timelines, and maintenance
           holds surfaced instantly on login.
         </p>
+      </div>
       </div>
     </div>
   );
