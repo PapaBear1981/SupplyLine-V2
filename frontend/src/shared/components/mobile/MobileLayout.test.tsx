@@ -59,6 +59,16 @@ vi.mock('@shared/hooks/useMobileAdminEnabled', () => ({
   useMobileAdminEnabled: () => mockMobileAdminEnabled(),
 }));
 
+// Scanner provider is mounted at the app root in production; tests mock the
+// hook so MobileLayout can render without a surrounding ScannerProvider.
+vi.mock('@features/scanner', () => ({
+  useScanner: () => ({
+    openScanner: vi.fn(),
+    closeScanner: vi.fn(),
+    isOpen: false,
+  }),
+}));
+
 const renderWithProviders = (component: React.ReactNode, store = createMockStore()) => {
   return render(
     <Provider store={store}>

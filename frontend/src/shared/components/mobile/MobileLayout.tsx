@@ -7,7 +7,10 @@ import {
   List,
   Avatar,
   SafeArea,
+  FloatingBubble,
 } from 'antd-mobile';
+import { ScanCodeOutline } from 'antd-mobile-icons';
+import { useScanner } from '@features/scanner';
 import {
   AppOutline,
   UnorderedListOutline,
@@ -79,6 +82,7 @@ export const MobileLayout = () => {
   const [logoutApi] = useLogoutMutation();
   const [menuVisible, setMenuVisible] = useState(false);
   const mobileAdminEnabled = useMobileAdminEnabled();
+  const { openScanner } = useScanner();
 
   // Memoize filtered menu items based on user permissions and mobile admin toggle
   const menuItems = useMemo(() => {
@@ -257,6 +261,20 @@ export const MobileLayout = () => {
       <div className="mobile-layout-content">
         <Outlet />
       </div>
+
+      {/* Global scan FAB — visible on every mobile screen */}
+      <FloatingBubble
+        style={{
+          '--initial-position-bottom': '88px',
+          '--initial-position-right': '16px',
+          '--edge-distance': '16px',
+          '--background': 'var(--adm-color-primary)',
+        }}
+        onClick={() => openScanner()}
+        aria-label="Scan QR code or barcode"
+      >
+        <ScanCodeOutline fontSize={26} />
+      </FloatingBubble>
 
       <div className="mobile-layout-footer">
         <TabBar

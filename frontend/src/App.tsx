@@ -10,6 +10,7 @@ import { ProtectedRoute } from '@features/auth/components/ProtectedRoute';
 import { AdminRoute } from '@features/auth/components/AdminRoute';
 import { PermissionProvider } from '@features/auth/context/PermissionContext';
 import { MobileProvider } from '@shared/contexts/MobileContext';
+import { ScannerProvider } from '@features/scanner';
 import { LoginPage } from '@features/auth/pages/LoginPage';
 import { ForgotPasswordPage } from '@features/auth/pages/ForgotPasswordPage';
 import { DashboardPage } from '@features/dashboard/pages/DashboardPage';
@@ -54,6 +55,7 @@ function AppContent() {
       <MobileConfigProvider>
         <div className={isDark ? 'adm-theme-dark' : ''}>
           <BrowserRouter>
+            <ScannerProvider>
             <Routes>
               {/* Auth Routes */}
               <Route element={<ResponsiveAuthLayout />}>
@@ -160,6 +162,7 @@ function AppContent() {
               {/* 404 Route */}
               <Route path="*" element={<Navigate to={ROUTES.HOME} replace />} />
             </Routes>
+            </ScannerProvider>
           </BrowserRouter>
         </div>
       </MobileConfigProvider>
