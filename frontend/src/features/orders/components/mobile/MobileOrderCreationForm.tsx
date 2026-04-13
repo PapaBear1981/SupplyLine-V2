@@ -262,13 +262,26 @@ const DueDateField = ({ value, onChange, visible, onOpen, onClose }: DueDateFiel
       {visible && (
         <Picker
           visible={visible}
-          columns={buildDateColumns()}
+          columns={buildDateColumns}
           onClose={onClose}
           onConfirm={(val) => {
             const [year, month, day] = val as (string | null)[];
             if (year && month && day) {
-              const date = new Date(Number(year), Number(month) - 1, Number(day));
-              onChange?.([date]);
+              // Column generator guarantees `day` is valid for the
+              // selected year/month (no Feb 31 → Mar 3 silent rollover),
+              // but double-check by comparing the parsed Date back to
+              // the picked values as a safety net.
+              const y = Number(year);
+              const m = Number(month);
+              const d = Number(day);
+              const date = new Date(y, m - 1, d);
+              if (
+                date.getFullYear() === y &&
+                date.getMonth() === m - 1 &&
+                date.getDate() === d
+              ) {
+                onChange?.([date]);
+              }
             }
             onClose();
           }}
@@ -278,23 +291,57 @@ const DueDateField = ({ value, onChange, visible, onOpen, onClose }: DueDateFiel
   );
 };
 
-function buildDateColumns() {
+type PickerColumnItem = { label: string; value: string };
+
+function buildYearColumn(): PickerColumnItem[] {
   const now = dayjs();
-  const years: Array<{ label: string; value: string }> = [];
+  const years: PickerColumnItem[] = [];
   for (let y = now.year(); y <= now.year() + 3; y++) {
     years.push({ label: `${y}`, value: `${y}` });
   }
-  const months: Array<{ label: string; value: string }> = Array.from({ length: 12 }).map(
-    (_, i) => ({
-      label: dayjs().month(i).format('MMM'),
-      value: String(i + 1).padStart(2, '0'),
-    })
-  );
-  const days: Array<{ label: string; value: string }> = Array.from({ length: 31 }).map(
+  return years;
+}
+
+function buildMonthColumn(): PickerColumnItem[] {
+  return Array.from({ length: 12 }).map((_, i) => ({
+    label: dayjs().month(i).format('MMM'),
+    value: String(i + 1).padStart(2, '0'),
+  }));
+}
+
+function daysInMonth(year: number, month: number): number {
+  // month is 1-12. `new Date(year, month, 0)` gives the last day of
+  // the previous month (which, because month is already +1, is the
+  // last day of our target month).
+  return new Date(year, month, 0).getDate();
+}
+
+/**
+ * Cascading-column builder for the antd-mobile Picker.
+ *
+ * Generating days from the selected year/month means the user can
+ * never see Feb 31 or Nov 31 in the day column, so the `new Date(...)`
+ * path in onConfirm can't silently roll over to the next month. When
+ * no year/month is picked yet, assume the current year + month so we
+ * still show a sensible set on first open.
+ */
+function buildDateColumns(
+  selected: ReadonlyArray<string | number | null>,
+): PickerColumnItem[][] {
+  const years = buildYearColumn();
+  const months = buildMonthColumn();
+
+  const now = dayjs();
+  const pickedYear = Number(selected[0]) || now.year();
+  const pickedMonth = Number(selected[1]) || now.month() + 1;
+  const dayCount = daysInMonth(pickedYear, pickedMonth);
+
+  const days: PickerColumnItem[] = Array.from({ length: dayCount }).map(
     (_, i) => ({
       label: `${i + 1}`,
       value: String(i + 1).padStart(2, '0'),
-    })
+    }),
   );
+
   return [years, months, days];
 }

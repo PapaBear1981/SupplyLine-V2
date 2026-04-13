@@ -161,6 +161,8 @@ export const MobileRequestCreationForm = () => {
   };
 
   const handleSubmit = async () => {
+    // Guard against rapid double-taps firing before `isLoading` flips.
+    if (isLoading) return;
     try {
       const values = await form.validateFields();
       if (items.length === 0) {
@@ -263,9 +265,11 @@ export const MobileRequestCreationForm = () => {
             <div className="mobile-request-form__items">
               {items.map((item) => (
                 <div key={item._key} className="mobile-request-form__item">
-                  <div
+                  <button
+                    type="button"
                     className="mobile-request-form__item-body"
                     onClick={() => openEditItem(item)}
+                    aria-label={`Edit item ${item.description}`}
                   >
                     <div className="mobile-request-form__item-title">
                       {item.description}
@@ -275,7 +279,7 @@ export const MobileRequestCreationForm = () => {
                       {item.part_number ? ` • PN: ${item.part_number}` : ''}
                       {item.item_type ? ` • ${item.item_type}` : ''}
                     </div>
-                  </div>
+                  </button>
                   <button
                     type="button"
                     className="mobile-request-form__item-remove"
@@ -302,6 +306,7 @@ export const MobileRequestCreationForm = () => {
             color="primary"
             size="large"
             loading={isLoading}
+            disabled={isLoading}
             onClick={handleSubmit}
           >
             Submit Request

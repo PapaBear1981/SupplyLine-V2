@@ -234,11 +234,25 @@ export const MobileOrderDetail = () => {
     }
   };
 
-  if (isLoading || !order) {
+  if (isLoading) {
     return (
       <div style={{ textAlign: 'center', padding: 64 }}>
         <SpinLoading />
       </div>
+    );
+  }
+
+  // Loading has settled — `order` can still be falsy for 404s, bad
+  // IDs in the URL, or network errors. Render an explicit empty state
+  // so the page doesn't get stuck on the spinner forever.
+  if (!order) {
+    return (
+      <MobilePageScaffold>
+        <MobileEmptyState
+          title="Fulfillment record not found"
+          description="This record may have been deleted or the link is out of date."
+        />
+      </MobilePageScaffold>
     );
   }
 

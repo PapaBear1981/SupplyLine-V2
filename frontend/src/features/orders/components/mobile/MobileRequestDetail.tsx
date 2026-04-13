@@ -147,13 +147,32 @@ export const MobileRequestDetail = () => {
     }
   };
 
-  if (isLoading || !request) {
+  if (isLoading) {
     return (
       <div style={{ textAlign: 'center', padding: 64 }}>
         <SpinLoading />
       </div>
     );
   }
+
+  // Loading has settled — `request` can still be falsy for 404s or
+  // network errors. Render an explicit empty state so the page
+  // doesn't get stuck on the spinner forever.
+  if (!request) {
+    return (
+      <MobilePageScaffold>
+        <MobileEmptyState
+          title="Request not found"
+          description="This request may have been deleted or the link is out of date."
+        />
+      </MobilePageScaffold>
+    );
+  }
+
+  // Tab counts should reflect what actually renders — the Messages tab
+  // only shows root messages (replies are collapsed in a future pass),
+  // so the tab badge must match.
+  const rootMessages = messages.filter((m) => !m.parent_message_id);
 
   return (
     <MobilePageScaffold>
@@ -268,7 +287,7 @@ export const MobileRequestDetail = () => {
         </Tabs.Tab>
 
         <Tabs.Tab
-          title={`Messages (${messages.length})`}
+          title={`Messages (${rootMessages.length})`}
           key="messages"
         >
           <div className="mobile-order-detail__compose-row">
@@ -287,15 +306,14 @@ export const MobileRequestDetail = () => {
             <div style={{ textAlign: 'center', padding: 32 }}>
               <SpinLoading />
             </div>
-          ) : messages.length === 0 ? (
+          ) : rootMessages.length === 0 ? (
             <MobileEmptyState
               title="No messages"
               description="Start a conversation about this request."
             />
           ) : (
             <div className="mobile-order-detail__messages">
-              {messages
-                .filter((m) => !m.parent_message_id)
+              {rootMessages
                 .map((msg) => (
                   <MobileSectionCard
                     key={msg.id}
