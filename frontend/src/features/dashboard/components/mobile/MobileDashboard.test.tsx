@@ -84,6 +84,12 @@ vi.mock('@features/admin/services/adminApi', () => ({
   }),
 }));
 
+// MobileKitLocationMap pulls in react-leaflet + useTheme from ThemeContext,
+// both of which are too heavy for a unit test to render. Mock it out.
+vi.mock('@features/kits/components/mobile', () => ({
+  MobileKitLocationMap: () => <div data-testid="kit-location-map" />,
+}));
+
 const renderWithProviders = (component: React.ReactNode) => {
   const store = createMockStore();
   return render(
