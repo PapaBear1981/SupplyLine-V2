@@ -41,12 +41,14 @@ const routeNames: Record<string, string> = {
   [ROUTES.TOOL_CHECKOUT]: 'Tool Checkout',
   [ROUTES.TOOLS]: 'Tools',
   [ROUTES.CHEMICALS]: 'Chemicals',
+  [ROUTES.CHEMICAL_FORECAST]: 'Chemical Forecast',
   [ROUTES.KITS]: 'Kits',
   '/orders': 'Fulfillment',
   '/requests': 'Requests',
   [ROUTES.WAREHOUSES]: 'Warehouses',
   [ROUTES.REPORTS]: 'Reports',
   [ROUTES.USERS]: 'Users',
+  [ROUTES.ADMIN]: 'Admin',
   [ROUTES.PROFILE]: 'Profile',
   [ROUTES.SETTINGS]: 'Settings',
 };
@@ -160,7 +162,8 @@ export const MobileLayout = () => {
     return (
       path.startsWith('/kits/') ||
       path.startsWith('/orders/') ||
-      path.startsWith('/requests/')
+      path.startsWith('/requests/') ||
+      path === ROUTES.CHEMICAL_FORECAST
     );
   };
 

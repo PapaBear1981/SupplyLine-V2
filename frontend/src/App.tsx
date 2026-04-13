@@ -4,6 +4,8 @@ import { ConfigProvider, theme } from 'antd';
 import { ConfigProvider as MobileConfigProvider } from 'antd-mobile';
 import { ResponsiveLayout } from '@shared/components/layouts/ResponsiveLayout';
 import { ResponsiveAuthLayout } from '@shared/components/layouts/ResponsiveAuthLayout';
+import { ResponsivePage } from '@shared/components/layouts/ResponsivePage';
+import { MobileComingSoon } from '@shared/components/mobile/MobileComingSoon';
 import { ProtectedRoute } from '@features/auth/components/ProtectedRoute';
 import { AdminRoute } from '@features/auth/components/AdminRoute';
 import { PermissionProvider } from '@features/auth/context/PermissionContext';
@@ -67,28 +69,84 @@ function AppContent() {
                   <Route path={ROUTES.TOOL_CHECKOUT} element={<ToolCheckoutPage />} />
                   <Route path={ROUTES.TOOLS} element={<ToolsPage />} />
                   <Route path={ROUTES.CHEMICALS} element={<ChemicalsPage />} />
-                  <Route path={ROUTES.CHEMICAL_FORECAST} element={<ChemicalForecastPage />} />
+                  <Route
+                    path={ROUTES.CHEMICAL_FORECAST}
+                    element={
+                      <ResponsivePage
+                        desktop={<ChemicalForecastPage />}
+                        mobile={<MobileComingSoon feature="Chemical Forecast" />}
+                      />
+                    }
+                  />
 
                   {/* Kits Routes */}
                   <Route path={ROUTES.KITS} element={<KitsDashboard />} />
-                  <Route path="/kits/new" element={<KitWizard />} />
+                  <Route
+                    path="/kits/new"
+                    element={
+                      <ResponsivePage
+                        desktop={<KitWizard />}
+                        mobile={<MobileComingSoon feature="Kit Wizard" />}
+                      />
+                    }
+                  />
                   <Route path="/kits/:id" element={<KitDetailView />} />
                   <Route path="/kits/:id/edit" element={<div>Edit Kit (Coming Soon)</div>} />
                   <Route path="/kits/:id/duplicate" element={<div>Duplicate Kit (Coming Soon)</div>} />
 
                   {/* Orders Routes */}
                   <Route path="/orders" element={<OrdersDashboard />} />
-                  <Route path="/orders/new" element={<OrderCreationForm />} />
-                  <Route path="/orders/:orderId" element={<OrderDetailView />} />
+                  <Route
+                    path="/orders/new"
+                    element={
+                      <ResponsivePage
+                        desktop={<OrderCreationForm />}
+                        mobile={<MobileComingSoon feature="New Fulfillment Record" />}
+                      />
+                    }
+                  />
+                  <Route
+                    path="/orders/:orderId"
+                    element={
+                      <ResponsivePage
+                        desktop={<OrderDetailView />}
+                        mobile={<MobileComingSoon feature="Fulfillment Details" />}
+                      />
+                    }
+                  />
 
                   {/* Requests Routes */}
                   <Route path="/requests" element={<RequestsDashboard />} />
-                  <Route path="/requests/new" element={<RequestCreationForm />} />
-                  <Route path="/requests/:requestId" element={<RequestDetailView />} />
+                  <Route
+                    path="/requests/new"
+                    element={
+                      <ResponsivePage
+                        desktop={<RequestCreationForm />}
+                        mobile={<MobileComingSoon feature="New Request" />}
+                      />
+                    }
+                  />
+                  <Route
+                    path="/requests/:requestId"
+                    element={
+                      <ResponsivePage
+                        desktop={<RequestDetailView />}
+                        mobile={<MobileComingSoon feature="Request Details" />}
+                      />
+                    }
+                  />
 
                   <Route path={ROUTES.WAREHOUSES} element={<WarehousesPage />} />
                   <Route path={ROUTES.REPORTS} element={<ReportsPage />} />
-                  <Route path={ROUTES.USERS} element={<UsersPage />} />
+                  <Route
+                    path={ROUTES.USERS}
+                    element={
+                      <ResponsivePage
+                        desktop={<UsersPage />}
+                        mobile={<MobileComingSoon feature="User Management" />}
+                      />
+                    }
+                  />
                   <Route path={ROUTES.PROFILE} element={<ProfilePage />} />
                   <Route path={ROUTES.SETTINGS} element={<SettingsPage />} />
 

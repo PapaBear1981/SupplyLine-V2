@@ -1,6 +1,7 @@
 export { MobileLayout } from './MobileLayout';
 export { MobileAuthLayout } from './MobileAuthLayout';
 export { DesktopOnlyMessage } from './DesktopOnlyMessage';
+export { MobileComingSoon } from './MobileComingSoon';
 
 // Shared mobile primitives
 export { MobilePageScaffold } from './MobilePageScaffold';
