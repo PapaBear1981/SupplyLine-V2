@@ -39,6 +39,7 @@ import { useGetChemicalsQuery } from '@features/chemicals/services/chemicalsApi'
 import { useGetKitsQuery, useGetRecentKitActivityQuery, useGetReorderReportQuery } from '@features/kits/services/kitsApi';
 import { useGetWarehousesQuery } from '@features/warehouses/services/warehousesApi';
 import { useGetAnnouncementsQuery } from '@features/admin/services/adminApi';
+import { MobileKitLocationMap } from '@features/kits/components/mobile';
 
 import './MobileDashboard.css';
 
@@ -302,6 +303,18 @@ export const MobileDashboard = () => {
           </div>
         ))}
       </div>
+
+      {/* Kit Location Map */}
+      <div className="section-title" style={{ marginTop: 20 }}>
+        <span>Kit Locations</span>
+        <RightOutline
+          className="section-more"
+          onClick={() => navigate(ROUTES.KITS)}
+        />
+      </div>
+      <Card className="map-card" style={{ padding: 0 }}>
+        <MobileKitLocationMap height={240} />
+      </Card>
 
       {/* Quick Actions */}
       <div className="section-title" style={{ marginTop: 20 }}>Quick Actions</div>

@@ -4,3 +4,4 @@ export { MobileKitDetailPage } from './MobileKitDetailPage';
 export { MobileKitWizard } from './MobileKitWizard';
 export { MobileKitContentsTab } from './MobileKitContentsTab';
 export { MobileKitReordersTab } from './MobileKitReordersTab';
+export { MobileKitLocationMap } from './MobileKitLocationMap';
