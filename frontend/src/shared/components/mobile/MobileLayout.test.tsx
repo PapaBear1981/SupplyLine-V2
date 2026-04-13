@@ -53,6 +53,12 @@ vi.mock('@services/socket', () => ({
   },
 }));
 
+// Mobile admin toggle — default off; individual tests override as needed
+const mockMobileAdminEnabled = vi.fn(() => false);
+vi.mock('@shared/hooks/useMobileAdminEnabled', () => ({
+  useMobileAdminEnabled: () => mockMobileAdminEnabled(),
+}));
+
 const renderWithProviders = (component: React.ReactNode, store = createMockStore()) => {
   return render(
     <Provider store={store}>
@@ -133,5 +139,59 @@ describe('MobileLayout', () => {
     expect(screen.getByText('Tools')).toBeInTheDocument();
     // User has page.checkouts permission, so Tool Checkout should be visible
     expect(screen.getByText('Tool Checkout')).toBeInTheDocument();
+  });
+
+  it('should expose Chemical Forecast when user has chemicals permission', () => {
+    const storeWithChemicals = createMockStore({
+      auth: {
+        user: { ...mockUser, permissions: ['page.chemicals'] },
+        token: 'mock-token',
+        isAuthenticated: true,
+      },
+    });
+    renderWithProviders(<MobileLayout />, storeWithChemicals);
+
+    fireEvent.click(screen.getAllByText('Menu')[0]);
+    expect(screen.getByText('Forecast')).toBeInTheDocument();
+  });
+
+  it('should hide Admin from non-admin users even when mobile admin is enabled', () => {
+    mockMobileAdminEnabled.mockReturnValue(true);
+    renderWithProviders(<MobileLayout />);
+
+    fireEvent.click(screen.getAllByText('Menu')[0]);
+    expect(screen.queryByText('Admin')).not.toBeInTheDocument();
+    mockMobileAdminEnabled.mockReturnValue(false);
+  });
+
+  it('should hide Admin from admin users when mobile admin is disabled', () => {
+    mockMobileAdminEnabled.mockReturnValue(false);
+    const adminStore = createMockStore({
+      auth: {
+        user: { ...mockUser, is_admin: true },
+        token: 'mock-token',
+        isAuthenticated: true,
+      },
+    });
+    renderWithProviders(<MobileLayout />, adminStore);
+
+    fireEvent.click(screen.getAllByText('Menu')[0]);
+    expect(screen.queryByText('Admin')).not.toBeInTheDocument();
+  });
+
+  it('should show Admin for admin users when mobile admin is enabled', () => {
+    mockMobileAdminEnabled.mockReturnValue(true);
+    const adminStore = createMockStore({
+      auth: {
+        user: { ...mockUser, is_admin: true },
+        token: 'mock-token',
+        isAuthenticated: true,
+      },
+    });
+    renderWithProviders(<MobileLayout />, adminStore);
+
+    fireEvent.click(screen.getAllByText('Menu')[0]);
+    expect(screen.getByText('Admin')).toBeInTheDocument();
+    mockMobileAdminEnabled.mockReturnValue(false);
   });
 });
