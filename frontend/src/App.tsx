@@ -5,7 +5,6 @@ import { ConfigProvider as MobileConfigProvider } from 'antd-mobile';
 import { ResponsiveLayout } from '@shared/components/layouts/ResponsiveLayout';
 import { ResponsiveAuthLayout } from '@shared/components/layouts/ResponsiveAuthLayout';
 import { ResponsivePage } from '@shared/components/layouts/ResponsivePage';
-import { MobileComingSoon } from '@shared/components/mobile/MobileComingSoon';
 import { ProtectedRoute } from '@features/auth/components/ProtectedRoute';
 import { AdminRoute } from '@features/auth/components/AdminRoute';
 import { PermissionProvider } from '@features/auth/context/PermissionContext';
@@ -24,6 +23,7 @@ import { SettingsPage } from '@features/settings/pages/SettingsPage';
 import { ProfilePage } from '@features/profile/pages/ProfilePage';
 import { UsersPage } from '@features/users/pages/UsersPage';
 import { AdminPageWrapper } from '@features/admin/components/AdminPageWrapper';
+import { MobileUsersList } from '@features/admin/components/mobile';
 import { KitsDashboard, KitDetailView, KitWizard, MobileKitWizard } from '@features/kits';
 import {
   OrdersDashboard,
@@ -150,7 +150,7 @@ function AppContent() {
                     element={
                       <ResponsivePage
                         desktop={<UsersPage />}
-                        mobile={<MobileComingSoon feature="User Management" />}
+                        mobile={<MobileUsersList />}
                       />
                     }
                   />
