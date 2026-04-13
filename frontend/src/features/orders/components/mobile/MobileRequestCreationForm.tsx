@@ -173,7 +173,8 @@ export const MobileRequestCreationForm = () => {
         priority: values.priority?.[0] ?? 'routine',
         description: values.description,
         notes: values.notes,
-        items: items.map(({ _key: _, ...rest }) => rest),
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
+        items: items.map(({ _key, ...rest }) => rest),
       };
 
       const result = await createRequest(payload).unwrap();

@@ -158,7 +158,8 @@ export const MobileKitWizard = () => {
         name: values.name,
         aircraft_type_id: Number(values.aircraft_type_id[0]),
         description: values.description,
-        boxes: boxes.map(({ _key: _, ...rest }) => rest),
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
+        boxes: boxes.map(({ _key, ...rest }) => rest),
       };
 
       const created = await createKit(payload).unwrap();

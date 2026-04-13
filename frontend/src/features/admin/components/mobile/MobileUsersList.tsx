@@ -12,7 +12,7 @@ import {
   Avatar,
 } from 'antd-mobile';
 import { LeftOutline } from 'antd-mobile-icons';
-import { UserOutlined, LockOutlined, UnlockOutlined } from '@ant-design/icons';
+import { LockOutlined, UnlockOutlined } from '@ant-design/icons';
 import {
   useGetUsersQuery,
   useUpdateUserMutation,
@@ -332,9 +332,6 @@ export const MobileUsersList = ({ onBack }: MobileUsersListProps) => {
         onClose={() => setResetConfirmOpen(false)}
         loading={resetting}
       />
-
-      {/* Used to avoid dead-code warnings from unused icons */}
-      {false && <UserOutlined />}
     </MobilePageScaffold>
   );
 };

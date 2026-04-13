@@ -7,7 +7,7 @@ import { Html5Qrcode, Html5QrcodeSupportedFormats } from 'html5-qrcode';
 import { useScannerLookupMutation } from '../services/scannerApi';
 import { parseScannedCode } from '../utils/parseScannedCode';
 import { useHaptics } from '@shared/hooks/useHaptics';
-import type { ScannerResolution } from '../context/ScannerContext';
+import type { ScannerResolution } from '../context/scannerContext';
 import './MobileScannerSheet.css';
 
 interface MobileScannerSheetProps {

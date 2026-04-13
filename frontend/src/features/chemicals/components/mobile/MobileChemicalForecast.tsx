@@ -65,7 +65,10 @@ export const MobileChemicalForecast = () => {
   const [selectedRow, setSelectedRow] = useState<ChemicalForecastRow | null>(null);
   const [form] = Form.useForm<ReorderFormValues>();
 
-  const rows: ChemicalForecastRow[] = data?.forecasts ?? [];
+  const rows: ChemicalForecastRow[] = useMemo(
+    () => data?.forecasts ?? [],
+    [data]
+  );
 
   const grouped = useMemo(() => {
     const buckets: Record<string, ChemicalForecastRow[]> = {

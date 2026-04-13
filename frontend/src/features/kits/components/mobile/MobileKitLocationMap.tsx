@@ -10,7 +10,6 @@ import { MobileEmptyState } from '@shared/components/mobile';
 import './MobileKitLocationMap.css';
 
 // Fix Leaflet's default icon paths (Vite doesn't resolve them out of the box)
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 delete ((L.Icon.Default.prototype as unknown) as { _getIconUrl?: unknown })._getIconUrl;
 L.Icon.Default.mergeOptions({
   iconRetinaUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png',

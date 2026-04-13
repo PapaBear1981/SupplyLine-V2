@@ -30,8 +30,14 @@ export const MobileKitContentsTab = ({ kitId }: MobileKitContentsTabProps) => {
     kitId,
   });
 
-  const items: KitItem[] = itemsResponse?.items ?? [];
-  const expendables: KitExpendable[] = expendablesResponse?.expendables ?? [];
+  const items: KitItem[] = useMemo(
+    () => itemsResponse?.items ?? [],
+    [itemsResponse]
+  );
+  const expendables: KitExpendable[] = useMemo(
+    () => expendablesResponse?.expendables ?? [],
+    [expendablesResponse]
+  );
 
   const [search, setSearch] = useState('');
 
