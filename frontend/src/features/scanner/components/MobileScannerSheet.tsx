@@ -41,6 +41,11 @@ export const MobileScannerSheet = ({
 
   const scannerRef = useRef<Html5Qrcode | null>(null);
   const busyRef = useRef(false);
+  // Tracks whether the sheet is still visible, so handleDecoded can bail
+  // out after an async await (backend lookup, camera stop) if the user
+  // dismissed the sheet while the lookup was in flight. Without this
+  // guard, late resolutions would still call onResolved / navigate().
+  const isVisibleRef = useRef(false);
   const [cameraReady, setCameraReady] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [torchOn, setTorchOn] = useState(false);
@@ -48,7 +53,11 @@ export const MobileScannerSheet = ({
 
   // ---- Start / stop camera when the sheet opens / closes ------------------
   useEffect(() => {
-    if (!visible) return;
+    if (!visible) {
+      isVisibleRef.current = false;
+      return;
+    }
+    isVisibleRef.current = true;
 
     let cancelled = false;
     const startCamera = async () => {
@@ -160,8 +169,10 @@ export const MobileScannerSheet = ({
           itemId: parsed.itemId,
         };
       } else {
-        // Backend lookup
+        // Backend lookup — the user may dismiss the sheet during this
+        // network request, so we re-check isVisibleRef afterwards.
         const result = await scannerLookup({ code: parsed.code }).unwrap();
+        if (!isVisibleRef.current) return;
         resolution = {
           itemType: result.item_type,
           itemId: result.item_id,
@@ -191,11 +202,14 @@ export const MobileScannerSheet = ({
         });
       }
 
-      // Stop scanning before triggering the callback / navigation
+      // Stop scanning before triggering the callback / navigation. This
+      // is another async boundary — re-check the visibility ref so a
+      // very-late camera-stop doesn't fire navigate() after onClose().
       const scanner = scannerRef.current;
       if (scanner && scanner.isScanning) {
         await scanner.stop().catch(() => {});
       }
+      if (!isVisibleRef.current) return;
 
       if (onResolved) {
         onResolved(resolution);
@@ -205,6 +219,7 @@ export const MobileScannerSheet = ({
 
       onClose();
     } catch (err) {
+      if (!isVisibleRef.current) return;
       haptics.trigger('error');
       const msg =
         (err as { data?: { error?: string } })?.data?.error ??

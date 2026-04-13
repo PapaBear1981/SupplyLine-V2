@@ -71,7 +71,7 @@
 .info-card .adm-list-item-content-extra {
   max-width: 60%;
   text-align: right;
-  word-break: break-word;
+  overflow-wrap: break-word;
 }
 
 /* Popup Styles */

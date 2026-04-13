@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Button, Toast, Input } from 'antd-mobile';
 import { SafetyCertificateOutlined, ArrowLeftOutlined, KeyOutlined } from '@ant-design/icons';
 import { useVerifyTotpMutation } from '../../services/authApi';
@@ -27,14 +27,32 @@ export const MobileTotpVerification = ({
   const [code, setCode] = useState('');
   const [verifyTotp, { isLoading }] = useVerifyTotpMutation();
 
-  const handleVerify = async () => {
-    if (code.length !== 6) {
+  // Ref-based timer so rapid re-renders don't pile up stale callbacks,
+  // and so we can always cancel a pending auto-submit when the user
+  // unmounts / navigates away / edits the code again.
+  const autoSubmitTimerRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (autoSubmitTimerRef.current !== null) {
+        window.clearTimeout(autoSubmitTimerRef.current);
+      }
+    };
+  }, []);
+
+  // Accept the freshly-typed digits as an explicit argument so the
+  // auto-submit path never reads a stale `code` from a previous render.
+  const handleVerify = async (submittedCode: string = code) => {
+    if (submittedCode.length !== 6) {
       Toast.show({ icon: 'fail', content: 'Please enter a 6-digit code' });
       return;
     }
 
     try {
-      const result = await verifyTotp({ employee_number: employeeNumber, code }).unwrap();
+      const result = await verifyTotp({
+        employee_number: employeeNumber,
+        code: submittedCode,
+      }).unwrap();
       onSuccess(result as LoginResponse);
     } catch (error: unknown) {
       const apiError = error as { data?: { error?: string } };
@@ -67,9 +85,15 @@ export const MobileTotpVerification = ({
               const digits = value.replace(/\D/g, '').slice(0, 6);
               setCode(digits);
               if (digits.length === 6) {
-                // Tiny delay so the user sees the last digit before the request
-                setTimeout(() => {
-                  void handleVerify();
+                if (autoSubmitTimerRef.current !== null) {
+                  window.clearTimeout(autoSubmitTimerRef.current);
+                }
+                // Tiny delay so the user sees the last digit before the
+                // request. Fires handleVerify with the fresh digits so
+                // we never submit a stale value.
+                autoSubmitTimerRef.current = window.setTimeout(() => {
+                  autoSubmitTimerRef.current = null;
+                  void handleVerify(digits);
                 }, 120);
               }
             }}
@@ -83,7 +107,9 @@ export const MobileTotpVerification = ({
           size="large"
           loading={isLoading}
           disabled={code.length !== 6}
-          onClick={handleVerify}
+          onClick={() => {
+            void handleVerify(code);
+          }}
         >
           Verify Code
         </Button>

@@ -92,6 +92,7 @@
   --font-size: 16px;
   --text-align: left;
   --placeholder-color: var(--login-text-tertiary);
+
   background: var(--login-input-bg);
   backdrop-filter: blur(8px);
   -webkit-backdrop-filter: blur(8px);
@@ -137,6 +138,7 @@
   --border-radius: 10px;
   --background-color: var(--login-accent-primary);
   --border-color: var(--login-accent-primary);
+
   height: 52px;
   font-size: 16px;
   font-weight: 600;

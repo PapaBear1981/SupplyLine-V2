@@ -132,7 +132,7 @@
   font-weight: 600;
   color: var(--adm-color-text);
   line-height: 1.25;
-  word-break: break-word;
+  overflow-wrap: break-word;
 }
 
 .mobile-detail-header__subtitle {
@@ -140,7 +140,7 @@
   font-size: 13px;
   color: var(--adm-color-weak);
   line-height: 1.4;
-  word-break: break-word;
+  overflow-wrap: break-word;
 }
 
 .mobile-detail-header__actions {
@@ -272,4 +272,22 @@
   flex-wrap: wrap;
   gap: 6px;
   padding: 8px 16px;
+}
+
+.mobile-filter-chip-row__clear {
+  margin-left: 4px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  color: inherit;
+  font-size: inherit;
+}
+
+.mobile-filter-chip-row__clear:focus-visible {
+  outline: 2px solid var(--adm-color-primary);
+  outline-offset: 2px;
+  border-radius: 2px;
 }

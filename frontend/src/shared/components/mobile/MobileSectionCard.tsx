@@ -27,12 +27,17 @@ export const MobileSectionCard = ({
   children,
   flush = false,
 }: MobileSectionCardProps) => {
+  // Use explicit null/undefined checks so legitimate `0` content
+  // (e.g., a count badge showing "0 pending") still renders.
+  const hasTitle = title !== undefined && title !== null;
+  const hasExtra = extra !== undefined && extra !== null;
+
   return (
     <div className="mobile-section-card">
-      {(title || extra) && (
+      {(hasTitle || hasExtra) && (
         <div className="mobile-section-card__header">
-          {title && <div className="mobile-section-card__title">{title}</div>}
-          {extra && <div className="mobile-section-card__extra">{extra}</div>}
+          {hasTitle && <div className="mobile-section-card__title">{title}</div>}
+          {hasExtra && <div className="mobile-section-card__extra">{extra}</div>}
         </div>
       )}
       <div
@@ -40,7 +45,9 @@ export const MobileSectionCard = ({
       >
         {children}
       </div>
-      {footer && <div className="mobile-section-card__footer">{footer}</div>}
+      {footer !== undefined && footer !== null && (
+        <div className="mobile-section-card__footer">{footer}</div>
+      )}
     </div>
   );
 };

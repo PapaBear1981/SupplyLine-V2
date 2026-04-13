@@ -52,6 +52,10 @@ export function useNotifications() {
       setPermission(next);
       return next;
     } catch {
+      // Keep internal state in sync with what the caller receives so
+      // hook.isDenied / the show() guard aren't left pointing at stale
+      // 'default' after an exception.
+      setPermission('denied');
       return 'denied';
     }
   }, [permission]);

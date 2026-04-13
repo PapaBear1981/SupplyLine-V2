@@ -1,4 +1,11 @@
-import { useCallback, useMemo, useState, type ReactNode } from 'react';
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ReactNode,
+} from 'react';
 import { MobileScannerSheet } from '../components/MobileScannerSheet';
 import {
   ScannerContext,
@@ -23,17 +30,43 @@ export const ScannerProvider = ({ children }: ScannerProviderProps) => {
   const [isOpen, setIsOpen] = useState(false);
   const [options, setOptions] = useState<OpenScannerOptions | undefined>();
 
-  const openScanner = useCallback((nextOptions?: OpenScannerOptions) => {
-    setOptions(nextOptions);
-    setIsOpen(true);
+  // closeScanner schedules a tiny delayed clear of `options` so the sheet
+  // transition finishes before React unmounts the (now-empty) callback
+  // prop. That timer must be cancellable: if the user immediately
+  // reopens the scanner, the pending timer would otherwise wipe the
+  // fresh `options` and break onResolved/title/accept.
+  const closeTimerRef = useRef<number | null>(null);
+
+  const clearCloseTimer = useCallback(() => {
+    if (closeTimerRef.current !== null) {
+      window.clearTimeout(closeTimerRef.current);
+      closeTimerRef.current = null;
+    }
   }, []);
+
+  const openScanner = useCallback(
+    (nextOptions?: OpenScannerOptions) => {
+      clearCloseTimer();
+      setOptions(nextOptions);
+      setIsOpen(true);
+    },
+    [clearCloseTimer]
+  );
 
   const closeScanner = useCallback(() => {
     setIsOpen(false);
-    // Clear options on the next tick so the sheet transition finishes
-    // before React re-renders the (now-empty) callback prop.
-    window.setTimeout(() => setOptions(undefined), 200);
-  }, []);
+    clearCloseTimer();
+    closeTimerRef.current = window.setTimeout(() => {
+      setOptions(undefined);
+      closeTimerRef.current = null;
+    }, 200);
+  }, [clearCloseTimer]);
+
+  // Cancel any pending close timer on unmount so React doesn't try to
+  // setState on a stale component.
+  useEffect(() => {
+    return clearCloseTimer;
+  }, [clearCloseTimer]);
 
   const value = useMemo<ScannerContextValue>(
     () => ({ openScanner, closeScanner, isOpen }),

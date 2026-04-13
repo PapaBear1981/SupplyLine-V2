@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react';
+import { useState, type ReactNode } from 'react';
 import { Popup, Button, SafeArea } from 'antd-mobile';
 import { CloseOutline } from 'antd-mobile-icons';
 import './MobilePrimitives.css';
@@ -47,20 +47,29 @@ export const MobileFormSheet = ({
   fullScreen = false,
   destroyOnClose = true,
 }: MobileFormSheetProps) => {
-  const handleSubmit = () => {
-    if (onSubmit) {
-      const result = onSubmit();
-      if (result instanceof Promise) {
-        // parent handles errors; we just await so button state is consistent
-        result.catch(() => {});
-      }
+  // Local in-flight guard so rapid taps can't fire onSubmit twice before
+  // the parent's `submitting` prop propagates. Cancel/close buttons
+  // already guard with `disabled={submitting}`, but the submit button
+  // only checked `submitDisabled` — that created a window where a
+  // double-tap could call onSubmit twice.
+  const [submitPending, setSubmitPending] = useState(false);
+
+  const handleSubmit = async () => {
+    if (!onSubmit || submitting || submitPending) return;
+    setSubmitPending(true);
+    try {
+      await onSubmit();
+    } finally {
+      setSubmitPending(false);
     }
   };
+
+  const busy = submitting || submitPending;
 
   return (
     <Popup
       visible={visible}
-      onMaskClick={submitting ? undefined : onClose}
+      onMaskClick={busy ? undefined : onClose}
       onClose={onClose}
       position="bottom"
       destroyOnClose={destroyOnClose}
@@ -83,7 +92,7 @@ export const MobileFormSheet = ({
             type="button"
             className="mobile-form-sheet__close"
             onClick={onClose}
-            disabled={submitting}
+            disabled={busy}
             aria-label="Close"
           >
             <CloseOutline fontSize={22} />
@@ -94,14 +103,14 @@ export const MobileFormSheet = ({
 
         {onSubmit && (
           <div className="mobile-form-sheet__footer">
-            <Button block color="default" onClick={onClose} disabled={submitting}>
+            <Button block color="default" onClick={onClose} disabled={busy}>
               Cancel
             </Button>
             <Button
               block
               color="primary"
-              loading={submitting}
-              disabled={submitDisabled}
+              loading={busy}
+              disabled={submitDisabled || busy}
               onClick={handleSubmit}
             >
               {submitLabel}

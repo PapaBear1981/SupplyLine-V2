@@ -37,13 +37,17 @@ export const MobileFilterChipRow = ({ chips, onClearAll }: MobileFilterChipRowPr
           style={{ '--border-radius': '12px' }}
         >
           {chip.label}
-          <CloseOutline
+          <button
+            type="button"
+            className="mobile-filter-chip-row__clear"
+            aria-label={`Clear ${chip.label} filter`}
             onClick={(event) => {
               event.stopPropagation();
               chip.onClear();
             }}
-            style={{ marginLeft: 4, cursor: 'pointer' }}
-          />
+          >
+            <CloseOutline />
+          </button>
         </Tag>
       ))}
       {chips.length > 1 && onClearAll && (
