@@ -5,3 +5,4 @@ export { MobileKitWizard } from './MobileKitWizard';
 export { MobileKitContentsTab } from './MobileKitContentsTab';
 export { MobileKitReordersTab } from './MobileKitReordersTab';
 export { MobileKitLocationMap } from './MobileKitLocationMap';
+export { MobileKitGpsCaptureButton } from './MobileKitGpsCaptureButton';

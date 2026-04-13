@@ -43,6 +43,7 @@ import type { KitStatus } from '../../types';
 import EditKitModal from '../EditKitModal';
 import { MobileKitContentsTab } from './MobileKitContentsTab';
 import { MobileKitReordersTab } from './MobileKitReordersTab';
+import { MobileKitGpsCaptureButton } from './MobileKitGpsCaptureButton';
 import './MobileKitDetailPage.css';
 
 // Status color mapping
@@ -397,6 +398,22 @@ export const MobileKitDetailPage = () => {
                 <p>No location set for this kit</p>
               </div>
             )}
+
+            {/* One-tap GPS capture — available on every kit detail on mobile */}
+            <div style={{ padding: '16px' }}>
+              <MobileKitGpsCaptureButton
+                kitId={kitId}
+                existingAddress={{
+                  location_address: kit.location_address,
+                  location_city: kit.location_city,
+                  location_state: kit.location_state,
+                  location_zip: kit.location_zip,
+                  location_country: kit.location_country,
+                  location_notes: kit.location_notes,
+                }}
+                onSuccess={() => refetch()}
+              />
+            </div>
           </div>
         )}
 
