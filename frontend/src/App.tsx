@@ -18,6 +18,7 @@ import { ToolsPage } from '@features/tools/pages/ToolsPage';
 import { ToolCheckoutPage } from '@features/tool-checkout';
 import { ChemicalsPage } from '@features/chemicals/pages/ChemicalsPage';
 import { ChemicalForecastPage } from '@features/chemicals/pages/ChemicalForecastPage';
+import { MobileChemicalForecast } from '@features/chemicals/components/mobile';
 import { WarehousesPage } from '@features/warehouses/pages/WarehousesPage';
 import { SettingsPage } from '@features/settings/pages/SettingsPage';
 import { ProfilePage } from '@features/profile/pages/ProfilePage';
@@ -80,7 +81,7 @@ function AppContent() {
                     element={
                       <ResponsivePage
                         desktop={<ChemicalForecastPage />}
-                        mobile={<MobileComingSoon feature="Chemical Forecast" />}
+                        mobile={<MobileChemicalForecast />}
                       />
                     }
                   />
