@@ -11,6 +11,7 @@ import {
 } from 'antd-mobile';
 import { ScanCodeOutline } from 'antd-mobile-icons';
 import { useScanner } from '@features/scanner';
+import { MobileAIAssistant } from '@features/ai/components/MobileAIAssistant';
 import {
   AppOutline,
   UnorderedListOutline,
@@ -275,6 +276,9 @@ export const MobileLayout = () => {
       >
         <ScanCodeOutline fontSize={26} />
       </FloatingBubble>
+
+      {/* AI Assistant FAB + full-screen chat */}
+      <MobileAIAssistant />
 
       <div className="mobile-layout-footer">
         <TabBar
