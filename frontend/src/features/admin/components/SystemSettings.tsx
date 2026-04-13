@@ -13,22 +13,50 @@ import {
   Divider,
   Row,
   Col,
+  Switch,
 } from 'antd';
 import {
   ClockCircleOutlined,
   SaveOutlined,
   ReloadOutlined,
   InfoCircleOutlined,
+  MobileOutlined,
 } from '@ant-design/icons';
-import { useGetSecuritySettingsQuery, useUpdateSecuritySettingsMutation } from '../services/securityApi';
+import {
+  useGetSecuritySettingsQuery,
+  useUpdateSecuritySettingsMutation,
+  useGetMobileSettingsQuery,
+  useUpdateMobileSettingsMutation,
+} from '../services/securityApi';
 
 const { Title, Text, Paragraph } = Typography;
 
 export const SystemSettings = () => {
   const { data: settings, isLoading } = useGetSecuritySettingsQuery();
   const [updateSettings, { isLoading: isUpdating }] = useUpdateSecuritySettingsMutation();
+  const { data: mobileSettings, isLoading: mobileLoading } = useGetMobileSettingsQuery();
+  const [updateMobileSettings, { isLoading: isMobileUpdating }] =
+    useUpdateMobileSettingsMutation();
   const [form] = Form.useForm();
   const [hasChanges, setHasChanges] = useState(false);
+
+  const handleMobileAdminToggle = async (enabled: boolean) => {
+    try {
+      await updateMobileSettings({ mobile_admin_enabled: enabled }).unwrap();
+      message.success(
+        enabled
+          ? 'Mobile admin access enabled'
+          : 'Mobile admin access disabled'
+      );
+    } catch (error: unknown) {
+      if (error && typeof error === 'object' && 'data' in error) {
+        const apiError = error as { data?: { error?: string } };
+        message.error(apiError.data?.error || 'Failed to update mobile settings');
+      } else {
+        message.error('Failed to update mobile settings');
+      }
+    }
+  };
 
   const handleSubmit = async (values: { session_timeout_minutes: number }) => {
     try {
@@ -241,6 +269,61 @@ export const SystemSettings = () => {
           </Card>
         </Col>
       </Row>
+
+      {/* Mobile Access Settings */}
+      <Card
+        title={
+          <span>
+            <MobileOutlined style={{ marginRight: 8 }} />
+            Mobile App Access
+          </span>
+        }
+        bordered={false}
+        style={{ marginTop: 24 }}
+      >
+        {mobileLoading ? (
+          <Spin />
+        ) : (
+          <Row gutter={[24, 16]} align="middle">
+            <Col xs={24} md={16}>
+              <Title level={5} style={{ marginTop: 0 }}>
+                Admin panel on mobile devices
+              </Title>
+              <Paragraph type="secondary" style={{ marginBottom: 0 }}>
+                When enabled, administrators can access a trimmed-down version
+                of the admin panel (users, announcements, aircraft types,
+                departments) from phones and tablets. Full system settings and
+                role / permission editing remain desktop-only for safety.
+              </Paragraph>
+              {mobileSettings?.updated_by && (
+                <Paragraph type="secondary" style={{ marginBottom: 0, marginTop: 8, fontSize: 12 }}>
+                  Last changed by {mobileSettings.updated_by.name} (
+                  {mobileSettings.updated_by.employee_number})
+                  {mobileSettings.updated_at
+                    ? ` on ${new Date(mobileSettings.updated_at).toLocaleString()}`
+                    : ''}
+                </Paragraph>
+              )}
+            </Col>
+            <Col xs={24} md={8} style={{ textAlign: 'right' }}>
+              <Space direction="vertical" size="small" align="end">
+                <Switch
+                  checked={Boolean(mobileSettings?.mobile_admin_enabled)}
+                  loading={isMobileUpdating}
+                  onChange={handleMobileAdminToggle}
+                  checkedChildren="Enabled"
+                  unCheckedChildren="Disabled"
+                />
+                <Text type="secondary" style={{ fontSize: 12 }}>
+                  {mobileSettings?.mobile_admin_enabled
+                    ? 'Mobile admin menu is visible to admins'
+                    : 'Mobile admin menu is hidden'}
+                </Text>
+              </Space>
+            </Col>
+          </Row>
+        )}
+      </Card>
 
       {/* Future Settings Placeholder */}
       <Card

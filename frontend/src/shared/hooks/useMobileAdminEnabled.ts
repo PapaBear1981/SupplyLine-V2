@@ -1,19 +1,20 @@
+import { useGetMobileSettingsQuery } from '@features/admin/services/securityApi';
+
 /**
  * Hook that returns whether mobile admin access is enabled system-wide.
  *
- * Phase 1 ships this hook with a hard-coded `false` default so the mobile
- * layout and menu can already check it. Phase 5 will replace the
- * implementation with a real API call against the `mobile_admin_enabled`
- * system setting (/api/admin/mobile-settings), and add a matching
- * toggle to the desktop System Settings page.
+ * Reads /api/mobile/settings via RTK Query. If the request is still
+ * in flight or fails, returns false — admins can flip this from the
+ * desktop System Settings page (Admin → System Settings → Mobile
+ * Access). The Phase 1 placeholder that hard-coded `false` is now
+ * replaced by a real backend-backed lookup.
  *
- * Consumers should always use this hook rather than hard-coding a
- * boolean — the hook will transparently start reading from the
- * system setting once Phase 5 wires it up.
+ * Note: both admin and non-admin users fetch this on mobile so the
+ * layout can decide whether to expose the admin menu entry. The
+ * backend endpoint is authentication-gated but not permission-gated
+ * for reads.
  */
 export function useMobileAdminEnabled(): boolean {
-  // Phase 5 will replace this with:
-  //   const { data } = useGetMobileAdminSettingQuery();
-  //   return Boolean(data?.enabled);
-  return false;
+  const { data } = useGetMobileSettingsQuery();
+  return Boolean(data?.mobile_admin_enabled);
 }
