@@ -7,6 +7,7 @@ import {
 import { useTheme } from '../../contexts/ThemeContext';
 import { COLOR_THEMES } from '../../types/theme';
 import type { ColorTheme } from '../../types/theme';
+import { MobileNotificationsCard } from './MobileNotificationsCard';
 import './MobileSettings.css';
 
 export const MobileSettings = () => {
@@ -86,6 +87,9 @@ export const MobileSettings = () => {
           </div>
         </div>
       </Card>
+
+      {/* Notifications */}
+      <MobileNotificationsCard />
 
       {/* Theme Preview Card */}
       <Card title="Preview" className="settings-card">
