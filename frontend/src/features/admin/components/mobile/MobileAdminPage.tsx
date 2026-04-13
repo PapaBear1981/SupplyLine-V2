@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Tag, List, Toast } from 'antd-mobile';
+import { Tag, List, SpinLoading } from 'antd-mobile';
 import {
   UserOutlined,
   TeamOutlined,
@@ -22,9 +22,10 @@ import { MobileAnnouncementsList } from './MobileAnnouncementsList';
 import './MobileAdminPage.css';
 
 type AdminSection = 'home' | 'users' | 'announcements';
+type AvailableSection = Extract<AdminSection, 'users' | 'announcements'>;
 
 const adminSections: Array<{
-  key: AdminSection | 'disabled';
+  key: AvailableSection;
   title: string;
   description: string;
   icon: React.ReactNode;
@@ -81,7 +82,11 @@ const desktopOnlySections = [
  */
 export const MobileAdminPage = () => {
   const user = useAppSelector((state) => state.auth.user);
-  const mobileAdminEnabled = useMobileAdminEnabled();
+  const {
+    isEnabled: mobileAdminEnabled,
+    isLoading: mobileAdminLoading,
+    isError: mobileAdminError,
+  } = useMobileAdminEnabled();
   const [section, setSection] = useState<AdminSection>('home');
 
   const isAdmin = Boolean(user?.is_admin);
@@ -91,6 +96,27 @@ export const MobileAdminPage = () => {
       <DesktopOnlyMessage
         title="Admin access required"
         description="This page is only available to admin users."
+      />
+    );
+  }
+
+  // Wait for the mobile_admin_enabled query to resolve before deciding
+  // whether to show the "disabled" message. Without this, admin users
+  // would briefly see a "Mobile Admin Disabled" flash on first load
+  // even when the setting is actually on.
+  if (mobileAdminLoading) {
+    return (
+      <div style={{ textAlign: 'center', padding: 64 }}>
+        <SpinLoading />
+      </div>
+    );
+  }
+
+  if (mobileAdminError) {
+    return (
+      <DesktopOnlyMessage
+        title="Couldn't load mobile admin settings"
+        description="Please refresh the page to try again. If the problem persists, use the desktop admin panel."
       />
     );
   }
@@ -139,13 +165,7 @@ export const MobileAdminPage = () => {
               }
               description={item.description}
               arrow={<AdmRightOutline />}
-              onClick={() => {
-                if (item.key === 'users' || item.key === 'announcements') {
-                  setSection(item.key);
-                } else {
-                  Toast.show({ content: 'Coming soon', duration: 1000 });
-                }
-              }}
+              onClick={() => setSection(item.key)}
             >
               {item.title}
             </List.Item>

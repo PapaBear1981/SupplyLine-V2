@@ -33,13 +33,25 @@ const PRIORITY_COLORS: Record<string, string> = {
  * mobile.
  */
 export const MobileKitReordersTab = ({ kitId }: MobileKitReordersTabProps) => {
-  const { data: reorders, isLoading } = useGetKitReordersQuery({ kitId });
+  const { data: reorders, isLoading, isError } = useGetKitReordersQuery({ kitId });
 
   if (isLoading) {
     return (
       <div style={{ textAlign: 'center', padding: 48 }}>
         <SpinLoading />
       </div>
+    );
+  }
+
+  // Surface fetch failures explicitly — previously they collapsed into
+  // the "No reorder requests" empty state, so users couldn't tell a
+  // 4xx/5xx apart from an actually-empty list.
+  if (isError) {
+    return (
+      <MobileEmptyState
+        title="Couldn't load reorder requests"
+        description="Please try again in a moment."
+      />
     );
   }
 
@@ -58,30 +70,30 @@ export const MobileKitReordersTab = ({ kitId }: MobileKitReordersTabProps) => {
         {reorders.map((reorder: KitReorderRequest) => (
           <List.Item
             key={reorder.id}
-            title={reorder.description}
             description={
-              <div
-                style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginTop: 4 }}
-              >
-                <Tag color={STATUS_COLORS[reorder.status]} fill="outline">
-                  {reorder.status}
-                </Tag>
-                <Tag color={PRIORITY_COLORS[reorder.priority]} fill="outline">
-                  {reorder.priority}
-                </Tag>
-                <Tag fill="outline">
-                  Qty {reorder.quantity_requested}
-                </Tag>
-                {reorder.part_number && (
-                  <Tag fill="outline">PN: {reorder.part_number}</Tag>
-                )}
-              </div>
+              <>
+                <div
+                  style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginTop: 4 }}
+                >
+                  <Tag color={STATUS_COLORS[reorder.status]} fill="outline">
+                    {reorder.status}
+                  </Tag>
+                  <Tag color={PRIORITY_COLORS[reorder.priority]} fill="outline">
+                    {reorder.priority}
+                  </Tag>
+                  <Tag fill="outline">Qty {reorder.quantity_requested}</Tag>
+                  {reorder.part_number && (
+                    <Tag fill="outline">PN: {reorder.part_number}</Tag>
+                  )}
+                </div>
+                <div style={{ fontSize: 13, marginTop: 8 }}>
+                  {reorder.requester_name ?? 'Requester'} •{' '}
+                  {dayjs(reorder.requested_date).fromNow()}
+                </div>
+              </>
             }
           >
-            <div style={{ fontSize: 13 }}>
-              {reorder.requester_name ?? 'Requester'} •{' '}
-              {dayjs(reorder.requested_date).fromNow()}
-            </div>
+            {reorder.description}
           </List.Item>
         ))}
       </List>

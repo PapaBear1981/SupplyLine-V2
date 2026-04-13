@@ -53,10 +53,15 @@ vi.mock('@services/socket', () => ({
   },
 }));
 
-// Mobile admin toggle — default off; individual tests override as needed
+// Mobile admin toggle — default off; individual tests override as needed.
+// The real hook returns { isEnabled, isLoading, isError }.
 const mockMobileAdminEnabled = vi.fn(() => false);
 vi.mock('@shared/hooks/useMobileAdminEnabled', () => ({
-  useMobileAdminEnabled: () => mockMobileAdminEnabled(),
+  useMobileAdminEnabled: () => ({
+    isEnabled: mockMobileAdminEnabled(),
+    isLoading: false,
+    isError: false,
+  }),
 }));
 
 // Scanner provider is mounted at the app root in production; tests mock the

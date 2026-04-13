@@ -242,9 +242,11 @@ export const MobileKitWizard = () => {
             <div className="mobile-kit-wizard__boxes">
               {boxes.map((box) => (
                 <div key={box._key} className="mobile-kit-wizard__box">
-                  <div
+                  <button
+                    type="button"
                     className="mobile-kit-wizard__box-body"
                     onClick={() => openEditBox(box)}
+                    aria-label={`Edit box ${box.box_number}`}
                   >
                     <div className="mobile-kit-wizard__box-title">
                       {box.box_number}
@@ -253,7 +255,7 @@ export const MobileKitWizard = () => {
                       {box.box_type}
                       {box.description ? ` • ${box.description}` : ''}
                     </div>
-                  </div>
+                  </button>
                   <button
                     type="button"
                     className="mobile-kit-wizard__box-remove"

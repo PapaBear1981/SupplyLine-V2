@@ -1,20 +1,31 @@
 import { useGetMobileSettingsQuery } from '@features/admin/services/securityApi';
 
+export interface MobileAdminEnabledResult {
+  /** True when the system-wide toggle is on. */
+  isEnabled: boolean;
+  /** True while the setting is being fetched for the first time. */
+  isLoading: boolean;
+  /** True if the fetch failed. Callers may want to treat this as "unknown". */
+  isError: boolean;
+}
+
 /**
- * Hook that returns whether mobile admin access is enabled system-wide.
+ * Hook that returns the mobile admin toggle state from the system
+ * setting exposed at `GET /api/mobile/settings`.
  *
- * Reads /api/mobile/settings via RTK Query. If the request is still
- * in flight or fails, returns false — admins can flip this from the
- * desktop System Settings page (Admin → System Settings → Mobile
- * Access). The Phase 1 placeholder that hard-coded `false` is now
- * replaced by a real backend-backed lookup.
+ * Returns a three-part result so callers can distinguish loading /
+ * error / explicitly-disabled. The mobile admin page needs this to
+ * avoid flashing a "Mobile Admin Disabled" message while the setting
+ * is still being fetched for the first time.
  *
- * Note: both admin and non-admin users fetch this on mobile so the
- * layout can decide whether to expose the admin menu entry. The
- * backend endpoint is authentication-gated but not permission-gated
- * for reads.
+ * The menu layer (MobileLayout) only cares about the boolean, so it
+ * pulls `isEnabled` and ignores the rest.
  */
-export function useMobileAdminEnabled(): boolean {
-  const { data } = useGetMobileSettingsQuery();
-  return Boolean(data?.mobile_admin_enabled);
+export function useMobileAdminEnabled(): MobileAdminEnabledResult {
+  const { data, isLoading, isError } = useGetMobileSettingsQuery();
+  return {
+    isEnabled: Boolean(data?.mobile_admin_enabled),
+    isLoading,
+    isError,
+  };
 }

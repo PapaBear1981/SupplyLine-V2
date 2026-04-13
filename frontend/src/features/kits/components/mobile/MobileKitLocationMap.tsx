@@ -9,13 +9,11 @@ import type { KitLocation } from '../../types';
 import { MobileEmptyState } from '@shared/components/mobile';
 import './MobileKitLocationMap.css';
 
-// Fix Leaflet's default icon paths (Vite doesn't resolve them out of the box)
-delete ((L.Icon.Default.prototype as unknown) as { _getIconUrl?: unknown })._getIconUrl;
-L.Icon.Default.mergeOptions({
-  iconRetinaUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png',
-  iconUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
-  shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
-});
+// NOTE: every marker below uses a custom DivIcon, so we deliberately do
+// NOT mutate L.Icon.Default here — that would bring in a CDN dependency
+// and change the default icon for every other leaflet instance in the
+// app. If another component ever needs a real Leaflet default icon it
+// should set its own paths locally.
 
 const STATUS_COLOR: Record<string, string> = {
   active: '#52c41a',

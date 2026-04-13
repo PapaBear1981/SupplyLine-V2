@@ -82,7 +82,7 @@ export const MobileLayout = () => {
   const user = useAppSelector((state) => state.auth.user);
   const [logoutApi] = useLogoutMutation();
   const [menuVisible, setMenuVisible] = useState(false);
-  const mobileAdminEnabled = useMobileAdminEnabled();
+  const { isEnabled: mobileAdminEnabled } = useMobileAdminEnabled();
   const { openScanner } = useScanner();
 
   // Memoize filtered menu items based on user permissions and mobile admin toggle

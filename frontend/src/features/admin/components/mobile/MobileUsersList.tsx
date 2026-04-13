@@ -110,6 +110,14 @@ export const MobileUsersList = ({ onBack }: MobileUsersListProps) => {
   const handleUnlock = async (user: User) => {
     try {
       await unlockUser(user.id).unwrap();
+      // Keep the local snapshot in sync so the edit sheet stops
+      // rendering the unlock button immediately, without waiting
+      // for the users-list refetch to propagate back to selectedUser.
+      setSelectedUser((current) =>
+        current?.id === user.id
+          ? { ...current, account_locked: false }
+          : current
+      );
       haptics.trigger('success');
       Toast.show({ icon: 'success', content: 'User unlocked' });
     } catch {
@@ -322,11 +330,7 @@ export const MobileUsersList = ({ onBack }: MobileUsersListProps) => {
       <MobileConfirmSheet
         visible={resetConfirmOpen}
         title="Reset password?"
-        description={
-          selectedUser
-            ? `A password reset email will be sent to ${selectedUser.name}.`
-            : ''
-        }
+        description="A temporary password will be generated and copied to your clipboard. The user will be required to change it on next login."
         confirmLabel="Reset password"
         onConfirm={handleResetPassword}
         onClose={() => setResetConfirmOpen(false)}

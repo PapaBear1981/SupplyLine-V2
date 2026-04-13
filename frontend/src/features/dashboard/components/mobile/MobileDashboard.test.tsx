@@ -133,6 +133,14 @@ describe('MobileDashboard', () => {
     expect(screen.getByText('Alerts & Warnings')).toBeInTheDocument();
   });
 
+  it('should render the kit location map section', () => {
+    renderWithProviders(<MobileDashboard />);
+
+    // Section header + the mocked MobileKitLocationMap placeholder
+    expect(screen.getByText('Kit Locations')).toBeInTheDocument();
+    expect(screen.getByTestId('kit-location-map')).toBeInTheDocument();
+  });
+
   it('should render quick actions section', () => {
     renderWithProviders(<MobileDashboard />);
 

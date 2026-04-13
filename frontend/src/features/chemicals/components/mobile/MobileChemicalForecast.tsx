@@ -241,7 +241,7 @@ export const MobileChemicalForecast = () => {
       </MobileSectionCard>
 
       <Tabs activeKey={activeTab} onChange={setActiveTab}>
-        {(['critical', 'soon', 'expiry_risk', 'ok'] as const).map((urgency) => {
+        {(['critical', 'soon', 'expiry_risk', 'ok', 'no_data'] as const).map((urgency) => {
           const bucket = grouped[urgency];
           return (
             <Tabs.Tab
@@ -254,7 +254,9 @@ export const MobileChemicalForecast = () => {
                   description={
                     urgency === 'critical'
                       ? 'Good news — nothing is critical right now.'
-                      : undefined
+                      : urgency === 'no_data'
+                        ? 'Chemicals without usage history will appear here.'
+                        : undefined
                   }
                 />
               ) : (
