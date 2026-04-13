@@ -124,6 +124,7 @@ export const baseApi = createApi({
     'Permission',
     'SystemSettings',
     'AISettings',
+    'OnCall',
   ],
   endpoints: () => ({}),
 });
