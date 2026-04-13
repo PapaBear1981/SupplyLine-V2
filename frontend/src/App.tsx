@@ -23,7 +23,7 @@ import { SettingsPage } from '@features/settings/pages/SettingsPage';
 import { ProfilePage } from '@features/profile/pages/ProfilePage';
 import { UsersPage } from '@features/users/pages/UsersPage';
 import { AdminPageWrapper } from '@features/admin/components/AdminPageWrapper';
-import { KitsDashboard, KitDetailView, KitWizard } from '@features/kits';
+import { KitsDashboard, KitDetailView, KitWizard, MobileKitWizard } from '@features/kits';
 import {
   OrdersDashboard,
   OrderDetailView,
@@ -92,7 +92,7 @@ function AppContent() {
                     element={
                       <ResponsivePage
                         desktop={<KitWizard />}
-                        mobile={<MobileComingSoon feature="Kit Wizard" />}
+                        mobile={<MobileKitWizard />}
                       />
                     }
                   />
