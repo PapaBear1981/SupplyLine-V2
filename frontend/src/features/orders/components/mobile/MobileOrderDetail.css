@@ -1,0 +1,36 @@
+.mobile-order-detail__paragraph {
+  font-size: 14px;
+  line-height: 1.55;
+  color: var(--adm-color-text);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.mobile-order-detail__actions {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.mobile-order-detail__compose-row {
+  padding: 8px 0 16px;
+}
+
+.mobile-order-detail__messages {
+  display: flex;
+  flex-direction: column;
+}
+
+.mobile-order-detail__message-subject {
+  font-size: 14px;
+  font-weight: 600;
+  margin-bottom: 4px;
+  color: var(--adm-color-text);
+}
+
+.mobile-order-detail__message-body {
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--adm-color-text);
+  white-space: pre-wrap;
+}

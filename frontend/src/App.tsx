@@ -31,6 +31,8 @@ import {
   RequestsDashboard,
   RequestDetailView,
   RequestCreationForm,
+  MobileOrderDetail,
+  MobileOrderCreationForm,
 } from '@features/orders';
 import { ReportsPage } from '@features/reports';
 import { ThemeProvider, useTheme } from '@features/settings/contexts/ThemeContext';
@@ -103,7 +105,7 @@ function AppContent() {
                     element={
                       <ResponsivePage
                         desktop={<OrderCreationForm />}
-                        mobile={<MobileComingSoon feature="New Fulfillment Record" />}
+                        mobile={<MobileOrderCreationForm />}
                       />
                     }
                   />
@@ -112,7 +114,7 @@ function AppContent() {
                     element={
                       <ResponsivePage
                         desktop={<OrderDetailView />}
-                        mobile={<MobileComingSoon feature="Fulfillment Details" />}
+                        mobile={<MobileOrderDetail />}
                       />
                     }
                   />
