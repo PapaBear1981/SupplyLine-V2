@@ -10,7 +10,7 @@ from datetime import datetime, timedelta
 from flask import jsonify, request
 
 from auth import department_required, jwt_required
-from models import AuditLog, Checkout, Tool, User, UserActivity, db
+from models import AuditLog, Checkout, Tool, User, UserActivity, db, get_current_time
 from utils.error_handler import log_security_event
 
 
@@ -233,7 +233,7 @@ def register_checkout_routes(app):
 
             try:
                 # Mark as returned
-                c.return_date = datetime.now()
+                c.return_date = get_current_time()
 
                 # Update tool condition if provided
                 if condition and tool:
@@ -245,12 +245,24 @@ def register_checkout_routes(app):
                     old_status = tool.status
                     tool.status = "available"
 
-                # Store return details in the database
-                # We'll add these as attributes to the checkout record
-                c.return_condition = condition
-                c.returned_by = returned_by
-                c.found = found
-                c.return_notes = notes
+                # Persist return details on the real Checkout columns.
+                # Historical versions of this handler assigned to
+                # `return_condition` / `returned_by` / `found`, none of
+                # which are mapped columns on the Checkout model, so the
+                # data was silently dropped. Use the actual column names
+                # and record the non-mapped `found` flag in return_notes
+                # so it isn't lost either.
+                if condition:
+                    c.condition_at_return = condition
+                if isinstance(returned_by, int):
+                    c.checked_in_by_id = returned_by
+                note_parts = []
+                if notes:
+                    note_parts.append(notes)
+                if found:
+                    note_parts.append("[found]")
+                if note_parts:
+                    c.return_notes = " ".join(note_parts)
 
                 db.session.commit()
 
@@ -366,8 +378,10 @@ def register_checkout_routes(app):
     @app.route("/api/checkouts/overdue", methods=["GET"])
     @tool_manager_required
     def get_overdue_checkouts():
-        # Get all overdue checkouts (expected_return_date < current date and not returned)
-        now = datetime.now()
+        # Get all overdue checkouts (expected_return_date < current date and not returned).
+        # Use the project's timezone-aware "now" helper to stay consistent
+        # with timezone-aware DB values and avoid false positives/negatives.
+        now = get_current_time()
         overdue_checkouts = Checkout.query.filter(
             Checkout.return_date.is_(None),
             Checkout.expected_return_date < now

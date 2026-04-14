@@ -255,9 +255,14 @@ def register_routes(app):
             reason = request.args.get("reason")
             search = request.args.get("q")
 
-            # Start with base query for archived chemicals
+            # Start with base query for archived chemicals.
+            # NB: `Chemical.is_archived is True` is a Python identity check,
+            # not a SQLAlchemy comparison — it always evaluates to False
+            # before any SQL is emitted, so the previous version silently
+            # returned an empty list. Use `.is_(True)` to get the correct
+            # column comparison.
             try:
-                query = Chemical.query.filter(Chemical.is_archived is True)
+                query = Chemical.query.filter(Chemical.is_archived.is_(True))
             except Exception:
                 # If the column doesn't exist, return an empty list
                 return jsonify([])
