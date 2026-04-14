@@ -70,6 +70,16 @@ function subscribe(callback: () => void): () => void {
     callback();
   };
 
+  // Refresh the cached snapshot when a new subscriber attaches. The
+  // module-level `cachedState` is initialised at import time, which
+  // can be stale if the viewport changed between module load and the
+  // first mount (common in tests that set `window.innerWidth`
+  // directly, and also possible in real browsers when the window is
+  // resized before any component using this hook has mounted).
+  // `useSyncExternalStore` performs a tearing check after subscribe
+  // and will re-render with the fresh snapshot if it differs.
+  updateCachedState();
+
   const mobileQuery = window.matchMedia(`(max-width: ${MOBILE_BREAKPOINT - 1}px)`);
   const tabletQuery = window.matchMedia(`(min-width: ${MOBILE_BREAKPOINT}px) and (max-width: ${TABLET_BREAKPOINT - 1}px)`);
 
