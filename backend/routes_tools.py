@@ -6,7 +6,7 @@ that file focused on a smaller set of concerns.
 """
 
 import logging
-from datetime import datetime, timedelta
+from datetime import timedelta
 
 from flask import jsonify, request
 
@@ -20,6 +20,7 @@ from models import (
     ToolServiceRecord,
     UserActivity,
     db,
+    get_current_time,
 )
 from utils.error_handler import ValidationError
 from utils.validation import validate_serial_number_format, validate_warehouse_id
@@ -521,6 +522,7 @@ def register_tool_routes(app):
         }), 200
 
     @app.route("/api/tools/search", methods=["GET"])
+    @login_required
     def search_tools():
         # Get search query from request parameters
         query = request.args.get("q", "")
@@ -593,11 +595,15 @@ def register_tool_routes(app):
         return jsonify([]), 200
 
     @app.route("/api/tools/<int:id>/checkouts", methods=["GET"])
+    @login_required
     def get_tool_checkouts(id):
-        # Get checkout history for a specific tool
+        # Get checkout history for a specific tool.
         Tool.query.get_or_404(id)
         checkouts = Checkout.query.filter_by(tool_id=id).order_by(Checkout.checkout_date.desc()).all()
 
+        # Use the project's timezone-aware "now" helper so overdue comparisons
+        # stay consistent with timezone-aware values in the database.
+        now = get_current_time()
         return jsonify([{
             "id": c.id,
             "user_id": c.user_id,
@@ -606,13 +612,17 @@ def register_tool_routes(app):
             "checkout_date": c.checkout_date.isoformat(),
             "return_date": c.return_date.isoformat() if c.return_date else None,
             "expected_return_date": c.expected_return_date.isoformat() if c.expected_return_date else None,
-            "condition_at_return": getattr(c, "return_condition", None),
-            "returned_by": getattr(c, "returned_by", None),
-            "found": getattr(c, "found", None),
-            "return_notes": getattr(c, "return_notes", None),
-            "is_overdue": c.return_date is None and c.expected_return_date and c.expected_return_date < datetime.now(),
+            # Read from the real Checkout columns (the previous version
+            # read from non-existent attributes that always returned None).
+            "condition_at_return": c.condition_at_return,
+            "checked_in_by_id": c.checked_in_by_id,
+            "return_notes": c.return_notes,
+            "is_overdue": c.return_date is None and c.expected_return_date is not None and c.expected_return_date < now,
             "duration_days": (c.return_date - c.checkout_date).days if c.return_date else None,
-            "status": "Returned" if c.return_date else ("Overdue" if c.expected_return_date and c.expected_return_date < datetime.now() else "Checked Out")
+            "status": (
+                "Returned" if c.return_date else
+                ("Overdue" if c.expected_return_date is not None and c.expected_return_date < now else "Checked Out")
+            ),
         } for c in checkouts]), 200
 
     @app.route("/api/tools/<int:id>/service/remove", methods=["POST"])
@@ -779,6 +789,7 @@ def register_tool_routes(app):
             return jsonify({"error": "An error occurred while returning the tool to service"}), 500
 
     @app.route("/api/tools/<int:id>/service/history", methods=["GET"])
+    @login_required
     def get_tool_service_history(id):
         try:
             # Get pagination parameters

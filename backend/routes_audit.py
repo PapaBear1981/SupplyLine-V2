@@ -1,14 +1,17 @@
 """Audit log routes.
 
 Provides read-only endpoints over AuditLog and UserActivity records used
-by the admin dashboard and per-resource audit views.
+by the admin dashboard and per-resource audit views. All endpoints are
+admin-only: audit logs contain sensitive operational data (user activity,
+resource access patterns, action timestamps) and should not leak to
+regular users, let alone unauthenticated callers.
 """
 
 import logging
 from datetime import datetime, timedelta
 
 from flask import jsonify, request
-from sqlalchemy import func
+from sqlalchemy import func, or_
 
 from auth import admin_required
 from models import AuditLog, UserActivity, db
@@ -30,6 +33,7 @@ def register_audit_routes(app):
         } for a in logs])
 
     @app.route("/api/audit/logs", methods=["GET"])
+    @admin_required
     def audit_logs_route():
         # Get pagination parameters
         page = request.args.get("page", 1, type=int)
@@ -49,6 +53,7 @@ def register_audit_routes(app):
         } for a in logs])
 
     @app.route("/api/audit/metrics", methods=["GET"])
+    @admin_required
     def audit_metrics_route():
         # Get timeframe parameter (default to 'week')
         timeframe = request.args.get("timeframe", "week")
@@ -111,6 +116,7 @@ def register_audit_routes(app):
         })
 
     @app.route("/api/audit/users/<int:user_id>", methods=["GET"])
+    @admin_required
     def user_audit_logs_route(user_id):
         # Get pagination parameters
         page = request.args.get("page", 1, type=int)
@@ -127,6 +133,7 @@ def register_audit_routes(app):
         return jsonify([activity.to_dict() for activity in activities])
 
     @app.route("/api/audit/tools/<int:tool_id>", methods=["GET"])
+    @admin_required
     def tool_audit_logs_route(tool_id):
         # Get pagination parameters
         page = request.args.get("page", 1, type=int)
@@ -135,12 +142,22 @@ def register_audit_routes(app):
         # Calculate offset
         offset = (page - 1) * limit
 
-        # Get tool-related audit logs with pagination
-        # This is a simplified approach - in a real app, you might want to
-        # search for tool ID in action_details or have a more structured way
-        # to track tool-specific actions
+        # Prefer the structured (resource_type, resource_id) columns that
+        # AuditLog.log() populates for new entries. Fall back to a LIKE
+        # match on action_details for legacy rows that predate the
+        # structured columns, using the exact id (e.g. "tool 12")
+        # followed by a non-digit so the filter for tool_id=1 does not
+        # accidentally match "tool 10", "tool 100", etc.
         logs = AuditLog.query.filter(
-            AuditLog.action_details.like(f"%tool%{tool_id}%")
+            or_(
+                db.and_(
+                    AuditLog.resource_type == "tool",
+                    AuditLog.resource_id == tool_id,
+                ),
+                AuditLog.action_details.like(f"%tool {tool_id} %"),
+                AuditLog.action_details.like(f"%tool {tool_id})%"),
+                AuditLog.action_details.like(f"%tool {tool_id}:%"),
+            )
         ).order_by(
             AuditLog.timestamp.desc()
         ).offset(offset).limit(limit).all()
