@@ -212,7 +212,7 @@ GET http://localhost:5000/api/permissions/categories
 ## Next Steps
 
 1. Run through the Quick Test Flow above
-2. Review the detailed [TESTING_GUIDE.md](./TESTING_GUIDE.md)
+2. Review the detailed [TESTING_GUIDE.md](./docs/TESTING_GUIDE.md)
 3. Check the [VISUAL_CHANGES_GUIDE.md](./VISUAL_CHANGES_GUIDE.md) for UI details
 4. Read the [REFACTORING_SUMMARY.md](./REFACTORING_SUMMARY.md) for technical details
 

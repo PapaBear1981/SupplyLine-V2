@@ -1,371 +1,215 @@
-# SupplyLine MRO Suite - Backend API
+# SupplyLine MRO Suite
 
-A comprehensive, secure, and scalable backend API for Maintenance, Repair, and Operations (MRO) management built with Flask, JWT authentication, and Socket.IO for real-time features.
+A comprehensive Maintenance, Repair, and Operations (MRO) management platform for
+tool inventory, chemical tracking, mobile warehouse kits, calibration, and
+real-time messaging.
 
 **Current Version: 5.3.0**
 
-## Overview
+## Architecture
 
-This repository contains the **backend API only**. The frontend has been removed to allow you to integrate any modern frontend framework of your choice (React, Vue, Angular, Svelte, etc.).
+| Layer    | Stack                                                                      |
+|----------|----------------------------------------------------------------------------|
+| Backend  | Python 3.11+, Flask, SQLAlchemy, Flask-SocketIO, JWT auth                  |
+| Frontend | React 19, TypeScript, Vite, Redux Toolkit (RTK Query), Ant Design 6        |
+| Database | SQLite (default) or PostgreSQL                                             |
+| Realtime | Socket.IO                                                                  |
+| Deploy   | Docker Compose (backend + nginx-served frontend)                           |
 
-The backend provides a complete REST API with JWT authentication for managing:
-- Tool inventory and calibration
-- Chemical inventory and analytics
-- Mobile warehouse kits
-- User management and RBAC
-- Barcode/QR code generation
-- Real-time messaging
-- Reporting and analytics
+## Features
+
+- **Tool management** — inventory, checkouts, calibration, history
+- **Chemical management** — lot tracking, waste reporting, analytics, forecasting
+- **Mobile warehouse kits** — create kits, issue items, transfer between kits
+  and warehouses, reorder workflow
+- **Warehouse management** — locations, inventory operations, transfers
+- **RBAC & auth** — JWT tokens, roles, departments, TOTP 2FA, password reset
+- **Barcode / QR labels** — PDF label generation (4×6, 3×4, 2×4, 2×2 in)
+- **Messaging** — real-time channels, kit messages, notifications
+- **Reports & analytics** — tools, chemicals, utilization, audit trails
+- **Bulk import / export** — CSV-driven data operations
 
 ## Quick Start
 
 ### Prerequisites
+
 - Python 3.11+
-- pip (Python package manager)
-- Docker and Docker Compose (optional, for containerized deployment)
+- Node.js 20+
+- Docker & Docker Compose (optional, for containerized deployment)
 
-### Local Development Setup
+### Local Development
 
-1. **Clone the repository**:
-   ```bash
-   git clone <your-repo-url>
-   cd SupplyLine-MRO-Suite-newFrontend
-   ```
-
-2. **Set up environment variables**:
-   ```bash
-   cp .env.example .env
-   ```
-
-3. **Generate secure keys** (REQUIRED):
-   ```bash
-   python -c "import secrets; print('SECRET_KEY=' + secrets.token_urlsafe(64))" >> .env
-   python -c "import secrets; print('JWT_SECRET_KEY=' + secrets.token_urlsafe(64))" >> .env
-   ```
-
-4. **Configure CORS** for your frontend:
-   Edit `.env` and update `CORS_ORIGINS` with your frontend URL:
-   ```
-   CORS_ORIGINS=http://localhost:3000,http://localhost:5173,http://localhost:8080
-   ```
-
-5. **Start the backend**:
-
-   **Option A: Using the startup script** (Windows/Linux/macOS):
-   ```bash
-   # Windows
-   start_dev_servers.bat
-
-   # Linux/macOS
-   ./start_dev_servers.sh
-   ```
-
-   **Option B: Manual setup**:
-   ```bash
-   cd backend
-   python -m venv venv
-
-   # Activate virtual environment
-   # Windows:
-   venv\Scripts\activate
-   # Linux/macOS:
-   source venv/bin/activate
-
-   pip install -r requirements.txt
-   python app.py
-   ```
-
-6. **Verify the backend is running**:
-   ```bash
-   curl http://localhost:5000/api/health
-   ```
-
-### Docker Deployment
+Clone the repo and create a `.env` at the root:
 
 ```bash
-# Build and start the backend container
-docker-compose up -d
-
-# View logs
-docker-compose logs -f backend
-
-# Stop the backend
-docker-compose down
+git clone <your-repo-url>
+cd SupplyLine-V2
+cp .env.example .env
 ```
 
-## API Documentation
-
-See [BACKEND_API.md](BACKEND_API.md) for comprehensive API documentation including:
-- Available endpoints and modules
-- Authentication flow
-- Request/response formats
-- Environment variables
-- Security features
-
-## Setting Up a New Frontend
-
-### Step 1: Create Your Frontend Project
-
-Choose your preferred framework and create a new project:
-
-**React (Vite)**:
-```bash
-npm create vite@latest frontend -- --template react
-cd frontend
-npm install
-```
-
-**Vue**:
-```bash
-npm create vue@latest frontend
-cd frontend
-npm install
-```
-
-**Angular**:
-```bash
-ng new frontend
-cd frontend
-```
-
-**Next.js**:
-```bash
-npx create-next-app@latest frontend
-cd frontend
-```
-
-### Step 2: Configure API Client
-
-Create an API client to communicate with the backend:
-
-**Example for React/Vue (Axios)**:
-
-```javascript
-// src/services/api.js
-import axios from 'axios';
-
-const API_BASE_URL = 'http://localhost:5000';
-
-const api = axios.create({
-  baseURL: API_BASE_URL,
-  headers: {
-    'Content-Type': 'application/json',
-  },
-});
-
-// Add JWT token to requests
-api.interceptors.request.use((config) => {
-  const token = localStorage.getItem('access_token');
-  if (token) {
-    config.headers.Authorization = `Bearer ${token}`;
-  }
-  return config;
-});
-
-export default api;
-```
-
-### Step 3: Implement Authentication
-
-**Login example**:
-
-```javascript
-import api from './api';
-
-async function login(employeeNumber, password) {
-  try {
-    const response = await api.post('/api/auth/login', {
-      employee_number: employeeNumber,
-      password: password,
-    });
-
-    const { access_token, user } = response.data;
-    localStorage.setItem('access_token', access_token);
-    return user;
-  } catch (error) {
-    console.error('Login failed:', error);
-    throw error;
-  }
-}
-```
-
-### Step 4: Update CORS Configuration
-
-Add your frontend URL to the backend's CORS configuration in `.env`:
-
-```
-CORS_ORIGINS=http://localhost:3000
-```
-
-Restart the backend for changes to take effect.
-
-### Step 5: Start Development
+Generate strong secrets (REQUIRED — do not ship the example values):
 
 ```bash
-# Terminal 1: Backend (already running)
+python -c "import secrets; print('SECRET_KEY=' + secrets.token_urlsafe(64))" >> .env
+python -c "import secrets; print('JWT_SECRET_KEY=' + secrets.token_urlsafe(64))" >> .env
+```
+
+#### Start the backend
+
+```bash
 cd backend
-python app.py
-
-# Terminal 2: Frontend
-cd frontend
-npm run dev
+python -m venv venv
+source venv/bin/activate            # on Windows: venv\Scripts\activate
+pip install -r requirements.txt
+python run.py
 ```
 
-## Default Users
-
-The system includes default users for testing:
-
-- **Admin**: Employee Number `ADMIN001`, Password `admin123`
-- **Materials**: Employee Number `MAT001`, Password `materials123`
-- **Maintenance**: Employee Number `MAINT001`, Password `maintenance123`
-
-**⚠️ Change these credentials in production!**
-
-## Key Features
-
-### Backend API Modules
-
-- **Authentication & Authorization**: JWT-based auth, RBAC, password reset
-- **Tool Management**: Inventory, calibration, barcode scanning
-- **Chemical Management**: Inventory, analytics, waste tracking
-- **Kit Management**: Mobile warehouse, transfers, messaging, reorders
-- **Warehouse Management**: Location tracking, inventory operations
-- **Reporting & Analytics**: Comprehensive reports for tools, chemicals, usage
-- **Barcode System**: PDF label generation for tools, chemicals, expendables
-- **Messaging**: Real-time communication via Socket.IO
-- **Bulk Operations**: Import/export functionality
-
-### Security Features
-
-- JWT token-based authentication
-- CSRF protection
-- Rate limiting and account lockout
-- Secure password hashing
-- Role-based access control (RBAC)
-- SQL injection protection via SQLAlchemy ORM
-
-### Database Support
-
-- **SQLite** (default): Data stored in `database/tools.db`
-- **PostgreSQL**: Set `DATABASE_URL` environment variable
-
-## Environment Variables
-
-Key environment variables (see `.env.example` for full list):
-
-### Required
-- `SECRET_KEY` - Flask secret key
-- `JWT_SECRET_KEY` - JWT signing key
-
-### Optional
-- `FLASK_ENV` - Environment (development/production)
-- `FLASK_DEBUG` - Debug mode (True/False)
-- `CORS_ORIGINS` - Comma-separated list of allowed origins
-- `DATABASE_URL` - PostgreSQL connection string
-- `PUBLIC_URL` - Public URL for QR codes
-
-## Project Structure
-
-```
-SupplyLine-MRO-Suite-newFrontend/
-├── backend/                    # Flask backend API
-│   ├── app.py                  # Application entry point
-│   ├── config.py               # Configuration
-│   ├── models.py               # Database models
-│   ├── routes_*.py             # API route modules
-│   ├── requirements.txt        # Python dependencies
-│   └── ...
-├── database/                   # SQLite database
-│   └── tools.db               # Main database file
-├── .env.example               # Environment variables template
-├── docker-compose.yml         # Docker configuration
-├── BACKEND_API.md             # API documentation
-└── README.md                  # This file
-```
-
-## API Health Check
-
-Test the backend is running:
+Backend listens on `http://localhost:5000`. Verify:
 
 ```bash
 curl http://localhost:5000/api/health
 ```
 
-Expected response:
-```json
-{
-  "status": "healthy",
-  "timestamp": "2025-01-27T10:30:00Z"
-}
-```
+#### Start the frontend
 
-## WebSocket/Socket.IO
-
-The backend includes Socket.IO support for real-time features:
-
-**Client connection example**:
-```javascript
-import io from 'socket.io-client';
-
-const socket = io('http://localhost:5000', {
-  auth: {
-    token: localStorage.getItem('access_token')
-  }
-});
-
-socket.on('connect', () => {
-  console.log('Connected to backend');
-});
-```
-
-## Deployment
-
-### Production Checklist
-
-1. ✅ Generate strong, unique `SECRET_KEY` and `JWT_SECRET_KEY`
-2. ✅ Set `FLASK_ENV=production` and `FLASK_DEBUG=False`
-3. ✅ Configure appropriate `CORS_ORIGINS` for your domain
-4. ✅ Use PostgreSQL for production database
-5. ✅ Set up SSL/TLS with reverse proxy (Nginx, Traefik)
-6. ✅ Configure regular database backups
-7. ✅ Update default user credentials
-
-### Docker Production
+In a second terminal:
 
 ```bash
-# Build production image
-docker-compose build
-
-# Start in production mode
-FLASK_ENV=production docker-compose up -d
-
-# Monitor logs
-docker-compose logs -f backend
+cd frontend
+npm install
+npm run dev
 ```
 
-## Documentation Files
+Frontend dev server runs on `http://localhost:5173` and proxies API calls to
+the backend. See `frontend/vite.config.ts` for the proxy config.
 
-- **[BACKEND_API.md](BACKEND_API.md)** - Complete API documentation
-- **[CHANGELOG.md](CHANGELOG.md)** - Version history
-- **[QUICK_START.md](QUICK_START.md)** - Quick start guide
-- **Backend-specific docs** in `backend/` directory
+### Default Credentials
 
-## Support
+The system seeds a default admin user on first run:
 
-For issues, feature requests, or questions, please open an issue on GitHub.
+- **Employee Number**: `ADMIN001`
+- **Password**: `admin123`
+
+**Change these before deploying anywhere.** See `docs/PASSWORD_MANAGEMENT_IMPLEMENTATION.md`.
+
+### Docker Deployment
+
+```bash
+docker-compose up -d
+docker-compose logs -f
+```
+
+Backend runs on `:5000`, frontend (nginx) on `:80`. See
+[DOCKER_DEPLOYMENT.md](DOCKER_DEPLOYMENT.md) for production guidance.
+
+## Project Structure
+
+```
+SupplyLine-V2/
+├── backend/                  # Flask backend API
+│   ├── app.py                # Application factory
+│   ├── config.py             # Configuration
+│   ├── run.py                # Dev entry point
+│   ├── models.py             # Core SQLAlchemy models
+│   ├── models_kits.py        # Kit-related models
+│   ├── models_messaging.py   # Messaging models
+│   ├── routes_*.py           # Route blueprints per domain
+│   ├── migrations/           # Database migration scripts
+│   └── tests/                # pytest suite
+├── frontend/                 # React + TypeScript frontend
+│   ├── src/
+│   │   ├── app/              # Redux store, hooks
+│   │   ├── features/         # Feature modules (auth, kits, chemicals, …)
+│   │   ├── services/         # API clients (baseApi, socket)
+│   │   └── shared/           # Shared components, hooks, contexts
+│   ├── tests/                # Playwright E2E tests
+│   └── package.json
+├── docs/                     # Project documentation
+├── scripts/                  # Helper scripts
+├── docker-compose.yml
+├── .env.example
+└── README.md                 # This file
+```
+
+## Testing
+
+### Backend
+
+```bash
+cd backend
+pytest                              # full suite
+pytest tests/test_auth.py           # specific file
+pytest --cov                        # with coverage
+```
+
+See [docs/TESTING_GUIDE.md](docs/TESTING_GUIDE.md) for detailed guidance.
+
+### Frontend
+
+```bash
+cd frontend
+npm run test            # Vitest unit tests (watch)
+npm run test:run        # single-run
+npm run lint            # ESLint
+npx playwright test     # E2E (Playwright)
+```
+
+## Documentation
+
+### Getting Started
+- [QUICK_START.md](QUICK_START.md) — Quick start for the user management flows
+- [UPDATING.md](UPDATING.md) — Update / upgrade procedures
+
+### Backend
+- [BACKEND_API.md](BACKEND_API.md) — API module reference
+- [docs/API_DOCUMENTATION.md](docs/API_DOCUMENTATION.md) — Full REST API reference
+
+### Features
+- [docs/KITS_USER_GUIDE.md](docs/KITS_USER_GUIDE.md) — Kits user guide
+- [docs/BARCODE_SYSTEM.md](docs/BARCODE_SYSTEM.md) — Barcode / label system
+- [docs/WAREHOUSE_MANAGEMENT.md](docs/WAREHOUSE_MANAGEMENT.md) — Warehouse ops
+- [docs/EXPENDABLES_SYSTEM.md](docs/EXPENDABLES_SYSTEM.md) — Expendables
+- [docs/MESSAGING_INFRASTRUCTURE.md](docs/MESSAGING_INFRASTRUCTURE.md) — Messaging
+
+### Security
+- [SECURITY_SETUP.md](SECURITY_SETUP.md) — Required security configuration
+- [SECURITY_ANALYSIS.md](SECURITY_ANALYSIS.md) — Security posture audit
+- [SECURITY_NOTES.md](SECURITY_NOTES.md) — Known issues and mitigations
+- [PASSWORD_MANAGEMENT_USER_GUIDE.md](PASSWORD_MANAGEMENT_USER_GUIDE.md) — End-user password guide
+
+### Release info
+- [CHANGELOG.md](CHANGELOG.md)
+- [RELEASE_NOTES.md](RELEASE_NOTES.md)
+
+### Developer docs
+- [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md) — Repository guidelines
+- [docs/BRANCH_STRATEGY.md](docs/BRANCH_STRATEGY.md) — Branch conventions
+- [docs/TESTING_GUIDE.md](docs/TESTING_GUIDE.md) — Testing guide
+
+## Environment Variables
+
+See `.env.example` for the full list. Key variables:
+
+| Name                | Required | Notes                                       |
+|---------------------|:--------:|---------------------------------------------|
+| `SECRET_KEY`        | ✓        | Flask secret. Generate with `secrets`.      |
+| `JWT_SECRET_KEY`    | ✓        | JWT signing key. Generate with `secrets`.   |
+| `FLASK_ENV`         |          | `development` or `production`.              |
+| `FLASK_DEBUG`       |          | `True` / `False`.                           |
+| `CORS_ORIGINS`      |          | Comma-separated allowed origins.            |
+| `DATABASE_URL`      |          | PostgreSQL URL; defaults to SQLite.         |
+| `PUBLIC_URL`        |          | Public URL used in QR codes.                |
+
+## Production Checklist
+
+1. Generate strong, unique `SECRET_KEY` and `JWT_SECRET_KEY`.
+2. Set `FLASK_ENV=production` and `FLASK_DEBUG=False`.
+3. Configure `CORS_ORIGINS` for your domain.
+4. Change default user credentials.
+5. Put the backend behind HTTPS (nginx / Traefik / CloudFront).
+6. Configure regular database backups (see [docs/DATABASE_PERSISTENCE.md](docs/DATABASE_PERSISTENCE.md)).
+7. Review [SECURITY_SETUP.md](SECURITY_SETUP.md).
 
 ## License
 
-MIT
-
-## Next Steps
-
-1. Set up your frontend framework
-2. Configure API client with base URL `http://localhost:5000`
-3. Implement authentication flow
-4. Start building your UI components
-5. Refer to [BACKEND_API.md](BACKEND_API.md) for available endpoints
-
----
-
-**Ready to build your frontend?** The backend is fully functional and waiting for your UI! 🚀
+Copyright © 2025 SupplyLine MRO Suite. All rights reserved.

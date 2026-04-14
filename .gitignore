@@ -100,10 +100,8 @@ backend/static/order_documents/
 
 # AI/Code assistant directories
 .codex/
-.specify/
 .claude/
 supplyline_mro_suite/.codex/
-supplyline_mro_suite/.specify/
 
 # Security - credential files
 push-to-github.bat
