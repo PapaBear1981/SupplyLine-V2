@@ -153,7 +153,7 @@ class TestJWTSecurity:
             "current_password": "user123",
             "new_password": "NewPassword123!"
         }
-        response = client.put("/api/user/password", json=first_change_payload)
+        response = client.put("/api/profile/password", json=first_change_payload)
         assert response.status_code == 200
 
         # Login again with new password to get fresh token
@@ -168,7 +168,7 @@ class TestJWTSecurity:
             "current_password": "NewPassword123!",
             "new_password": "AnotherPassword123!"
         }
-        response = client.put("/api/user/password", json=second_change_payload)
+        response = client.put("/api/profile/password", json=second_change_payload)
         assert response.status_code == 200
 
         # Login again with newest password
@@ -183,7 +183,7 @@ class TestJWTSecurity:
             "current_password": "AnotherPassword123!",
             "new_password": "NewPassword123!"
         }
-        response = client.put("/api/user/password", json=reuse_payload)
+        response = client.put("/api/profile/password", json=reuse_payload)
         assert response.status_code == 400
         assert "last 5 passwords" in response.get_json()["error"]
 

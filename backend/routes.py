@@ -1,5 +1,4 @@
 import logging
-import os
 import time
 from datetime import UTC, datetime, timedelta
 
@@ -56,7 +55,6 @@ from routes_user_requests import register_user_request_routes
 from routes_users import register_user_routes
 from routes_warehouses import warehouses_bp
 from utils.error_handler import handle_errors
-from utils.file_validation import FileValidationError, validate_image_upload
 from utils.password_reset_security import get_password_reset_tracker
 from utils.rate_limiter import rate_limit
 
@@ -861,161 +859,6 @@ def register_routes(app):
         # Get user_id from JWT token
         user = db.session.get(User, request.current_user["user_id"])
         return jsonify(user.to_dict(include_roles=True, include_permissions=True)), 200
-
-    @app.route("/api/user/profile", methods=["PUT"])
-    @login_required
-    def update_profile():
-        # Get user_id from JWT token
-        user = db.session.get(User, request.current_user["user_id"])
-        data = request.get_json() or {}
-
-        # Update allowed fields
-        if "name" in data:
-            user.name = data["name"]
-        if "department" in data:
-            user.department = data["department"]
-        if "avatar" in data:
-            user.avatar = data["avatar"]
-
-        db.session.commit()
-
-        # Log the profile update
-        activity = UserActivity(
-            user_id=user.id,
-            activity_type="profile_update",
-            description="Profile information updated",
-            ip_address=request.remote_addr
-        )
-        db.session.add(activity)
-        db.session.commit()
-
-        return jsonify(user.to_dict()), 200
-
-    @app.route("/api/user/avatar", methods=["POST"])
-    @login_required
-    def upload_avatar():
-        # Get user_id from JWT token
-        user = db.session.get(User, request.current_user["user_id"])
-
-        if "avatar" not in request.files:
-            return jsonify({"error": "No file part"}), 400
-
-        file = request.files["avatar"]
-
-        if file.filename == "":
-            return jsonify({"error": "No selected file"}), 400
-
-        if file:
-            try:
-                max_size = current_app.config.get("MAX_AVATAR_FILE_SIZE")
-                safe_filename = validate_image_upload(file, max_size=max_size)
-            except FileValidationError as exc:
-                return jsonify({"error": str(exc)}), getattr(exc, "status_code", 400)
-
-            avatar_dir = os.path.join(current_app.static_folder, "avatars")
-            os.makedirs(avatar_dir, exist_ok=True)
-
-            file_path = os.path.join(avatar_dir, safe_filename)
-            file.save(file_path)
-
-            # Update user's avatar field with the relative path
-            avatar_url = f"/api/static/avatars/{safe_filename}"
-            user.avatar = avatar_url
-            db.session.commit()
-
-            # Log the avatar update
-            activity = UserActivity(
-                user_id=user.id,
-                activity_type="avatar_update",
-                description="Profile avatar updated",
-                ip_address=request.remote_addr
-            )
-            db.session.add(activity)
-            db.session.commit()
-
-            return jsonify({
-                "message": "Avatar uploaded successfully",
-                "avatar": avatar_url
-            }), 200
-
-        return jsonify({"error": "Failed to upload avatar"}), 400
-
-    @app.route("/api/user/password", methods=["PUT"])
-    @login_required
-    def change_password():
-        # Get user_id from JWT token
-        user = db.session.get(User, request.current_user["user_id"])
-        data = request.get_json() or {}
-
-        # SECURITY: Enforce current-session JWT validation (OWASP ASVS 3.1.4)
-        # Prevent password changes using old/stale JWT tokens issued before last password change
-        if hasattr(user, "password_changed_at") and user.password_changed_at:
-            # Get JWT issued-at timestamp
-            jwt_iat = request.current_user.get("iat")
-            if jwt_iat:
-                from datetime import datetime
-                # Convert JWT iat (Unix timestamp) to datetime
-                jwt_issued_at = datetime.fromtimestamp(jwt_iat, tz=UTC)
-
-                # Ensure password_changed_at is timezone-aware
-                password_changed_at = user.password_changed_at
-                if password_changed_at.tzinfo is None:
-                    password_changed_at = password_changed_at.replace(tzinfo=UTC)
-
-                # Reject if JWT was issued before the last password change
-                if jwt_issued_at < password_changed_at:
-                    app.logger.warning(
-                        f"Password change attempt with stale JWT token for user {user.id}. "
-                        f"JWT issued: {jwt_issued_at}, Password changed: {password_changed_at}"
-                    )
-                    return jsonify({
-                        "error": "Your session is outdated. Please log in again to change your password.",
-                        "code": "STALE_SESSION"
-                    }), 401
-
-        # Validate required fields
-        required_fields = ["current_password", "new_password"]
-        for field in required_fields:
-            if not data.get(field):
-                return jsonify({"error": f"Missing required field: {field}"}), 400
-
-        # Verify current password
-        if not user.check_password(data["current_password"]):
-            return jsonify({"error": "Current password is incorrect"}), 400
-
-        # Validate password strength
-        is_valid, errors = password_utils.validate_password_strength(data["new_password"])
-        if not is_valid:
-            return jsonify({"error": "Password does not meet security requirements", "details": errors}), 400
-
-        if hasattr(user, "is_password_reused") and user.is_password_reused(data["new_password"]):
-            return jsonify({"error": "New password cannot match any of your last 5 passwords"}), 400
-
-        # Update password
-        user.set_password(data["new_password"])
-        if hasattr(user, "force_password_change"):
-            user.force_password_change = False
-        db.session.commit()
-
-        # Log the password change
-        activity = UserActivity(
-            user_id=user.id,
-            activity_type="password_change",
-            description="Password changed",
-            ip_address=request.remote_addr
-        )
-        db.session.add(activity)
-        db.session.commit()
-
-        return jsonify({"message": "Password changed successfully"}), 200
-
-    @app.route("/api/user/activity", methods=["GET"])
-    @login_required
-    def get_user_activity():
-        # Get user_id from JWT token
-        user_id = request.current_user["user_id"]
-        activities = UserActivity.query.filter_by(user_id=user_id).order_by(UserActivity.timestamp.desc()).limit(50).all()
-        return jsonify([activity.to_dict() for activity in activities]), 200
 
     # Removed duplicate get_checkout_details - now handled by routes_tool_checkout.py
 
