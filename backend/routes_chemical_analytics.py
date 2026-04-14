@@ -398,9 +398,9 @@ def register_chemical_analytics_routes(app):
                 },
                 "lot_numbers": lot_numbers
             })
-        except Exception as e:
+        except Exception:
             logger.exception("Error in part analytics route")
-            return jsonify({"error": "An error occurred while generating part analytics", "details": str(e)}), 500
+            return jsonify({"error": "An error occurred while generating part analytics"}), 500
 
     # Get usage analytics
     @app.route("/api/chemicals/usage-analytics", methods=["GET"])
@@ -562,6 +562,6 @@ def register_chemical_analytics_routes(app):
                     "usage_efficiency_data": []  # Simplified
                 }
             })
-        except Exception as e:
+        except Exception:
             logger.exception("Error in usage analytics route")
-            return jsonify({"error": "An error occurred while generating usage analytics", "details": str(e)}), 500
+            return jsonify({"error": "An error occurred while generating usage analytics"}), 500

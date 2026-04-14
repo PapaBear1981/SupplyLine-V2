@@ -88,9 +88,9 @@ def get_warehouses():
 
         return jsonify(response), 200
 
-    except Exception as e:
+    except Exception:
         logger.exception("Error in get_warehouses")
-        return jsonify({"error": str(e)}), 500
+        return jsonify({"error": "An internal server error occurred"}), 500
 
 
 @warehouses_bp.route("/warehouses", methods=["POST"])
@@ -141,10 +141,10 @@ def create_warehouse():
             "warehouse": warehouse.to_dict()
         }), 201
 
-    except Exception as e:
+    except Exception:
         logger.exception("Error in create_warehouse")
         db.session.rollback()
-        return jsonify({"error": str(e)}), 500
+        return jsonify({"error": "An internal server error occurred"}), 500
 
 
 @warehouses_bp.route("/warehouses/<int:warehouse_id>", methods=["GET"])
@@ -159,8 +159,8 @@ def get_warehouse(warehouse_id):
 
         return jsonify(warehouse.to_dict()), 200
 
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
+    except Exception:
+        return jsonify({"error": "An internal server error occurred"}), 500
 
 
 @warehouses_bp.route("/warehouses/<int:warehouse_id>", methods=["PUT"])
@@ -218,9 +218,9 @@ def update_warehouse(warehouse_id):
             "warehouse": warehouse.to_dict()
         }), 200
 
-    except Exception as e:
+    except Exception:
         db.session.rollback()
-        return jsonify({"error": str(e)}), 500
+        return jsonify({"error": "An internal server error occurred"}), 500
 
 
 @warehouses_bp.route("/warehouses/<int:warehouse_id>", methods=["DELETE"])
@@ -257,9 +257,9 @@ def delete_warehouse(warehouse_id):
             "warehouse": warehouse.to_dict()
         }), 200
 
-    except Exception as e:
+    except Exception:
         db.session.rollback()
-        return jsonify({"error": str(e)}), 500
+        return jsonify({"error": "An internal server error occurred"}), 500
 
 
 @warehouses_bp.route("/warehouses/<int:warehouse_id>/stats", methods=["GET"])
@@ -319,8 +319,8 @@ def get_warehouse_stats(warehouse_id):
             }
         }), 200
 
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
+    except Exception:
+        return jsonify({"error": "An internal server error occurred"}), 500
 
 
 @warehouses_bp.route("/warehouses/<int:warehouse_id>/tools", methods=["GET"])
@@ -381,8 +381,8 @@ def get_warehouse_tools(warehouse_id):
             "pages": pagination.pages
         }), 200
 
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
+    except Exception:
+        return jsonify({"error": "An internal server error occurred"}), 500
 
 
 @warehouses_bp.route("/warehouses/<int:warehouse_id>/chemicals", methods=["GET"])
@@ -443,8 +443,8 @@ def get_warehouse_chemicals(warehouse_id):
             "pages": pagination.pages
         }), 200
 
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
+    except Exception:
+        return jsonify({"error": "An internal server error occurred"}), 500
 
 
 @warehouses_bp.route("/warehouses/<int:warehouse_id>/inventory", methods=["GET"])
@@ -521,5 +521,5 @@ def get_warehouse_inventory(warehouse_id):
             "total": len(inventory)
         }), 200
 
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
+    except Exception:
+        return jsonify({"error": "An internal server error occurred"}), 500
