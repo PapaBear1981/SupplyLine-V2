@@ -90,6 +90,10 @@ portable-build/
 check_*.py
 backend/check_*.py
 
+# Type checker output (generated artifacts)
+pyright_results*.json
+backend/pyright_results*.json
+
 
 # Uploaded order documentation
 backend/static/order_documents/
