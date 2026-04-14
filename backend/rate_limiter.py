@@ -5,11 +5,15 @@ This module provides a rate limiter for the Flask API to prevent
 the backend from being overwhelmed by too many requests.
 """
 
+import logging
 import time
 from functools import wraps
 from threading import Lock
 
 from flask import jsonify, request
+
+
+logger = logging.getLogger(__name__)
 
 
 class RateLimiter:
@@ -73,7 +77,7 @@ class RateLimiter:
             self.last_cleanup = now
 
         if old_clients:
-            print(f"Rate limiter: Cleaned up {len(old_clients)} old client buckets")
+            logger.info(f"Rate limiter: Cleaned up {len(old_clients)} old client buckets")
 
     def _consume_token(self, client_id):
         """

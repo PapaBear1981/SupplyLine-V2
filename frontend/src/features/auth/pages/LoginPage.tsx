@@ -48,17 +48,11 @@ export const LoginPage = () => {
   }
 
   const handleLoginSuccess = (response: LoginResponse) => {
-    console.log('[LoginPage] handleLoginSuccess called with response:', response);
-    console.log('[LoginPage] requires_totp_setup:', response.requires_totp_setup);
-    console.log('[LoginPage] requires_totp:', response.requires_totp);
-    console.log('[LoginPage] setup_token:', response.setup_token);
-
     setLoginResponse(response);
     setEmployeeNumber(response.employee_number || '');
 
     // Check if user needs to set up TOTP (first-time mandatory enrollment)
     if (response.requires_totp_setup) {
-      console.log('[LoginPage] Entering TOTP_SETUP state');
       // Store the setup token for TOTP API calls BUT don't set isAuthenticated
       // This prevents refresh bypass vulnerability
       dispatch(
@@ -74,13 +68,11 @@ export const LoginPage = () => {
 
     // Check if user needs to verify TOTP (returning user with 2FA enabled)
     if (response.requires_totp) {
-      console.log('[LoginPage] Entering TOTP_VERIFICATION state');
       setLoginState('TOTP_VERIFICATION');
       return;
     }
 
     // Normal login flow (no TOTP required - should not happen with mandatory 2FA)
-    console.log('[LoginPage] Completing authentication normally (no 2FA required)');
     completeAuthentication(response);
   };
 

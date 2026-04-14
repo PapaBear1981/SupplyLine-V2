@@ -7,6 +7,9 @@ from sqlalchemy.orm import object_session
 from werkzeug.security import check_password_hash, generate_password_hash
 
 
+logger = logging.getLogger(__name__)
+
+
 # Import time utilities for consistent time handling
 try:
     from time_utils import get_local_timestamp
@@ -2181,9 +2184,9 @@ class Warehouse(db.Model):
                 result["tools_count"] = Tool.query.filter_by(warehouse_id=self.id).count()
                 result["chemicals_count"] = Chemical.query.filter_by(warehouse_id=self.id).count()
                 result["expendables_count"] = Expendable.query.filter_by(warehouse_id=self.id).count()
-            except Exception as e:
+            except Exception:
                 # If queries fail, skip counts
-                print(f"Error getting counts for warehouse {self.id}: {e}")
+                logger.exception("Error getting counts for warehouse %s", self.id)
                 result["created_by"] = None
                 result["tools_count"] = 0
                 result["chemicals_count"] = 0
