@@ -241,17 +241,31 @@ def register_analytics_routes(app):
                     Checkout.return_date.is_(None)
                 ).count()
 
-                # Average checkout duration (for returned items)
-                avg_duration_query = db.session.query(
-                    func.avg(
-                        func.julianday(Checkout.return_date) - func.julianday(Checkout.checkout_date)
-                    ).label("avg_days")
+                # Average checkout duration (for returned items).
+                # Compute the average in Python rather than via SQL so
+                # this works on every database the app supports
+                # (`func.julianday` is a SQLite-specific builtin and
+                # blows up on PostgreSQL). The periods we care about are
+                # short and bounded by `start_date`, so the row count
+                # here stays small.
+                returned_rows = Checkout.query.with_entities(
+                    Checkout.checkout_date,
+                    Checkout.return_date,
                 ).filter(
                     Checkout.checkout_date >= start_date,
-                    Checkout.return_date.isnot(None)
-                ).scalar()
+                    Checkout.return_date.isnot(None),
+                ).all()
 
-                avg_duration = round(float(avg_duration_query or 0), 1)
+                if returned_rows:
+                    avg_duration = round(
+                        sum(
+                            (row.return_date - row.checkout_date).total_seconds() / 86400
+                            for row in returned_rows
+                        ) / len(returned_rows),
+                        1,
+                    )
+                else:
+                    avg_duration = 0.0
 
                 # Overdue checkouts
                 overdue_count = Checkout.query.filter(

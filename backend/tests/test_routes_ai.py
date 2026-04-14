@@ -612,7 +612,7 @@ class TestToolExecutors:
     def test_get_active_checkouts_returns_rows_for_open_checkouts(
         self, app, db_session, regular_user
     ):
-        from datetime import datetime
+        from datetime import UTC, datetime
 
         with app.app_context():
             tool = Tool(
@@ -624,11 +624,12 @@ class TestToolExecutors:
             db_session.add(tool)
             db_session.flush()
 
+            now = datetime.now(UTC)
             checkout = Checkout(
                 tool_id=tool.id,
                 user_id=regular_user.id,
-                checkout_date=datetime.utcnow(),
-                expected_return_date=datetime.utcnow() + timedelta(days=2),
+                checkout_date=now,
+                expected_return_date=now + timedelta(days=2),
             )
             db_session.add(checkout)
             db_session.commit()
