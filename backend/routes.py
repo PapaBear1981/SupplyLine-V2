@@ -2,12 +2,11 @@ import logging
 import os
 import time
 from datetime import UTC, datetime, timedelta
-from functools import wraps
 
 from flask import current_app, jsonify, request, session
 
 import utils as password_utils
-from auth.jwt_manager import jwt_required
+from auth import admin_required, department_required, jwt_required
 from models import (
     AuditLog,
     Checkout,
@@ -64,92 +63,12 @@ from utils.validation import validate_serial_number_format, validate_warehouse_i
 
 logger = logging.getLogger(__name__)
 
-# Removed duplicate materials_manager_required - using secure version below
-
-
-def login_required(f):
-    @wraps(f)
-    def decorated_function(*args, **kwargs):
-        # Use JWT authentication
-        from auth.jwt_manager import JWTManager
-        user_payload = JWTManager.get_current_user()
-        if not user_payload:
-            log_security_event("unauthorized_access_attempt", "Login required access denied: No valid JWT token")
-            return jsonify({"error": "Authentication required", "reason": "No valid JWT token"}), 401
-
-        # Add user info to request context
-        request.current_user = user_payload
-        return f(*args, **kwargs)
-    return decorated_function
-
-
-def admin_required(f):
-    @wraps(f)
-    def decorated_function(*args, **kwargs):
-        # Use JWT authentication
-        import logging
-
-        from auth.jwt_manager import JWTManager
-
-        logger = logging.getLogger(__name__)
-        logger.debug(f"Admin access attempted for {f.__name__}")
-
-        user_payload = JWTManager.get_current_user()
-        if not user_payload:
-            logger.warning("Admin access denied - No valid JWT token")
-            return jsonify({"error": "Authentication required", "reason": "No valid JWT token"}), 401
-
-        if not user_payload.get("is_admin", False):
-            logger.warning(f"Admin access denied - insufficient privileges for user {user_payload.get('user_id')}")
-            return jsonify({"error": "Admin privileges required"}), 403
-
-        logger.debug(f"Admin access granted for user {user_payload.get('user_id')}")
-        # Add user info to request context
-        request.current_user = user_payload
-        return f(*args, **kwargs)
-    return decorated_function
-
-
-def tool_manager_required(f):
-    @wraps(f)
-    def decorated_function(*args, **kwargs):
-        # Use JWT authentication
-        from auth.jwt_manager import JWTManager
-        user_payload = JWTManager.get_current_user()
-        if not user_payload:
-            log_security_event("unauthorized_access_attempt", "Tool management access denied: No valid JWT token")
-            return jsonify({"error": "Authentication required", "reason": "No valid JWT token"}), 401
-
-        # Allow access for admins or Materials department users
-        if user_payload.get("is_admin", False) or user_payload.get("department") == "Materials":
-            # Add user info to request context
-            request.current_user = user_payload
-            return f(*args, **kwargs)
-
-        log_security_event("insufficient_permissions", f'Tool management access denied for user {user_payload.get("user_id")}')
-        return jsonify({"error": "Tool management privileges required"}), 403
-    return decorated_function
-
-
-def materials_manager_required(f):
-    @wraps(f)
-    def decorated_function(*args, **kwargs):
-        # Use JWT authentication
-        from auth.jwt_manager import JWTManager
-        user_payload = JWTManager.get_current_user()
-        if not user_payload:
-            log_security_event("unauthorized_access_attempt", "Materials management access denied: No valid JWT token")
-            return jsonify({"error": "Authentication required", "reason": "No valid JWT token"}), 401
-
-        # Check if user is admin or Materials department
-        if not (user_payload.get("is_admin", False) or user_payload.get("department") == "Materials"):
-            log_security_event("insufficient_permissions", f'Materials management access denied for user {user_payload.get("user_id")}')
-            return jsonify({"error": "Materials management privileges required"}), 403
-
-        # Add user info to request context
-        request.current_user = user_payload
-        return f(*args, **kwargs)
-    return decorated_function
+# Aliases matching the pattern used by other route modules:
+# both "tool manager" and "materials manager" are Materials-department access
+# (admins bypass the check inside department_required).
+login_required = jwt_required
+tool_manager_required = department_required("Materials")
+materials_manager_required = department_required("Materials")
 
 
 def register_routes(app):
