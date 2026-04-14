@@ -74,8 +74,21 @@ This directory contains comprehensive documentation for the SupplyLine MRO Suite
 ### Security & Deployment
 
 - **[SECURITY_SETUP.md](../SECURITY_SETUP.md)** - Security configuration and best practices
-- **[SECURITY_COMPLIANCE.md](../SECURITY_COMPLIANCE.md)** - Compliance and audit requirements
-- **[DEPLOYMENT.md](../DEPLOYMENT.md)** - Deployment guide for production environments
+- **[SECURITY_ANALYSIS.md](../SECURITY_ANALYSIS.md)** - Security posture audit
+- **[SECURITY_NOTES.md](../SECURITY_NOTES.md)** - Known issues and mitigations
+- **[DOCKER_DEPLOYMENT.md](../DOCKER_DEPLOYMENT.md)** - Docker deployment guide
+- **[UPDATING.md](../UPDATING.md)** - Update / upgrade procedures
+
+### Developer Reference
+
+- **[DEVELOPMENT.md](DEVELOPMENT.md)** - Repository guidelines and conventions
+- **[BRANCH_STRATEGY.md](BRANCH_STRATEGY.md)** - Branch and workflow conventions
+- **[TESTING_GUIDE.md](TESTING_GUIDE.md)** - Testing guide
+- **[TESTING_CHECKLIST.md](TESTING_CHECKLIST.md)** - Manual QA checklists
+- **[MESSAGING_INFRASTRUCTURE.md](MESSAGING_INFRASTRUCTURE.md)** - Messaging architecture
+- **[MESSAGING_QUICK_REFERENCE.md](MESSAGING_QUICK_REFERENCE.md)** - Messaging API quick reference
+- **[PASSWORD_MANAGEMENT_IMPLEMENTATION.md](PASSWORD_MANAGEMENT_IMPLEMENTATION.md)** - Password flow implementation
+- **[PERMISSION_SYSTEM_PLAN.md](PERMISSION_SYSTEM_PLAN.md)** - Permission system design
 
 ## What's New in v5.1.0
 
@@ -126,7 +139,7 @@ This directory contains comprehensive documentation for the SupplyLine MRO Suite
 ### For Administrators
 1. Review [WAREHOUSE_MANAGEMENT.md](WAREHOUSE_MANAGEMENT.md) for warehouse setup
 2. Check [SECURITY_SETUP.md](../SECURITY_SETUP.md) for security configuration
-3. See [DEPLOYMENT.md](../DEPLOYMENT.md) for production deployment
+3. See [DOCKER_DEPLOYMENT.md](../DOCKER_DEPLOYMENT.md) for production deployment
 
 ### For Developers
 1. Start with [API_DOCUMENTATION.md](API_DOCUMENTATION.md) for API reference

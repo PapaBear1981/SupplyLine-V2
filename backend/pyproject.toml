@@ -122,5 +122,4 @@ lines-after-imports = 2
 "routes.py" = ["I001"]  # Import sorting - complex file with many imports
 "routes_chemicals.py" = ["I001", "F541"]
 "routes_users.py" = ["I001", "F401", "W293", "W291"]
-"add_email_column.py" = ["ALL"]
 

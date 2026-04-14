@@ -1,10 +1,13 @@
-import traceback
+import logging
 from datetime import datetime, timedelta
 
 from flask import jsonify, request
 
 from auth import department_required
 from models import Chemical, ChemicalIssuance, User, db
+
+
+logger = logging.getLogger(__name__)
 
 
 # Helper functions for part number analytics
@@ -29,10 +32,9 @@ def calculate_inventory_stats(chemicals):
             # Collect unique lot numbers
             if c.lot_number:
                 lot_numbers.add(c.lot_number)
-        except Exception as e:
-            print(f"Error processing chemical {c.id}: {e!s}")
+        except Exception:
+            logger.exception("Error processing chemical %s", c.id)
             # Log the full error with traceback for better debugging
-            print(traceback.format_exc())
             # Consider if continuing with default values is appropriate
             active_count += 1  # Default to active
             current_inventory += getattr(c, "quantity", 0)
@@ -139,9 +141,8 @@ def calculate_waste_stats(chemicals):
                     depleted_count += 1
                 else:
                     other_archived_count += 1
-        except Exception as e:
-            print(f"Error processing waste stats for chemical {c.id}: {e!s}")
-            print(traceback.format_exc())
+        except Exception:
+            logger.exception("Error processing waste stats for chemical %s", c.id)
 
     # Calculate waste percentage (expired items as percentage of total archived)
     waste_percentage = 0
@@ -186,10 +187,8 @@ def calculate_shelf_life_stats(chemicals):
                     # Calculate usage percentage
                     usage_percentage = (used_life_days / shelf_life_days) * 100
                     usage_percentage_list.append(usage_percentage)
-        except Exception as e:
-            import traceback
-            print(f"Error processing shelf life stats for chemical {c.id}: {e!s}")
-            print(traceback.format_exc())
+        except Exception:
+            logger.exception("Error processing shelf life stats for chemical %s", c.id)
 
     # Calculate averages
     results = {
@@ -353,8 +352,8 @@ def register_chemical_analytics_routes(app):
                     "averages_by_part_number": []
                 }
             })
-        except Exception as e:
-            print(f"Error in waste analytics route: {e!s}")
+        except Exception:
+            logger.exception("Error in waste analytics route")
             return jsonify({"error": "An error occurred while generating waste analytics"}), 500
 
     # Get part number analytics
@@ -399,11 +398,9 @@ def register_chemical_analytics_routes(app):
                 },
                 "lot_numbers": lot_numbers
             })
-        except Exception as e:
-            error_traceback = traceback.format_exc()
-            print(f"Error in part analytics route: {e!s}")
-            print(f"Traceback: {error_traceback}")
-            return jsonify({"error": "An error occurred while generating part analytics", "details": str(e)}), 500
+        except Exception:
+            logger.exception("Error in part analytics route")
+            return jsonify({"error": "An error occurred while generating part analytics"}), 500
 
     # Get usage analytics
     @app.route("/api/chemicals/usage-analytics", methods=["GET"])
@@ -414,7 +411,7 @@ def register_chemical_analytics_routes(app):
             timeframe = request.args.get("timeframe", "month")  # week, month, quarter, year, all
             part_number = request.args.get("part_number")  # Required part number filter
 
-            print(f"Usage analytics request received: part_number={part_number}, timeframe={timeframe}")
+            logger.info(f"Usage analytics request received: part_number={part_number}, timeframe={timeframe}")
 
             # Part number is required
             if not part_number:
@@ -453,8 +450,8 @@ def register_chemical_analytics_routes(app):
                     else:
                         active_count += 1
                         current_inventory += getattr(c, "quantity", 0)
-                except Exception as e:
-                    print(f"Error processing chemical {c.id}: {e!s}")
+                except Exception:
+                    logger.exception("Error processing chemical %s", c.id)
                     active_count += 1  # Default to active
                     current_inventory += getattr(c, "quantity", 0)
 
@@ -533,8 +530,8 @@ def register_chemical_analytics_routes(app):
                         else:
                             projected_depletion_days = None
 
-            except Exception as e:
-                print(f"Error processing issuances: {e!s}")
+            except Exception:
+                logger.exception("Error processing issuances")
                 issuances = []
                 total_issued = 0
                 location_list = []
@@ -565,9 +562,6 @@ def register_chemical_analytics_routes(app):
                     "usage_efficiency_data": []  # Simplified
                 }
             })
-        except Exception as e:
-            import traceback
-            error_traceback = traceback.format_exc()
-            print(f"Error in usage analytics route: {e!s}")
-            print(f"Traceback: {error_traceback}")
-            return jsonify({"error": "An error occurred while generating usage analytics", "details": str(e)}), 500
+        except Exception:
+            logger.exception("Error in usage analytics route")
+            return jsonify({"error": "An error occurred while generating usage analytics"}), 500

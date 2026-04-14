@@ -22,7 +22,7 @@ def test_avatar_upload_rejects_non_image(client, auth_headers):
     }
 
     response = client.post(
-        "/api/user/avatar",
+        "/api/profile/avatar",
         headers=auth_headers,
         data=data,
         content_type="multipart/form-data"
@@ -42,7 +42,7 @@ def test_avatar_upload_rejects_large_image(client, auth_headers, _sample_png_byt
     }
 
     response = client.post(
-        "/api/user/avatar",
+        "/api/profile/avatar",
         headers=auth_headers,
         data=data,
         content_type="multipart/form-data"

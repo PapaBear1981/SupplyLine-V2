@@ -70,8 +70,9 @@ packaging==25.0
     # via
     #   gunicorn
     #   pytest
-pillow==12.1.1
+pillow==12.2.0
     # via
+    #   -r requirements.in
     #   reportlab
     #   weasyprint
 pluggy==1.6.0

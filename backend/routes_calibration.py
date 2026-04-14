@@ -58,9 +58,9 @@ def register_calibration_routes(app):
                 }
             }), 200
 
-        except Exception as e:
-            print(f"Error getting calibrations: {e!s}")
-            return jsonify({"error": f"An error occurred: {e!s}"}), 500
+        except Exception:
+            logger.exception("Error getting calibrations")
+            return jsonify({"error": "An internal server error occurred"}), 500
 
     # Get tools due for calibration
     @app.route("/api/calibrations/due", methods=["GET"])
@@ -109,7 +109,7 @@ def register_calibration_routes(app):
                 "error_type": type(e).__name__,
                 "error_message": str(e)
             })
-            return jsonify({"error": f"An error occurred: {e!s}"}), 500
+            return jsonify({"error": "An internal server error occurred"}), 500
 
     # Get tools overdue for calibration
     @app.route("/api/calibrations/overdue", methods=["GET"])
@@ -141,7 +141,7 @@ def register_calibration_routes(app):
                 "error_type": type(e).__name__,
                 "error_message": str(e)
             })
-            return jsonify({"error": f"An error occurred: {e!s}"}), 500
+            return jsonify({"error": "An internal server error occurred"}), 500
 
     # Get calibration history for a specific tool
     @app.route("/api/tools/<int:id>/calibrations", methods=["GET"])
@@ -176,9 +176,9 @@ def register_calibration_routes(app):
                 }
             }), 200
 
-        except Exception as e:
-            print(f"Error getting tool calibration history: {e!s}")
-            return jsonify({"error": f"An error occurred: {e!s}"}), 500
+        except Exception:
+            logger.exception("Error getting tool calibration history")
+            return jsonify({"error": "An internal server error occurred"}), 500
 
     # Add a new calibration record for a tool
     @app.route("/api/tools/<int:id>/calibrations", methods=["POST"])
@@ -323,9 +323,9 @@ def register_calibration_routes(app):
                 }
             }), 200
 
-        except Exception as e:
-            print(f"Error getting calibration standards: {e!s}")
-            return jsonify({"error": f"An error occurred: {e!s}"}), 500
+        except Exception:
+            logger.exception("Error getting calibration standards")
+            return jsonify({"error": "An internal server error occurred"}), 500
 
     # Add a new calibration standard
     @app.route("/api/calibration-standards", methods=["POST"])
@@ -360,8 +360,8 @@ def register_calibration_routes(app):
                 if "Z" in exp_date_str:
                     exp_date_str = exp_date_str.replace("Z", "")
                 expiration_date = datetime.fromisoformat(exp_date_str)
-            except ValueError as e:
-                print(f"Error parsing dates: {e!s}")
+            except ValueError:
+                logger.exception("Error parsing dates")
                 return jsonify({"error": "Invalid date format"}), 400
 
             # Create standard
@@ -402,9 +402,9 @@ def register_calibration_routes(app):
                 "standard": standard.to_dict()
             }), 201
 
-        except Exception as e:
-            print(f"Error adding calibration standard: {e!s}")
-            return jsonify({"error": f"An error occurred: {e!s}"}), 500
+        except Exception:
+            logger.exception("Error adding calibration standard")
+            return jsonify({"error": "An internal server error occurred"}), 500
 
     # Get a specific calibration record
     @app.route("/api/tools/<int:tool_id>/calibrations/<int:calibration_id>", methods=["GET"])
@@ -430,9 +430,9 @@ def register_calibration_routes(app):
 
             return jsonify(calibration_data), 200
 
-        except Exception as e:
-            print(f"Error getting calibration details: {e!s}")
-            return jsonify({"error": f"An error occurred: {e!s}"}), 500
+        except Exception:
+            logger.exception("Error getting calibration details")
+            return jsonify({"error": "An internal server error occurred"}), 500
 
     # Get a specific calibration standard
     @app.route("/api/calibration-standards/<int:id>", methods=["GET"])
@@ -442,9 +442,9 @@ def register_calibration_routes(app):
             standard = CalibrationStandard.query.get_or_404(id)
             return jsonify(standard.to_dict()), 200
 
-        except Exception as e:
-            print(f"Error getting calibration standard: {e!s}")
-            return jsonify({"error": f"An error occurred: {e!s}"}), 500
+        except Exception:
+            logger.exception("Error getting calibration standard")
+            return jsonify({"error": "An internal server error occurred"}), 500
 
     # Update a calibration standard
     @app.route("/api/calibration-standards/<int:id>", methods=["PUT"])
@@ -476,8 +476,8 @@ def register_calibration_routes(app):
                     if "Z" in cert_date_str:
                         cert_date_str = cert_date_str.replace("Z", "")
                     standard.certification_date = datetime.fromisoformat(cert_date_str)
-                except ValueError as e:
-                    print(f"Error parsing certification date: {e!s}")
+                except ValueError:
+                    logger.exception("Error parsing certification date")
                     return jsonify({"error": "Invalid certification date format"}), 400
 
             if "expiration_date" in data:
@@ -489,8 +489,8 @@ def register_calibration_routes(app):
                     if "Z" in exp_date_str:
                         exp_date_str = exp_date_str.replace("Z", "")
                     standard.expiration_date = datetime.fromisoformat(exp_date_str)
-                except ValueError as e:
-                    print(f"Error parsing expiration date: {e!s}")
+                except ValueError:
+                    logger.exception("Error parsing expiration date")
                     return jsonify({"error": "Invalid expiration date format"}), 400
 
             # Save changes
@@ -518,7 +518,7 @@ def register_calibration_routes(app):
                 "error_type": type(e).__name__,
                 "error_message": str(e)
             })
-            return jsonify({"error": f"An error occurred: {e!s}"}), 500
+            return jsonify({"error": "An internal server error occurred"}), 500
 
     @app.route("/api/calibrations/<int:calibration_id>/certificate", methods=["POST"])
     @tool_manager_required

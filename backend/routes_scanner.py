@@ -1,8 +1,12 @@
+import logging
 from datetime import datetime
 
 from flask import current_app, jsonify, render_template_string, request
 
 from models import Chemical, Tool, ToolCalibration
+
+
+logger = logging.getLogger(__name__)
 
 
 def register_scanner_routes(app):
@@ -127,8 +131,8 @@ def register_scanner_routes(app):
             # If no matching item found
             return jsonify({"error": "No matching item found for the provided code"}), 404
 
-        except Exception as e:
-            print(f"Error in scanner lookup: {e!s}")
+        except Exception:
+            logger.exception("Error in scanner lookup")
             return jsonify({"error": "An error occurred while processing the code"}), 500
 
     # Get barcode data for a tool
@@ -188,8 +192,8 @@ def register_scanner_routes(app):
                 "last_calibration_date": tool.last_calibration_date.isoformat() if tool.last_calibration_date else None,
                 "next_calibration_date": tool.next_calibration_date.isoformat() if tool.next_calibration_date else None
             })
-        except Exception as e:
-            print(f"Error in tool barcode route: {e!s}")
+        except Exception:
+            logger.exception("Error in tool barcode route")
             return jsonify({"error": "An error occurred while generating barcode data"}), 500
 
     # Public tool view page (accessible via QR code scan)
@@ -464,8 +468,8 @@ def register_scanner_routes(app):
                 format_date=format_date
             )
 
-        except Exception as e:
-            print(f"Error in tool view page: {e!s}")
+        except Exception:
+            logger.exception("Error in tool view page")
             return "<html><body><h1>Error</h1><p>Tool not found or an error occurred.</p></body></html>", 404
 
     # Public chemical view page (accessible via QR code scan)
@@ -679,6 +683,6 @@ def register_scanner_routes(app):
                 format_date=format_date
             )
 
-        except Exception as e:
-            print(f"Error in chemical view page: {e!s}")
+        except Exception:
+            logger.exception("Error in chemical view page")
             return "<html><body><h1>Error</h1><p>Chemical not found or an error occurred.</p></body></html>", 404

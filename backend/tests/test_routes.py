@@ -410,7 +410,7 @@ class TestUserRoutes:
             "department": "Updated Engineering"
         }
 
-        response = client.put("/api/user/profile",
+        response = client.put("/api/profile",
                             json=update_data,
                             headers=auth_headers_user)
 
@@ -431,7 +431,7 @@ class TestUserRoutes:
             "new_password": "NewPassword123!"
         }
 
-        response = client.put("/api/user/password",
+        response = client.put("/api/profile/password",
                             json=password_data,
                             headers=auth_headers_user)
 
@@ -451,7 +451,7 @@ class TestUserRoutes:
             "new_password": "NewPassword123!"
         }
 
-        response = client.put("/api/user/password",
+        response = client.put("/api/profile/password",
                             json=password_data,
                             headers=auth_headers_user)
 

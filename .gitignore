@@ -90,16 +90,18 @@ portable-build/
 check_*.py
 backend/check_*.py
 
+# Type checker output (generated artifacts)
+pyright_results*.json
+backend/pyright_results*.json
+
 
 # Uploaded order documentation
 backend/static/order_documents/
 
 # AI/Code assistant directories
 .codex/
-.specify/
 .claude/
 supplyline_mro_suite/.codex/
-supplyline_mro_suite/.specify/
 
 # Security - credential files
 push-to-github.bat

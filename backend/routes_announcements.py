@@ -82,9 +82,9 @@ def register_announcement_routes(app):
                 "pages": (total + limit - 1) // limit  # Ceiling division
             }), 200
 
-        except Exception as e:
-            print(f"Error getting announcements: {e!s}")
-            return jsonify({"error": f"An error occurred: {e!s}"}), 500
+        except Exception:
+            logger.exception("Error getting announcements")
+            return jsonify({"error": "An internal server error occurred"}), 500
 
     # Get a specific announcement
     @app.route("/api/announcements/<int:id>", methods=["GET"])
@@ -116,9 +116,9 @@ def register_announcement_routes(app):
 
             return jsonify(announcement_dict), 200
 
-        except Exception as e:
-            print(f"Error getting announcement: {e!s}")
-            return jsonify({"error": f"An error occurred: {e!s}"}), 500
+        except Exception:
+            logger.exception("Error getting announcement")
+            return jsonify({"error": "An internal server error occurred"}), 500
 
     # Create a new announcement (admin only)
     @app.route("/api/announcements", methods=["POST"])
@@ -181,10 +181,10 @@ def register_announcement_routes(app):
 
             return jsonify(announcement.to_dict()), 201
 
-        except Exception as e:
+        except Exception:
             db.session.rollback()
-            print(f"Error creating announcement: {e!s}")
-            return jsonify({"error": f"An error occurred: {e!s}"}), 500
+            logger.exception("Error creating announcement")
+            return jsonify({"error": "An internal server error occurred"}), 500
 
     # Update an announcement (admin only)
     @app.route("/api/announcements/<int:id>", methods=["PUT"])
@@ -246,10 +246,10 @@ def register_announcement_routes(app):
 
             return jsonify(announcement.to_dict()), 200
 
-        except Exception as e:
+        except Exception:
             db.session.rollback()
-            print(f"Error updating announcement: {e!s}")
-            return jsonify({"error": f"An error occurred: {e!s}"}), 500
+            logger.exception("Error updating announcement")
+            return jsonify({"error": "An internal server error occurred"}), 500
 
     # Delete an announcement (admin only)
     @app.route("/api/announcements/<int:id>", methods=["DELETE"])
@@ -293,10 +293,10 @@ def register_announcement_routes(app):
 
             return jsonify({"message": "Announcement deleted successfully"}), 200
 
-        except Exception as e:
+        except Exception:
             db.session.rollback()
-            print(f"Error deleting announcement: {e!s}")
-            return jsonify({"error": f"An error occurred: {e!s}"}), 500
+            logger.exception("Error deleting announcement")
+            return jsonify({"error": "An internal server error occurred"}), 500
 
     # Mark an announcement as read
     @app.route("/api/announcements/<int:id>/read", methods=["POST"])
@@ -328,7 +328,7 @@ def register_announcement_routes(app):
 
             return jsonify({"message": "Announcement marked as read"}), 200
 
-        except Exception as e:
+        except Exception:
             db.session.rollback()
-            print(f"Error marking announcement as read: {e!s}")
-            return jsonify({"error": f"An error occurred: {e!s}"}), 500
+            logger.exception("Error marking announcement as read")
+            return jsonify({"error": "An internal server error occurred"}), 500

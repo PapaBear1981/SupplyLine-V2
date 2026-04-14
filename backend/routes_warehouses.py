@@ -3,6 +3,7 @@ Warehouse management routes.
 Handles CRUD operations for warehouses and warehouse inventory.
 """
 
+import logging
 from datetime import datetime
 
 from flask import Blueprint, jsonify, request
@@ -10,6 +11,9 @@ from sqlalchemy import or_
 
 from auth.jwt_manager import permission_required
 from models import Chemical, Tool, User, Warehouse, db
+
+
+logger = logging.getLogger(__name__)
 
 
 warehouses_bp = Blueprint("warehouses", __name__)
@@ -84,11 +88,9 @@ def get_warehouses():
 
         return jsonify(response), 200
 
-    except Exception as e:
-        import traceback
-        print(f"ERROR in get_warehouses: {e!s}")
-        print(traceback.format_exc())
-        return jsonify({"error": str(e)}), 500
+    except Exception:
+        logger.exception("Error in get_warehouses")
+        return jsonify({"error": "An internal server error occurred"}), 500
 
 
 @warehouses_bp.route("/warehouses", methods=["POST"])
@@ -139,12 +141,10 @@ def create_warehouse():
             "warehouse": warehouse.to_dict()
         }), 201
 
-    except Exception as e:
-        import traceback
-        print(f"ERROR in create_warehouse: {e!s}")
-        print(traceback.format_exc())
+    except Exception:
+        logger.exception("Error in create_warehouse")
         db.session.rollback()
-        return jsonify({"error": str(e)}), 500
+        return jsonify({"error": "An internal server error occurred"}), 500
 
 
 @warehouses_bp.route("/warehouses/<int:warehouse_id>", methods=["GET"])
@@ -159,8 +159,8 @@ def get_warehouse(warehouse_id):
 
         return jsonify(warehouse.to_dict()), 200
 
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
+    except Exception:
+        return jsonify({"error": "An internal server error occurred"}), 500
 
 
 @warehouses_bp.route("/warehouses/<int:warehouse_id>", methods=["PUT"])
@@ -218,9 +218,9 @@ def update_warehouse(warehouse_id):
             "warehouse": warehouse.to_dict()
         }), 200
 
-    except Exception as e:
+    except Exception:
         db.session.rollback()
-        return jsonify({"error": str(e)}), 500
+        return jsonify({"error": "An internal server error occurred"}), 500
 
 
 @warehouses_bp.route("/warehouses/<int:warehouse_id>", methods=["DELETE"])
@@ -257,9 +257,9 @@ def delete_warehouse(warehouse_id):
             "warehouse": warehouse.to_dict()
         }), 200
 
-    except Exception as e:
+    except Exception:
         db.session.rollback()
-        return jsonify({"error": str(e)}), 500
+        return jsonify({"error": "An internal server error occurred"}), 500
 
 
 @warehouses_bp.route("/warehouses/<int:warehouse_id>/stats", methods=["GET"])
@@ -274,8 +274,6 @@ def get_warehouse_stats(warehouse_id):
 
         # Debug: Check direct query
         tools_count_direct = Tool.query.filter_by(warehouse_id=warehouse_id).count()
-        print(f"DEBUG: Warehouse {warehouse_id} - Direct query tools count: {tools_count_direct}")
-        print(f"DEBUG: Warehouse {warehouse_id} - Relationship tools count: {warehouse.tools.count()}")
 
         # Get counts by category
         tools_by_category = db.session.query(
@@ -321,8 +319,8 @@ def get_warehouse_stats(warehouse_id):
             }
         }), 200
 
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
+    except Exception:
+        return jsonify({"error": "An internal server error occurred"}), 500
 
 
 @warehouses_bp.route("/warehouses/<int:warehouse_id>/tools", methods=["GET"])
@@ -383,8 +381,8 @@ def get_warehouse_tools(warehouse_id):
             "pages": pagination.pages
         }), 200
 
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
+    except Exception:
+        return jsonify({"error": "An internal server error occurred"}), 500
 
 
 @warehouses_bp.route("/warehouses/<int:warehouse_id>/chemicals", methods=["GET"])
@@ -445,8 +443,8 @@ def get_warehouse_chemicals(warehouse_id):
             "pages": pagination.pages
         }), 200
 
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
+    except Exception:
+        return jsonify({"error": "An internal server error occurred"}), 500
 
 
 @warehouses_bp.route("/warehouses/<int:warehouse_id>/inventory", methods=["GET"])
@@ -523,5 +521,5 @@ def get_warehouse_inventory(warehouse_id):
             "total": len(inventory)
         }), 200
 
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
+    except Exception:
+        return jsonify({"error": "An internal server error occurred"}), 500

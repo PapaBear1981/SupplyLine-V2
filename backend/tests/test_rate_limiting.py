@@ -115,7 +115,7 @@ class TestAPIRateLimiting:
             "/api/tools",
             "/api/chemicals",
             "/api/checkouts",
-            "/api/user/profile"
+            "/api/profile"
         ]
 
         # Make requests to different endpoints
