@@ -83,3 +83,7 @@ pyright==1.1.390
 cryptography==46.0.5
 pyotp==2.9.0  # Generate and verify TOTP codes
 qrcode[pil]==8.0  # Generate QR codes for authenticator apps
+
+# Image library (transitive dep of reportlab, weasyprint, qrcode[pil])
+# Pinned explicitly to fix CVE-2026-40192 (FITS GZIP decompression bomb)
+pillow==12.2.0
