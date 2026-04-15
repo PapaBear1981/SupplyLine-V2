@@ -1,5 +1,7 @@
 import { baseApi } from '@services/baseApi';
 import type {
+  BatchCheckoutRequest,
+  BatchCheckoutResponse,
   CheckinRequest,
   CheckoutListResponse,
   CheckoutQueryParams,
@@ -38,6 +40,22 @@ export const checkoutApi = baseApi.injectEndpoints({
       }),
       invalidatesTags: (_result, _error, { tool_id }) => [
         { type: 'Tool' as const, id: tool_id },
+        { type: 'Tool' as const, id: 'LIST' },
+        { type: 'Checkout' as const, id: 'LIST' },
+        { type: 'Checkout' as const, id: 'ACTIVE' },
+        { type: 'Checkout' as const, id: 'MY' },
+        { type: 'Checkout' as const, id: 'STATS' },
+      ],
+    }),
+
+    batchCheckout: builder.mutation<BatchCheckoutResponse, BatchCheckoutRequest>({
+      query: (body) => ({
+        url: '/api/tool-checkout/batch',
+        method: 'POST',
+        body,
+      }),
+      invalidatesTags: (_result, _error, { tool_ids }) => [
+        ...tool_ids.map((id) => ({ type: 'Tool' as const, id })),
         { type: 'Tool' as const, id: 'LIST' },
         { type: 'Checkout' as const, id: 'LIST' },
         { type: 'Checkout' as const, id: 'ACTIVE' },
@@ -288,6 +306,7 @@ export const {
 
   // Checkout operations
   useCreateCheckoutMutation,
+  useBatchCheckoutMutation,
   useCheckinToolMutation,
 
   // Queries

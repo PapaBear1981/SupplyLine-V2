@@ -292,6 +292,208 @@ def register_tool_checkout_routes(app):
             return jsonify({"error": str(e)}), 500
 
     # ============================================
+    # Batch Checkout Endpoint
+    # ============================================
+    @app.route("/api/tool-checkout/batch", methods=["POST"])
+    @permission_required("checkout.create")
+    def batch_tool_checkout():
+        """
+        Check out multiple tools at once to the same user.
+        Each tool is processed independently; partial failures are reported
+        without rolling back successful checkouts.
+        Returns a per-tool result list along with aggregate counts.
+        """
+        try:
+            data = request.get_json() or {}
+            current_user_id = request.current_user.get("user_id")
+            user_payload = request.current_user
+
+            tool_ids = data.get("tool_ids")
+            if not tool_ids or not isinstance(tool_ids, list) or len(tool_ids) == 0:
+                return jsonify({"error": "tool_ids must be a non-empty list"}), 400
+
+            # Deduplicate while preserving order
+            seen = set()
+            unique_tool_ids = []
+            for tid in tool_ids:
+                if tid not in seen:
+                    seen.add(tid)
+                    unique_tool_ids.append(tid)
+
+            checkout_user_id = data.get("user_id") or user_payload.get("user_id")
+            checkout_user = db.session.get(User, checkout_user_id)
+            if not checkout_user:
+                return jsonify({"error": f"User with ID {checkout_user_id} not found"}), 404
+
+            # Parse expected return date once for all tools
+            expected_return_date = data.get("expected_return_date")
+            if expected_return_date:
+                try:
+                    if isinstance(expected_return_date, str):
+                        expected_return_date = datetime.fromisoformat(
+                            expected_return_date.replace("Z", "+00:00").replace("+00:00", "")
+                        )
+                except (ValueError, TypeError):
+                    expected_return_date = datetime.now() + timedelta(days=7)
+            else:
+                expected_return_date = datetime.now() + timedelta(days=7)
+
+            results = []
+            succeeded = 0
+            failed = 0
+
+            for tool_id in unique_tool_ids:
+                tool = db.session.get(Tool, tool_id)
+                if not tool:
+                    results.append({
+                        "tool_id": tool_id,
+                        "tool_number": None,
+                        "success": False,
+                        "error": f"Tool with ID {tool_id} not found",
+                    })
+                    failed += 1
+                    continue
+
+                # Check availability
+                blocking_reasons = []
+
+                active_checkout = Checkout.query.filter_by(
+                    tool_id=tool_id, return_date=None
+                ).first()
+                if active_checkout:
+                    blocking_reasons.append(
+                        f"Already checked out to {active_checkout.user.name if active_checkout.user else 'Unknown'}"
+                    )
+
+                if tool.requires_calibration and tool.calibration_status == "overdue":
+                    blocking_reasons.append("Calibration is overdue")
+
+                if tool.status == "maintenance":
+                    blocking_reasons.append(
+                        f"In maintenance: {tool.status_reason or 'No reason provided'}"
+                    )
+                if tool.status == "retired":
+                    blocking_reasons.append(
+                        f"Retired: {tool.status_reason or 'No reason provided'}"
+                    )
+
+                if tool.condition and tool.condition.lower() in ["damaged", "unusable", "broken"]:
+                    blocking_reasons.append(f"Marked as {tool.condition}")
+
+                if blocking_reasons:
+                    results.append({
+                        "tool_id": tool_id,
+                        "tool_number": tool.tool_number,
+                        "success": False,
+                        "error": "; ".join(blocking_reasons),
+                    })
+                    failed += 1
+                    continue
+
+                # Create the checkout
+                try:
+                    checkout = Checkout(
+                        tool_id=tool_id,
+                        user_id=checkout_user_id,
+                        expected_return_date=expected_return_date,
+                        checkout_notes=data.get("notes") or data.get("checkout_notes"),
+                        condition_at_checkout=data.get("condition_at_checkout") or tool.condition,
+                        work_order=data.get("work_order"),
+                        project=data.get("project"),
+                    )
+                    db.session.add(checkout)
+
+                    old_status = tool.status
+                    tool.status = "checked_out"
+
+                    db.session.flush()
+
+                    history_entry = ToolHistory.create_event(
+                        tool_id=tool_id,
+                        event_type="checkout",
+                        user_id=current_user_id,
+                        description=f"Checked out to {checkout_user.name} (batch)",
+                        details={
+                            "checkout_user_id": checkout_user_id,
+                            "checkout_user_name": checkout_user.name,
+                            "expected_return_date": expected_return_date.isoformat(),
+                            "work_order": data.get("work_order"),
+                            "project": data.get("project"),
+                            "notes": data.get("notes"),
+                            "batch": True,
+                        },
+                        related_checkout_id=checkout.id,
+                        old_status=old_status,
+                        new_status="checked_out",
+                    )
+                    db.session.add(history_entry)
+
+                    AuditLog.log(
+                        user_id=current_user_id,
+                        action="tool_checkout_batch",
+                        resource_type="tool",
+                        resource_id=tool_id,
+                        details={
+                            "tool_number": tool.tool_number,
+                            "checkout_user_id": checkout_user_id,
+                            "checkout_user_name": checkout_user.name,
+                            "checkout_id": checkout.id,
+                            "batch": True,
+                        },
+                        ip_address=request.remote_addr,
+                    )
+
+                    db.session.commit()
+
+                    results.append({
+                        "tool_id": tool_id,
+                        "tool_number": tool.tool_number,
+                        "success": True,
+                        "checkout": checkout.to_dict(),
+                    })
+                    succeeded += 1
+                    logger.info(f"Batch: tool {tool.tool_number} checked out to {checkout_user.name}")
+
+                except Exception as tool_error:
+                    db.session.rollback()
+                    logger.warning(f"Batch checkout failed for tool {tool_id}: {tool_error}")
+                    results.append({
+                        "tool_id": tool_id,
+                        "tool_number": tool.tool_number if tool else None,
+                        "success": False,
+                        "error": str(tool_error),
+                    })
+                    failed += 1
+
+            # Log a single user activity for the whole batch
+            try:
+                tool_numbers = [r["tool_number"] for r in results if r["success"]]
+                if tool_numbers:
+                    activity = UserActivity(
+                        user_id=current_user_id,
+                        activity_type="tool_checkout_batch",
+                        description=f"Batch checkout of {len(tool_numbers)} tool(s) to {checkout_user.name}: {', '.join(tool_numbers)}",
+                        ip_address=request.remote_addr,
+                    )
+                    db.session.add(activity)
+                    db.session.commit()
+            except Exception as e:
+                logger.warning(f"Failed to record batch checkout activity: {e}")
+
+            status_code = 201 if failed == 0 else (207 if succeeded > 0 else 409)
+            return jsonify({
+                "results": results,
+                "total": len(results),
+                "succeeded": succeeded,
+                "failed": failed,
+            }), status_code
+
+        except Exception as e:
+            db.session.rollback()
+            logger.exception("Error during batch tool checkout")
+            return jsonify({"error": str(e)}), 500
+
+    # ============================================
     # Enhanced Check-In Endpoint
     # ============================================
     @app.route("/api/tool-checkout/<int:checkout_id>/checkin", methods=["POST"])

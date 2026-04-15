@@ -154,6 +154,31 @@ export interface CheckoutRequest {
   project?: string;
 }
 
+export interface BatchCheckoutRequest {
+  tool_ids: number[];
+  user_id?: number;
+  expected_return_date?: string;
+  notes?: string;
+  condition_at_checkout?: ToolCondition;
+  work_order?: string;
+  project?: string;
+}
+
+export interface BatchCheckoutResult {
+  tool_id: number;
+  tool_number: string | null;
+  success: boolean;
+  checkout?: ToolCheckout;
+  error?: string;
+}
+
+export interface BatchCheckoutResponse {
+  results: BatchCheckoutResult[];
+  total: number;
+  succeeded: number;
+  failed: number;
+}
+
 export interface CheckinRequest {
   condition_at_return?: ToolCondition;
   return_notes?: string;
