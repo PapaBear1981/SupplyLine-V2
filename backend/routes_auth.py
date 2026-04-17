@@ -263,7 +263,7 @@ def register_auth_routes(app):
                 max_age=int(tokens["expires_in"]),  # Match actual JWT lifetime
                 httponly=True,  # Prevents JavaScript access
                 secure=current_app.config.get("SESSION_COOKIE_SECURE", True),  # HTTPS only in production
-                samesite="Lax",  # CSRF protection
+                samesite=current_app.config.get("COOKIE_SAMESITE", "Lax"),
                 path="/"
             )
 
@@ -276,7 +276,7 @@ def register_auth_routes(app):
                 max_age=refresh_token_max_age,
                 httponly=True,  # Prevents JavaScript access
                 secure=current_app.config.get("SESSION_COOKIE_SECURE", True),  # HTTPS only in production
-                samesite="Lax",  # CSRF protection
+                samesite=current_app.config.get("COOKIE_SAMESITE", "Lax"),
                 path="/"
             )
 
@@ -338,7 +338,7 @@ def register_auth_routes(app):
                 max_age=int(new_tokens["expires_in"]),  # Match actual JWT lifetime
                 httponly=True,
                 secure=current_app.config.get("SESSION_COOKIE_SECURE", True),
-                samesite="Lax",
+                samesite=current_app.config.get("COOKIE_SAMESITE", "Lax"),
                 path="/"
             )
 
@@ -349,7 +349,7 @@ def register_auth_routes(app):
                 max_age=604800,  # 7 days
                 httponly=True,
                 secure=current_app.config.get("SESSION_COOKIE_SECURE", True),
-                samesite="Lax",
+                samesite=current_app.config.get("COOKIE_SAMESITE", "Lax"),
                 path="/"
             )
 
@@ -404,7 +404,7 @@ def register_auth_routes(app):
                 max_age=0,
                 httponly=True,
                 secure=current_app.config.get("SESSION_COOKIE_SECURE", True),
-                samesite="Lax",
+                samesite=current_app.config.get("COOKIE_SAMESITE", "Lax"),
                 path="/"
             )
 
@@ -415,7 +415,7 @@ def register_auth_routes(app):
                 max_age=0,
                 httponly=True,
                 secure=current_app.config.get("SESSION_COOKIE_SECURE", True),
-                samesite="Lax",
+                samesite=current_app.config.get("COOKIE_SAMESITE", "Lax"),
                 path="/"
             )
 
@@ -593,7 +593,7 @@ def register_auth_routes(app):
                 max_age=int(tokens["expires_in"]),  # Match actual JWT lifetime
                 httponly=True,  # Prevents JavaScript access
                 secure=current_app.config.get("SESSION_COOKIE_SECURE", True),  # HTTPS only in production
-                samesite="Lax",  # CSRF protection
+                samesite=current_app.config.get("COOKIE_SAMESITE", "Lax"),
                 path="/"
             )
 
@@ -604,7 +604,7 @@ def register_auth_routes(app):
                 max_age=604800,  # 7 days
                 httponly=True,  # Prevents JavaScript access
                 secure=current_app.config.get("SESSION_COOKIE_SECURE", True),  # HTTPS only in production
-                samesite="Lax",  # CSRF protection
+                samesite=current_app.config.get("COOKIE_SAMESITE", "Lax"),
                 path="/"
             )
 

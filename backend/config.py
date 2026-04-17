@@ -73,6 +73,12 @@ class Config:
     SESSION_COOKIE_HTTPONLY = True  # Prevent JavaScript access to session cookies
     SESSION_COOKIE_SAMESITE = "Lax"  # CSRF protection
 
+    # Auth cookie SameSite policy.
+    # Use "Lax" for same-origin dev; set COOKIE_SAMESITE=None in production
+    # when the frontend and backend are on different domains (e.g. Render).
+    # "None" requires Secure=True (HTTPS), which Render always enforces.
+    COOKIE_SAMESITE = os.environ.get("COOKIE_SAMESITE", "Lax")
+
     # Structured logging configuration
     LOGGING_CONFIG = {
         "version": 1,
