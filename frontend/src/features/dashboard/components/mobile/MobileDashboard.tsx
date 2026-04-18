@@ -1,4 +1,7 @@
 import { useMemo, useState } from 'react';
+import dayjs from 'dayjs';
+import relativeTime from 'dayjs/plugin/relativeTime';
+dayjs.extend(relativeTime);
 import { useNavigate } from 'react-router-dom';
 import {
   Card,
@@ -263,34 +266,68 @@ export const MobileDashboard = () => {
           <Skeleton.Paragraph lineCount={2} animated />
         ) : (
           <List>
-            <List.Item
-              prefix={<InboxOutlined style={{ fontSize: 20, color: '#1890ff' }} />}
-              description={
-                oncallData?.materials.user
-                  ? `#${oncallData.materials.user.employee_number}${
-                      oncallData.materials.user.department
-                        ? ` · ${oncallData.materials.user.department}`
-                        : ''
-                    }`
-                  : 'No one assigned'
-              }
-            >
-              Materials: {oncallData?.materials.user?.name || '—'}
-            </List.Item>
-            <List.Item
-              prefix={<ToolOutlined style={{ fontSize: 20, color: '#fa8c16' }} />}
-              description={
-                oncallData?.maintenance.user
-                  ? `#${oncallData.maintenance.user.employee_number}${
-                      oncallData.maintenance.user.department
-                        ? ` · ${oncallData.maintenance.user.department}`
-                        : ''
-                    }`
-                  : 'No one assigned'
-              }
-            >
-              Maintenance: {oncallData?.maintenance.user?.name || '—'}
-            </List.Item>
+            {[
+              { role: 'Materials', icon: <InboxOutlined style={{ fontSize: 16, color: '#1890ff' }} />, color: '#1890ff', entry: oncallData?.materials },
+              { role: 'Maintenance', icon: <ToolOutlined style={{ fontSize: 16, color: '#fa8c16' }} />, color: '#fa8c16', entry: oncallData?.maintenance },
+            ].map(({ role, icon, color, entry }) => (
+              <List.Item
+                key={role}
+                prefix={
+                  entry?.user?.avatar ? (
+                    <img
+                      src={entry.user.avatar}
+                      alt=""
+                      style={{ width: 40, height: 40, borderRadius: '50%', objectFit: 'cover' }}
+                    />
+                  ) : (
+                    <div style={{
+                      width: 40, height: 40, borderRadius: '50%', flexShrink: 0,
+                      background: entry?.user ? `${color}20` : 'var(--adm-color-fill-content)',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      color: entry?.user ? color : 'var(--adm-color-text-secondary)',
+                      fontWeight: 700, fontSize: 14,
+                    }}>
+                      {entry?.user
+                        ? entry.user.name.split(' ').map((n: string) => n[0]).join('').toUpperCase().slice(0, 2)
+                        : '—'}
+                    </div>
+                  )
+                }
+                description={
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 2, marginTop: 2 }}>
+                    {entry?.user ? (
+                      <>
+                        <span style={{ fontSize: 12, color: 'var(--adm-color-text-secondary)' }}>
+                          #{entry.user.employee_number}{entry.user.department ? ` · ${entry.user.department}` : ''}
+                        </span>
+                        {entry.user.email && (
+                          <a
+                            href={`mailto:${entry.user.email}`}
+                            style={{ fontSize: 12, color: color }}
+                            onClick={e => e.stopPropagation()}
+                          >
+                            {entry.user.email}
+                          </a>
+                        )}
+                        {entry.updated_at && (
+                          <span style={{ fontSize: 11, color: 'var(--adm-color-text-secondary)', opacity: 0.65 }}>
+                            Updated {dayjs(entry.updated_at).fromNow()}
+                            {entry.updated_by ? ` by ${entry.updated_by.name}` : ''}
+                          </span>
+                        )}
+                      </>
+                    ) : (
+                      <span style={{ fontSize: 12, color: 'var(--adm-color-text-secondary)' }}>No one assigned</span>
+                    )}
+                  </div>
+                }
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontWeight: 500 }}>
+                  {icon}
+                  {role}: {entry?.user?.name || '—'}
+                </div>
+              </List.Item>
+            ))}
           </List>
         )}
       </Card>

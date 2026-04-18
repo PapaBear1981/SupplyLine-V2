@@ -19,13 +19,16 @@ import {
   Empty,
   Selector,
 } from 'antd-mobile';
-import { AddOutline, CloseOutline } from 'antd-mobile-icons';
+import { AddOutline, CloseOutline, DeleteOutline } from 'antd-mobile-icons';
 import {
   SwapOutlined,
   WarningOutlined,
   UserOutlined,
   ClockCircleOutlined,
   HistoryOutlined,
+  ShoppingCartOutlined,
+  CheckCircleOutlined,
+  CloseCircleOutlined,
 } from '@ant-design/icons';
 import dayjs from 'dayjs';
 import relativeTime from 'dayjs/plugin/relativeTime';
@@ -36,11 +39,12 @@ import {
   useGetDueTodayCheckoutsQuery,
   useSearchToolsForCheckoutQuery,
   useCreateCheckoutMutation,
+  useBatchCheckoutMutation,
   useCheckinToolMutation,
 } from '../../services/checkoutApi';
 import { useLazyGetUsersQuery } from '@features/users/services/usersApi';
 import type { User } from '@features/users/types';
-import type { ToolCheckout } from '../../types';
+import type { ToolCheckout, ToolSearchResult, BatchCheckoutResult } from '../../types';
 import { useScanner } from '@features/scanner';
 import './MobileToolCheckout.css';
 
@@ -60,38 +64,16 @@ export const MobileToolCheckout = () => {
   const [activeTab, setActiveTab] = useState('active');
   const [showCheckoutPopup, setShowCheckoutPopup] = useState(false);
   const [showCheckinPopup, setShowCheckinPopup] = useState(false);
+  const [showResultsPopup, setShowResultsPopup] = useState(false);
   const [selectedCheckout, setSelectedCheckout] = useState<ToolCheckout | null>(null);
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
+  const [cartItems, setCartItems] = useState<ToolSearchResult[]>([]);
+  const [batchResults, setBatchResults] = useState<BatchCheckoutResult[] | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [userSearchQuery, setUserSearchQuery] = useState('');
   const [checkoutForm] = Form.useForm();
   const [checkinForm] = Form.useForm();
   const { openScanner } = useScanner();
-
-  const handleScanTool = () => {
-    openScanner({
-      title: 'Scan tool to check out',
-      accept: ['tool'],
-      onResolved: (result) => {
-        const data = result.itemData ?? {};
-        const toolNumber =
-          typeof data['tool_number'] === 'string'
-            ? String(data['tool_number'])
-            : `Tool #${result.itemId}`;
-        const description =
-          typeof data['description'] === 'string'
-            ? String(data['description'])
-            : '';
-        checkoutForm.setFieldValue('tool_id', result.itemId);
-        checkoutForm.setFieldValue(
-          'tool_display',
-          description ? `${toolNumber} - ${description}` : toolNumber
-        );
-        setSearchQuery('');
-        setShowCheckoutPopup(true);
-      },
-    });
-  };
 
   // API queries
   const { data: stats, isLoading: statsLoading, refetch: refetchStats } = useGetCheckoutStatsQuery();
@@ -103,7 +85,10 @@ export const MobileToolCheckout = () => {
   });
   const [searchUsers, { data: userResults }] = useLazyGetUsersQuery();
   const [checkoutTool, { isLoading: isCheckingOut }] = useCreateCheckoutMutation();
+  const [batchCheckout, { isLoading: isBatchingOut }] = useBatchCheckoutMutation();
   const [checkinTool, { isLoading: isCheckingIn }] = useCheckinToolMutation();
+
+  const isSubmitting = isCheckingOut || isBatchingOut;
 
   const handleRefresh = async () => {
     await Promise.all([refetchStats(), refetchActive(), refetchOverdue(), refetchDueToday()]);
@@ -119,6 +104,63 @@ export const MobileToolCheckout = () => {
     }
   }, [userSearchQuery, searchUsers]);
 
+  const handleAddToCart = (tool: ToolSearchResult) => {
+    if (cartItems.find(t => t.id === tool.id)) {
+      Toast.show({ content: 'Tool already in cart', icon: 'fail' });
+      return;
+    }
+    setCartItems(prev => [...prev, tool]);
+    setSearchQuery('');
+  };
+
+  const handleRemoveFromCart = (toolId: number) => {
+    setCartItems(prev => prev.filter(t => t.id !== toolId));
+  };
+
+  const handleScanTool = () => {
+    openScanner({
+      title: 'Scan tool to add to cart',
+      accept: ['tool'],
+      onResolved: (result) => {
+        const data = result.itemData ?? {};
+        const toolNumber =
+          typeof data['tool_number'] === 'string'
+            ? String(data['tool_number'])
+            : `Tool #${result.itemId}`;
+        const description =
+          typeof data['description'] === 'string' ? String(data['description']) : '';
+        if (cartItems.find(t => t.id === result.itemId)) {
+          Toast.show({ content: 'Tool already in cart', icon: 'fail' });
+          return;
+        }
+        const scannedTool: ToolSearchResult = {
+          id: result.itemId,
+          tool_number: toolNumber,
+          serial_number:
+            typeof data['serial_number'] === 'string' ? String(data['serial_number']) : '',
+          description,
+          category: '',
+          condition: typeof data['condition'] === 'string' ? String(data['condition']) : 'Good',
+          status: 'available',
+          calibration_status: 'ok',
+          available: true,
+          checked_out_to: null,
+        };
+        setCartItems(prev => [...prev, scannedTool]);
+        setShowCheckoutPopup(true);
+      },
+    });
+  };
+
+  const resetCheckoutState = () => {
+    setShowCheckoutPopup(false);
+    setCartItems([]);
+    setSelectedUser(null);
+    setSearchQuery('');
+    setUserSearchQuery('');
+    checkoutForm.resetFields();
+  };
+
   const handleCheckin = (checkout: ToolCheckout) => {
     setSelectedCheckout(checkout);
     checkinForm.resetFields();
@@ -126,33 +168,55 @@ export const MobileToolCheckout = () => {
   };
 
   const handleCheckoutSubmit = async () => {
-    try {
-      const values = await checkoutForm.validateFields();
+    if (cartItems.length === 0) {
+      Toast.show({ content: 'Add at least one tool to the cart', icon: 'fail' });
+      return;
+    }
+    if (!selectedUser) {
+      Toast.show({ content: 'Please select who is checking out', icon: 'fail' });
+      return;
+    }
 
-      if (!selectedUser) {
-        Toast.show({ content: 'Please select who is checking out this tool', icon: 'fail' });
-        return;
+    const values = await checkoutForm.validateFields();
+
+    if (cartItems.length === 1) {
+      // Single checkout — same as before
+      try {
+        await checkoutTool({
+          tool_id: cartItems[0].id,
+          user_id: selectedUser.id,
+          condition_at_checkout: values.condition || 'Good',
+          notes: values.notes || undefined,
+          work_order: values.work_order || undefined,
+        }).unwrap();
+        Toast.show({ content: `Checked out to ${selectedUser.name}`, icon: 'success' });
+        resetCheckoutState();
+        handleRefresh();
+      } catch (error: unknown) {
+        const msg =
+          error && typeof error === 'object' && 'data' in error
+            ? ((error as Record<string, unknown>).data as Record<string, unknown>)
+                ?.error as string
+            : 'Failed to checkout tool';
+        Toast.show({ content: msg, icon: 'fail' });
       }
-
-      await checkoutTool({
-        tool_id: values.tool_id,
-        user_id: selectedUser.id,
-        condition_at_checkout: values.condition || 'Good',
-        notes: values.notes || undefined,
-        work_order: values.work_order || undefined,
-      }).unwrap();
-      Toast.show({ content: `Tool checked out to ${selectedUser.name} successfully`, icon: 'success' });
-      setShowCheckoutPopup(false);
-      checkoutForm.resetFields();
-      setSearchQuery('');
-      setUserSearchQuery('');
-      setSelectedUser(null);
-      handleRefresh();
-    } catch (error: unknown) {
-      const errorMessage = error && typeof error === 'object' && 'data' in error
-        ? ((error as Record<string, unknown>).data as Record<string, unknown>)?.error as string
-        : 'Failed to checkout tool';
-      Toast.show({ content: errorMessage, icon: 'fail' });
+    } else {
+      // Batch checkout
+      try {
+        const result = await batchCheckout({
+          tool_ids: cartItems.map(t => t.id),
+          user_id: selectedUser.id,
+          condition_at_checkout: values.condition || 'Good',
+          notes: values.notes || undefined,
+          work_order: values.work_order || undefined,
+        }).unwrap();
+        setBatchResults(result.results);
+        resetCheckoutState();
+        setShowResultsPopup(true);
+        handleRefresh();
+      } catch {
+        Toast.show({ content: 'Batch checkout failed', icon: 'fail' });
+      }
     }
   };
 
@@ -233,9 +297,7 @@ export const MobileToolCheckout = () => {
             <Skeleton.Paragraph lineCount={2} animated />
           ) : (
             <>
-              <div className="stat-icon blue">
-                <SwapOutlined />
-              </div>
+              <div className="stat-icon blue"><SwapOutlined /></div>
               <div className="stat-value">{stats?.active_checkouts || 0}</div>
               <div className="stat-label">Active</div>
             </>
@@ -259,9 +321,7 @@ export const MobileToolCheckout = () => {
             <Skeleton.Paragraph lineCount={2} animated />
           ) : (
             <>
-              <div className="stat-icon blue">
-                <ClockCircleOutlined />
-              </div>
+              <div className="stat-icon blue"><ClockCircleOutlined /></div>
               <div className="stat-value">{stats?.checkouts_today || 0}</div>
               <div className="stat-label">Today</div>
             </>
@@ -272,9 +332,7 @@ export const MobileToolCheckout = () => {
             <Skeleton.Paragraph lineCount={2} animated />
           ) : (
             <>
-              <div className="stat-icon green">
-                <HistoryOutlined />
-              </div>
+              <div className="stat-icon green"><HistoryOutlined /></div>
               <div className="stat-value">{stats?.returns_today || 0}</div>
               <div className="stat-label">Returns</div>
             </>
@@ -348,7 +406,7 @@ export const MobileToolCheckout = () => {
         </Tabs>
       </PullToRefresh>
 
-      {/* Floating Checkout Button */}
+      {/* FAB — shows cart icon + count when tools are in cart */}
       <FloatingBubble
         style={{
           '--initial-position-bottom': '76px',
@@ -357,7 +415,22 @@ export const MobileToolCheckout = () => {
         }}
         onClick={() => setShowCheckoutPopup(true)}
       >
-        <AddOutline fontSize={24} />
+        {cartItems.length > 0 ? (
+          <div style={{ position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <ShoppingCartOutlined style={{ fontSize: 24 }} />
+            <span style={{
+              position: 'absolute', top: -10, right: -10,
+              background: '#ff4d4f', color: '#fff', borderRadius: '50%',
+              width: 18, height: 18, fontSize: 11,
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              fontWeight: 700, lineHeight: 1,
+            }}>
+              {cartItems.length}
+            </span>
+          </div>
+        ) : (
+          <AddOutline fontSize={24} />
+        )}
       </FloatingBubble>
 
       {/* Checkout Popup */}
@@ -368,17 +441,18 @@ export const MobileToolCheckout = () => {
         bodyStyle={{
           borderTopLeftRadius: 16,
           borderTopRightRadius: 16,
-          height: '80vh',
+          height: '85vh',
           overflow: 'auto',
         }}
       >
         <div className="form-popup">
           <div className="form-header">
-            <span>Checkout Tool</span>
+            <span>Checkout Tool{cartItems.length !== 1 ? 's' : ''}</span>
             <CloseOutline onClick={() => setShowCheckoutPopup(false)} />
           </div>
 
-          <div style={{ display: 'flex', gap: 8, marginBottom: 16, alignItems: 'center' }}>
+          {/* Tool search — adds to cart */}
+          <div style={{ display: 'flex', gap: 8, marginBottom: 12, alignItems: 'center' }}>
             <div style={{ flex: 1 }}>
               <SearchBar
                 placeholder="Search tool by number or serial..."
@@ -392,38 +466,72 @@ export const MobileToolCheckout = () => {
           </div>
 
           {searchQuery.length >= 2 && toolResults && toolResults.tools.length > 0 && (
-            <List header="Available Tools" className="tool-search-results">
-              {toolResults.tools.filter((t) => t.available).map((tool) => (
+            <List header="Tap to add to cart" className="tool-search-results">
+              {toolResults.tools.filter(t => t.available).map(tool => (
                 <List.Item
                   key={tool.id}
-                  onClick={() => {
-                    checkoutForm.setFieldValue('tool_id', tool.id);
-                    checkoutForm.setFieldValue('tool_display', `${tool.tool_number} - ${tool.description}`);
-                    setSearchQuery('');
-                  }}
+                  onClick={() => handleAddToCart(tool)}
                   description={`S/N: ${tool.serial_number} | ${tool.condition}`}
+                  extra={
+                    cartItems.find(c => c.id === tool.id)
+                      ? <Tag color="success">Added</Tag>
+                      : <Tag color="primary">+ Add</Tag>
+                  }
                 >
-                  {tool.tool_number} - {tool.description}
+                  {tool.tool_number} — {tool.description}
                 </List.Item>
               ))}
             </List>
           )}
 
+          {/* Cart */}
+          {cartItems.length > 0 && (
+            <div className="checkout-cart">
+              <div className="cart-header">
+                <ShoppingCartOutlined />
+                <span>Cart — {cartItems.length} tool{cartItems.length !== 1 ? 's' : ''}</span>
+              </div>
+              <List className="cart-list">
+                {cartItems.map(tool => (
+                  <List.Item
+                    key={tool.id}
+                    description={tool.serial_number ? `S/N: ${tool.serial_number}` : undefined}
+                    extra={
+                      <Button
+                        size="mini"
+                        color="danger"
+                        fill="none"
+                        onClick={() => handleRemoveFromCart(tool.id)}
+                      >
+                        <DeleteOutline />
+                      </Button>
+                    }
+                  >
+                    <span className="cart-tool-number">{tool.tool_number}</span>
+                    {tool.description && (
+                      <span className="cart-tool-desc"> · {tool.description}</span>
+                    )}
+                  </List.Item>
+                ))}
+              </List>
+            </div>
+          )}
+
+          {/* User search */}
           <SearchBar
             placeholder="Search user by name or employee number..."
             value={userSearchQuery}
             onChange={setUserSearchQuery}
-            style={{ marginBottom: 16 }}
+            style={{ marginBottom: 12, marginTop: 16 }}
           />
 
           {userSearchQuery.length >= 2 && userResults && userResults.length > 0 && (
             <List header="Select User" className="user-search-results">
-              {userResults.filter((u) => u.is_active).map((user) => (
+              {userResults.filter(u => u.is_active).map(user => (
                 <List.Item
                   key={user.id}
                   onClick={() => {
                     setSelectedUser(user);
-                    checkoutForm.setFieldValue('user_display', `${user.name} (#${user.employee_number})`);
                     setUserSearchQuery('');
                   }}
                   description={user.department || 'No department'}
@@ -435,29 +543,27 @@ export const MobileToolCheckout = () => {
           )}
 
           {selectedUser && (
-            <Card
-              style={{
-                marginBottom: 16,
-                backgroundColor: 'var(--adm-color-success-light, #e6f7e6)',
-                borderColor: 'var(--adm-color-success, #52c41a)',
-              }}
-            >
+            <Card style={{
+              marginBottom: 12,
+              background: 'rgba(82, 196, 26, 0.08)',
+              borderColor: '#52c41a',
+            }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <div>
-                  <div style={{ fontWeight: 'bold' }}>
-                    <UserOutlined /> Checking out to: {selectedUser.name}
+                  <div style={{ fontWeight: 600 }}>
+                    <UserOutlined /> {selectedUser.name}
                   </div>
                   <div style={{ fontSize: 12, opacity: 0.65 }}>
-                    #{selectedUser.employee_number} {selectedUser.department && `• ${selectedUser.department}`}
+                    #{selectedUser.employee_number}
+                    {selectedUser.department && ` · ${selectedUser.department}`}
                   </div>
                 </div>
-                <Button size="small" onClick={() => setSelectedUser(null)}>
-                  Change
-                </Button>
+                <Button size="small" onClick={() => setSelectedUser(null)}>Change</Button>
               </div>
             </Card>
           )}
 
+          {/* Checkout details — applied to all tools in cart */}
           <Form
             form={checkoutForm}
             layout="vertical"
@@ -465,28 +571,16 @@ export const MobileToolCheckout = () => {
               <Button
                 block
                 color="primary"
-                loading={isCheckingOut}
+                loading={isSubmitting}
+                disabled={cartItems.length === 0 || !selectedUser}
                 onClick={handleCheckoutSubmit}
               >
-                Checkout Tool
+                {cartItems.length > 1
+                  ? `Checkout ${cartItems.length} Tools`
+                  : 'Checkout Tool'}
               </Button>
             }
           >
-            <Form.Item name="tool_id" hidden><Input /></Form.Item>
-            <Form.Item
-              name="tool_display"
-              label="Selected Tool"
-              rules={[{ required: true, message: 'Please select a tool' }]}
-            >
-              <Input placeholder="Search and select a tool above" readOnly />
-            </Form.Item>
-            <Form.Item
-              name="user_display"
-              label="Checking Out To"
-              rules={[{ required: true, message: 'Please select a user' }]}
-            >
-              <Input placeholder="Search and select a user above" readOnly />
-            </Form.Item>
             <Form.Item
               name="condition"
               label="Condition at Checkout"
@@ -501,9 +595,79 @@ export const MobileToolCheckout = () => {
               <Input placeholder="Enter work order (optional)" />
             </Form.Item>
             <Form.Item name="notes" label="Notes">
-              <TextArea placeholder="Additional notes (optional)" rows={2} />
+              <TextArea
+                placeholder={
+                  cartItems.length > 1
+                    ? 'Notes applied to all tools (optional)'
+                    : 'Additional notes (optional)'
+                }
+                rows={2}
+              />
             </Form.Item>
           </Form>
+        </div>
+      </Popup>
+
+      {/* Batch Results Popup */}
+      <Popup
+        visible={showResultsPopup}
+        onMaskClick={() => setShowResultsPopup(false)}
+        position="bottom"
+        bodyStyle={{
+          borderTopLeftRadius: 16,
+          borderTopRightRadius: 16,
+          maxHeight: '70vh',
+          overflow: 'auto',
+        }}
+      >
+        <div className="form-popup">
+          <div className="form-header">
+            <span>Checkout Results</span>
+            <CloseOutline onClick={() => setShowResultsPopup(false)} />
+          </div>
+          {batchResults && (
+            <>
+              <div className="batch-summary">
+                <span className="batch-success">
+                  <CheckCircleOutlined /> {batchResults.filter(r => r.success).length} succeeded
+                </span>
+                {batchResults.some(r => !r.success) && (
+                  <span className="batch-failure">
+                    <CloseCircleOutlined /> {batchResults.filter(r => !r.success).length} failed
+                  </span>
+                )}
+              </div>
+              <List>
+                {batchResults.map(result => (
+                  <List.Item
+                    key={result.tool_id}
+                    prefix={
+                      result.success
+                        ? <CheckCircleOutlined style={{ color: '#52c41a', fontSize: 20 }} />
+                        : <CloseCircleOutlined style={{ color: '#ff4d4f', fontSize: 20 }} />
+                    }
+                    description={
+                      <span style={{ color: result.success ? '#52c41a' : '#ff4d4f', fontSize: 12 }}>
+                        {result.success ? 'Checked out successfully' : result.error}
+                      </span>
+                    }
+                  >
+                    <span style={{ fontWeight: 600 }}>
+                      {result.tool_number || `Tool #${result.tool_id}`}
+                    </span>
+                  </List.Item>
+                ))}
+              </List>
+              <Button
+                block
+                color="primary"
+                style={{ marginTop: 16 }}
+                onClick={() => setShowResultsPopup(false)}
+              >
+                Done
+              </Button>
+            </>
+          )}
         </div>
       </Popup>
 
@@ -562,10 +726,7 @@ export const MobileToolCheckout = () => {
             <Form.Item name="notes" label="Return Notes">
               <TextArea placeholder="Any notes about the return" rows={2} />
             </Form.Item>
-            <Form.Item
-              name="damage_reported"
-              label="Report Damage?"
-            >
+            <Form.Item name="damage_reported" label="Report Damage?">
               <Selector
                 options={[
                   { label: 'No Damage', value: 'no_damage' },
@@ -573,11 +734,7 @@ export const MobileToolCheckout = () => {
                 ]}
               />
             </Form.Item>
-            <Form.Item
-              name="damage_description"
-              label="Damage Description"
-              dependencies={['damage_reported']}
-            >
+            <Form.Item name="damage_description" label="Damage Description">
               <TextArea placeholder="Describe the damage..." rows={3} />
             </Form.Item>
           </Form>

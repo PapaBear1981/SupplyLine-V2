@@ -28,6 +28,10 @@ const authSlice = createSlice({
       if (token) {
         localStorage.setItem('access_token', token);
 
+        // Initialize the inactivity clock so the session timer starts from now,
+        // not from a stale or zero value left over from a previous session.
+        localStorage.setItem('last_user_activity', Date.now().toString());
+
         // Set token expiration for automatic refresh
         if (action.payload.expiresIn) {
           setTokenExpiration(action.payload.expiresIn);

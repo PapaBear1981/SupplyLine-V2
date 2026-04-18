@@ -52,6 +52,19 @@ export const securityApi = baseApi.injectEndpoints({
     getSecuritySettings: builder.query<SecuritySettings, void>({
       query: () => '/api/security/settings',
       providesTags: ['SystemSettings'],
+      // Cache the timeout in localStorage so non-React code (baseApi, SessionExpiryWarning)
+      // can read it without making additional API calls.
+      onQueryStarted: async (_, { queryFulfilled }) => {
+        try {
+          const { data } = await queryFulfilled;
+          localStorage.setItem(
+            'session_timeout_ms',
+            (data.session_timeout_minutes * 60 * 1000).toString()
+          );
+        } catch {
+          // Ignore — fallback default will be used
+        }
+      },
     }),
     updateSecuritySettings: builder.mutation<SecuritySettings, UpdateSecuritySettingsRequest>({
       query: (body) => ({

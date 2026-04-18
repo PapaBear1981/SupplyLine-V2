@@ -8,6 +8,21 @@ import type { User } from '@features/auth/types';
 let tokenExpiresAt: number | null = null;
 let isRefreshing = false;
 
+const FALLBACK_SESSION_TIMEOUT_MS = 30 * 60 * 1000; // 30 minutes
+
+/** Returns the admin-configured inactivity timeout in ms, falling back to 30 min. */
+function getSessionTimeoutMs(): number {
+  const cached = localStorage.getItem('session_timeout_ms');
+  return cached ? parseInt(cached, 10) : FALLBACK_SESSION_TIMEOUT_MS;
+}
+
+/** Returns true only if the user has interacted within the inactivity window. */
+function userIsActive(): boolean {
+  const lastActivity = parseInt(localStorage.getItem('last_user_activity') || '0', 10);
+  if (!lastActivity) return false;
+  return Date.now() - lastActivity < getSessionTimeoutMs();
+}
+
 export const setTokenExpiration = (expiresIn: number) => {
   // Set expiration time (current time + expires_in seconds)
   tokenExpiresAt = Date.now() + expiresIn * 1000;
@@ -38,8 +53,11 @@ const baseQueryWithAuth: BaseQueryFn<
   unknown,
   FetchBaseQueryError
 > = async (args, api, extraOptions) => {
-  // Check if token needs refresh (if it expires in less than 2 minutes)
-  const shouldRefresh = tokenExpiresAt && (tokenExpiresAt - Date.now() < 2 * 60 * 1000);
+  // Only refresh if the token is nearly expired AND the user has been recently active.
+  // Without the activity gate, background polls and WebSocket pings would refresh the
+  // token indefinitely, keeping idle sessions alive forever.
+  const tokenNearExpiry = tokenExpiresAt && (tokenExpiresAt - Date.now() < 2 * 60 * 1000);
+  const shouldRefresh = tokenNearExpiry && userIsActive();
 
   // Refresh token if needed and not already refreshing
   if (shouldRefresh && !isRefreshing) {

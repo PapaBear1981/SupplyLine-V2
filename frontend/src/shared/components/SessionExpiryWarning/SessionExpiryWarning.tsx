@@ -1,120 +1,135 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Modal, Button, Typography, Progress } from 'antd';
 import { ExclamationCircleOutlined } from '@ant-design/icons';
-import { useAppSelector } from '@app/hooks';
+import { useAppDispatch, useAppSelector } from '@app/hooks';
+import { logout } from '@features/auth/slices/authSlice';
 import { useRefreshTokenMutation } from '@features/auth/services/authApi';
 import { setTokenExpiration } from '@services/baseApi';
 
 const { Text, Title } = Typography;
 
-// Warning shows 3 minutes before expiration
-const WARNING_THRESHOLD_MS = 3 * 60 * 1000;
+// Show the warning this many ms before the inactivity timeout fires
+const WARNING_THRESHOLD_MS = 3 * 60 * 1000; // 3 minutes
 
-// Auto-logout happens 30 seconds before token expires
-const AUTO_LOGOUT_THRESHOLD_MS = 30 * 1000;
+const FALLBACK_TIMEOUT_MS = 30 * 60 * 1000; // 30 minutes
+
+/** Reads the admin-configured inactivity timeout, falling back to 30 min. */
+function getSessionTimeoutMs(): number {
+  const cached = localStorage.getItem('session_timeout_ms');
+  return cached ? parseInt(cached, 10) : FALLBACK_TIMEOUT_MS;
+}
+
+/** Returns ms until the session times out due to inactivity, or null if no activity recorded. */
+function getMsUntilTimeout(): number | null {
+  const lastActivity = parseInt(localStorage.getItem('last_user_activity') || '0', 10);
+  if (!lastActivity) return null;
+  const elapsed = Date.now() - lastActivity;
+  return Math.max(0, getSessionTimeoutMs() - elapsed);
+}
 
 export const SessionExpiryWarning = () => {
+  const dispatch = useAppDispatch();
   const isAuthenticated = useAppSelector((state) => state.auth.isAuthenticated);
   const [showWarning, setShowWarning] = useState(false);
   const [timeRemaining, setTimeRemaining] = useState(0);
   const [refreshToken] = useRefreshTokenMutation();
 
-  // Get token expiration from module-level variable in baseApi
-  const getTokenExpiration = useCallback(() => {
-    // Access the tokenExpiresAt from localStorage as backup
-    const storedExpiry = localStorage.getItem('token_expires_at');
-    return storedExpiry ? parseInt(storedExpiry, 10) : null;
-  }, []);
+  const handleLogout = useCallback(() => {
+    dispatch(logout());
+    try {
+      import('@services/socket').then(({ socketService }) => socketService.disconnect()).catch(() => {});
+    } catch {
+      // ignore
+    }
+    if (typeof window !== 'undefined') {
+      window.location.href = '/login';
+    }
+  }, [dispatch]);
 
-  // Reset warning when user logs out
+  // Reset warning on logout
   useEffect(() => {
     if (!isAuthenticated) {
-      setShowWarning(false); // eslint-disable-line react-hooks/set-state-in-effect -- Valid use case: cleanup state on logout
+      setShowWarning(false);
     }
   }, [isAuthenticated]);
 
+  // Main inactivity check — runs every 10 seconds
   useEffect(() => {
     if (!isAuthenticated) return;
 
-    const checkExpiry = () => {
-      const expiresAt = getTokenExpiration();
-      if (!expiresAt) return;
+    const checkInactivity = () => {
+      const msLeft = getMsUntilTimeout();
 
-      const now = Date.now();
-      const remaining = expiresAt - now;
+      if (msLeft === null) return; // no activity recorded yet
 
-      // Show warning if token expires in less than WARNING_THRESHOLD_MS
-      if (remaining <= WARNING_THRESHOLD_MS && remaining > AUTO_LOGOUT_THRESHOLD_MS) {
-        setShowWarning(true);
-        setTimeRemaining(remaining);
-      } else if (remaining <= AUTO_LOGOUT_THRESHOLD_MS) {
-        // Token is about to expire - let the auto-refresh handle it
+      if (msLeft <= 0) {
+        // Inactivity timeout reached — log out
         setShowWarning(false);
+        handleLogout();
+      } else if (msLeft <= WARNING_THRESHOLD_MS) {
+        // Approaching timeout — show warning
+        setShowWarning(true);
+        setTimeRemaining(msLeft);
       } else {
         setShowWarning(false);
       }
     };
 
-    // Check every 10 seconds
-    const interval = setInterval(checkExpiry, 10000);
+    const interval = setInterval(checkInactivity, 10_000);
+    checkInactivity(); // run immediately
 
-    // Initial check
-    checkExpiry();
+    return () => clearInterval(interval);
+  }, [isAuthenticated, handleLogout]);
 
-    return () => {
-      clearInterval(interval);
-    };
-  }, [isAuthenticated, getTokenExpiration]);
-
-  // Update countdown every second when warning is shown
+  // Per-second countdown while warning is visible
   useEffect(() => {
     if (!showWarning) return;
 
     const interval = setInterval(() => {
-      const expiresAt = getTokenExpiration();
-      if (!expiresAt) return;
+      const msLeft = getMsUntilTimeout();
 
-      const now = Date.now();
-      const remaining = expiresAt - now;
+      if (msLeft === null || msLeft <= 0) {
+        setShowWarning(false);
+        handleLogout();
+        return;
+      }
 
-      setTimeRemaining(remaining);
+      setTimeRemaining(msLeft);
 
-      // Hide warning if time is up or user refreshed
-      if (remaining <= AUTO_LOGOUT_THRESHOLD_MS || remaining > WARNING_THRESHOLD_MS) {
+      if (msLeft > WARNING_THRESHOLD_MS) {
+        // User became active again (activity tracker updated localStorage)
         setShowWarning(false);
       }
-    }, 1000);
+    }, 1_000);
 
-    return () => {
-      clearInterval(interval);
-    };
-  }, [showWarning, getTokenExpiration]);
+    return () => clearInterval(interval);
+  }, [showWarning, handleLogout]);
 
   const handleStayLoggedIn = async () => {
+    // Reset inactivity clock immediately
+    localStorage.setItem('last_user_activity', Date.now().toString());
+    setShowWarning(false);
+
+    // Also refresh the JWT so the backend session is extended
     try {
-      // Refresh the token to extend the session
       const result = await refreshToken().unwrap();
-      // Update the session timer so the warning doesn't reappear immediately
       if (result.expires_in) {
         setTokenExpiration(result.expires_in);
       }
-      setShowWarning(false);
     } catch (error) {
       console.error('Failed to refresh token:', error);
-      // The baseQueryWithAuth will handle the logout
     }
   };
 
   const formatTimeRemaining = (ms: number) => {
-    const minutes = Math.floor(ms / 60000);
-    const seconds = Math.floor((ms % 60000) / 1000);
+    const minutes = Math.floor(ms / 60_000);
+    const seconds = Math.floor((ms % 60_000) / 1_000);
     return `${minutes}:${seconds.toString().padStart(2, '0')}`;
   };
 
   const getProgressPercent = () => {
-    const totalWarningTime = WARNING_THRESHOLD_MS - AUTO_LOGOUT_THRESHOLD_MS;
     const elapsed = WARNING_THRESHOLD_MS - timeRemaining;
-    return Math.min(100, Math.max(0, (elapsed / totalWarningTime) * 100));
+    return Math.min(100, Math.max(0, (elapsed / WARNING_THRESHOLD_MS) * 100));
   };
 
   return (
