@@ -1,340 +1,370 @@
 """
 Label PDF Generation Service
 
-This module provides functions to generate professional PDF labels using
-Jinja2 templates and WeasyPrint. Supports multiple label sizes and item types.
+Generates QR-code-only labels using ReportLab for precise, single-page output.
+Each label is drawn as a compact box on a standard letter page (8.5" x 11")
+with a dashed cut border, so users can print on any paper and cut to size.
+
+Layout (landscape box, QR code left / info fields right):
+
+  ┌ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─┐  ← dashed cut line
+  │ SupplyLine MRO           PART-001 - LOT-XYZ        │  ← header strip
+  │  ┌──────┐  │  TOOL NUMBER    DESCRIPTION           │
+  │  │  QR  │  │  TL-001        Torque Wrench          │
+  │  │      │  │  LOCATION      STATUS                 │
+  │  └──────┘  │  Bay 3         Available              │
+  └ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─┘
 """
 
 import io
-import os
 from typing import Any, Literal
 
-from flask import current_app
-from jinja2 import Environment, FileSystemLoader, select_autoescape
+import segno
+from reportlab.lib import colors
+from reportlab.lib.pagesizes import letter
+from reportlab.lib.units import inch
+from reportlab.lib.utils import ImageReader
+from reportlab.pdfgen import canvas as rl_canvas
 
-from .barcode_service import generate_barcode_for_label, generate_qr_code_for_label
-from .label_config import get_label_template_context
+# ── Label size configurations ─────────────────────────────────────────────────
+# Physical label box dimensions drawn on the letter page.
+# All measurements are in inches; ReportLab converts to points internally.
+_LABEL_CFG: dict[str, dict] = {
+    "4x6": {
+        "w": 5.0, "h": 3.2,        # box size on the page
+        "qr_frac": 0.52,            # QR width as fraction of body height
+        "header_h": 0.28,           # header strip height (inches)
+        "pad": 0.10,                # inner padding (inches)
+        "title_font": 8.5,          # header font sizes (points)
+        "label_font": 6.0,          # field-label font (grey)
+        "value_font": 7.5,          # field-value font (dark)
+        "line_gap": 3,              # extra gap between label/value rows
+        "max_fields": 8,
+    },
+    "3x4": {
+        "w": 4.0, "h": 2.6,
+        "qr_frac": 0.52,
+        "header_h": 0.25,
+        "pad": 0.08,
+        "title_font": 7.5,
+        "label_font": 5.5,
+        "value_font": 7.0,
+        "line_gap": 2,
+        "max_fields": 6,
+    },
+    "2x4": {
+        "w": 3.2, "h": 2.0,
+        "qr_frac": 0.50,
+        "header_h": 0.22,
+        "pad": 0.07,
+        "title_font": 7.0,
+        "label_font": 5.0,
+        "value_font": 6.5,
+        "line_gap": 2,
+        "max_fields": 4,
+    },
+    "2x2": {
+        "w": 2.6, "h": 1.6,
+        "qr_frac": 0.50,
+        "header_h": 0.20,
+        "pad": 0.06,
+        "title_font": 6.5,
+        "label_font": 4.5,
+        "value_font": 6.0,
+        "line_gap": 1,
+        "max_fields": 3,
+    },
+}
 
-
-def _get_weasyprint():
-    """Lazy import WeasyPrint to avoid GTK dependency issues."""
-    try:
-        from weasyprint import CSS, HTML
-        return HTML, CSS
-    except (ImportError, OSError) as e:
-        raise RuntimeError(
-            "WeasyPrint is not available. This is likely due to missing GTK libraries on Windows. "
-            "PDF label generation requires WeasyPrint with GTK support. "
-            f"Error: {e}"
-        ) from e
-
-
-def _clip_to_one_page(pdf_bytes: bytes) -> bytes:
-    """
-    Extract only the first page from a PDF.
-
-    WeasyPrint paginates based on content flow, not CSS overflow — any content
-    that exceeds the @page height spills onto page 2. This function guarantees
-    the returned PDF contains exactly one page regardless of what WeasyPrint
-    produced, so labels always print as a single sticker.
-    """
-    from pypdf import PdfReader, PdfWriter
-
-    reader = PdfReader(io.BytesIO(pdf_bytes))
-    if len(reader.pages) == 1:
-        return pdf_bytes  # Already one page — return as-is (no rewrite overhead)
-
-    writer = PdfWriter()
-    writer.add_page(reader.pages[0])
-    output = io.BytesIO()
-    writer.write(output)
-    return output.getvalue()
-
-
-# Type definitions
-ItemType = Literal["tool", "chemical", "expendable", "kit_item"]
+# Kept for API compatibility — backend always generates QR codes
 CodeType = Literal["barcode", "qrcode"]
+ItemType = Literal["tool", "chemical", "expendable", "kit_item"]
 
 
-def get_template_environment() -> Environment:
+# ── Helpers ───────────────────────────────────────────────────────────────────
+
+def _qr_reader(data: str) -> ImageReader:
+    """Render QR code to PNG and wrap in ReportLab ImageReader."""
+    qr = segno.make(data, error="m", boost_error=False)
+    buf = io.BytesIO()
+    qr.save(buf, kind="png", scale=12, border=2, dark="#000000", light="#FFFFFF")
+    buf.seek(0)
+    return ImageReader(buf)
+
+
+def _fit(text: str, c: rl_canvas.Canvas, font: str, size: float, max_w: float) -> str:
+    """Truncate *text* with an ellipsis to fit within *max_w* points."""
+    if c.stringWidth(text, font, size) <= max_w:
+        return text
+    while len(text) > 1 and c.stringWidth(text + "\u2026", font, size) > max_w:
+        text = text[:-1]
+    return text + "\u2026"
+
+
+# ── Core drawing routine ──────────────────────────────────────────────────────
+
+def _draw_label(
+    c: rl_canvas.Canvas,
+    lx: float,
+    ly: float,
+    cfg: dict,
+    item_title: str,
+    qr_data: str,
+    fields: list[dict[str, str]],
+    warning_text: str | None = None,
+) -> None:
     """
-    Get configured Jinja2 environment for label templates.
-
-    Returns:
-        Configured Jinja2 Environment instance
+    Draw one label box at canvas coordinates (lx, ly) — bottom-left in
+    ReportLab's coordinate system (y increases upward).
     """
-    # Get template directory path
-    template_dir = os.path.join(
-        current_app.root_path, "templates", "labels"
-    )
+    LW = cfg["w"] * inch
+    LH = cfg["h"] * inch
+    HDR = cfg["header_h"] * inch
+    PAD = cfg["pad"] * inch
 
-    # Create and return Jinja2 environment
-    return Environment(
-        loader=FileSystemLoader(template_dir),
-        autoescape=select_autoescape(["html", "xml"]),
-        trim_blocks=True,
-        lstrip_blocks=True,
-    )
+    # ── Dashed cut border ─────────────────────────────────────────────────────
+    c.saveState()
+    c.setDash(5, 4)
+    c.setStrokeColor(colors.HexColor("#aaaaaa"))
+    c.setLineWidth(0.6)
+    c.rect(lx, ly, LW, LH, stroke=1, fill=0)
+    c.restoreState()
 
+    # ── Header strip ──────────────────────────────────────────────────────────
+    hdr_y = ly + LH - HDR
+    c.setFillColor(colors.HexColor("#2c3e50"))
+    c.rect(lx, hdr_y, LW, HDR, stroke=0, fill=1)
+
+    text_baseline = hdr_y + HDR * 0.25
+    c.setFillColor(colors.white)
+    c.setFont("Helvetica-Bold", cfg["title_font"])
+    c.drawString(lx + PAD, text_baseline, "SupplyLine MRO")
+
+    c.setFont("Helvetica", cfg["title_font"] - 1)
+    title_max = LW - c.stringWidth("SupplyLine MRO", "Helvetica-Bold", cfg["title_font"]) - PAD * 3
+    title = _fit(item_title, c, "Helvetica", cfg["title_font"] - 1, title_max)
+    c.drawRightString(lx + LW - PAD, text_baseline, title)
+
+    # ── Warning banner (optional — used for transfer labels) ─────────────────
+    warn_h = 0.0
+    if warning_text:
+        warn_h = cfg["title_font"] * 1.6
+        warn_y = hdr_y - warn_h
+        c.setFillColor(colors.HexColor("#e74c3c"))
+        c.rect(lx, warn_y, LW, warn_h, stroke=0, fill=1)
+        c.setFillColor(colors.white)
+        c.setFont("Helvetica-Bold", cfg["title_font"] - 1)
+        c.drawCentredString(lx + LW / 2, warn_y + warn_h * 0.20, warning_text)
+
+    # ── Body area ─────────────────────────────────────────────────────────────
+    body_top = hdr_y - warn_h
+    body_h = body_top - ly
+    body_x = lx + PAD
+    body_w = LW - 2 * PAD
+
+    # QR code — square, sized as fraction of body height, vertically centred
+    QR = body_h * cfg["qr_frac"]
+    qr_x = body_x
+    qr_y = ly + (body_h - QR) / 2
+    c.drawImage(_qr_reader(qr_data), qr_x, qr_y, QR, QR, preserveAspectRatio=True)
+
+    # Thin vertical divider
+    div_x = body_x + QR + PAD * 0.6
+    c.saveState()
+    c.setStrokeColor(colors.HexColor("#dde0e3"))
+    c.setLineWidth(0.6)
+    c.line(div_x, ly + PAD * 0.5, div_x, body_top - PAD * 0.5)
+    c.restoreState()
+
+    # ── Fields (right column) ─────────────────────────────────────────────────
+    fx = div_x + PAD * 0.8
+    fw = lx + LW - PAD - fx          # available width for text
+
+    LF = cfg["label_font"]           # label-row font size (points)
+    VF = cfg["value_font"]           # value-row font size (points)
+    GAP = cfg["line_gap"]            # gap between field blocks
+
+    ROW_H = LF + VF + GAP + 2       # height of one label+value block
+
+    shown = fields[: cfg["max_fields"]]
+    total_h = len(shown) * ROW_H - GAP
+    # Start y so fields are vertically centred in the body area
+    fy = ly + (body_h + total_h) / 2 - LF
+
+    for field in shown:
+        if fy - VF < ly + 2:
+            break
+
+        # Field label (small, grey)
+        c.setFillColor(colors.HexColor("#95a5a6"))
+        c.setFont("Helvetica", LF)
+        lbl = _fit(field["label"].upper(), c, "Helvetica", LF, fw)
+        c.drawString(fx, fy, lbl)
+        fy -= LF + 1
+
+        # Field value (larger, dark)
+        c.setFillColor(colors.HexColor("#1a2632"))
+        c.setFont("Helvetica-Bold", VF)
+        val = _fit(str(field["value"]), c, "Helvetica-Bold", VF, fw)
+        c.drawString(fx, fy, val)
+        fy -= VF + GAP + 2
+
+
+# ── Public PDF builder ────────────────────────────────────────────────────────
+
+def _build_label_pdf(
+    item_title: str,
+    qr_data: str,
+    fields: list[dict[str, str]],
+    label_size: str,
+    warning_text: str | None = None,
+) -> bytes:
+    """
+    Produce a letter-size (8.5" x 11") PDF with the label drawn at the
+    top-left corner.  The dashed border shows where to cut.
+    """
+    cfg = _LABEL_CFG.get(label_size, _LABEL_CFG["3x4"])
+    PAGE_W, PAGE_H = letter          # 612 × 792 pt
+    MARGIN = 0.45 * inch
+
+    lx = MARGIN
+    ly = PAGE_H - MARGIN - cfg["h"] * inch
+
+    buf = io.BytesIO()
+    c = rl_canvas.Canvas(buf, pagesize=letter)
+    c.setTitle(f"Label \u2013 {item_title}")
+    _draw_label(c, lx, ly, cfg, item_title, qr_data, fields, warning_text)
+    c.showPage()
+    c.save()
+    return buf.getvalue()
+
+
+# ── Public API (signatures unchanged so routes need no changes) ───────────────
 
 def generate_label_pdf(
     item_title: str,
     barcode_data: str,
     fields: list[dict[str, str]],
-    label_size: str = "4x6",
-    code_type: CodeType = "barcode",
+    label_size: str = "3x4",
+    code_type: CodeType = "qrcode",   # kept for API compat; always QR
     is_transfer: bool = False,
     warning_text: str | None = None,
-    barcode_type: str = "CODE128",
+    barcode_type: str = "CODE128",    # unused; kept for compat
 ) -> bytes:
-    """
-    Generate a professional PDF label.
-
-    Args:
-        item_title: Title to display on the label (e.g., "CHEM-001 - LOT-12345")
-        barcode_data: Data to encode in the barcode/QR code
-        fields: List of field dictionaries with 'label' and 'value' keys
-        label_size: Label size (4x6, 3x4, 2x4, 2x2)
-        code_type: Type of code to generate (barcode or qrcode)
-        is_transfer: Whether this is a transfer label
-        warning_text: Optional warning text to display
-        barcode_type: Type of 1D barcode (CODE128, CODE39, etc.)
-
-    Returns:
-        PDF file as bytes
-
-    Raises:
-        ValueError: If invalid parameters are provided
-        RuntimeError: If PDF generation fails
-    """
-    try:
-        # Generate barcode/QR code SVG
-        if code_type == "qrcode":
-            barcode_svg = generate_qr_code_for_label(barcode_data, label_size)
-        else:
-            barcode_svg = generate_barcode_for_label(
-                barcode_data, label_size, barcode_type
-            )
-
-        # Get template context
-        context = get_label_template_context(
-            label_size=label_size,
-            item_title=item_title,
-            barcode_svg=barcode_svg,
-            fields=fields,
-            is_transfer=is_transfer,
-            warning_text=warning_text,
-        )
-
-        # Load and render template
-        env = get_template_environment()
-        template = env.get_template("base_label.html")
-        html_content = template.render(**context)
-
-        # Generate PDF using WeasyPrint (lazy loaded)
-        html_class, _ = _get_weasyprint()
-        html = html_class(string=html_content)
-        pdf_bytes = html.write_pdf()
-
-        if pdf_bytes is None:
-            raise RuntimeError("PDF generation returned None")
-
-        # WeasyPrint paginates by content flow — clip to page 1 so the label
-        # is always exactly one sticker, never two pages.
-        return _clip_to_one_page(pdf_bytes)
-
-    except Exception as e:
-        raise RuntimeError(f"Failed to generate label PDF: {e!s}") from e
+    return _build_label_pdf(item_title, barcode_data, fields, label_size, warning_text)
 
 
 def generate_tool_label_pdf(
     tool: Any,
-    label_size: str = "4x6",
-    code_type: CodeType = "barcode",
+    label_size: str = "3x4",
+    code_type: CodeType = "qrcode",
 ) -> bytes:
-    """
-    Generate a PDF label for a tool.
-
-    Args:
-        tool: Tool model instance
-        label_size: Label size (4x6, 3x4, 2x4, 2x2)
-        code_type: Type of code to generate
-
-    Returns:
-        PDF file as bytes
-    """
-    # Generate barcode data
     tool_number = tool.tool_number or ""
     if tool.lot_number:
-        barcode_data = f"{tool_number}-LOT-{tool.lot_number}"
+        qr_data = f"{tool_number}-LOT-{tool.lot_number}"
     else:
-        barcode_data = f"{tool_number}-{tool.serial_number or ''}"
+        qr_data = f"{tool_number}-{tool.serial_number or ''}"
 
-    # Build title
-    title = f"{tool.tool_number}"
+    title = tool.tool_number or "Tool"
     if tool.lot_number:
         title += f" - LOT {tool.lot_number}"
     elif tool.serial_number:
         title += f" - SN {tool.serial_number}"
 
-    # Build fields
-    fields = [
+    fields: list[dict[str, str]] = [
         {"label": "Tool Number", "value": tool.tool_number or "N/A"},
         {"label": "Description", "value": tool.description or "N/A"},
-        {"label": "Location", "value": tool.location or "N/A"},
-        {"label": "Status", "value": tool.status or "N/A"},
+        {"label": "Location",    "value": tool.location or "N/A"},
+        {"label": "Status",      "value": tool.status or "N/A"},
     ]
-
     if tool.lot_number:
-        fields.append({"label": "Lot Number", "value": tool.lot_number})
+        fields.append({"label": "Lot Number",    "value": tool.lot_number})
     if tool.serial_number:
         fields.append({"label": "Serial Number", "value": tool.serial_number})
     if tool.category:
-        fields.append({"label": "Category", "value": tool.category})
+        fields.append({"label": "Category",      "value": tool.category})
     if tool.condition:
-        fields.append({"label": "Condition", "value": tool.condition})
+        fields.append({"label": "Condition",     "value": tool.condition})
     if hasattr(tool, "created_at") and tool.created_at:
-        fields.append({"label": "Date Added", "value": tool.created_at.strftime("%Y-%m-%d")})
+        fields.append({"label": "Date Added",    "value": tool.created_at.strftime("%Y-%m-%d")})
 
-    return generate_label_pdf(
-        item_title=title,
-        barcode_data=barcode_data,
-        fields=fields,
-        label_size=label_size,
-        code_type=code_type,
-    )
+    return _build_label_pdf(title, qr_data, fields, label_size)
 
 
 def generate_chemical_label_pdf(
     chemical: Any,
-    label_size: str = "4x6",
-    code_type: CodeType = "barcode",
+    label_size: str = "3x4",
+    code_type: CodeType = "qrcode",
     is_transfer: bool = False,
     transfer_data: dict[str, Any] | None = None,
 ) -> bytes:
-    """
-    Generate a PDF label for a chemical.
-
-    Args:
-        chemical: Chemical model instance
-        label_size: Label size (4x6, 3x4, 2x4, 2x2)
-        code_type: Type of code to generate
-        is_transfer: Whether this is a transfer label
-        transfer_data: Optional transfer metadata
-
-    Returns:
-        PDF file as bytes
-    """
-    # Generate barcode data
     part_number = chemical.part_number or ""
-    lot_number = chemical.lot_number or ""
-    exp_date = chemical.expiration_date.strftime("%Y%m%d") if chemical.expiration_date else "NOEXP"
-    barcode_data = f"{part_number}-{lot_number}-{exp_date}"
+    lot_number  = chemical.lot_number or ""
+    exp_date    = chemical.expiration_date.strftime("%Y%m%d") if chemical.expiration_date else "NOEXP"
+    qr_data     = f"{part_number}-{lot_number}-{exp_date}"
+    title       = f"{chemical.part_number} - {chemical.lot_number}"
 
-    # Build title
-    title = f"{chemical.part_number} - {chemical.lot_number}"
-
-    # Build fields
-    # For issued child lots, show the originally issued quantity instead of current quantity (which is 0)
-    # Use the relationship to avoid N+1 queries if this is called in a loop
-    display_quantity = chemical.quantity
+    display_qty = chemical.quantity
     if chemical.status == "issued" and chemical.parent_lot_number and chemical.issuance:
-        display_quantity = chemical.issuance.quantity
+        display_qty = chemical.issuance.quantity
 
-    fields = [
-        {"label": "Part Number", "value": chemical.part_number or "N/A"},
-        {"label": "Lot Number", "value": chemical.lot_number or "N/A"},
-        {"label": "Description", "value": chemical.description or "N/A"},
+    fields: list[dict[str, str]] = [
+        {"label": "Part Number",  "value": chemical.part_number or "N/A"},
+        {"label": "Lot Number",   "value": chemical.lot_number or "N/A"},
+        {"label": "Description",  "value": chemical.description or "N/A"},
         {"label": "Manufacturer", "value": chemical.manufacturer or "N/A"},
-        {"label": "Quantity", "value": f"{display_quantity} {chemical.unit or 'each'}" if display_quantity is not None else "N/A"},
-        {"label": "Location", "value": chemical.location or "N/A"},
-        {"label": "Status", "value": chemical.status or "N/A"},
+        {"label": "Quantity",     "value": f"{display_qty} {chemical.unit or 'each'}" if display_qty is not None else "N/A"},
+        {"label": "Location",     "value": chemical.location or "N/A"},
+        {"label": "Status",       "value": chemical.status or "N/A"},
     ]
-
     if chemical.expiration_date:
         fields.append({"label": "Expiration Date", "value": chemical.expiration_date.strftime("%Y-%m-%d")})
     if chemical.date_added:
-        fields.append({"label": "Date Added", "value": chemical.date_added.strftime("%Y-%m-%d")})
+        fields.append({"label": "Date Added",      "value": chemical.date_added.strftime("%Y-%m-%d")})
 
-    # Add transfer-specific fields
     warning_text = None
     if is_transfer and transfer_data:
         if transfer_data.get("parent_lot_number"):
-            fields.append({"label": "Parent Lot", "value": transfer_data["parent_lot_number"]})
+            fields.append({"label": "Parent Lot",  "value": transfer_data["parent_lot_number"]})
         if transfer_data.get("destination"):
             fields.append({"label": "Destination", "value": transfer_data["destination"]})
         if transfer_data.get("transfer_date"):
-            transfer_date = transfer_data["transfer_date"]
-            if hasattr(transfer_date, "strftime"):
-                date_str = transfer_date.strftime("%Y-%m-%d")
-            else:
-                date_str = str(transfer_date)
-            fields.append({"label": "Transfer Date", "value": date_str})
+            td = transfer_data["transfer_date"]
+            fields.append({"label": "Transfer Date", "value": td.strftime("%Y-%m-%d") if hasattr(td, "strftime") else str(td)})
+        warning_text = "PARTIAL TRANSFER \u2013 NEW LOT NUMBER"
 
-        warning_text = "PARTIAL TRANSFER - NEW LOT NUMBER"
-
-    return generate_label_pdf(
-        item_title=title,
-        barcode_data=barcode_data,
-        fields=fields,
-        label_size=label_size,
-        code_type=code_type,
-        is_transfer=is_transfer,
-        warning_text=warning_text,
-    )
+    return _build_label_pdf(title, qr_data, fields, label_size, warning_text)
 
 
 def generate_expendable_label_pdf(
     expendable: Any,
-    label_size: str = "4x6",
-    code_type: CodeType = "barcode",
+    label_size: str = "3x4",
+    code_type: CodeType = "qrcode",
 ) -> bytes:
-    """
-    Generate a PDF label for an expendable.
-
-    Args:
-        expendable: Expendable model instance
-        label_size: Label size (4x6, 3x4, 2x4, 2x2)
-        code_type: Type of code to generate
-
-    Returns:
-        PDF file as bytes
-    """
-    # Generate barcode data
     part_number = expendable.part_number or ""
     if expendable.lot_number:
-        barcode_data = f"{part_number}-LOT-{expendable.lot_number}"
+        qr_data = f"{part_number}-LOT-{expendable.lot_number}"
     else:
-        barcode_data = f"{part_number}-SN-{expendable.serial_number or ''}"
+        qr_data = f"{part_number}-SN-{expendable.serial_number or ''}"
 
-    # Build title
-    title = f"{expendable.part_number}"
+    title = expendable.part_number or "Expendable"
     if expendable.lot_number:
         title += f" - LOT {expendable.lot_number}"
     elif expendable.serial_number:
         title += f" - SN {expendable.serial_number}"
 
-    # Build fields
-    fields = [
+    fields: list[dict[str, str]] = [
         {"label": "Part Number", "value": expendable.part_number or "N/A"},
         {"label": "Description", "value": expendable.description or "N/A"},
-        {"label": "Quantity", "value": f"{expendable.quantity} {expendable.unit}" if expendable.quantity else "N/A"},
-        {"label": "Location", "value": expendable.location or "N/A"},
-        {"label": "Category", "value": expendable.category or "N/A"},
+        {"label": "Quantity",    "value": f"{expendable.quantity} {expendable.unit}" if expendable.quantity else "N/A"},
+        {"label": "Location",    "value": expendable.location or "N/A"},
+        {"label": "Category",    "value": expendable.category or "N/A"},
     ]
-
     if expendable.lot_number:
-        fields.append({"label": "Lot Number", "value": expendable.lot_number})
+        fields.append({"label": "Lot Number",    "value": expendable.lot_number})
     if expendable.serial_number:
         fields.append({"label": "Serial Number", "value": expendable.serial_number})
     if expendable.date_added:
-        fields.append({"label": "Date Added", "value": expendable.date_added.strftime("%Y-%m-%d")})
+        fields.append({"label": "Date Added",    "value": expendable.date_added.strftime("%Y-%m-%d")})
 
-    return generate_label_pdf(
-        item_title=title,
-        barcode_data=barcode_data,
-        fields=fields,
-        label_size=label_size,
-        code_type=code_type,
-    )
-
+    return _build_label_pdf(title, qr_data, fields, label_size)
