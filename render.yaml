@@ -26,10 +26,11 @@ services:
     dockerContext: ./backend
     autoDeploy: false
     healthCheckPath: /api/health
-    # Override the Dockerfile's CMD with Gunicorn using Flask's app-factory
-    # pattern. -w 1 is required: Socket.IO tracks connection state per
+    # Override the Dockerfile's CMD with Gunicorn pointing at
+    # backend/wsgi.py (copied to /app/wsgi.py in the image).
+    # -w 1 is required: Socket.IO tracks connection state per
     # process, so multiple workers would break real-time broadcasts.
-    dockerCommand: gunicorn -w 1 --timeout 120 -b 0.0.0.0:$PORT "app:create_app()"
+    dockerCommand: gunicorn -w 1 --timeout 120 -b 0.0.0.0:$PORT wsgi:application
     envVars:
       - key: FLASK_ENV
         value: production
