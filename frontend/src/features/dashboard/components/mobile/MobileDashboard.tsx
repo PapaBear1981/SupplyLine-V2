@@ -39,6 +39,7 @@ import { useGetChemicalsQuery } from '@features/chemicals/services/chemicalsApi'
 import { useGetKitsQuery, useGetRecentKitActivityQuery, useGetReorderReportQuery } from '@features/kits/services/kitsApi';
 import { useGetWarehousesQuery } from '@features/warehouses/services/warehousesApi';
 import { useGetAnnouncementsQuery } from '@features/admin/services/adminApi';
+import { useGetOnCallPersonnelQuery } from '@features/admin/services/oncallApi';
 
 import './MobileDashboard.css';
 
@@ -55,6 +56,7 @@ export const MobileDashboard = () => {
   const { data: announcements } = useGetAnnouncementsQuery();
   const { data: recentActivity, isLoading: activityLoading } = useGetRecentKitActivityQuery({ limit: 5 });
   const { data: pendingReorders } = useGetReorderReportQuery({ status: 'pending' });
+  const { data: oncallData, isLoading: oncallLoading } = useGetOnCallPersonnelQuery();
 
   // Calculate tool stats
   const toolStats = useMemo(() => {
@@ -252,6 +254,45 @@ export const MobileDashboard = () => {
           />
         </div>
       )}
+
+      {/* On-Call Personnel */}
+      <div className="section-title">On-Call Personnel</div>
+      <Card className="activity-card" style={{ marginBottom: 16 }}>
+        {oncallLoading ? (
+          <Skeleton.Paragraph lineCount={2} animated />
+        ) : (
+          <List>
+            <List.Item
+              prefix={<InboxOutlined style={{ fontSize: 20, color: '#1890ff' }} />}
+              description={
+                oncallData?.materials.user
+                  ? `#${oncallData.materials.user.employee_number}${
+                      oncallData.materials.user.department
+                        ? ` · ${oncallData.materials.user.department}`
+                        : ''
+                    }`
+                  : 'No one assigned'
+              }
+            >
+              Materials: {oncallData?.materials.user?.name || '—'}
+            </List.Item>
+            <List.Item
+              prefix={<ToolOutlined style={{ fontSize: 20, color: '#fa8c16' }} />}
+              description={
+                oncallData?.maintenance.user
+                  ? `#${oncallData.maintenance.user.employee_number}${
+                      oncallData.maintenance.user.department
+                        ? ` · ${oncallData.maintenance.user.department}`
+                        : ''
+                    }`
+                  : 'No one assigned'
+              }
+            >
+              Maintenance: {oncallData?.maintenance.user?.name || '—'}
+            </List.Item>
+          </List>
+        )}
+      </Card>
 
       {/* Stats Grid */}
       <div className="section-title">Inventory Overview</div>

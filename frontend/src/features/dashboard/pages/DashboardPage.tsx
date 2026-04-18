@@ -33,6 +33,7 @@ import {
   RecentActivity,
   InventoryPieChart,
   AnnouncementsPanel,
+  OnCallCard,
 } from '../components';
 import { MobileDashboard } from '../components/mobile';
 
@@ -244,6 +245,13 @@ export const DashboardPage = () => {
           primaryColor={primaryColor}
         />
       </div>
+
+      {/* On-Call Personnel */}
+      <Row gutter={[16, 16]} style={{ marginBottom: 24 }}>
+        <Col span={24}>
+          <OnCallCard />
+        </Col>
+      </Row>
 
       {/* Stats Grid */}
       <div className={styles.statsGrid}>

@@ -127,6 +127,7 @@ export const baseApi = createApi({
     'SystemSettings',
     'AISettings',
     'BugReport',
+    'OnCall',
   ],
   endpoints: () => ({}),
 });

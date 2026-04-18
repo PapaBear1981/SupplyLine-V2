@@ -10,6 +10,7 @@ import {
   SettingOutlined,
   RobotOutlined,
   BugOutlined,
+  PhoneOutlined,
 } from '@ant-design/icons';
 import { AdminOverview } from '../components/AdminOverview';
 import { UserManagement } from '../components/UserManagement';
@@ -21,6 +22,7 @@ import { PermissionOverview } from '../components/PermissionOverview';
 import { SystemSettings } from '../components/SystemSettings';
 import { AISettings } from '../components/AISettings';
 import { BugReportManagement } from '../components/BugReportManagement';
+import { OnCallManagement } from '../components/OnCallManagement';
 
 const { Title, Paragraph } = Typography;
 
@@ -65,6 +67,16 @@ export const AdminPage = () => {
         </span>
       ),
       children: <AnnouncementManagement />,
+    },
+    {
+      key: 'oncall',
+      label: (
+        <span>
+          <PhoneOutlined />
+          On-Call
+        </span>
+      ),
+      children: <OnCallManagement />,
     },
     {
       key: 'roles',

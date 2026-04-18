@@ -49,6 +49,7 @@ from routes_rbac import register_rbac_routes
 from routes_reports import register_report_routes
 from routes_scanner import register_scanner_routes
 from routes_ai import register_ai_routes
+from routes_oncall import register_oncall_routes
 from routes_security import register_security_routes
 from routes_tool_checkout import register_tool_checkout_routes
 from routes_transfers import transfers_bp
@@ -228,6 +229,10 @@ def register_routes(app):
 
     # Register security configuration routes
     register_security_routes(app)
+
+    # Register on-call personnel routes
+    register_oncall_routes(app)
+
     register_ai_routes(app)
 
     # Register kit/mobile warehouse routes

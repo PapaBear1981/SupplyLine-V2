@@ -5,3 +5,4 @@ export { RecentActivity } from './RecentActivity';
 export { InventoryPieChart, ActivityChart } from './InventoryCharts';
 export { QuickActions } from './QuickActions';
 export { AnnouncementsPanel } from './AnnouncementsPanel';
+export { OnCallCard } from './OnCallCard';
