@@ -1,19 +1,22 @@
 """
 Label PDF Generation Service
 
-Generates QR-code-only labels using ReportLab for precise, single-page output.
-Each label is drawn as a compact box on a standard letter page (8.5" x 11")
-with a dashed cut border, so users can print on any paper and cut to size.
+Generates QR-code-only labels using ReportLab.  The PDF page is always a
+standard 4"×6" sticker — the selected label size determines how much of that
+sticker is used:
 
-Layout (landscape box, QR code left / info fields right):
+  4×6  → fills the entire sticker (no cut needed), shows the most info
+  3×4  → top-left 3"×4" region with a dashed cut border
+  2×4  → top-left 2"×4" region with a dashed cut border
+  2×2  → top-left 2"×2" region with a dashed cut border
 
-  ┌ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─┐  ← dashed cut line
-  │ SupplyLine MRO           PART-001 - LOT-XYZ        │  ← header strip
-  │  ┌──────┐  │  TOOL NUMBER    DESCRIPTION           │
-  │  │  QR  │  │  TL-001        Torque Wrench          │
-  │  │      │  │  LOCATION      STATUS                 │
-  │  └──────┘  │  Bay 3         Available              │
-  └ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─┘
+All layouts use a portrait orientation:
+  • dark header strip (company name left, item title right)
+  • QR code centred horizontally below the header
+  • info fields below the QR code (2 columns for larger sizes, 1 for smaller)
+
+Users print on their 4"×6" label stock and cut along the dashed border for
+the smaller label sizes.
 """
 
 import io
@@ -21,58 +24,72 @@ from typing import Any, Literal
 
 import segno
 from reportlab.lib import colors
-from reportlab.lib.pagesizes import letter
 from reportlab.lib.units import inch
 from reportlab.lib.utils import ImageReader
 from reportlab.pdfgen import canvas as rl_canvas
 
+# ── Page ──────────────────────────────────────────────────────────────────────
+# Always a 4"×6" sticker regardless of which label size is selected.
+PAGE_W = 4 * inch   # 288 pt
+PAGE_H = 6 * inch   # 432 pt
+
 # ── Label size configurations ─────────────────────────────────────────────────
-# Physical label box dimensions drawn on the letter page.
-# All measurements are in inches; ReportLab converts to points internally.
-_LABEL_CFG: dict[str, dict] = {
+_CFG: dict[str, dict] = {
     "4x6": {
-        "w": 5.0, "h": 3.2,        # box size on the page
-        "qr_frac": 0.52,            # QR width as fraction of body height
-        "header_h": 0.28,           # header strip height (inches)
-        "pad": 0.10,                # inner padding (inches)
-        "title_font": 8.5,          # header font sizes (points)
-        "label_font": 6.0,          # field-label font (grey)
-        "value_font": 7.5,          # field-value font (dark)
-        "line_gap": 3,              # extra gap between label/value rows
-        "max_fields": 8,
+        "w": 4.0, "h": 6.0,        # label box fills the whole sticker
+        "cut_border": False,         # no cut needed — it IS the sticker
+        "header_h": 0.42,
+        "pad": 0.14,
+        "qr_frac": 0.62,            # QR size as fraction of body width
+        "company_font": 10.0,
+        "title_font":   9.5,
+        "label_font":   6.5,        # field-name row (grey, uppercase)
+        "value_font":   8.0,        # field-value row (dark, bold)
+        "line_gap":     4,          # extra pt between value and next label
+        "field_cols":   2,
+        "max_fields":  10,
     },
     "3x4": {
-        "w": 4.0, "h": 2.6,
-        "qr_frac": 0.52,
-        "header_h": 0.25,
-        "pad": 0.08,
-        "title_font": 7.5,
-        "label_font": 5.5,
-        "value_font": 7.0,
-        "line_gap": 2,
-        "max_fields": 6,
+        "w": 3.0, "h": 4.0,
+        "cut_border": True,
+        "header_h": 0.34,
+        "pad": 0.11,
+        "qr_frac": 0.60,
+        "company_font": 8.5,
+        "title_font":   8.0,
+        "label_font":   5.5,
+        "value_font":   7.0,
+        "line_gap":     3,
+        "field_cols":   2,
+        "max_fields":   6,
     },
     "2x4": {
-        "w": 3.2, "h": 2.0,
-        "qr_frac": 0.50,
-        "header_h": 0.22,
-        "pad": 0.07,
-        "title_font": 7.0,
-        "label_font": 5.0,
-        "value_font": 6.5,
-        "line_gap": 2,
-        "max_fields": 4,
+        "w": 2.0, "h": 4.0,
+        "cut_border": True,
+        "header_h": 0.28,
+        "pad": 0.09,
+        "qr_frac": 0.68,
+        "company_font": 7.0,
+        "title_font":   6.5,
+        "label_font":   5.0,
+        "value_font":   6.5,
+        "line_gap":     2,
+        "field_cols":   1,
+        "max_fields":   4,
     },
     "2x2": {
-        "w": 2.6, "h": 1.6,
-        "qr_frac": 0.50,
-        "header_h": 0.20,
-        "pad": 0.06,
-        "title_font": 6.5,
-        "label_font": 4.5,
-        "value_font": 6.0,
-        "line_gap": 1,
-        "max_fields": 3,
+        "w": 2.0, "h": 2.0,
+        "cut_border": True,
+        "header_h": 0.24,
+        "pad": 0.08,
+        "qr_frac": 0.55,
+        "company_font": 6.5,
+        "title_font":   6.0,
+        "label_font":   4.5,
+        "value_font":   5.8,
+        "line_gap":     1,
+        "field_cols":   1,
+        "max_fields":   3,
     },
 }
 
@@ -84,16 +101,16 @@ ItemType = Literal["tool", "chemical", "expendable", "kit_item"]
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
 def _qr_reader(data: str) -> ImageReader:
-    """Render QR code to PNG and wrap in ReportLab ImageReader."""
+    """Render QR code to PNG and wrap in a ReportLab ImageReader."""
     qr = segno.make(data, error="m", boost_error=False)
     buf = io.BytesIO()
-    qr.save(buf, kind="png", scale=12, border=2, dark="#000000", light="#FFFFFF")
+    qr.save(buf, kind="png", scale=14, border=2, dark="#000000", light="#FFFFFF")
     buf.seek(0)
     return ImageReader(buf)
 
 
 def _fit(text: str, c: rl_canvas.Canvas, font: str, size: float, max_w: float) -> str:
-    """Truncate *text* with an ellipsis to fit within *max_w* points."""
+    """Truncate *text* with an ellipsis so it fits within *max_w* points."""
     if c.stringWidth(text, font, size) <= max_w:
         return text
     while len(text) > 1 and c.stringWidth(text + "\u2026", font, size) > max_w:
@@ -101,116 +118,139 @@ def _fit(text: str, c: rl_canvas.Canvas, font: str, size: float, max_w: float) -
     return text + "\u2026"
 
 
+def _draw_field(
+    c: rl_canvas.Canvas,
+    fx: float,
+    fy: float,     # baseline of the label row
+    fw: float,
+    field: dict[str, str],
+    lf: float,
+    vf: float,
+) -> None:
+    """Draw one field: a small grey label row then a bold dark value row."""
+    c.setFillColor(colors.HexColor("#7f8c8d"))
+    c.setFont("Helvetica", lf)
+    c.drawString(fx, fy, _fit(field["label"].upper(), c, "Helvetica", lf, fw))
+
+    c.setFillColor(colors.HexColor("#1a2632"))
+    c.setFont("Helvetica-Bold", vf)
+    c.drawString(fx, fy - lf - 1, _fit(str(field["value"]), c, "Helvetica-Bold", vf, fw))
+
+
 # ── Core drawing routine ──────────────────────────────────────────────────────
 
 def _draw_label(
     c: rl_canvas.Canvas,
     lx: float,
-    ly: float,
+    ly: float,          # bottom-left of the label box (ReportLab y=0 is bottom)
     cfg: dict,
     item_title: str,
     qr_data: str,
     fields: list[dict[str, str]],
     warning_text: str | None = None,
 ) -> None:
-    """
-    Draw one label box at canvas coordinates (lx, ly) — bottom-left in
-    ReportLab's coordinate system (y increases upward).
-    """
-    LW = cfg["w"] * inch
-    LH = cfg["h"] * inch
+    LW  = cfg["w"] * inch
+    LH  = cfg["h"] * inch
     HDR = cfg["header_h"] * inch
     PAD = cfg["pad"] * inch
 
-    # ── Dashed cut border ─────────────────────────────────────────────────────
-    c.saveState()
-    c.setDash(5, 4)
-    c.setStrokeColor(colors.HexColor("#aaaaaa"))
-    c.setLineWidth(0.6)
-    c.rect(lx, ly, LW, LH, stroke=1, fill=0)
-    c.restoreState()
+    # ── Border ────────────────────────────────────────────────────────────────
+    if cfg["cut_border"]:
+        # Dashed cut line for sub-sticker sizes
+        c.saveState()
+        c.setDash(5, 4)
+        c.setStrokeColor(colors.HexColor("#aaaaaa"))
+        c.setLineWidth(0.7)
+        c.rect(lx, ly, LW, LH, stroke=1, fill=0)
+        c.restoreState()
+    else:
+        # Solid border for the full-sticker (4×6) label
+        c.saveState()
+        c.setStrokeColor(colors.HexColor("#2c3e50"))
+        c.setLineWidth(1.5)
+        c.rect(lx, ly, LW, LH, stroke=1, fill=0)
+        c.restoreState()
 
     # ── Header strip ──────────────────────────────────────────────────────────
     hdr_y = ly + LH - HDR
     c.setFillColor(colors.HexColor("#2c3e50"))
     c.rect(lx, hdr_y, LW, HDR, stroke=0, fill=1)
 
-    text_baseline = hdr_y + HDR * 0.25
+    # Accent bar (blue underline on header)
+    c.setFillColor(colors.HexColor("#2980b9"))
+    c.rect(lx, hdr_y, LW, 2, stroke=0, fill=1)
+
+    text_y = hdr_y + HDR * 0.24
     c.setFillColor(colors.white)
-    c.setFont("Helvetica-Bold", cfg["title_font"])
-    c.drawString(lx + PAD, text_baseline, "SupplyLine MRO")
 
+    # Company name — left
+    c.setFont("Helvetica-Bold", cfg["company_font"])
+    c.drawString(lx + PAD, text_y, "SupplyLine MRO")
+
+    # Item title — right (truncated to fit)
     c.setFont("Helvetica", cfg["title_font"] - 1)
-    title_max = LW - c.stringWidth("SupplyLine MRO", "Helvetica-Bold", cfg["title_font"]) - PAD * 3
-    title = _fit(item_title, c, "Helvetica", cfg["title_font"] - 1, title_max)
-    c.drawRightString(lx + LW - PAD, text_baseline, title)
+    co_w      = c.stringWidth("SupplyLine MRO", "Helvetica-Bold", cfg["company_font"])
+    title_max = LW - co_w - PAD * 3
+    title     = _fit(item_title, c, "Helvetica", cfg["title_font"] - 1, title_max)
+    c.drawRightString(lx + LW - PAD, text_y, title)
 
-    # ── Warning banner (optional — used for transfer labels) ─────────────────
+    # ── Optional warning banner (transfer labels) ─────────────────────────────
     warn_h = 0.0
     if warning_text:
-        warn_h = cfg["title_font"] * 1.6
+        warn_h = cfg["company_font"] * 1.9
         warn_y = hdr_y - warn_h
         c.setFillColor(colors.HexColor("#e74c3c"))
         c.rect(lx, warn_y, LW, warn_h, stroke=0, fill=1)
         c.setFillColor(colors.white)
-        c.setFont("Helvetica-Bold", cfg["title_font"] - 1)
-        c.drawCentredString(lx + LW / 2, warn_y + warn_h * 0.20, warning_text)
+        c.setFont("Helvetica-Bold", cfg["company_font"] - 1.5)
+        c.drawCentredString(lx + LW / 2, warn_y + warn_h * 0.22, warning_text)
 
-    # ── Body area ─────────────────────────────────────────────────────────────
+    # ── Body ──────────────────────────────────────────────────────────────────
     body_top = hdr_y - warn_h
-    body_h = body_top - ly
-    body_x = lx + PAD
-    body_w = LW - 2 * PAD
+    body_x   = lx + PAD
+    body_w   = LW - 2 * PAD
+    body_y   = ly + PAD
+    body_h   = body_top - ly - PAD
 
-    # QR code — square, sized as fraction of body height, vertically centred
-    QR = body_h * cfg["qr_frac"]
-    qr_x = body_x
-    qr_y = ly + (body_h - QR) / 2
+    # QR code — centred horizontally, flush with the top of the body
+    QR    = cfg["qr_frac"] * body_w
+    qr_x  = body_x + (body_w - QR) / 2
+    qr_y  = body_top - QR          # bottom of QR image
     c.drawImage(_qr_reader(qr_data), qr_x, qr_y, QR, QR, preserveAspectRatio=True)
 
-    # Thin vertical divider
-    div_x = body_x + QR + PAD * 0.6
-    c.saveState()
-    c.setStrokeColor(colors.HexColor("#dde0e3"))
-    c.setLineWidth(0.6)
-    c.line(div_x, ly + PAD * 0.5, div_x, body_top - PAD * 0.5)
-    c.restoreState()
+    # ── Fields (below QR) ─────────────────────────────────────────────────────
+    LF     = cfg["label_font"]
+    VF     = cfg["value_font"]
+    GAP    = cfg["line_gap"]
+    ROW_H  = LF + 1 + VF + GAP + 2    # height of one full field block
 
-    # ── Fields (right column) ─────────────────────────────────────────────────
-    fx = div_x + PAD * 0.8
-    fw = lx + LW - PAD - fx          # available width for text
+    fields_top = qr_y - PAD * 0.4     # a small gap under the QR
+    shown      = fields[: cfg["max_fields"]]
 
-    LF = cfg["label_font"]           # label-row font size (points)
-    VF = cfg["value_font"]           # value-row font size (points)
-    GAP = cfg["line_gap"]            # gap between field blocks
-
-    ROW_H = LF + VF + GAP + 2       # height of one label+value block
-
-    shown = fields[: cfg["max_fields"]]
-    total_h = len(shown) * ROW_H - GAP
-    # Start y so fields are vertically centred in the body area
-    fy = ly + (body_h + total_h) / 2 - LF
-
-    for field in shown:
-        if fy - VF < ly + 2:
-            break
-
-        # Field label (small, grey)
-        c.setFillColor(colors.HexColor("#95a5a6"))
-        c.setFont("Helvetica", LF)
-        lbl = _fit(field["label"].upper(), c, "Helvetica", LF, fw)
-        c.drawString(fx, fy, lbl)
-        fy -= LF + 1
-
-        # Field value (larger, dark)
-        c.setFillColor(colors.HexColor("#1a2632"))
-        c.setFont("Helvetica-Bold", VF)
-        val = _fit(str(field["value"]), c, "Helvetica-Bold", VF, fw)
-        c.drawString(fx, fy, val)
-        fy -= VF + GAP + 2
+    if cfg["field_cols"] == 2 and len(shown) > 1:
+        # Two-column layout: interleave fields (even → left, odd → right)
+        col_w = (body_w - PAD * 0.5) / 2
+        left  = shown[0::2]
+        right = shown[1::2]
+        for col_idx, col_fields in enumerate((left, right)):
+            fx = body_x + col_idx * (col_w + PAD * 0.5)
+            fy = fields_top - LF
+            for field in col_fields:
+                if fy - VF < body_y:
+                    break
+                _draw_field(c, fx, fy, col_w - 2, field, LF, VF)
+                fy -= ROW_H
+    else:
+        # Single-column layout
+        fy = fields_top - LF
+        for field in shown:
+            if fy - VF < body_y:
+                break
+            _draw_field(c, body_x, fy, body_w, field, LF, VF)
+            fy -= ROW_H
 
 
-# ── Public PDF builder ────────────────────────────────────────────────────────
+# ── PDF builder ───────────────────────────────────────────────────────────────
 
 def _build_label_pdf(
     item_title: str,
@@ -220,18 +260,18 @@ def _build_label_pdf(
     warning_text: str | None = None,
 ) -> bytes:
     """
-    Produce a letter-size (8.5" x 11") PDF with the label drawn at the
-    top-left corner.  The dashed border shows where to cut.
+    Produce a 4"×6" PDF (standard sticker stock) with the label drawn
+    starting at the top-left corner.  Smaller label sizes include a dashed
+    cut border; the 4×6 size fills the entire sticker.
     """
-    cfg = _LABEL_CFG.get(label_size, _LABEL_CFG["3x4"])
-    PAGE_W, PAGE_H = letter          # 612 × 792 pt
-    MARGIN = 0.45 * inch
+    cfg = _CFG.get(label_size, _CFG["3x4"])
 
-    lx = MARGIN
-    ly = PAGE_H - MARGIN - cfg["h"] * inch
+    # Label box: anchored to the top-left of the 4×6 page
+    lx = 0.0
+    ly = PAGE_H - cfg["h"] * inch      # bottom of label box
 
     buf = io.BytesIO()
-    c = rl_canvas.Canvas(buf, pagesize=letter)
+    c   = rl_canvas.Canvas(buf, pagesize=(PAGE_W, PAGE_H))
     c.setTitle(f"Label \u2013 {item_title}")
     _draw_label(c, lx, ly, cfg, item_title, qr_data, fields, warning_text)
     c.showPage()
@@ -263,19 +303,19 @@ def generate_tool_label_pdf(
     if tool.lot_number:
         qr_data = f"{tool_number}-LOT-{tool.lot_number}"
     else:
-        qr_data = f"{tool_number}-{tool.serial_number or ''}"
+        qr_data = f"{tool_number}-{tool.serial_number or tool_number}"
 
     title = tool.tool_number or "Tool"
     if tool.lot_number:
-        title += f" - LOT {tool.lot_number}"
+        title += f" \u2013 LOT {tool.lot_number}"
     elif tool.serial_number:
-        title += f" - SN {tool.serial_number}"
+        title += f" \u2013 SN {tool.serial_number}"
 
     fields: list[dict[str, str]] = [
-        {"label": "Tool Number", "value": tool.tool_number or "N/A"},
-        {"label": "Description", "value": tool.description or "N/A"},
-        {"label": "Location",    "value": tool.location or "N/A"},
-        {"label": "Status",      "value": tool.status or "N/A"},
+        {"label": "Tool Number",  "value": tool.tool_number or "N/A"},
+        {"label": "Description",  "value": tool.description or "N/A"},
+        {"label": "Location",     "value": tool.location or "N/A"},
+        {"label": "Status",       "value": tool.status or "N/A"},
     ]
     if tool.lot_number:
         fields.append({"label": "Lot Number",    "value": tool.lot_number})
@@ -302,7 +342,7 @@ def generate_chemical_label_pdf(
     lot_number  = chemical.lot_number or ""
     exp_date    = chemical.expiration_date.strftime("%Y%m%d") if chemical.expiration_date else "NOEXP"
     qr_data     = f"{part_number}-{lot_number}-{exp_date}"
-    title       = f"{chemical.part_number} - {chemical.lot_number}"
+    title       = f"{chemical.part_number} \u2013 {chemical.lot_number}"
 
     display_qty = chemical.quantity
     if chemical.status == "issued" and chemical.parent_lot_number and chemical.issuance:
@@ -330,7 +370,8 @@ def generate_chemical_label_pdf(
             fields.append({"label": "Destination", "value": transfer_data["destination"]})
         if transfer_data.get("transfer_date"):
             td = transfer_data["transfer_date"]
-            fields.append({"label": "Transfer Date", "value": td.strftime("%Y-%m-%d") if hasattr(td, "strftime") else str(td)})
+            fields.append({"label": "Transfer Date",
+                           "value": td.strftime("%Y-%m-%d") if hasattr(td, "strftime") else str(td)})
         warning_text = "PARTIAL TRANSFER \u2013 NEW LOT NUMBER"
 
     return _build_label_pdf(title, qr_data, fields, label_size, warning_text)
@@ -345,13 +386,13 @@ def generate_expendable_label_pdf(
     if expendable.lot_number:
         qr_data = f"{part_number}-LOT-{expendable.lot_number}"
     else:
-        qr_data = f"{part_number}-SN-{expendable.serial_number or ''}"
+        qr_data = f"{part_number}-SN-{expendable.serial_number or part_number}"
 
     title = expendable.part_number or "Expendable"
     if expendable.lot_number:
-        title += f" - LOT {expendable.lot_number}"
+        title += f" \u2013 LOT {expendable.lot_number}"
     elif expendable.serial_number:
-        title += f" - SN {expendable.serial_number}"
+        title += f" \u2013 SN {expendable.serial_number}"
 
     fields: list[dict[str, str]] = [
         {"label": "Part Number", "value": expendable.part_number or "N/A"},
