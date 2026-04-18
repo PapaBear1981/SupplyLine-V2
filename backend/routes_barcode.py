@@ -7,7 +7,7 @@ Supports tools, chemicals, expendables, and kit items with multiple label sizes.
 
 import io
 
-from flask import Blueprint, jsonify, request, send_file
+from flask import Blueprint, current_app, jsonify, request, send_file
 from sqlalchemy.orm import joinedload
 
 from auth.jwt_manager import jwt_required
@@ -20,6 +20,14 @@ from utils.label_pdf_service import (
 
 
 barcode_bp = Blueprint("barcode", __name__)
+
+
+def _base_url() -> str:
+    """Return the public base URL (no trailing slash) for QR code links."""
+    configured = current_app.config.get("PUBLIC_URL", "")
+    if configured:
+        return configured.rstrip("/")
+    return request.host_url.rstrip("/")
 
 
 @barcode_bp.route("/api/barcode/tool/<int:tool_id>", methods=["GET"])
@@ -54,6 +62,7 @@ def generate_tool_barcode_label(tool_id):
             tool=tool,
             label_size=label_size,
             code_type=code_type,
+            base_url=_base_url(),
         )
 
         # Return PDF
@@ -120,6 +129,7 @@ def generate_chemical_barcode_label(chemical_id):
             code_type=code_type,
             is_transfer=is_transfer,
             transfer_data=transfer_data,
+            base_url=_base_url(),
         )
 
         # Return PDF
@@ -172,6 +182,7 @@ def generate_expendable_barcode_label(expendable_id):
             expendable=expendable,
             label_size=label_size,
             code_type=code_type,
+            base_url=_base_url(),
         )
 
         # Return PDF
@@ -215,20 +226,21 @@ def generate_kit_item_barcode_label(kit_id, item_id):
             return jsonify({"error": "Invalid or missing item_type parameter"}), 400
 
         # Get the actual item based on type
+        base = _base_url()
         if item_type == "tool":
             item = Tool.query.get_or_404(item_id)
-            pdf_bytes = generate_tool_label_pdf(item, label_size, code_type)
+            pdf_bytes = generate_tool_label_pdf(item, label_size, code_type, base_url=base)
             filename = f"kit-{kit_id}-tool-{item.tool_number}-label.pdf"
         elif item_type == "chemical":
             # Eager load issuance relationship for issued child lots
             item = Chemical.query.options(
                 joinedload(Chemical.issuance)
             ).get_or_404(item_id)
-            pdf_bytes = generate_chemical_label_pdf(item, label_size, code_type)
+            pdf_bytes = generate_chemical_label_pdf(item, label_size, code_type, base_url=base)
             filename = f"kit-{kit_id}-chemical-{item.part_number}-label.pdf"
         else:  # expendable
             item = Expendable.query.get_or_404(item_id)
-            pdf_bytes = generate_expendable_label_pdf(item, label_size, code_type)
+            pdf_bytes = generate_expendable_label_pdf(item, label_size, code_type, kit_id=kit_id, base_url=base)
             filename = f"kit-{kit_id}-expendable-{item.part_number}-label.pdf"
 
         # Return PDF

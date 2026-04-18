@@ -101,10 +101,15 @@ ItemType = Literal["tool", "chemical", "expendable", "kit_item"]
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
 def _qr_reader(data: str) -> ImageReader:
-    """Render QR code to PNG and wrap in a ReportLab ImageReader."""
+    """Render QR code to PNG and wrap in a ReportLab ImageReader.
+
+    border=4 satisfies the QR spec's minimum 4-module quiet zone requirement.
+    scale=12 gives a 336-px source image for version-1 codes — plenty of
+    resolution even after ReportLab scales it to fit the drawn box.
+    """
     qr = segno.make(data, error="m", boost_error=False)
     buf = io.BytesIO()
-    qr.save(buf, kind="png", scale=14, border=2, dark="#000000", light="#FFFFFF")
+    qr.save(buf, kind="png", scale=12, border=4, dark="#000000", light="#FFFFFF")
     buf.seek(0)
     return ImageReader(buf)
 
@@ -212,11 +217,19 @@ def _draw_label(
     body_y   = ly + PAD
     body_h   = body_top - ly - PAD
 
-    # QR code — centred horizontally, flush with the top of the body
-    QR    = cfg["qr_frac"] * body_w
-    qr_x  = body_x + (body_w - QR) / 2
-    qr_y  = body_top - QR          # bottom of QR image
-    c.drawImage(_qr_reader(qr_data), qr_x, qr_y, QR, QR, preserveAspectRatio=True)
+    # QR code — centred horizontally, with a small gap below the header so the
+    # quiet zone is never adjacent to the dark header strip.
+    QR      = cfg["qr_frac"] * body_w
+    qr_gap  = PAD * 0.5                  # breathing room under the header
+    qr_x    = body_x + (body_w - QR) / 2
+    qr_y    = body_top - qr_gap - QR    # bottom of QR image
+
+    # Explicit white background guarantees the quiet zone is never compromised
+    # by adjacent dark elements when printing.
+    c.setFillColor(colors.white)
+    c.rect(qr_x, qr_y, QR, QR, stroke=0, fill=1)
+    c.drawImage(_qr_reader(qr_data), qr_x, qr_y, QR, QR,
+                preserveAspectRatio=True, mask=None)
 
     # ── Fields (below QR) ─────────────────────────────────────────────────────
     LF     = cfg["label_font"]
@@ -298,12 +311,12 @@ def generate_tool_label_pdf(
     tool: Any,
     label_size: str = "3x4",
     code_type: CodeType = "qrcode",
+    base_url: str = "",
 ) -> bytes:
-    tool_number = tool.tool_number or ""
-    if tool.lot_number:
-        qr_data = f"{tool_number}-LOT-{tool.lot_number}"
-    else:
-        qr_data = f"{tool_number}-{tool.serial_number or tool_number}"
+    # Full URL so the QR code works with any scanner app, not just the
+    # in-app scanner.  parseScannedCode.ts matches the /tool-view/{id}
+    # substring whether or not a full origin is present.
+    qr_data = f"{base_url}/tool-view/{tool.id}"
 
     title = tool.tool_number or "Tool"
     if tool.lot_number:
@@ -337,12 +350,13 @@ def generate_chemical_label_pdf(
     code_type: CodeType = "qrcode",
     is_transfer: bool = False,
     transfer_data: dict[str, Any] | None = None,
+    base_url: str = "",
 ) -> bytes:
-    part_number = chemical.part_number or ""
-    lot_number  = chemical.lot_number or ""
-    exp_date    = chemical.expiration_date.strftime("%Y%m%d") if chemical.expiration_date else "NOEXP"
-    qr_data     = f"{part_number}-{lot_number}-{exp_date}"
-    title       = f"{chemical.part_number} \u2013 {chemical.lot_number}"
+    # Full URL so the QR code works with any scanner app, not just the
+    # in-app scanner.  parseScannedCode.ts matches the /chemical-view/{id}
+    # substring whether or not a full origin is present.
+    qr_data = f"{base_url}/chemical-view/{chemical.id}"
+    title   = f"{chemical.part_number} \u2013 {chemical.lot_number}"
 
     display_qty = chemical.quantity
     if chemical.status == "issued" and chemical.parent_lot_number and chemical.issuance:
@@ -381,12 +395,20 @@ def generate_expendable_label_pdf(
     expendable: Any,
     label_size: str = "3x4",
     code_type: CodeType = "qrcode",
+    kit_id: int | None = None,
+    base_url: str = "",
 ) -> bytes:
-    part_number = expendable.part_number or ""
-    if expendable.lot_number:
-        qr_data = f"{part_number}-LOT-{expendable.lot_number}"
+    # Full URL so the QR code works with any scanner app.
+    # Expendables live inside kits; navigate to the parent kit when kit_id is
+    # known, otherwise fall back to a stable identifier string.
+    if kit_id is not None:
+        qr_data = f"{base_url}/kits/{kit_id}"
     else:
-        qr_data = f"{part_number}-SN-{expendable.serial_number or part_number}"
+        part_number = expendable.part_number or ""
+        if expendable.lot_number:
+            qr_data = f"{part_number}-LOT-{expendable.lot_number}"
+        else:
+            qr_data = f"{part_number}-SN-{expendable.serial_number or part_number}"
 
     title = expendable.part_number or "Expendable"
     if expendable.lot_number:
