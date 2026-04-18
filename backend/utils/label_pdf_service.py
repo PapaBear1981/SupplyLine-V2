@@ -5,6 +5,7 @@ This module provides functions to generate professional PDF labels using
 Jinja2 templates and WeasyPrint. Supports multiple label sizes and item types.
 """
 
+import io
 import os
 from typing import Any, Literal
 
@@ -26,6 +27,28 @@ def _get_weasyprint():
             "PDF label generation requires WeasyPrint with GTK support. "
             f"Error: {e}"
         ) from e
+
+
+def _clip_to_one_page(pdf_bytes: bytes) -> bytes:
+    """
+    Extract only the first page from a PDF.
+
+    WeasyPrint paginates based on content flow, not CSS overflow — any content
+    that exceeds the @page height spills onto page 2. This function guarantees
+    the returned PDF contains exactly one page regardless of what WeasyPrint
+    produced, so labels always print as a single sticker.
+    """
+    from pypdf import PdfReader, PdfWriter
+
+    reader = PdfReader(io.BytesIO(pdf_bytes))
+    if len(reader.pages) == 1:
+        return pdf_bytes  # Already one page — return as-is (no rewrite overhead)
+
+    writer = PdfWriter()
+    writer.add_page(reader.pages[0])
+    output = io.BytesIO()
+    writer.write(output)
+    return output.getvalue()
 
 
 # Type definitions
@@ -116,7 +139,9 @@ def generate_label_pdf(
         if pdf_bytes is None:
             raise RuntimeError("PDF generation returned None")
 
-        return pdf_bytes
+        # WeasyPrint paginates by content flow — clip to page 1 so the label
+        # is always exactly one sticker, never two pages.
+        return _clip_to_one_page(pdf_bytes)
 
     except Exception as e:
         raise RuntimeError(f"Failed to generate label PDF: {e!s}") from e
