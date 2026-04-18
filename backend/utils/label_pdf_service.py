@@ -109,9 +109,28 @@ def generate_label_pdf(
         html_content = template.render(**context)
 
         # Generate PDF using WeasyPrint (lazy loaded)
-        html_class, _ = _get_weasyprint()
+        # Pass the page size as a CSS override to guarantee single-page output —
+        # WeasyPrint determines page count from content flow, so we also inject
+        # an explicit @page rule with a large enough area and clip to one page.
+        html_class, css_class = _get_weasyprint()
         html = html_class(string=html_content)
-        pdf_bytes = html.write_pdf()
+
+        # Build a CSS override that locks the page size and suppresses overflow
+        page_width = context["page_width"]
+        page_height = context["page_height"]
+        page_css = css_class(string=f"""
+            @page {{
+                size: {page_width} {page_height};
+                margin: 0;
+            }}
+            html, body {{
+                width: {page_width};
+                height: {page_height};
+                max-height: {page_height};
+                overflow: hidden;
+            }}
+        """)
+        pdf_bytes = html.write_pdf(stylesheets=[page_css])
 
         if pdf_bytes is None:
             raise RuntimeError("PDF generation returned None")
