@@ -53,6 +53,9 @@ reportlab==4.2.5
 # Updated to 68.0 to fix CVE-2025-68616 (SSRF via arbitrary URL loading)
 WeasyPrint==68.0
 
+# PDF post-processing — used to clip WeasyPrint output to exactly one page
+pypdf==5.1.0
+
 # Barcode Generation
 segno==1.6.1  # QR codes and other 2D barcodes
 python-barcode==0.15.1  # 1D barcodes (CODE128, EAN, etc.)
