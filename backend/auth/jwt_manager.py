@@ -271,6 +271,11 @@ def jwt_required(f):
     """Decorator for JWT authentication requirement"""
     @wraps(f)
     def decorated_function(*args, **kwargs):
+        # CORS preflight requests never carry an Authorization header.
+        # Let them fall through so Flask-CORS can attach the correct headers.
+        if request.method == "OPTIONS":
+            return ("", 204)
+
         user_payload = JWTManager.get_current_user()
         if not user_payload:
             return jsonify({"error": "Authentication required", "code": "AUTH_REQUIRED"}), 401
@@ -285,6 +290,9 @@ def admin_required(f):
     """Decorator for admin privilege requirement"""
     @wraps(f)
     def decorated_function(*args, **kwargs):
+        if request.method == "OPTIONS":
+            return ("", 204)
+
         user_payload = JWTManager.get_current_user()
         if not user_payload:
             return jsonify({"error": "Authentication required", "code": "AUTH_REQUIRED"}), 401
@@ -307,6 +315,9 @@ def permission_required(permission_name: str):
     def decorator(f):
         @wraps(f)
         def decorated_function(*args, **kwargs):
+            if request.method == "OPTIONS":
+                return ("", 204)
+
             user_payload = JWTManager.get_current_user()
             if not user_payload:
                 return jsonify({"error": "Authentication required", "code": "AUTH_REQUIRED"}), 401
@@ -339,6 +350,9 @@ def permission_required_any(*permission_names: str):
     def decorator(f):
         @wraps(f)
         def decorated_function(*args, **kwargs):
+            if request.method == "OPTIONS":
+                return ("", 204)
+
             user_payload = JWTManager.get_current_user()
             if not user_payload:
                 return jsonify({"error": "Authentication required", "code": "AUTH_REQUIRED"}), 401

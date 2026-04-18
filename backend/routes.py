@@ -70,6 +70,8 @@ logger = logging.getLogger(__name__)
 def login_required(f):
     @wraps(f)
     def decorated_function(*args, **kwargs):
+        if request.method == "OPTIONS":
+            return ("", 204)
         # Use JWT authentication
         from auth.jwt_manager import JWTManager
         user_payload = JWTManager.get_current_user()
@@ -86,6 +88,8 @@ def login_required(f):
 def admin_required(f):
     @wraps(f)
     def decorated_function(*args, **kwargs):
+        if request.method == "OPTIONS":
+            return ("", 204)
         # Use JWT authentication
         import logging
 
@@ -113,6 +117,8 @@ def admin_required(f):
 def tool_manager_required(f):
     @wraps(f)
     def decorated_function(*args, **kwargs):
+        if request.method == "OPTIONS":
+            return ("", 204)
         # Use JWT authentication
         from auth.jwt_manager import JWTManager
         user_payload = JWTManager.get_current_user()
@@ -134,6 +140,8 @@ def tool_manager_required(f):
 def materials_manager_required(f):
     @wraps(f)
     def decorated_function(*args, **kwargs):
+        if request.method == "OPTIONS":
+            return ("", 204)
         # Use JWT authentication
         from auth.jwt_manager import JWTManager
         user_payload = JWTManager.get_current_user()
