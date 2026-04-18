@@ -1,6 +1,6 @@
 export { ScannerProvider } from './context/ScannerContext';
-export { useScanner } from './context/scannerContext';
-export type { ScannerResolution } from './context/scannerContext';
+export { useScanner } from './context/scannerHooks';
+export type { ScannerResolution } from './context/scannerHooks';
 export { MobileScannerSheet } from './components/MobileScannerSheet';
 export { parseScannedCode } from './utils/parseScannedCode';
 export { useScannerLookupMutation } from './services/scannerApi';

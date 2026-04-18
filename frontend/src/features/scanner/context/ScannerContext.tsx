@@ -11,7 +11,7 @@ import {
   ScannerContext,
   type OpenScannerOptions,
   type ScannerContextValue,
-} from './scannerContext';
+} from './scannerHooks';
 
 interface ScannerProviderProps {
   children: ReactNode;
@@ -24,7 +24,7 @@ interface ScannerProviderProps {
  * all share the same camera UX.
  *
  * Non-component exports (ScannerContext, useScanner, types) live in
- * `./scannerContext.ts` so this file can stay fast-refresh friendly.
+ * `./scannerHooks.ts` so this file can stay fast-refresh friendly.
  */
 export const ScannerProvider = ({ children }: ScannerProviderProps) => {
   const [isOpen, setIsOpen] = useState(false);

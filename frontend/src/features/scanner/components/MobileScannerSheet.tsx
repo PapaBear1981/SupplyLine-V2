@@ -7,7 +7,7 @@ import { Html5Qrcode, Html5QrcodeSupportedFormats } from 'html5-qrcode';
 import { useScannerLookupMutation } from '../services/scannerApi';
 import { parseScannedCode } from '../utils/parseScannedCode';
 import { useHaptics } from '@shared/hooks/useHaptics';
-import type { ScannerResolution } from '../context/scannerContext';
+import type { ScannerResolution } from '../context/scannerHooks';
 import './MobileScannerSheet.css';
 
 interface MobileScannerSheetProps {
@@ -83,13 +83,13 @@ export const MobileScannerSheet = ({
           { facingMode: 'environment' },
           {
             fps: 10,
-            qrbox: (viewfinderWidth, viewfinderHeight) => {
+            qrbox: (viewfinderWidth: number, viewfinderHeight: number) => {
               const min = Math.min(viewfinderWidth, viewfinderHeight);
               const edge = Math.floor(min * 0.75);
               return { width: edge, height: edge };
             },
           },
-          async (decoded) => {
+          async (decoded: string) => {
             if (busyRef.current || cancelled) return;
             busyRef.current = true;
             haptics.trigger('success');
