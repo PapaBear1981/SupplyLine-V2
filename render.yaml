@@ -26,16 +26,9 @@ services:
     plan: free
     autoDeploy: false
     healthCheckPath: /api/health
-    # WeasyPrint (PDF generation) requires these system libraries.
-    # Render installs apt packages before running buildCommand.
-    packages:
-      - libpango-1.0-0
-      - libpangoft2-1.0-0
-      - libpangocairo-1.0-0
-      - libgdk-pixbuf-2.0-0
-      - libffi-dev
-      - shared-mime-info
-    buildCommand: pip install -r backend/requirements.txt
+    # WeasyPrint (PDF generation) needs system libraries not in Render's
+    # default image. Install them via apt-get before pip install.
+    buildCommand: apt-get update -qq && apt-get install -y -q libpango-1.0-0 libpangoft2-1.0-0 libpangocairo-1.0-0 libgdk-pixbuf-2.0-0 libffi-dev shared-mime-info && pip install -r backend/requirements.txt
     # -w 1 is required: Socket.IO tracks connection state per-process,
     # so multiple workers would break real-time broadcasts.
     startCommand: gunicorn -w 1 --timeout 120 -b 0.0.0.0:$PORT wsgi:application
