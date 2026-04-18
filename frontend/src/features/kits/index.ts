@@ -2,6 +2,9 @@
 export { default as KitsDashboard } from './pages/KitsDashboard';
 export { default as KitDetailView } from './pages/KitDetailView';
 
+// Mobile components
+export { MobileKitWizard } from './components/mobile';
+
 // Components
 export { default as KitWizard } from './components/KitWizard';
 export { default as KitBoxManager } from './components/KitBoxManager';

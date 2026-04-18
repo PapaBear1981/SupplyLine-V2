@@ -7,7 +7,11 @@ import {
   List,
   Avatar,
   SafeArea,
+  FloatingBubble,
 } from 'antd-mobile';
+import { ScanCodeOutline } from 'antd-mobile-icons';
+import { useScanner } from '@features/scanner';
+import { MobileAIAssistant } from '@features/ai/components/MobileAIAssistant';
 import {
   AppOutline,
   UnorderedListOutline,
@@ -26,6 +30,8 @@ import {
   ShoppingCartOutlined,
   FormOutlined,
   LogoutOutlined,
+  BarChartOutlined,
+  SettingOutlined,
 } from '@ant-design/icons';
 import { useAppDispatch, useAppSelector } from '@app/hooks';
 import { logout } from '@features/auth/slices/authSlice';
@@ -33,6 +39,7 @@ import { useLogoutMutation } from '@features/auth/services/authApi';
 import { socketService } from '@services/socket';
 import { ROUTES } from '@shared/constants/routes';
 import { ALL_MENU_ITEMS } from '@shared/constants/navigation';
+import { useMobileAdminEnabled } from '@shared/hooks/useMobileAdminEnabled';
 import './MobileLayout.css';
 
 // Map route keys to display names
@@ -41,12 +48,14 @@ const routeNames: Record<string, string> = {
   [ROUTES.TOOL_CHECKOUT]: 'Tool Checkout',
   [ROUTES.TOOLS]: 'Tools',
   [ROUTES.CHEMICALS]: 'Chemicals',
+  [ROUTES.CHEMICAL_FORECAST]: 'Chemical Forecast',
   [ROUTES.KITS]: 'Kits',
   '/orders': 'Fulfillment',
   '/requests': 'Requests',
   [ROUTES.WAREHOUSES]: 'Warehouses',
   [ROUTES.REPORTS]: 'Reports',
   [ROUTES.USERS]: 'Users',
+  [ROUTES.ADMIN]: 'Admin',
   [ROUTES.PROFILE]: 'Profile',
   [ROUTES.SETTINGS]: 'Settings',
 };
@@ -56,12 +65,14 @@ const routeIcons: Record<string, React.ReactNode> = {
   [ROUTES.TOOL_CHECKOUT]: <SwapOutlined />,
   [ROUTES.TOOLS]: <ToolOutlined />,
   [ROUTES.CHEMICALS]: <ExperimentOutlined />,
+  [ROUTES.CHEMICAL_FORECAST]: <BarChartOutlined />,
   [ROUTES.KITS]: <InboxOutlined />,
   '/orders': <ShoppingCartOutlined />,
   '/requests': <FormOutlined />,
   [ROUTES.WAREHOUSES]: <HomeOutlined />,
   [ROUTES.REPORTS]: <FileTextOutlined />,
   [ROUTES.USERS]: <UserOutlined />,
+  [ROUTES.ADMIN]: <SettingOutlined />,
 };
 
 export const MobileLayout = () => {
@@ -71,35 +82,63 @@ export const MobileLayout = () => {
   const user = useAppSelector((state) => state.auth.user);
   const [logoutApi] = useLogoutMutation();
   const [menuVisible, setMenuVisible] = useState(false);
+  const { isEnabled: mobileAdminEnabled } = useMobileAdminEnabled();
+  const { openScanner } = useScanner();
 
-  // Memoize filtered menu items based on user permissions (excluding admin and main tab items)
+  // Memoize filtered menu items based on user permissions and mobile admin toggle
   const menuItems = useMemo(() => {
     const isAdmin = user?.is_admin || false;
     const permissions = user?.permissions || [];
 
-    // Filter items that should appear in the "More" menu
-    // Exclude Dashboard (in tab bar), Admin (desktop only), Profile, Settings
-    const moreMenuRoutes = [
+    // Routes that should appear in the "More" menu — Dashboard, Profile,
+    // and Settings already live in the bottom tab bar. Chemical Forecast
+    // and Admin are mobile additions and are filtered further below.
+    const moreMenuRoutes: string[] = [
       ROUTES.TOOL_CHECKOUT,
       ROUTES.TOOLS,
       ROUTES.CHEMICALS,
+      ROUTES.CHEMICAL_FORECAST,
       ROUTES.KITS,
       '/orders',
       '/requests',
       ROUTES.WAREHOUSES,
       ROUTES.REPORTS,
       ROUTES.USERS,
+      ROUTES.ADMIN,
     ];
 
-    return ALL_MENU_ITEMS
+    // Chemical Forecast lives inside a nested children[] entry on desktop.
+    // Flatten ALL_MENU_ITEMS so the mobile menu can surface it directly.
+    const flattenedItems = ALL_MENU_ITEMS.flatMap((item) => {
+      if (item.children && item.children.length > 0) {
+        return [item, ...item.children];
+      }
+      return [item];
+    });
+
+    // De-dupe by key so nested children don't appear twice when the
+    // parent and child share the same route (e.g. Chemicals + Inventory).
+    const seen = new Set<string>();
+    const uniqueItems = flattenedItems.filter((item) => {
+      if (seen.has(item.key)) return false;
+      seen.add(item.key);
+      return true;
+    });
+
+    return uniqueItems
       .filter((item) => {
-        // Only include items in the moreMenuRoutes list
         if (!moreMenuRoutes.includes(item.key)) return false;
 
-        // Admins can see everything except admin page on mobile
+        // Admin item is gated by the mobile_admin_enabled system setting
+        // (Phase 5 wires the backend value; Phase 1 hard-codes false).
+        if (item.key === ROUTES.ADMIN) {
+          return isAdmin && mobileAdminEnabled;
+        }
+
+        // Admins can see everything else
         if (isAdmin) return true;
 
-        // Admin-only items are hidden for non-admins
+        // Admin-only items (besides /admin itself) are hidden for non-admins
         if (item.adminOnly) return false;
 
         // If no permission required, show the item
@@ -113,7 +152,7 @@ export const MobileLayout = () => {
         label: item.label,
         icon: routeIcons[item.key],
       }));
-  }, [user?.is_admin, user?.permissions]);
+  }, [user?.is_admin, user?.permissions, mobileAdminEnabled]);
 
   const handleLogout = async () => {
     try {
@@ -160,7 +199,8 @@ export const MobileLayout = () => {
     return (
       path.startsWith('/kits/') ||
       path.startsWith('/orders/') ||
-      path.startsWith('/requests/')
+      path.startsWith('/requests/') ||
+      path === ROUTES.CHEMICAL_FORECAST
     );
   };
 
@@ -222,6 +262,23 @@ export const MobileLayout = () => {
       <div className="mobile-layout-content">
         <Outlet />
       </div>
+
+      {/* Global scan FAB — visible on every mobile screen */}
+      <FloatingBubble
+        style={{
+          '--initial-position-bottom': '88px',
+          '--initial-position-right': '16px',
+          '--edge-distance': '16px',
+          '--background': 'var(--adm-color-primary)',
+        }}
+        onClick={() => openScanner()}
+        aria-label="Scan QR code or barcode"
+      >
+        <ScanCodeOutline fontSize={26} />
+      </FloatingBubble>
+
+      {/* AI Assistant FAB + full-screen chat */}
+      <MobileAIAssistant />
 
       <div className="mobile-layout-footer">
         <TabBar

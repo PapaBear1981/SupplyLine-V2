@@ -6,6 +6,16 @@ export { RequestsDashboard } from './pages/RequestsDashboard';
 export { RequestDetailView } from './pages/RequestDetailView';
 export { RequestCreationForm } from './pages/RequestCreationForm';
 
+// Mobile components (exposed at feature root so App.tsx can import them)
+export {
+  MobileOrdersList,
+  MobileRequestsList,
+  MobileOrderDetail,
+  MobileOrderCreationForm,
+  MobileRequestDetail,
+  MobileRequestCreationForm,
+} from './components/mobile';
+
 // Services
 export * from './services/ordersApi';
 export * from './services/requestsApi';

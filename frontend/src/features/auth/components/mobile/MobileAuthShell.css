@@ -1,0 +1,19 @@
+/**
+ * MobileAuthShell styles
+ * Complements MobileLoginForm.css (which defines .mobile-login-bg)
+ * and provides the shared glass card container for all mobile auth
+ * states (login, TOTP, backup codes).
+ */
+
+.mobile-auth-shell__card {
+  position: relative;
+  z-index: 1;
+  padding: 28px 20px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  animation: fadeInUp 0.4s ease-out;
+  border-radius: 20px;
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}

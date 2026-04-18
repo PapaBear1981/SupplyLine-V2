@@ -30,10 +30,7 @@ import {
   UserOutlined,
   CalendarOutlined,
   FileTextOutlined,
-  SwapOutlined,
   ShoppingCartOutlined,
-  MessageOutlined,
-  BarChartOutlined,
 } from '@ant-design/icons';
 import dayjs from 'dayjs';
 import {
@@ -44,6 +41,9 @@ import {
 } from '../../services/kitsApi';
 import type { KitStatus } from '../../types';
 import EditKitModal from '../EditKitModal';
+import { MobileKitContentsTab } from './MobileKitContentsTab';
+import { MobileKitReordersTab } from './MobileKitReordersTab';
+import { MobileKitGpsCaptureButton } from './MobileKitGpsCaptureButton';
 import './MobileKitDetailPage.css';
 
 // Status color mapping
@@ -197,7 +197,17 @@ export const MobileKitDetailPage = () => {
           key="items"
         />
         <Tabs.Tab title="Location" key="location" />
-        <Tabs.Tab title="More" key="more" />
+        <Tabs.Tab
+          title={
+            <Badge
+              content={analytics?.reorders.pending || null}
+              style={{ '--right': '-10px', '--top': '-3px' }}
+            >
+              Reorders
+            </Badge>
+          }
+          key="more"
+        />
       </Tabs>
 
       {/* Tab Content */}
@@ -320,43 +330,7 @@ export const MobileKitDetailPage = () => {
 
         {activeTab === 'items' && (
           <div className="items-tab">
-            <Card className="info-card">
-              <List header="Boxes & Items">
-                <List.Item
-                  prefix={<InboxOutlined style={{ fontSize: 20, color: '#1890ff' }} />}
-                  extra={<Badge content={kit.box_count || 0} />}
-                  arrow
-                  onClick={() => {/* TODO: Navigate to boxes */}}
-                >
-                  Boxes
-                </List.Item>
-                <List.Item
-                  prefix={<ToolOutlined style={{ fontSize: 20, color: '#52c41a' }} />}
-                  extra={<Badge content={kit.item_count || 0} />}
-                  arrow
-                  onClick={() => {/* TODO: Navigate to items */}}
-                >
-                  All Items
-                </List.Item>
-              </List>
-            </Card>
-
-            <Card className="info-card">
-              <List header="Activity">
-                <List.Item
-                  prefix={<SwapOutlined style={{ fontSize: 20, color: '#722ed1' }} />}
-                  extra={analytics?.issuances.total || 0}
-                  arrow
-                  onClick={() => {/* TODO: Navigate to issuances */}}
-                >
-                  Issuance History
-                </List.Item>
-              </List>
-            </Card>
-
-            <div className="coming-soon">
-              <p>Full item management coming soon. Use the desktop view for full functionality.</p>
-            </div>
+            <MobileKitContentsTab kitId={kitId} />
           </div>
         )}
 
@@ -424,47 +398,28 @@ export const MobileKitDetailPage = () => {
                 <p>No location set for this kit</p>
               </div>
             )}
+
+            {/* One-tap GPS capture — available on every kit detail on mobile */}
+            <div style={{ padding: '16px' }}>
+              <MobileKitGpsCaptureButton
+                kitId={kitId}
+                existingAddress={{
+                  location_address: kit.location_address,
+                  location_city: kit.location_city,
+                  location_state: kit.location_state,
+                  location_zip: kit.location_zip,
+                  location_country: kit.location_country,
+                  location_notes: kit.location_notes,
+                }}
+                onSuccess={() => refetch()}
+              />
+            </div>
           </div>
         )}
 
         {activeTab === 'more' && (
           <div className="more-tab">
-            <Card className="info-card">
-              <List header="Additional Features">
-                <List.Item
-                  prefix={<ShoppingCartOutlined style={{ fontSize: 20, color: '#faad14' }} />}
-                  extra={
-                    analytics?.reorders.pending ? (
-                      <Badge content={analytics.reorders.pending} />
-                    ) : null
-                  }
-                  arrow
-                >
-                  Pending Reorders
-                </List.Item>
-                <List.Item
-                  prefix={<MessageOutlined style={{ fontSize: 20, color: '#1890ff' }} />}
-                  extra={
-                    kit.unread_messages ? (
-                      <Badge content={kit.unread_messages} />
-                    ) : null
-                  }
-                  arrow
-                >
-                  Messages
-                </List.Item>
-                <List.Item
-                  prefix={<BarChartOutlined style={{ fontSize: 20, color: '#722ed1' }} />}
-                  arrow
-                >
-                  Analytics
-                </List.Item>
-              </List>
-            </Card>
-
-            <div className="coming-soon">
-              <p>These features are coming soon to mobile. Use the desktop view for full functionality.</p>
-            </div>
+            <MobileKitReordersTab kitId={kitId} />
           </div>
         )}
       </div>

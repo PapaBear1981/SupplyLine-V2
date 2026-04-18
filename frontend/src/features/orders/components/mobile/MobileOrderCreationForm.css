@@ -1,0 +1,16 @@
+.mobile-order-creation-form {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding-bottom: 120px;
+}
+
+.mobile-order-creation-form__row {
+  display: grid;
+  grid-template-columns: 1fr 1.2fr;
+  gap: 12px;
+}
+
+.mobile-order-creation-form__submit {
+  padding: 16px 4px calc(24px + env(safe-area-inset-bottom, 0));
+}

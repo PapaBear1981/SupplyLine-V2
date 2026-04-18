@@ -24,6 +24,7 @@ import dayjs from 'dayjs';
 import relativeTime from 'dayjs/plugin/relativeTime';
 import { useGetRequestsQuery } from '../../services/requestsApi';
 import type { UserRequest, RequestStatus, RequestPriority } from '../../types';
+import { useHaptics } from '@shared/hooks/useHaptics';
 import './MobileRequestsList.css';
 
 dayjs.extend(relativeTime);
@@ -82,6 +83,7 @@ const priorityOptions = [
 
 export const MobileRequestsList = () => {
   const navigate = useNavigate();
+  const haptics = useHaptics();
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<RequestStatus | ''>('');
   const [priorityFilter, setPriorityFilter] = useState<RequestPriority | ''>('');
@@ -109,11 +111,13 @@ export const MobileRequestsList = () => {
   };
 
   const handleRequestClick = (request: UserRequest) => {
+    haptics.trigger('selection');
     setSelectedRequest(request);
     setShowDetailPopup(true);
   };
 
   const handleCreate = () => {
+    haptics.trigger('selection');
     navigate('/requests/new');
   };
 

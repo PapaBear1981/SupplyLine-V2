@@ -2,12 +2,17 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { AnimatePresence, motion } from 'framer-motion';
 import { message } from 'antd';
+import { Toast } from 'antd-mobile';
 import { useAppDispatch, useAppSelector } from '@app/hooks';
 import { setCredentials, setSetupToken } from '../slices/authSlice';
 import { socketService } from '@services/socket';
 import { ROUTES } from '@shared/constants/routes';
 import { useIsMobile } from '@shared/hooks/useMobile';
-import { MobileLoginForm } from '../components/mobile';
+import {
+  MobileLoginForm,
+  MobileTotpVerification,
+  MobileBackupCodeForm,
+} from '../components/mobile';
 import { LoginForm } from '../components/login/LoginForm';
 import { ForcedTotpSetup } from '../components/login/ForcedTotpSetup';
 import { TotpVerificationForm } from '../components/TotpVerificationForm';
@@ -37,28 +42,17 @@ export const LoginPage = () => {
 
   // Redirect if already authenticated AND not in TOTP setup/verification flow
   useEffect(() => {
-    if (isAuthenticated && !isMobile && loginState === 'PASSWORD_ENTRY') {
+    if (isAuthenticated && loginState === 'PASSWORD_ENTRY') {
       navigate(ROUTES.DASHBOARD, { replace: true });
     }
-  }, [isAuthenticated, navigate, isMobile, loginState]);
-
-  // Render mobile version if on mobile device
-  if (isMobile) {
-    return <MobileLoginForm />;
-  }
+  }, [isAuthenticated, navigate, loginState]);
 
   const handleLoginSuccess = (response: LoginResponse) => {
-    console.log('[LoginPage] handleLoginSuccess called with response:', response);
-    console.log('[LoginPage] requires_totp_setup:', response.requires_totp_setup);
-    console.log('[LoginPage] requires_totp:', response.requires_totp);
-    console.log('[LoginPage] setup_token:', response.setup_token);
-
     setLoginResponse(response);
     setEmployeeNumber(response.employee_number || '');
 
     // Check if user needs to set up TOTP (first-time mandatory enrollment)
     if (response.requires_totp_setup) {
-      console.log('[LoginPage] Entering TOTP_SETUP state');
       // Store the setup token for TOTP API calls BUT don't set isAuthenticated
       // This prevents refresh bypass vulnerability
       dispatch(
@@ -74,13 +68,11 @@ export const LoginPage = () => {
 
     // Check if user needs to verify TOTP (returning user with 2FA enabled)
     if (response.requires_totp) {
-      console.log('[LoginPage] Entering TOTP_VERIFICATION state');
       setLoginState('TOTP_VERIFICATION');
       return;
     }
 
     // Normal login flow (no TOTP required - should not happen with mandatory 2FA)
-    console.log('[LoginPage] Completing authentication normally (no 2FA required)');
     completeAuthentication(response);
   };
 
@@ -101,7 +93,11 @@ export const LoginPage = () => {
       // Don't block login if WebSocket fails
     }
 
-    message.success('Welcome back. Launch checklist complete.');
+    if (isMobile) {
+      Toast.show({ icon: 'success', content: 'Welcome back', duration: 2000 });
+    } else {
+      message.success('Welcome back. Launch checklist complete.');
+    }
     setLoginState('AUTHENTICATED');
     navigate(ROUTES.DASHBOARD);
   };
@@ -124,6 +120,46 @@ export const LoginPage = () => {
     setLoginState('TOTP_VERIFICATION');
   };
 
+  // ---------- Mobile rendering ------------------------------------------------
+  if (isMobile) {
+    if (loginState === 'PASSWORD_ENTRY') {
+      return <MobileLoginForm onSuccess={handleLoginSuccess} />;
+    }
+
+    if (loginState === 'TOTP_SETUP' && loginResponse) {
+      // Reuse desktop ForcedTotpSetup on mobile — it already ships with
+      // glass-card-elevated styling and works reasonably well on mobile
+      // viewports. A dedicated mobile TOTP enrollment flow can follow in
+      // a later iteration.
+      return <ForcedTotpSetup />;
+    }
+
+    if (loginState === 'TOTP_VERIFICATION') {
+      return (
+        <MobileTotpVerification
+          employeeNumber={employeeNumber}
+          onSuccess={handleTotpVerified}
+          onBack={handleBackToPassword}
+          onUseBackupCode={handleBackupCodeSwitch}
+        />
+      );
+    }
+
+    if (loginState === 'BACKUP_CODE_ENTRY') {
+      return (
+        <MobileBackupCodeForm
+          employeeNumber={employeeNumber}
+          onSuccess={completeAuthentication}
+          onBack={handleBackToTotp}
+        />
+      );
+    }
+
+    // AUTHENTICATED — navigation is in-flight, render nothing.
+    return null;
+  }
+
+  // ---------- Desktop rendering ---------------------------------------------
   return (
     <div className="login-page">
       <ThemeToggle />

@@ -27,6 +27,7 @@ import dayjs from 'dayjs';
 import relativeTime from 'dayjs/plugin/relativeTime';
 import { useGetOrdersQuery } from '../../services/ordersApi';
 import type { ProcurementOrder, OrderStatus, OrderPriority, OrderType } from '../../types';
+import { useHaptics } from '@shared/hooks/useHaptics';
 import './MobileOrdersList.css';
 
 dayjs.extend(relativeTime);
@@ -83,6 +84,7 @@ const priorityOptions = [
 
 export const MobileOrdersList = () => {
   const navigate = useNavigate();
+  const haptics = useHaptics();
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<OrderStatus | ''>('');
   const [priorityFilter, setPriorityFilter] = useState<OrderPriority | ''>('');
@@ -110,11 +112,13 @@ export const MobileOrdersList = () => {
   };
 
   const handleOrderClick = (order: ProcurementOrder) => {
+    haptics.trigger('selection');
     setSelectedOrder(order);
     setShowDetailPopup(true);
   };
 
   const handleCreate = () => {
+    haptics.trigger('selection');
     navigate('/orders/new');
   };
 

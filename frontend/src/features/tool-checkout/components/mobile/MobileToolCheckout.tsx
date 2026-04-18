@@ -33,6 +33,7 @@ import {
   useGetCheckoutStatsQuery,
   useGetActiveCheckoutsQuery,
   useGetOverdueCheckoutsQuery,
+  useGetDueTodayCheckoutsQuery,
   useSearchToolsForCheckoutQuery,
   useCreateCheckoutMutation,
   useCheckinToolMutation,
@@ -40,6 +41,7 @@ import {
 import { useLazyGetUsersQuery } from '@features/users/services/usersApi';
 import type { User } from '@features/users/types';
 import type { ToolCheckout } from '../../types';
+import { useScanner } from '@features/scanner';
 import './MobileToolCheckout.css';
 
 dayjs.extend(relativeTime);
@@ -64,11 +66,38 @@ export const MobileToolCheckout = () => {
   const [userSearchQuery, setUserSearchQuery] = useState('');
   const [checkoutForm] = Form.useForm();
   const [checkinForm] = Form.useForm();
+  const { openScanner } = useScanner();
+
+  const handleScanTool = () => {
+    openScanner({
+      title: 'Scan tool to check out',
+      accept: ['tool'],
+      onResolved: (result) => {
+        const data = result.itemData ?? {};
+        const toolNumber =
+          typeof data['tool_number'] === 'string'
+            ? String(data['tool_number'])
+            : `Tool #${result.itemId}`;
+        const description =
+          typeof data['description'] === 'string'
+            ? String(data['description'])
+            : '';
+        checkoutForm.setFieldValue('tool_id', result.itemId);
+        checkoutForm.setFieldValue(
+          'tool_display',
+          description ? `${toolNumber} - ${description}` : toolNumber
+        );
+        setSearchQuery('');
+        setShowCheckoutPopup(true);
+      },
+    });
+  };
 
   // API queries
   const { data: stats, isLoading: statsLoading, refetch: refetchStats } = useGetCheckoutStatsQuery();
   const { data: activeCheckouts, isLoading: activeLoading, refetch: refetchActive } = useGetActiveCheckoutsQuery({});
   const { data: overdueCheckouts, isLoading: overdueLoading, refetch: refetchOverdue } = useGetOverdueCheckoutsQuery({});
+  const { data: dueTodayCheckouts, isLoading: dueTodayLoading, refetch: refetchDueToday } = useGetDueTodayCheckoutsQuery({});
   const { data: toolResults } = useSearchToolsForCheckoutQuery(searchQuery, {
     skip: searchQuery.length < 2,
   });
@@ -77,7 +106,7 @@ export const MobileToolCheckout = () => {
   const [checkinTool, { isLoading: isCheckingIn }] = useCheckinToolMutation();
 
   const handleRefresh = async () => {
-    await Promise.all([refetchStats(), refetchActive(), refetchOverdue()]);
+    await Promise.all([refetchStats(), refetchActive(), refetchOverdue(), refetchDueToday()]);
   };
 
   // Debounced user search (300ms)
@@ -193,6 +222,7 @@ export const MobileToolCheckout = () => {
 
   const activeList = activeCheckouts?.checkouts || [];
   const overdueList = overdueCheckouts?.checkouts || [];
+  const dueTodayList = dueTodayCheckouts?.checkouts || [];
 
   return (
     <div className="mobile-tool-checkout">
@@ -276,6 +306,27 @@ export const MobileToolCheckout = () => {
           <Tabs.Tab
             title={
               <Badge
+                content={dueTodayList.length > 0 ? dueTodayList.length : null}
+                style={{ '--background-color': '#faad14' } as React.CSSProperties}
+              >
+                <span><ClockCircleOutlined /> Due Today</span>
+              </Badge>
+            }
+            key="due-today"
+          >
+            {dueTodayLoading ? (
+              <div style={{ padding: 16 }}>
+                {[1, 2, 3].map(i => <Skeleton key={i} animated className="checkout-skeleton" />)}
+              </div>
+            ) : dueTodayList.length === 0 ? (
+              <Empty description="Nothing due back today" style={{ padding: '48px 0' }} />
+            ) : (
+              <List>{dueTodayList.map(c => renderCheckoutItem(c))}</List>
+            )}
+          </Tabs.Tab>
+          <Tabs.Tab
+            title={
+              <Badge
                 content={overdueList.length > 0 ? overdueList.length : null}
                 style={{ '--background-color': '#ff4d4f' } as React.CSSProperties}
               >
@@ -327,12 +378,18 @@ export const MobileToolCheckout = () => {
             <CloseOutline onClick={() => setShowCheckoutPopup(false)} />
           </div>
 
-          <SearchBar
-            placeholder="Search tool by number or serial..."
-            value={searchQuery}
-            onChange={setSearchQuery}
-            style={{ marginBottom: 16 }}
-          />
+          <div style={{ display: 'flex', gap: 8, marginBottom: 16, alignItems: 'center' }}>
+            <div style={{ flex: 1 }}>
+              <SearchBar
+                placeholder="Search tool by number or serial..."
+                value={searchQuery}
+                onChange={setSearchQuery}
+              />
+            </div>
+            <Button size="small" fill="outline" onClick={handleScanTool}>
+              Scan
+            </Button>
+          </div>
 
           {searchQuery.length >= 2 && toolResults && toolResults.tools.length > 0 && (
             <List header="Available Tools" className="tool-search-results">

@@ -3,22 +3,31 @@ import { useNavigate } from 'react-router-dom';
 import { Form, Input, Button, Toast } from 'antd-mobile';
 import { EyeInvisibleOutline, EyeOutline } from 'antd-mobile-icons';
 import { useLoginMutation } from '../../services/authApi';
-import { useAppDispatch, useAppSelector } from '@app/hooks';
-import { setCredentials } from '../../slices/authSlice';
-import { socketService } from '@services/socket';
+import { useAppSelector } from '@app/hooks';
 import { ROUTES } from '@shared/constants/routes';
-import type { LoginRequest } from '../../types';
+import type { LoginRequest, LoginResponse } from '../../types';
+import { MobileAuthShell } from './MobileAuthShell';
+import '../../styles/glassmorphism.css';
 import './MobileLoginForm.css';
 
-export const MobileLoginForm = () => {
+interface MobileLoginFormProps {
+  /**
+   * Called after the credentials API call succeeds, regardless of whether
+   * the backend returned a session token or a TOTP challenge. The parent
+   * (LoginPage) decides what to do next (dashboard redirect, TOTP prompt,
+   * backup-code fallback).
+   */
+  onSuccess: (response: LoginResponse) => void;
+}
+
+export const MobileLoginForm = ({ onSuccess }: MobileLoginFormProps) => {
   const navigate = useNavigate();
-  const dispatch = useAppDispatch();
   const isAuthenticated = useAppSelector((state) => state.auth.isAuthenticated);
   const [login, { isLoading }] = useLoginMutation();
   const [showPassword, setShowPassword] = useState(false);
   const [form] = Form.useForm();
 
-  // Redirect to dashboard if already authenticated
+  // Redirect to dashboard if already authenticated (e.g. warm refresh)
   useEffect(() => {
     if (isAuthenticated) {
       navigate(ROUTES.DASHBOARD, { replace: true });
@@ -29,26 +38,7 @@ export const MobileLoginForm = () => {
     try {
       const values = await form.validateFields();
       const result = await login(values as LoginRequest).unwrap();
-      dispatch(setCredentials({
-        user: result.user,
-        token: result.access_token,
-        expiresIn: result.expires_in
-      }));
-
-      // Establish WebSocket connection for real-time features
-      try {
-        socketService.connect(result.access_token);
-      } catch (socketError) {
-        console.warn('WebSocket connection failed:', socketError);
-        // Don't block login if WebSocket fails
-      }
-
-      Toast.show({
-        icon: 'success',
-        content: 'Welcome back. Launch checklist complete.',
-        duration: 2000,
-      });
-      navigate(ROUTES.DASHBOARD);
+      onSuccess(result);
     } catch (error: unknown) {
       if (error && typeof error === 'object' && 'status' in error) {
         const apiError = error as { status: number; data?: { error?: string } };
@@ -68,7 +58,8 @@ export const MobileLoginForm = () => {
   };
 
   return (
-    <div className="mobile-login-form">
+    <MobileAuthShell>
+      <div className="mobile-login-form">
       <div className="mobile-login-header">
         <h1 className="mobile-login-title">Welcome back</h1>
         <p className="mobile-login-subtitle">
@@ -157,6 +148,7 @@ export const MobileLoginForm = () => {
           holds surfaced instantly on login.
         </p>
       </div>
-    </div>
+      </div>
+    </MobileAuthShell>
   );
 };
