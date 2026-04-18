@@ -64,7 +64,8 @@ export interface LabelPrintModalProps {
   onClose: () => void;
   itemType: LabelItemType;
   itemId: number;
-  kitId?: number; // Required for 'kit-item' type
+  kitId?: number; // Required for 'kit-item' and 'expendable' types
+  kitItemSubType?: 'tool' | 'chemical' | 'expendable'; // Required when itemType is 'kit-item'
   itemDescription?: string; // Display in modal header
 }
 

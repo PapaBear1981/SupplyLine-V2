@@ -9,6 +9,7 @@ import type {
   ChemicalForecastParams,
   ChemicalForecastResponse,
 } from '../types';
+import type { LabelSize, CodeType } from '@/types/label';
 
 export const chemicalsApi = baseApi.injectEndpoints({
   endpoints: (builder) => ({
@@ -105,6 +106,27 @@ export const chemicalsApi = baseApi.injectEndpoints({
       }),
       providesTags: [{ type: 'Chemical', id: 'FORECAST' }],
     }),
+
+    printChemicalLabel: builder.mutation<Blob, { chemicalId: number; labelSize: LabelSize; codeType: CodeType }>({
+      query: ({ chemicalId, labelSize, codeType }) => ({
+        url: `/api/barcode/chemical/${chemicalId}`,
+        params: { label_size: labelSize, code_type: codeType },
+        responseHandler: async (response: Response) => {
+          if (!response.ok) {
+            let errorMessage = 'Failed to generate label PDF';
+            try {
+              const errorData = await response.json();
+              errorMessage = errorData.message || errorData.error || errorMessage;
+            } catch {
+              errorMessage = response.statusText || errorMessage;
+            }
+            throw new Error(errorMessage);
+          }
+          return response.blob();
+        },
+        headers: { 'Cache-Control': 'no-cache' },
+      }),
+    }),
   }),
 });
 
@@ -116,4 +138,5 @@ export const {
   useDeleteChemicalMutation,
   useIssueChemicalMutation,
   useGetChemicalForecastQuery,
+  usePrintChemicalLabelMutation,
 } = chemicalsApi;

@@ -19,6 +19,7 @@ import {
 } from '@ant-design/icons';
 import { useGetToolsQuery, useDeleteToolMutation } from '../services/toolsApi';
 import type { Tool, ToolStatus, CalibrationStatus } from '../types';
+import { LabelPrintModal } from '@/components/shared/LabelPrintModal';
 
 interface ToolsTableProps {
   onView: (tool: Tool) => void;
@@ -29,6 +30,7 @@ export const ToolsTable = ({ onView, onEdit }: ToolsTableProps) => {
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(50);
   const [searchQuery, setSearchQuery] = useState('');
+  const [printModalTool, setPrintModalTool] = useState<{ id: number; description: string } | null>(null);
 
   const { data, isLoading, isFetching } = useGetToolsQuery({
     page,
@@ -169,11 +171,11 @@ export const ToolsTable = ({ onView, onEdit }: ToolsTableProps) => {
               onClick={() => onEdit(record)}
             />
           </Tooltip>
-          <Tooltip title="QR Code">
+          <Tooltip title="Print Label">
             <Button
               type="text"
               icon={<QrcodeOutlined />}
-              onClick={() => message.info('QR Code feature coming soon')}
+              onClick={() => setPrintModalTool({ id: record.id, description: record.tool_number || record.description || '' })}
             />
           </Tooltip>
           <Popconfirm
@@ -226,6 +228,16 @@ export const ToolsTable = ({ onView, onEdit }: ToolsTableProps) => {
           },
         }}
       />
+
+      {printModalTool && (
+        <LabelPrintModal
+          open={true}
+          onClose={() => setPrintModalTool(null)}
+          itemType="tool"
+          itemId={printModalTool.id}
+          itemDescription={printModalTool.description}
+        />
+      )}
     </div>
   );
 };
