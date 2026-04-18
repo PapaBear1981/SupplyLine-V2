@@ -151,7 +151,7 @@ class User(db.Model):
     last_failed_login = db.Column(db.DateTime, nullable=True)
 
     # TOTP Two-Factor Authentication fields
-    totp_secret = db.Column(db.String(32), nullable=True)  # Base32 encoded secret
+    totp_secret = db.Column(db.String(255), nullable=True)  # Fernet-encrypted Base32 secret
     is_totp_enabled = db.Column(db.Boolean, default=False)
 
     # Backup codes for TOTP recovery

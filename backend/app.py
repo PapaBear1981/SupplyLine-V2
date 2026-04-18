@@ -249,6 +249,21 @@ def create_app():
                     _auto_add_col("procurement_orders", "fulfillment_quantity INTEGER NULL", "fulfillment_quantity", ord_cols)
                     _auto_add_col("procurement_orders", "is_internal_fulfillment BOOLEAN NOT NULL DEFAULT 0", "is_internal_fulfillment", ord_cols)
 
+                # Widen users.totp_secret: stores Fernet-encrypted secret (~140 chars),
+                # not the 32-char Base32 plaintext the original schema assumed.
+                if "users" in tables:
+                    totp_col = next(
+                        (c for c in inspector.get_columns("users") if c["name"] == "totp_secret"),
+                        None,
+                    )
+                    col_type = totp_col.get("type") if totp_col else None
+                    existing_length = getattr(col_type, "length", None)
+                    if existing_length is not None and existing_length < 255:
+                        db.session.execute(sa_text(
+                            "ALTER TABLE users ALTER COLUMN totp_secret TYPE VARCHAR(255)"
+                        ))
+                        logger.info("Phase 2 auto-migration: widened users.totp_secret to VARCHAR(255)")
+
                 db.session.commit()
                 logger.info("Phase 2 auto-migrations verified/applied successfully")
         except Exception as e:
