@@ -24,7 +24,6 @@ import {
   SearchOutlined,
   CheckCircleOutlined,
   CloseCircleOutlined,
-  WarningOutlined,
   ToolOutlined,
   UserOutlined,
   PlusOutlined,
@@ -282,7 +281,7 @@ export const QuickCheckoutModal = ({ open, onClose }: QuickCheckoutModalProps) =
       {/* Cart */}
       {selectedTools.length > 0 && (
         <div style={{ marginTop: 20 }}>
-          <Divider orientation="left">
+          <Divider orientation={"left" as const}>
             <Space>
               Selected Tools
               <Badge count={selectedTools.length} style={{ backgroundColor: token.colorPrimary }} />
