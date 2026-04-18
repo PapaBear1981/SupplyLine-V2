@@ -41,6 +41,7 @@ import {
   useCreateCheckoutMutation,
   useBatchCheckoutMutation,
   useCheckinToolMutation,
+  useLazyGetToolActiveCheckoutQuery,
 } from '../../services/checkoutApi';
 import { useLazyGetUsersQuery } from '@features/users/services/usersApi';
 import type { User } from '@features/users/types';
@@ -87,6 +88,7 @@ export const MobileToolCheckout = () => {
   const [checkoutTool, { isLoading: isCheckingOut }] = useCreateCheckoutMutation();
   const [batchCheckout, { isLoading: isBatchingOut }] = useBatchCheckoutMutation();
   const [checkinTool, { isLoading: isCheckingIn }] = useCheckinToolMutation();
+  const [fetchActiveCheckout] = useLazyGetToolActiveCheckoutQuery();
 
   const isSubmitting = isCheckingOut || isBatchingOut;
 
@@ -148,6 +150,25 @@ export const MobileToolCheckout = () => {
         };
         setCartItems(prev => [...prev, scannedTool]);
         setShowCheckoutPopup(true);
+      },
+    });
+  };
+
+  const handleScanReturn = () => {
+    openScanner({
+      title: 'Scan tool to return',
+      accept: ['tool'],
+      onResolved: async (result) => {
+        try {
+          const { data } = await fetchActiveCheckout(result.itemId);
+          if (!data?.checkout) {
+            Toast.show({ icon: 'fail', content: 'This tool is not currently checked out' });
+            return;
+          }
+          handleCheckin(data.checkout);
+        } catch {
+          Toast.show({ icon: 'fail', content: 'This tool is not currently checked out' });
+        }
       },
     });
   };
@@ -405,6 +426,19 @@ export const MobileToolCheckout = () => {
           </Tabs.Tab>
         </Tabs>
       </PullToRefresh>
+
+      {/* FAB — Scan to Return */}
+      <FloatingBubble
+        style={{
+          '--initial-position-bottom': '156px',
+          '--initial-position-right': '16px',
+          '--edge-distance': '16px',
+          '--background': '#52c41a',
+        } as React.CSSProperties}
+        onClick={handleScanReturn}
+      >
+        <SwapOutlined style={{ fontSize: 22 }} />
+      </FloatingBubble>
 
       {/* FAB — shows cart icon + count when tools are in cart */}
       <FloatingBubble

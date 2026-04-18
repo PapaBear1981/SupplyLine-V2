@@ -193,6 +193,14 @@ export const checkoutApi = baseApi.injectEndpoints({
       ],
     }),
 
+    getToolActiveCheckout: builder.query<{ checkout: ToolCheckout }, number>({
+      query: (toolId) => `/api/tools/${toolId}/active-checkout`,
+      providesTags: (_result, _error, toolId) => [
+        { type: 'Tool' as const, id: toolId },
+        { type: 'Checkout' as const, id: 'ACTIVE' },
+      ],
+    }),
+
     // ==========================================
     // Tool History
     // ==========================================
@@ -319,6 +327,9 @@ export const {
   // History
   useGetToolCheckoutHistoryQuery,
   useGetToolTimelineQuery,
+
+  // Active checkout by tool
+  useLazyGetToolActiveCheckoutQuery,
 
   // Stats
   useGetCheckoutStatsQuery,

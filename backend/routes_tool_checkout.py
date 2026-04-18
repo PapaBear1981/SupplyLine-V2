@@ -117,6 +117,22 @@ def register_tool_checkout_routes(app):
         return jsonify(availability), 200
 
     # ============================================
+    # Get Active Checkout for a Tool
+    # ============================================
+    @app.route("/api/tools/<int:tool_id>/active-checkout", methods=["GET"])
+    @permission_required("checkout.view")
+    def get_tool_active_checkout(tool_id):
+        """
+        Return the active (not-yet-returned) checkout record for a specific tool.
+        Used by the mobile scan-to-return flow.
+        Returns 404 if the tool is not currently checked out.
+        """
+        checkout = Checkout.query.filter_by(tool_id=tool_id, return_date=None).first()
+        if not checkout:
+            return jsonify({"error": "This tool is not currently checked out"}), 404
+        return jsonify({"checkout": checkout.to_dict()}), 200
+
+    # ============================================
     # Enhanced Checkout Endpoint
     # ============================================
     @app.route("/api/tool-checkout", methods=["POST"])
