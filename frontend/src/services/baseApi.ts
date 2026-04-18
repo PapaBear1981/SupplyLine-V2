@@ -77,8 +77,10 @@ const baseQueryWithAuth: BaseQueryFn<
 
   const result = await baseQuery(args, api, extraOptions);
 
-  // If we get a 401 or 403 error, automatically logout the user
-  if (result.error && (result.error.status === 401 || result.error.status === 403)) {
+  // Only logout on 401 (unauthenticated). 403 means the user IS
+  // authenticated but lacks permission for that specific endpoint —
+  // the UI should show a permission error, not kick the user out.
+  if (result.error && result.error.status === 401) {
     // Dispatch logout action to clear auth state
     api.dispatch(logout());
 
