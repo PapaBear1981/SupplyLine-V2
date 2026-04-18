@@ -126,6 +126,17 @@ def create_app():
         },
     )
 
+    # Short-circuit CORS preflight requests so they never touch any
+    # auth decorators (jwt_required, admin_required, csrf_required, etc).
+    # Flask-CORS's after_request hook will attach the proper CORS headers
+    # to this empty 204 response.
+    from flask import request as _flask_request
+
+    @app.before_request
+    def _cors_preflight_bypass():
+        if _flask_request.method == "OPTIONS":
+            return ("", 204)
+
     # Ensure session storage is configured (default to secure filesystem storage)
     session_type = app.config.get("SESSION_TYPE")
     if not session_type or str(session_type).lower() in {"none", "null", ""}:
