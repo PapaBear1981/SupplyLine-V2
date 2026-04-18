@@ -23,7 +23,6 @@ services:
     name: supplyline-backend
     runtime: python
     rootDir: .
-    plan: free
     autoDeploy: false
     healthCheckPath: /api/health
     # WeasyPrint (PDF generation) needs system libraries not in Render's
@@ -81,7 +80,6 @@ services:
     name: supplyline-frontend
     env: static
     rootDir: frontend
-    plan: free
     autoDeploy: false
     buildCommand: npm install && npm run build
     staticPublishPath: dist
