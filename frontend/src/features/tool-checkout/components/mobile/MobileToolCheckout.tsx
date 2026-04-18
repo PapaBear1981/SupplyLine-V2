@@ -200,13 +200,14 @@ export const MobileToolCheckout = () => {
 
     const values = await checkoutForm.validateFields();
 
+    const conditionVal = Array.isArray(values.condition) ? values.condition[0] : values.condition;
     if (cartItems.length === 1) {
       // Single checkout — same as before
       try {
         await checkoutTool({
           tool_id: cartItems[0].id,
           user_id: selectedUser.id,
-          condition_at_checkout: values.condition || 'Good',
+          condition_at_checkout: conditionVal || 'Good',
           notes: values.notes || undefined,
           work_order: values.work_order || undefined,
         }).unwrap();
@@ -227,7 +228,7 @@ export const MobileToolCheckout = () => {
         const result = await batchCheckout({
           tool_ids: cartItems.map(t => t.id),
           user_id: selectedUser.id,
-          condition_at_checkout: values.condition || 'Good',
+          condition_at_checkout: conditionVal || 'Good',
           notes: values.notes || undefined,
           work_order: values.work_order || undefined,
         }).unwrap();
@@ -245,10 +246,11 @@ export const MobileToolCheckout = () => {
     if (!selectedCheckout) return;
     try {
       const values = await checkinForm.validateFields();
+      const conditionVal = Array.isArray(values.condition) ? values.condition[0] : values.condition;
       await checkinTool({
         checkoutId: selectedCheckout.id,
         data: {
-          condition_at_return: values.condition || 'Good',
+          condition_at_return: conditionVal || 'Good',
           return_notes: values.notes || undefined,
           damage_reported: values.damage_reported?.[0] === 'damage' || false,
           damage_description: values.damage_description || undefined,
@@ -379,7 +381,7 @@ export const MobileToolCheckout = () => {
             ) : activeList.length === 0 ? (
               <Empty description="No active checkouts" style={{ padding: '48px 0' }} />
             ) : (
-              <List>{activeList.map(c => renderCheckoutItem(c, false))}</List>
+              <List>{activeList.map(c => renderCheckoutItem(c))}</List>
             )}
           </Tabs.Tab>
           <Tabs.Tab
