@@ -19,11 +19,13 @@ import {
   WarningOutlined,
   HistoryOutlined,
   InfoCircleOutlined,
+  QrcodeOutlined,
 } from '@ant-design/icons';
 import type { ColumnsType } from 'antd/es/table';
 import { useGetKitItemDetailsQuery } from '../services/kitsApi';
 import type { KitIssuance, ItemStatus, KitItem } from '../types';
 import KitIssuanceForm from './KitIssuanceForm';
+import { LabelPrintModal } from '@/components/shared/LabelPrintModal';
 
 const { Title, Text } = Typography;
 const { TabPane } = Tabs;
@@ -64,6 +66,7 @@ interface KitItemDetailModalProps {
 
 const KitItemDetailModal = ({ open, onClose, kitId, itemId }: KitItemDetailModalProps) => {
   const [issuanceModalVisible, setIssuanceModalVisible] = useState(false);
+  const [printModalOpen, setPrintModalOpen] = useState(false);
   const { data, isLoading, error } = useGetKitItemDetailsQuery(
     { kitId, itemId },
     { skip: !open || !itemId }
@@ -174,6 +177,15 @@ const KitItemDetailModal = ({ open, onClose, kitId, itemId }: KitItemDetailModal
           <Button key="close" onClick={onClose}>
             Close
           </Button>,
+          item && (
+            <Button
+              key="print"
+              icon={<QrcodeOutlined />}
+              onClick={() => setPrintModalOpen(true)}
+            >
+              Print Label
+            </Button>
+          ),
           item && item.item_type !== 'tool' && item.quantity > 0 && (
             <Button
               key="issue"
@@ -392,6 +404,18 @@ const KitItemDetailModal = ({ open, onClose, kitId, itemId }: KitItemDetailModal
           </Tabs>
         )}
       </Modal>
+
+      {item && (
+        <LabelPrintModal
+          open={printModalOpen}
+          onClose={() => setPrintModalOpen(false)}
+          itemType="kit-item"
+          itemId={item.item_id}
+          kitId={kitId}
+          kitItemSubType={item.item_type as 'tool' | 'chemical' | 'expendable'}
+          itemDescription={item.part_number || item.description}
+        />
+      )}
 
       {item && (
         <KitIssuanceForm

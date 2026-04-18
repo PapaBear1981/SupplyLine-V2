@@ -5,6 +5,8 @@ import type { LabelSize, CodeType, LabelPrintModalProps } from '@/types/label';
 import { DEFAULT_PRINT_SETTINGS } from '@/types/label';
 import { LabelSizeSelector } from './LabelSizeSelector';
 import { usePrintToolLabelMutation } from '@/features/tools/services/toolsApi';
+import { usePrintChemicalLabelMutation } from '@/features/chemicals/services/chemicalsApi';
+import { usePrintKitItemLabelMutation } from '@/features/kits/services/kitsApi';
 
 const { Text, Title } = Typography;
 const { useToken } = theme;
@@ -39,6 +41,7 @@ export const LabelPrintModal = ({
   itemType,
   itemId,
   kitId,
+  kitItemSubType,
   itemDescription,
 }: LabelPrintModalProps) => {
   // Get default settings based on item type (memoized)
@@ -74,12 +77,10 @@ export const LabelPrintModal = ({
 
   // API mutations based on item type
   const [printToolLabel, { isLoading: isPrintingTool }] = usePrintToolLabelMutation();
-  // TODO: Add mutations for other item types when implemented
-  // const [printChemicalLabel, { isLoading: isPrintingChemical }] = usePrintChemicalLabelMutation();
-  // const [printExpendableLabel, { isLoading: isPrintingExpendable }] = usePrintExpendableLabelMutation();
-  // const [printKitItemLabel, { isLoading: isPrintingKitItem }] = usePrintKitItemLabelMutation();
+  const [printChemicalLabel, { isLoading: isPrintingChemical }] = usePrintChemicalLabelMutation();
+  const [printKitItemLabel, { isLoading: isPrintingKitItem }] = usePrintKitItemLabelMutation();
 
-  const isPrinting = isPrintingTool; // || isPrintingChemical || isPrintingExpendable || isPrintingKitItem;
+  const isPrinting = isPrintingTool || isPrintingChemical || isPrintingKitItem;
 
   /**
    * Handle print button click
@@ -100,23 +101,41 @@ export const LabelPrintModal = ({
           break;
 
         case 'chemical':
-          // TODO: Implement when chemicalsApi has print endpoint
-          message.warning('Chemical label printing coming soon!');
-          return;
+          pdfBlob = await printChemicalLabel({
+            chemicalId: itemId,
+            labelSize,
+            codeType,
+          }).unwrap();
+          break;
 
         case 'expendable':
-          // TODO: Implement when expendablesApi has print endpoint
-          message.warning('Expendable label printing coming soon!');
-          return;
+          // Expendables are only in kit context — use kit-item endpoint
+          if (!kitId) {
+            message.error('Kit ID is required for expendable labels');
+            return;
+          }
+          pdfBlob = await printKitItemLabel({
+            kitId,
+            itemId,
+            itemType: 'expendable',
+            labelSize,
+            codeType,
+          }).unwrap();
+          break;
 
         case 'kit-item':
-          // TODO: Implement when kitsApi has print endpoint
           if (!kitId) {
             message.error('Kit ID is required for kit item labels');
             return;
           }
-          message.warning('Kit item label printing coming soon!');
-          return;
+          pdfBlob = await printKitItemLabel({
+            kitId,
+            itemId,
+            itemType: kitItemSubType ?? 'tool',
+            labelSize,
+            codeType,
+          }).unwrap();
+          break;
 
         default:
           message.error('Unknown item type');

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Drawer, Descriptions, Tag, Button, Space, Spin, message, Form, Typography } from 'antd';
-import { EditOutlined } from '@ant-design/icons';
+import { EditOutlined, QrcodeOutlined } from '@ant-design/icons';
 import dayjs from 'dayjs';
 import {
   useCreateChemicalMutation,
@@ -9,6 +9,7 @@ import {
 } from '../services/chemicalsApi';
 import type { ChemicalFormData, ChemicalStatus } from '../types';
 import { ChemicalForm } from './ChemicalForm';
+import { LabelPrintModal } from '@/components/shared/LabelPrintModal';
 
 const { Title } = Typography;
 
@@ -29,6 +30,7 @@ export const ChemicalDrawer = ({
 }: ChemicalDrawerProps) => {
   const [mode, setMode] = useState(initialMode);
   const [form] = Form.useForm();
+  const [printModalOpen, setPrintModalOpen] = useState(false);
 
   const { data: chemical, isLoading } = useGetChemicalQuery(chemicalId!, {
     skip: !chemicalId || initialMode === 'create',
@@ -141,6 +143,9 @@ export const ChemicalDrawer = ({
     if (mode === 'view' && chemical) {
       return (
         <Space>
+          <Button icon={<QrcodeOutlined />} onClick={() => setPrintModalOpen(true)}>
+            Print Label
+          </Button>
           <Button icon={<EditOutlined />} onClick={() => setMode('edit')}>
             Edit
           </Button>
@@ -160,6 +165,16 @@ export const ChemicalDrawer = ({
       extra={getExtraActions()}
       destroyOnClose
     >
+      {chemical && (
+        <LabelPrintModal
+          open={printModalOpen}
+          onClose={() => setPrintModalOpen(false)}
+          itemType="chemical"
+          itemId={chemical.id}
+          itemDescription={chemical.part_number}
+        />
+      )}
+
       {isLoading ? (
         <div style={{ textAlign: 'center', padding: 48 }}>
           <Space direction="vertical" align="center">
