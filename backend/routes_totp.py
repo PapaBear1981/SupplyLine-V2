@@ -372,7 +372,7 @@ def register_totp_routes(app):
                 max_age=900,  # 15 minutes
                 httponly=True,
                 secure=current_app.config.get("SESSION_COOKIE_SECURE", True),
-                samesite="Lax",
+                samesite=current_app.config.get("COOKIE_SAMESITE", "Lax"),
                 path="/"
             )
 
@@ -383,7 +383,7 @@ def register_totp_routes(app):
                 max_age=604800,  # 7 days
                 httponly=True,
                 secure=current_app.config.get("SESSION_COOKIE_SECURE", True),
-                samesite="Lax",
+                samesite=current_app.config.get("COOKIE_SAMESITE", "Lax"),
                 path="/"
             )
 

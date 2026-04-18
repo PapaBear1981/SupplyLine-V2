@@ -1,0 +1,112 @@
+# Render deployment configuration for SupplyLine MRO Suite
+# https://render.com/docs/yaml-spec
+#
+# ---------------------------------------------------------------
+# DATABASE NOTE (important for free/low-cost demo):
+# Render's managed PostgreSQL starts at $7/month. For a free demo,
+# provision a FREE external database instead:
+#   - Neon     → https://neon.tech   (3 GB free, no expiry)
+#   - Supabase → https://supabase.com (500 MB free, no expiry)
+# Copy the connection string and paste it as DATABASE_URL in the
+# Render dashboard for the backend service.
+#
+# SERVICE NAMES → URLs (update CORS_ORIGINS / VITE_* if you rename):
+#   Backend  → https://supplyline-backend.onrender.com
+#   Frontend → https://supplyline-frontend.onrender.com
+# ---------------------------------------------------------------
+
+services:
+  # ============================================================
+  # Backend – Flask API + Socket.IO
+  # ============================================================
+  - type: web
+    name: supplyline-backend
+    runtime: python
+    rootDir: .
+    plan: free
+    autoDeploy: false
+    healthCheckPath: /api/health
+    # WeasyPrint (PDF generation) requires these system libraries.
+    # Render installs apt packages before running buildCommand.
+    packages:
+      - libpango-1.0-0
+      - libpangoft2-1.0-0
+      - libpangocairo-1.0-0
+      - libgdk-pixbuf-2.0-0
+      - libffi-dev
+      - shared-mime-info
+    buildCommand: pip install -r backend/requirements.txt
+    # -w 1 is required: Socket.IO tracks connection state per-process,
+    # so multiple workers would break real-time broadcasts.
+    startCommand: gunicorn -w 1 --timeout 120 -b 0.0.0.0:$PORT wsgi:application
+    envVars:
+      - key: FLASK_ENV
+        value: production
+      - key: FLASK_DEBUG
+        value: "False"
+      - key: FLASK_HOST
+        value: "0.0.0.0"
+      - key: PYTHONDONTWRITEBYTECODE
+        value: "1"
+      - key: PYTHONUNBUFFERED
+        value: "1"
+      - key: TZ
+        value: UTC
+      - key: SESSION_COOKIE_SECURE
+        value: "True"
+      # SameSite=None is required for cross-origin cookie auth.
+      # Frontend and backend are on different .onrender.com subdomains,
+      # so Lax would silently drop the refresh-token cookie on AJAX calls.
+      # None is safe here because Render always serves over HTTPS (Secure).
+      - key: COOKIE_SAMESITE
+        value: "None"
+      # Disable SQLite-era auto-backups; they write to the ephemeral
+      # filesystem and are meaningless against an external PostgreSQL.
+      - key: AUTO_BACKUP_ENABLED
+        value: "false"
+      - key: BACKUP_ON_STARTUP
+        value: "false"
+      # Set DATABASE_URL manually in the Render dashboard after you
+      # provision your Neon / Supabase / Render PostgreSQL database.
+      - key: DATABASE_URL
+        sync: false
+      # Render generates these once at first deploy and keeps them stable.
+      - key: SECRET_KEY
+        generateValue: true
+      - key: JWT_SECRET_KEY
+        generateValue: true
+      # Must match the deployed frontend URL exactly (no trailing slash).
+      - key: CORS_ORIGINS
+        value: https://supplyline-frontend.onrender.com
+      - key: PUBLIC_URL
+        value: https://supplyline-backend.onrender.com
+
+  # ============================================================
+  # Frontend – React / Vite static site (always free on Render)
+  # ============================================================
+  - type: web
+    name: supplyline-frontend
+    env: static
+    rootDir: frontend
+    plan: free
+    autoDeploy: false
+    buildCommand: npm install && npm run build
+    staticPublishPath: dist
+    # Rewrite all paths to index.html for React Router (SPA routing).
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html
+    headers:
+      # Vite appends content-hash fingerprints to asset filenames,
+      # so long-lived caching is safe and improves repeat-visit perf.
+      - path: /assets/*
+        name: Cache-Control
+        value: public, max-age=31536000, immutable
+    envVars:
+      # Vite bakes these into the bundle at build time.
+      # Update both values if you rename the backend service.
+      - key: VITE_API_BASE_URL
+        value: https://supplyline-backend.onrender.com
+      - key: VITE_SOCKET_URL
+        value: https://supplyline-backend.onrender.com
