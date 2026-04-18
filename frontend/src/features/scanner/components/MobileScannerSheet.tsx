@@ -163,15 +163,20 @@ export const MobileScannerSheet = ({
     try {
       let resolution: ScannerResolution | null = null;
 
-      if (parsed.kind === 'local') {
+      if (parsed.kind === 'local' && !onResolved) {
+        // Fast path: navigating directly — no itemData needed, skip the
+        // backend round-trip entirely.
         resolution = {
           itemType: parsed.itemType,
           itemId: parsed.itemId,
         };
       } else {
-        // Backend lookup — the user may dismiss the sheet during this
-        // network request, so we re-check isVisibleRef afterwards.
-        const result = await scannerLookup({ code: parsed.code }).unwrap();
+        // Either a remote code OR a local resolution where an onResolved
+        // callback needs full itemData (tool_number, description, etc.).
+        // Pass the original decoded string — the backend handles both URL
+        // format (https://host/tool-view/{id}) and legacy barcode strings.
+        const code = parsed.kind === 'local' ? decoded.trim() : parsed.code;
+        const result = await scannerLookup({ code }).unwrap();
         if (!isVisibleRef.current) return;
         resolution = {
           itemType: result.item_type,

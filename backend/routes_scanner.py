@@ -1,3 +1,4 @@
+import re
 from datetime import datetime
 
 from flask import current_app, jsonify, render_template_string, request
@@ -21,7 +22,55 @@ def register_scanner_routes(app):
 
             code = data["code"]
 
-            # Parse the code to determine if it's a tool or chemical
+            # ── URL-format QR codes (printed labels) ──────────────────────────
+            # Labels now encode full URLs like https://host/tool-view/{id}.
+            # Check for these patterns first so callers always receive itemData.
+            tool_url = re.search(r'/tool-view/(\d+)', code)
+            if tool_url:
+                tool = Tool.query.get(int(tool_url.group(1)))
+                if tool:
+                    return jsonify({
+                        "item_type": "tool",
+                        "item_id": tool.id,
+                        "item_data": {
+                            "id": tool.id,
+                            "tool_number": tool.tool_number,
+                            "serial_number": tool.serial_number,
+                            "lot_number": tool.lot_number,
+                            "description": tool.description,
+                            "category": tool.category,
+                            "location": tool.location,
+                            "status": tool.status,
+                        }
+                    })
+
+            chemical_url = re.search(r'/chemical-view/(\d+)', code)
+            if chemical_url:
+                chemical = Chemical.query.get(int(chemical_url.group(1)))
+                if chemical:
+                    return jsonify({
+                        "item_type": "chemical",
+                        "item_id": chemical.id,
+                        "item_data": {
+                            "id": chemical.id,
+                            "part_number": chemical.part_number,
+                            "lot_number": chemical.lot_number,
+                            "description": chemical.description,
+                            "manufacturer": chemical.manufacturer,
+                            "status": chemical.status,
+                            "expiration_date": chemical.expiration_date.isoformat() if chemical.expiration_date else None,
+                        }
+                    })
+
+            kit_url = re.search(r'/kits?/(\d+)', code)
+            if kit_url:
+                return jsonify({
+                    "item_type": "kit",
+                    "item_id": int(kit_url.group(1)),
+                    "item_data": {},
+                })
+
+            # ── Legacy barcode string format ───────────────────────────────────
             # Format for tools: tool_number-serial_number OR tool_number-LOT-lot_number
             # Format for chemicals: part_number-lot_number-expiration_date
             parts = code.split("-")
