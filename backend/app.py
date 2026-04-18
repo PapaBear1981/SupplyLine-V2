@@ -162,6 +162,29 @@ def create_app():
             resp.headers["Access-Control-Max-Age"] = "3600"
         return resp
 
+    # Belt-and-suspenders: ensure every response to an API request from
+    # an allowed origin carries the CORS headers, even if the view raised
+    # and Flask's default error handler built the response (Flask-CORS's
+    # own after_request can miss these).
+    @app.after_request
+    def _cors_response_headers(response):
+        origin = _flask_request.headers.get("Origin", "")
+        if not origin:
+            return response
+        allowed = app.config.get("CORS_ORIGINS", [])
+        if origin not in allowed:
+            return response
+        # Only decorate if not already set (avoid double-setting when
+        # Flask-CORS has already handled the response cleanly).
+        if "Access-Control-Allow-Origin" not in response.headers:
+            response.headers["Access-Control-Allow-Origin"] = origin
+            response.headers["Access-Control-Allow-Credentials"] = "true"
+            # Merge Vary header without clobbering existing values.
+            vary = response.headers.get("Vary", "")
+            if "Origin" not in vary:
+                response.headers["Vary"] = f"{vary}, Origin".strip(", ") if vary else "Origin"
+        return response
+
     # Ensure session storage is configured (default to secure filesystem storage)
     session_type = app.config.get("SESSION_TYPE")
     if not session_type or str(session_type).lower() in {"none", "null", ""}:
