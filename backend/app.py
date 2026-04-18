@@ -128,14 +128,39 @@ def create_app():
 
     # Short-circuit CORS preflight requests so they never touch any
     # auth decorators (jwt_required, admin_required, csrf_required, etc).
-    # Flask-CORS's after_request hook will attach the proper CORS headers
-    # to this empty 204 response.
+    # Attach the CORS headers directly here — in some cases Flask-CORS's
+    # after_request hook does not decorate responses that originate from
+    # before_request, which was causing browsers to reject the preflight.
+    from flask import make_response as _make_response
     from flask import request as _flask_request
+
+    _ALLOWED_CORS_METHODS = "GET, POST, PUT, PATCH, DELETE, OPTIONS"
+    _ALLOWED_CORS_HEADERS = ", ".join(
+        app.config.get("CORS_ALLOW_HEADERS", [
+            "Content-Type", "Authorization", "X-CSRF-Token",
+        ])
+    )
 
     @app.before_request
     def _cors_preflight_bypass():
-        if _flask_request.method == "OPTIONS":
-            return ("", 204)
+        if _flask_request.method != "OPTIONS":
+            return None
+        origin = _flask_request.headers.get("Origin", "")
+        allowed = app.config.get("CORS_ORIGINS", [])
+        resp = _make_response("", 204)
+        if origin and origin in allowed:
+            resp.headers["Access-Control-Allow-Origin"] = origin
+            resp.headers["Vary"] = "Origin"
+            resp.headers["Access-Control-Allow-Credentials"] = "true"
+            resp.headers["Access-Control-Allow-Methods"] = _ALLOWED_CORS_METHODS
+            # Echo the requested headers when present; otherwise use the
+            # configured allow-list. Safer than hardcoding.
+            requested_headers = _flask_request.headers.get(
+                "Access-Control-Request-Headers", _ALLOWED_CORS_HEADERS
+            )
+            resp.headers["Access-Control-Allow-Headers"] = requested_headers
+            resp.headers["Access-Control-Max-Age"] = "3600"
+        return resp
 
     # Ensure session storage is configured (default to secure filesystem storage)
     session_type = app.config.get("SESSION_TYPE")
