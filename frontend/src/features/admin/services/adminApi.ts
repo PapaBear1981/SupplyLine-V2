@@ -13,6 +13,8 @@ import type {
   Department,
   UserRole,
   OnlineUsersResponse,
+  BugReport,
+  UpdateBugReportRequest,
 } from '../types';
 
 export const adminApi = baseApi.injectEndpoints({
@@ -148,6 +150,35 @@ export const adminApi = baseApi.injectEndpoints({
       }),
       invalidatesTags: ['Role'],
     }),
+
+    // Bug Reports
+    getBugReports: builder.query<BugReport[], { status?: string; severity?: string } | void>({
+      query: (params) => {
+        const search = new URLSearchParams();
+        if (params?.status) search.append('status', params.status);
+        if (params?.severity) search.append('severity', params.severity);
+        const qs = search.toString();
+        return `/api/bug-reports${qs ? `?${qs}` : ''}`;
+      },
+      providesTags: ['BugReport'],
+    }),
+
+    updateBugReport: builder.mutation<BugReport, UpdateBugReportRequest>({
+      query: ({ id, ...body }) => ({
+        url: `/api/bug-reports/${id}`,
+        method: 'PUT',
+        body,
+      }),
+      invalidatesTags: ['BugReport'],
+    }),
+
+    deleteBugReport: builder.mutation<void, number>({
+      query: (id) => ({
+        url: `/api/bug-reports/${id}`,
+        method: 'DELETE',
+      }),
+      invalidatesTags: ['BugReport'],
+    }),
   }),
 });
 
@@ -170,4 +201,7 @@ export const {
   useCreateRoleMutation,
   useUpdateRoleMutation,
   useDeleteRoleMutation,
+  useGetBugReportsQuery,
+  useUpdateBugReportMutation,
+  useDeleteBugReportMutation,
 } = adminApi;

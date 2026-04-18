@@ -450,6 +450,7 @@ export interface UpdateRequestRequest {
   title?: string;
   description?: string;
   priority?: RequestPriority;
+  status?: RequestStatus;
   notes?: string;
   needs_more_info?: boolean;
   expected_due_date?: string;
@@ -556,6 +557,35 @@ export interface CreateRequestMessageRequest {
   subject: string;
   message: string;
   parent_message_id?: number;
+}
+
+// ============================================================================
+// Request Timeline Types
+// ============================================================================
+
+export type RequestTimelineEventType =
+  | 'created'
+  | 'status_changed'
+  | 'buyer_assigned'
+  | 'items_ordered'
+  | 'items_received'
+  | 'items_cancelled'
+  | 'cancelled'
+  | 'message_sent';
+
+export interface RequestTimelineEvent {
+  event_type: RequestTimelineEventType;
+  timestamp: string; // ISO 8601
+  user_id?: number;
+  user_name: string;
+  description: string;
+  details: Record<string, unknown>;
+}
+
+export interface RequestTimelineResponse {
+  timeline: RequestTimelineEvent[];
+  total: number;
+  request_number: string;
 }
 
 // ============================================================================

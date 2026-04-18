@@ -12,6 +12,7 @@ import {
   Divider,
   message,
   Descriptions,
+  theme,
 } from 'antd';
 import {
   ToolOutlined,
@@ -46,6 +47,7 @@ const severityOptions: { value: DamageSeverity; label: string; color: string }[]
 ];
 
 export const CheckinModal = ({ open, checkout, onClose }: CheckinModalProps) => {
+  const { token } = theme.useToken();
   const [form] = Form.useForm();
   const [checkinTool, { isLoading }] = useCheckinToolMutation();
 
@@ -121,9 +123,10 @@ export const CheckinModal = ({ open, checkout, onClose }: CheckinModalProps) => 
       {/* Tool Information */}
       <div
         style={{
-          background: '#f5f5f5',
+          background: token.colorFillAlter,
+          border: `1px solid ${token.colorBorderSecondary}`,
           padding: 16,
-          borderRadius: 8,
+          borderRadius: token.borderRadiusLG,
           marginBottom: 24,
         }}
       >

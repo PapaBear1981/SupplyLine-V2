@@ -76,3 +76,30 @@ export interface OnlineUsersResponse {
 }
 
 export type { User, Department, UserRole };
+
+export type BugSeverity = 'low' | 'medium' | 'high' | 'critical';
+export type BugStatus = 'open' | 'in_progress' | 'resolved' | 'closed';
+
+export interface BugReport {
+  id: number;
+  title: string;
+  description: string;
+  severity: BugSeverity;
+  status: BugStatus;
+  page_context: string | null;
+  steps_to_reproduce: string | null;
+  reported_by_id: number | null;
+  reported_by_name: string;
+  resolution_notes: string | null;
+  created_at: string;
+  updated_at: string | null;
+  resolved_at: string | null;
+}
+
+export interface UpdateBugReportRequest {
+  id: number;
+  status?: BugStatus;
+  severity?: BugSeverity;
+  resolution_notes?: string;
+  title?: string;
+}

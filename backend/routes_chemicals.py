@@ -455,7 +455,9 @@ def register_chemical_routes(app):
         if not db.session.get(User, validated_data["user_id"]):
             raise ValidationError("Supplied user_id does not exist")
 
-        quantity = float(validated_data["quantity"])
+        quantity = int(validated_data["quantity"])
+        if quantity <= 0:
+            raise ValidationError("Quantity must be a whole number greater than 0")
         if quantity > chemical.quantity:
             raise ValidationError(f"Cannot issue more than available quantity ({chemical.quantity} {chemical.unit})")
 

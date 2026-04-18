@@ -107,7 +107,7 @@ const ReorderModal = ({ row, onClose }: ReorderModalProps) => {
           <Statistic title="Current Stock" value={row.current_quantity} suffix={row.unit} valueStyle={{ fontSize: 16 }} />
         </Col>
         <Col span={8}>
-          <Statistic title="Weekly Use" value={row.weekly_consumption_rate.toFixed(1)} suffix={row.unit} valueStyle={{ fontSize: 16 }} />
+          <Statistic title="Used (window)" value={row.net_issued_in_window ?? 0} suffix={row.unit} valueStyle={{ fontSize: 16 }} />
         </Col>
         <Col span={8}>
           <Statistic
@@ -203,13 +203,23 @@ export const ChemicalForecastPage = () => {
       ),
     },
     {
-      title: 'Use / Week',
+      title: 'Used (window)',
+      dataIndex: 'net_issued_in_window',
+      width: 105,
+      align: 'right',
+      sorter: (a, b) => (a.net_issued_in_window ?? 0) - (b.net_issued_in_window ?? 0),
+      render: (val, row) => val > 0
+        ? <Text>{val} {row.unit}</Text>
+        : <Text type="secondary">—</Text>,
+    },
+    {
+      title: 'Avg / Week',
       dataIndex: 'weekly_consumption_rate',
       width: 95,
       align: 'right',
       sorter: (a, b) => a.weekly_consumption_rate - b.weekly_consumption_rate,
       render: (val, row) => val > 0
-        ? <Text>{val.toFixed(1)} {row.unit}</Text>
+        ? <Text type="secondary">{val.toFixed(2)} {row.unit}/wk</Text>
         : <Text type="secondary">—</Text>,
     },
     {

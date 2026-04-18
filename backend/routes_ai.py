@@ -17,6 +17,7 @@ from sqlalchemy import or_
 from auth import jwt_required, permission_required
 from models import (
     AuditLog,
+    BugReport,
     Checkout,
     Chemical,
     ChemicalIssuance,
@@ -94,6 +95,7 @@ OLLAMA_TOOL_NAMES = {
     "create_request",
     "transfer_item",
     "forecast_chemicals",
+    "report_bug",
 }
 
 
@@ -378,7 +380,10 @@ TOOL_DEFINITIONS = [
     {
         "name": "checkout_tool",
         "description": (
-            "Check out a tool to the current user. "
+            "Check out a tool to a specified user (or the current user if no one is specified). "
+            "If the user says 'check out to John' or 'for Jane Smith', pass that name as checkout_user. "
+            "Do NOT guess or default to the current user if a name was mentioned but could not be resolved — "
+            "instead return the needs_clarification response and ask for the full name. "
             "Call with confirmed=false first to preview. "
             "Only call with confirmed=true after the user explicitly says yes or confirm."
         ),
@@ -392,6 +397,16 @@ TOOL_DEFINITIONS = [
                 "tool_query": {
                     "type": "string",
                     "description": "Tool name or description to search by if serial number is unknown.",
+                },
+                "checkout_user": {
+                    "type": "string",
+                    "description": (
+                        "Name, partial name, or employee number of the user to check the tool out to. "
+                        "Examples: 'John Smith', 'John', 'MNT002'. "
+                        "Omit entirely to check out to the currently logged-in user. "
+                        "If no match is found, an error is returned. "
+                        "If multiple name matches are found, a needs_clarification response is returned — do not default to current user."
+                    ),
                 },
                 "work_order": {
                     "type": "string",
@@ -447,7 +462,9 @@ TOOL_DEFINITIONS = [
     {
         "name": "issue_chemical",
         "description": (
-            "Issue a quantity of a chemical to the current user. "
+            "Issue a quantity of a chemical to a user. "
+            "Materials department users and admins may issue to any user by name or employee number. "
+            "All other users may only issue to themselves — omit recipient_user in that case. "
             "Call with confirmed=false first to preview. "
             "Only call with confirmed=true after the user explicitly says yes or confirm."
         ),
@@ -473,6 +490,14 @@ TOOL_DEFINITIONS = [
                 "purpose": {
                     "type": "string",
                     "description": "What the chemical will be used for (optional).",
+                },
+                "recipient_user": {
+                    "type": "string",
+                    "description": (
+                        "Name, partial name, or employee number of the user receiving the chemical. "
+                        "Only valid for Materials department users and admins. "
+                        "Omit to issue to yourself."
+                    ),
                 },
                 "confirmed": {
                     "type": "boolean",
@@ -1066,6 +1091,45 @@ TOOL_DEFINITIONS = [
             "required": [],
         },
     },
+    {
+        "name": "report_bug",
+        "description": (
+            "Submit a bug report on behalf of the user. "
+            "Use this when a user describes a problem, error, or unexpected behavior in the application. "
+            "Always confirm the details with the user before submitting."
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "title": {
+                    "type": "string",
+                    "description": "Short summary of the bug, e.g. 'Tool check-in modal shows white card in dark mode'.",
+                },
+                "description": {
+                    "type": "string",
+                    "description": "Full description of the problem, including what happened and what was expected.",
+                },
+                "severity": {
+                    "type": "string",
+                    "enum": ["low", "medium", "high", "critical"],
+                    "description": "How severely the bug impacts usability. Defaults to medium.",
+                },
+                "page_context": {
+                    "type": "string",
+                    "description": "The page or feature where the bug occurs, e.g. 'Tool Checkout', 'Fulfillment', 'Admin'.",
+                },
+                "steps_to_reproduce": {
+                    "type": "string",
+                    "description": "Step-by-step instructions to reproduce the bug.",
+                },
+                "confirmed": {
+                    "type": "boolean",
+                    "description": "Set to true only after the user confirms they want to submit the report.",
+                },
+            },
+            "required": ["title", "description"],
+        },
+    },
 ]
 
 
@@ -1141,6 +1205,8 @@ def _execute_tool(name: str, args: dict, user_id: int | None = None, is_admin: b
             return _report_procurement_summary(**args)
         if name == "report_department_usage":
             return _report_department_usage(**args)
+        if name == "report_bug":
+            return _tool_report_bug(**args, _user_id=user_id)
         return {"error": f"Unknown tool: {name}"}
     except Exception:
         logger.exception("Tool %s failed", name)
@@ -1656,6 +1722,7 @@ def _tool_get_warehouses(query: str = "") -> dict:
 def _tool_checkout_tool(
     serial_number: str = "",
     tool_query: str = "",
+    checkout_user: str = "",
     work_order: str = "",
     notes: str = "",
     confirmed: bool = False,
@@ -1663,6 +1730,41 @@ def _tool_checkout_tool(
 ) -> dict:
     if not _user_id:
         return {"error": "Cannot determine current user. Please log in again."}
+
+    # ── Resolve who the tool is being checked out to ─────────────────────────
+    target_user_id = _user_id
+    target_user_name = None
+
+    if checkout_user and checkout_user.strip():
+        query_str = checkout_user.strip()
+        matches = User.query.filter(
+            User.is_active == True,  # noqa: E712
+            db.or_(
+                User.name.ilike(f"%{query_str}%"),
+                User.employee_number.ilike(query_str),
+            ),
+        ).all()
+
+        if len(matches) == 0:
+            return {
+                "error": f"There is no active user named '{query_str}' in the system. Please check the name and try again.",
+            }
+        elif len(matches) > 1:
+            names = ", ".join(u.name for u in matches[:8])
+            return {
+                "needs_clarification": True,
+                "question": (
+                    f"I found {len(matches)} users matching '{query_str}': {names}. "
+                    "Could you specify the full name so I can identify the right person?"
+                ),
+            }
+        else:
+            target_user_id = matches[0].id
+            target_user_name = matches[0].name
+
+    if target_user_name is None:
+        current_user_obj = db.session.get(User, _user_id)
+        target_user_name = current_user_obj.name if current_user_obj else "current user"
 
     # Locate the tool
     tool = None
@@ -1695,6 +1797,7 @@ def _tool_checkout_tool(
         "description": tool.description,
         "current_status": tool.status,
         "location": tool.location,
+        "checkout_to": target_user_name,
         "work_order": work_order or None,
         "notes": notes or None,
         "blocking_reasons": blocking,
@@ -1704,7 +1807,7 @@ def _tool_checkout_tool(
     if not confirmed:
         preview["status"] = "preview"
         if preview["can_proceed"]:
-            preview["message"] = "Ready to check out. Reply 'confirm' to proceed."
+            preview["message"] = f"Ready to check out to {target_user_name}. Reply 'confirm' to proceed."
         else:
             preview["message"] = "Cannot check out this tool — see blocking_reasons above."
         return preview
@@ -1714,11 +1817,10 @@ def _tool_checkout_tool(
         return {"error": "Cannot check out this tool.", "blocking_reasons": blocking}
 
     expected_return = datetime.now() + timedelta(days=7)
-    user = db.session.get(User, _user_id)
 
     checkout = Checkout(
         tool_id=tool.id,
-        user_id=_user_id,
+        user_id=target_user_id,
         expected_return_date=expected_return,
         checkout_notes=notes or None,
         condition_at_checkout=tool.condition,
@@ -1732,9 +1834,10 @@ def _tool_checkout_tool(
     history = ToolHistory.create_event(
         tool_id=tool.id,
         event_type="checkout",
-        user_id=_user_id,
-        description=f"Checked out to {user.name if user else 'Unknown'} via AI assistant",
-        details={"work_order": work_order, "notes": notes, "source": "ai_assistant"},
+        user_id=target_user_id,
+        description=f"Checked out to {target_user_name} via AI assistant",
+        details={"work_order": work_order, "notes": notes, "source": "ai_assistant",
+                 "requested_by_user_id": _user_id},
         related_checkout_id=checkout.id,
         old_status=old_status,
         new_status="checked_out",
@@ -1742,7 +1845,7 @@ def _tool_checkout_tool(
     db.session.add(history)
 
     try:
-        record_tool_checkout(tool_id=tool.id, user_id=_user_id,
+        record_tool_checkout(tool_id=tool.id, user_id=target_user_id,
                              expected_return_date=expected_return, notes=notes)
     except Exception:
         logger.warning("record_tool_checkout failed for tool %s", tool.id)
@@ -1750,7 +1853,7 @@ def _tool_checkout_tool(
     db.session.add(AuditLog(
         action_type="tool_checkout",
         action_details=(
-            f"AI assistant: {user.name if user else _user_id} checked out "
+            f"AI assistant: {target_user_name} checked out "
             f"{tool.tool_number} S/N {tool.serial_number}"
         ),
     ))
@@ -1759,8 +1862,8 @@ def _tool_checkout_tool(
     return {
         "status": "success",
         "message": (
-            f"Tool {tool.tool_number} (S/N {tool.serial_number}) checked out to "
-            f"{user.name if user else 'you'} successfully."
+            f"Tool {tool.tool_number} (S/N {tool.serial_number}) successfully checked out to "
+            f"{target_user_name}."
         ),
         "checkout_id": checkout.id,
         "expected_return_date": expected_return.strftime("%Y-%m-%d"),
@@ -2212,11 +2315,48 @@ def _tool_issue_chemical(
     quantity: int = 0,
     location: str = "",
     purpose: str = "",
+    recipient_user: str = "",
     confirmed: bool = False,
     _user_id: int | None = None,
 ) -> dict:
     if not _user_id:
         return {"error": "Cannot determine current user. Please log in again."}
+
+    # Resolve recipient — Materials dept/admin can issue to anyone; others only to themselves
+    actor = db.session.get(User, _user_id)
+    is_materials = actor and (
+        (actor.department or "").lower() == "materials" or actor.is_admin
+    )
+
+    recipient_id = _user_id
+    recipient_name = actor.name if actor else str(_user_id)
+
+    if recipient_user:
+        if not is_materials:
+            return {
+                "error": (
+                    "Only Materials department staff can issue chemicals to other users. "
+                    "You can only issue chemicals to yourself."
+                )
+            }
+        query_str = recipient_user.strip()
+        matches = User.query.filter(
+            User.is_active == True,  # noqa: E712
+            db.or_(
+                User.name.ilike(f"%{query_str}%"),
+                User.employee_number.ilike(query_str),
+            ),
+        ).all()
+        if len(matches) == 0:
+            return {"error": f"No active user found matching '{query_str}'. Please check the name or employee number."}
+        elif len(matches) > 1:
+            names = ", ".join(u.name for u in matches[:8])
+            return {
+                "needs_clarification": True,
+                "question": f"I found {len(matches)} users matching '{query_str}': {names}. Could you be more specific?",
+            }
+        recipient_id = matches[0].id
+        recipient_name = matches[0].name
 
     # Locate the chemical
     chem = None
@@ -2255,6 +2395,7 @@ def _tool_issue_chemical(
         "available_quantity": chem.quantity,
         "unit": chem.unit,
         "quantity_to_issue": quantity,
+        "recipient": recipient_name,
         "remaining_after": chem.quantity - quantity if not blocking else "N/A",
         "location": location,
         "purpose": purpose or None,
@@ -2266,7 +2407,7 @@ def _tool_issue_chemical(
     if not confirmed:
         preview["status"] = "preview"
         if preview["can_proceed"]:
-            preview["message"] = "Ready to issue. Reply 'confirm' to proceed."
+            preview["message"] = f"Ready to issue to {recipient_name}. Reply 'confirm' to proceed."
         else:
             preview["message"] = "Cannot issue this chemical — see blocking_reasons above."
         return preview
@@ -2274,7 +2415,6 @@ def _tool_issue_chemical(
     if blocking:
         return {"error": "Cannot issue this chemical.", "blocking_reasons": blocking}
 
-    user = db.session.get(User, _user_id)
     is_partial = quantity < chem.quantity
 
     if is_partial:
@@ -2288,7 +2428,7 @@ def _tool_issue_chemical(
         db.session.flush()
         issuance = ChemicalIssuance(
             chemical_id=child.id,
-            user_id=_user_id,
+            user_id=recipient_id,
             quantity=quantity,
             hangar=location,
             purpose=purpose or "",
@@ -2298,7 +2438,7 @@ def _tool_issue_chemical(
     else:
         issuance = ChemicalIssuance(
             chemical_id=chem.id,
-            user_id=_user_id,
+            user_id=recipient_id,
             quantity=quantity,
             hangar=location,
             purpose=purpose or "",
@@ -2314,10 +2454,11 @@ def _tool_issue_chemical(
     try:
         record_chemical_issuance(
             chemical_id=chem.id,
-            user_id=_user_id,
+            user_id=_user_id,        # actor (who performed the issuance)
             quantity=quantity,
             hangar=location,
             purpose=purpose,
+            recipient_id=recipient_id,
         )
     except Exception:
         logger.warning("record_chemical_issuance failed for chemical %s", chem.id)
@@ -2325,8 +2466,8 @@ def _tool_issue_chemical(
     db.session.add(AuditLog(
         action_type="chemical_issuance",
         action_details=(
-            f"AI assistant: {user.name if user else _user_id} issued {quantity} {chem.unit} "
-            f"of {chem.part_number} lot {chem.lot_number} to {location}"
+            f"AI assistant: {actor.name if actor else _user_id} issued {quantity} {chem.unit} "
+            f"of {chem.part_number} lot {chem.lot_number} to {recipient_name} at {location}"
         ),
     ))
     db.session.commit()
@@ -2335,7 +2476,7 @@ def _tool_issue_chemical(
         "status": "success",
         "message": (
             f"Issued {quantity} {chem.unit} of {chem.description} "
-            f"(P/N {chem.part_number}, lot {chem.lot_number}) to {location}."
+            f"(P/N {chem.part_number}, lot {chem.lot_number}) to {recipient_name} at {location}."
         ),
         "remaining_stock": chem.quantity,
     }
@@ -3732,6 +3873,57 @@ def _report_department_usage(timeframe: str = "month") -> dict:
     }
 
 
+# ─── Bug reporting tool ───────────────────────────────────────────────────────
+
+def _tool_report_bug(
+    title: str = "",
+    description: str = "",
+    severity: str = "medium",
+    page_context: str = "",
+    steps_to_reproduce: str = "",
+    confirmed: bool = False,
+    _user_id: int | None = None,
+) -> dict:
+    title = title.strip()
+    description = description.strip()
+    if not title or not description:
+        return {"error": "A title and description are required to file a bug report."}
+
+    if severity not in ("low", "medium", "high", "critical"):
+        severity = "medium"
+
+    if not confirmed:
+        return {
+            "preview": True,
+            "message": (
+                f"I'll submit the following bug report:\n\n"
+                f"**Title:** {title}\n"
+                f"**Severity:** {severity}\n"
+                f"**Page/Feature:** {page_context or 'Not specified'}\n\n"
+                f"**Description:** {description}\n\n"
+                + (f"**Steps to Reproduce:** {steps_to_reproduce}\n\n" if steps_to_reproduce else "")
+                + "Shall I go ahead and submit this?"
+            ),
+        }
+
+    report = BugReport(
+        title=title,
+        description=description,
+        severity=severity,
+        status="open",
+        page_context=page_context.strip() or None,
+        steps_to_reproduce=steps_to_reproduce.strip() or None,
+        reported_by_id=_user_id,
+    )
+    db.session.add(report)
+    db.session.commit()
+    return {
+        "success": True,
+        "bug_report_id": report.id,
+        "message": f"Bug report #{report.id} has been submitted. An admin will review it shortly.",
+    }
+
+
 # ─── Schema converters ────────────────────────────────────────────────────────
 
 def _select_tool_definitions(provider: str) -> list:
@@ -3968,9 +4160,13 @@ STEP 2 — Only call with confirmed=true after the user explicitly says
   Never execute with confirmed=true unless the user gave clear approval.
 
 Action tools:
-- checkout_tool — check out a tool to the current user
+- checkout_tool — check out a tool to a specified user (or yourself if no one is mentioned).
+    If a name is given but the tool returns needs_clarification, ask the user for the full name.
+    NEVER default to the current user when a specific person was mentioned but couldn't be resolved.
 - return_tool — return (check in) a tool the current user has checked out
-- issue_chemical — issue a quantity of a chemical to the current user
+- issue_chemical — issue a quantity of a chemical to a user.
+    Materials dept / admin: may issue to any user — provide recipient_user (name or employee number).
+    All other users: may only issue to themselves — omit recipient_user.
 - return_chemical — return issued chemical quantity back to stock
     Tip: use get_chemical_issuances first to find the issuance_id.
 - request_chemical_reorder — flag a chemical for reorder and create a procurement request
@@ -3994,6 +4190,10 @@ Action tools:
     (requires orders permission or admin)
 - mark_items_received — acknowledge receipt of all pending/ordered items in a request
     (requires orders permission or admin)
+- report_bug — submit a bug report when a user describes a problem or unexpected behavior.
+    Follow the two-step pattern: preview first (confirmed=false), then submit (confirmed=true).
+    Collect a clear title, description, severity, the page/feature where it happened, and
+    steps to reproduce if the user can provide them.
 
 ## Guidelines
 - Always use query tools for lookups — never invent serial numbers, names, or quantities.

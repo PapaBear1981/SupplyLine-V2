@@ -2237,4 +2237,40 @@ class WarehouseTransfer(db.Model):
             "status": self.status
         }
 
+
+class BugReport(db.Model):
+    __tablename__ = "bug_reports"
+
+    id = db.Column(db.Integer, primary_key=True)
+    title = db.Column(db.String(255), nullable=False)
+    description = db.Column(db.Text, nullable=False)
+    severity = db.Column(db.String(20), nullable=False, default="medium")  # low, medium, high, critical
+    status = db.Column(db.String(20), nullable=False, default="open")  # open, in_progress, resolved, closed
+    page_context = db.Column(db.String(255), nullable=True)   # e.g. "Tool Checkout", "Fulfillment"
+    steps_to_reproduce = db.Column(db.Text, nullable=True)
+    reported_by_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=True)
+    resolution_notes = db.Column(db.Text, nullable=True)
+    created_at = db.Column(db.DateTime, default=get_current_time)
+    updated_at = db.Column(db.DateTime, default=get_current_time, onupdate=get_current_time)
+    resolved_at = db.Column(db.DateTime, nullable=True)
+
+    reported_by = db.relationship("User", foreign_keys=[reported_by_id])
+
+    def to_dict(self):
+        return {
+            "id": self.id,
+            "title": self.title,
+            "description": self.description,
+            "severity": self.severity,
+            "status": self.status,
+            "page_context": self.page_context,
+            "steps_to_reproduce": self.steps_to_reproduce,
+            "reported_by_id": self.reported_by_id,
+            "reported_by_name": self.reported_by.name if self.reported_by else "Unknown",
+            "resolution_notes": self.resolution_notes,
+            "created_at": self.created_at.isoformat() if self.created_at else None,
+            "updated_at": self.updated_at.isoformat() if self.updated_at else None,
+            "resolved_at": self.resolved_at.isoformat() if self.resolved_at else None,
+        }
+
 # Import enhanced messaging models
