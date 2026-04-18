@@ -263,19 +263,21 @@ export const MobileLayout = () => {
         <Outlet />
       </div>
 
-      {/* Global scan FAB — visible on every mobile screen */}
-      <FloatingBubble
-        style={{
-          '--initial-position-bottom': '88px',
-          '--initial-position-right': '16px',
-          '--edge-distance': '16px',
-          '--background': 'var(--adm-color-primary)',
-        }}
-        onClick={() => openScanner()}
-        aria-label="Scan QR code or barcode"
-      >
-        <ScanCodeOutline fontSize={26} />
-      </FloatingBubble>
+      {/* Global scan FAB — hidden on tool checkout (that page has its own scan button in the popup) */}
+      {location.pathname !== ROUTES.TOOL_CHECKOUT && (
+        <FloatingBubble
+          style={{
+            '--initial-position-bottom': '88px',
+            '--initial-position-right': '16px',
+            '--edge-distance': '16px',
+            '--background': 'var(--adm-color-primary)',
+          }}
+          onClick={() => openScanner()}
+          aria-label="Scan QR code or barcode"
+        >
+          <ScanCodeOutline fontSize={26} />
+        </FloatingBubble>
+      )}
 
       {/* AI Assistant FAB + full-screen chat */}
       <MobileAIAssistant />

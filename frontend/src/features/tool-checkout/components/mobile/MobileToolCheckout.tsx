@@ -409,7 +409,7 @@ export const MobileToolCheckout = () => {
       {/* FAB — shows cart icon + count when tools are in cart */}
       <FloatingBubble
         style={{
-          '--initial-position-bottom': '76px',
+          '--initial-position-bottom': '88px',
           '--initial-position-right': '16px',
           '--edge-distance': '16px',
         }}

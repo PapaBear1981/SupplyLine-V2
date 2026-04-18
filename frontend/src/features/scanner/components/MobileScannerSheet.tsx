@@ -65,6 +65,16 @@ export const MobileScannerSheet = ({
       setCameraReady(false);
       busyRef.current = false;
 
+      // antd-mobile Popup with destroyOnClose renders children lazily into a
+      // portal. We need to wait for the viewport <div> to actually appear in
+      // the DOM before handing the element id to html5-qrcode, otherwise it
+      // throws a "NotFoundException" which we surface as "Camera unavailable".
+      // Two rAF calls guarantee at least one full paint cycle has occurred.
+      await new Promise<void>((resolve) =>
+        requestAnimationFrame(() => requestAnimationFrame(() => resolve()))
+      );
+      if (cancelled) return;
+
       try {
         const scanner = new Html5Qrcode(elementId, {
           verbose: false,
