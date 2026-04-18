@@ -1,4 +1,4 @@
-import { Card, Avatar, Tag, Typography, Empty, Row, Col, Tooltip } from 'antd';
+import { Card, Avatar, Tag, Typography, Empty, Row, Col, Tooltip, theme } from 'antd';
 import {
   PhoneOutlined,
   ToolOutlined,
@@ -28,6 +28,7 @@ interface OnCallRoleProps {
 
 const OnCallRole = ({ label, description, icon, accentColor, entry }: OnCallRoleProps) => {
   const user = entry?.user ?? null;
+  const { token } = theme.useToken();
 
   return (
     <div
@@ -37,8 +38,8 @@ const OnCallRole = ({ label, description, icon, accentColor, entry }: OnCallRole
         gap: 12,
         padding: 16,
         borderRadius: 12,
-        border: '1px solid var(--border-color, #f0f0f0)',
-        background: 'var(--component-bg, #fafafa)',
+        border: `1px solid ${token.colorBorderSecondary}`,
+        background: token.colorFillAlter,
         height: '100%',
       }}
     >
