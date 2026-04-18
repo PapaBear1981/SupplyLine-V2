@@ -281,7 +281,7 @@ export const QuickCheckoutModal = ({ open, onClose }: QuickCheckoutModalProps) =
       {/* Cart */}
       {selectedTools.length > 0 && (
         <div style={{ marginTop: 20 }}>
-          <Divider orientation={"left" as const}>
+          <Divider titlePlacement="left">
             <Space>
               Selected Tools
               <Badge count={selectedTools.length} style={{ backgroundColor: token.colorPrimary }} />
