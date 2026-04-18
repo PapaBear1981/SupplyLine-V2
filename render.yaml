@@ -30,7 +30,10 @@ services:
     # backend/wsgi.py (copied to /app/wsgi.py in the image).
     # -w 1 is required: Socket.IO tracks connection state per
     # process, so multiple workers would break real-time broadcasts.
-    dockerCommand: gunicorn -w 1 --timeout 120 -b 0.0.0.0:$PORT wsgi:application
+    # --threads 8 lets the single worker serve multiple concurrent
+    # requests; otherwise one slow DB call blocks the /api/health
+    # probe and Render kills the instance as unhealthy.
+    dockerCommand: gunicorn -w 1 --threads 8 --timeout 120 -b 0.0.0.0:$PORT wsgi:application
     envVars:
       - key: FLASK_ENV
         value: production
