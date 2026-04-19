@@ -129,6 +129,16 @@ export const UserForm = ({
       </Form.Item>
 
       <Form.Item
+        label="Phone Number"
+        name="phone"
+        rules={[
+          { pattern: /^[0-9()\-+\s]{7,20}$/, message: 'Please enter a valid phone number' },
+        ]}
+      >
+        <Input placeholder="e.g. (555) 123-4567" type="tel" maxLength={20} />
+      </Form.Item>
+
+      <Form.Item
         label="Password"
         name="password"
         rules={

@@ -75,6 +75,7 @@ export const UserDrawer = ({
         employee_number: user.employee_number,
         department: user.department || undefined,
         email: user.email || undefined,
+        phone: user.phone || undefined,
         is_admin: user.is_admin,
         is_active: user.is_active,
         password: undefined,

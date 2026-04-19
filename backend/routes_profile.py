@@ -87,11 +87,13 @@ def update_profile():
         data = request.get_json() or {}
         current_user_id = request.current_user.get("user_id")
 
-        # Update fields
-        first_name = data.get("first_name", "").strip()
-        last_name = data.get("last_name", "").strip()
-        email = data.get("email", "").strip()
-        phone = data.get("phone", "").strip() if data.get("phone") is not None else None
+        # Update fields — use (value or "") to safely handle JSON null values,
+        # since dict.get(key, default) only returns the default when the key is
+        # absent; it returns None when the key is present with a null value.
+        first_name = (data.get("first_name") or "").strip()
+        last_name = (data.get("last_name") or "").strip()
+        email = (data.get("email") or "").strip()
+        phone = (data.get("phone") or "").strip() or None
 
         # Validate inputs
         if not first_name or not last_name:
@@ -149,7 +151,8 @@ def update_profile():
             "role": "admin" if user.is_admin else "user",
             "department_id": user.department,
             "is_active": user.is_active,
-            "avatar": user.avatar
+            "avatar": user.avatar,
+            "phone": user.phone,
         }), 200
 
     except Exception as e:
