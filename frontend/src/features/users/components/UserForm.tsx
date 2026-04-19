@@ -2,7 +2,7 @@ import { useMemo } from 'react';
 import { Button, Form, Input, Select, Space, Switch, Typography } from 'antd';
 import { CheckCircleFilled, CloseCircleFilled } from '@ant-design/icons';
 import type { FormInstance } from 'antd';
-import type { Department, UserFormValues } from '../types';
+import type { Department, UserFormValues, UserRole } from '../types';
 
 const { Text } = Typography;
 
@@ -58,6 +58,7 @@ interface UserFormProps {
   form: FormInstance<UserFormValues>;
   mode: 'create' | 'edit';
   departments?: Department[];
+  roles?: UserRole[];
   onSubmit: (values: UserFormValues) => void;
   onCancel: () => void;
   submitting?: boolean;
@@ -67,6 +68,7 @@ export const UserForm = ({
   form,
   mode,
   departments,
+  roles,
   onSubmit,
   onCancel,
   submitting,
@@ -75,6 +77,11 @@ export const UserForm = ({
     label: dept.name,
     value: dept.name,
     disabled: !dept.is_active,
+  }));
+
+  const roleOptions = (roles || []).map((role) => ({
+    label: role.name,
+    value: role.id,
   }));
 
   // Watch password field for real-time validation display
@@ -127,6 +134,18 @@ export const UserForm = ({
       >
         <Input placeholder="name@company.com" />
       </Form.Item>
+
+      {roleOptions.length > 0 && (
+        <Form.Item label="Roles" name="role_ids">
+          <Select
+            mode="multiple"
+            placeholder="Select roles"
+            options={roleOptions}
+            optionFilterProp="label"
+            allowClear
+          />
+        </Form.Item>
+      )}
 
       <Form.Item
         label="Password"
