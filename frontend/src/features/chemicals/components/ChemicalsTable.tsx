@@ -1,8 +1,10 @@
 import { useState } from 'react';
 import {
+  Alert,
   Table,
   Button,
   Space,
+  Switch,
   Tag,
   Input,
   Tooltip,
@@ -27,6 +29,7 @@ import {
 } from '../services/chemicalsApi';
 import type { Chemical, ChemicalStatus } from '../types';
 import { PermissionGuard } from '@features/auth/components/PermissionGuard';
+import { useActiveWarehouse } from '@features/warehouses/hooks/useActiveWarehouse';
 
 const { Text } = Typography;
 
@@ -41,11 +44,16 @@ export const ChemicalsTable = ({ onView, onEdit, onIssue }: ChemicalsTableProps)
   const [pageSize, setPageSize] = useState(50);
   const [searchQuery, setSearchQuery] = useState('');
   const [committedSearch, setCommittedSearch] = useState('');
+  const [showAllWarehouses, setShowAllWarehouses] = useState(false);
+
+  const { activeWarehouseId, activeWarehouseName } = useActiveWarehouse();
 
   const { data, isLoading, isFetching } = useGetChemicalsQuery({
     page,
     per_page: pageSize,
     q: committedSearch || undefined,
+    warehouse_id:
+      !showAllWarehouses && activeWarehouseId ? activeWarehouseId : undefined,
   });
 
   const [deleteChemical] = useDeleteChemicalMutation();
@@ -209,7 +217,15 @@ export const ChemicalsTable = ({ onView, onEdit, onIssue }: ChemicalsTableProps)
 
   return (
     <div>
-      <div style={{ marginBottom: 16 }}>
+      <div
+        style={{
+          marginBottom: 16,
+          display: 'flex',
+          alignItems: 'center',
+          flexWrap: 'wrap',
+          gap: 16,
+        }}
+      >
         <Input
           placeholder="Search chemicals..."
           prefix={<SearchOutlined />}
@@ -227,7 +243,28 @@ export const ChemicalsTable = ({ onView, onEdit, onIssue }: ChemicalsTableProps)
             setPage(1);
           }}
         />
+        {activeWarehouseId && (
+          <Space>
+            <span>All warehouses</span>
+            <Switch
+              size="small"
+              checked={showAllWarehouses}
+              onChange={(value) => {
+                setShowAllWarehouses(value);
+                setPage(1);
+              }}
+            />
+          </Space>
+        )}
       </div>
+      {activeWarehouseId && showAllWarehouses && (
+        <Alert
+          type="info"
+          showIcon
+          style={{ marginBottom: 12 }}
+          message={`Viewing chemicals across all warehouses. Issue/return is only allowed for items in ${activeWarehouseName || 'your active warehouse'}.`}
+        />
+      )}
 
       <Table
         columns={columns}

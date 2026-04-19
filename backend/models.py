@@ -192,6 +192,15 @@ class User(db.Model):
     # Contact information
     phone = db.Column(db.String(30), nullable=True)
 
+    # Active warehouse context — which warehouse the user is currently working in
+    active_warehouse_id = db.Column(
+        db.Integer,
+        db.ForeignKey("warehouses.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
+    active_warehouse = db.relationship("Warehouse", foreign_keys=[active_warehouse_id])
+
     # TOTP Two-Factor Authentication fields
     totp_secret = db.Column(db.String(255), nullable=True)  # Fernet-encrypted Base32 secret
     is_totp_enabled = db.Column(db.Boolean, default=False)
@@ -509,6 +518,8 @@ class User(db.Model):
             "password_changed_at": self.password_changed_at.isoformat() if self.password_changed_at else None,
             "is_totp_enabled": self.is_totp_enabled,
             "phone": self.phone,
+            "active_warehouse_id": self.active_warehouse_id,
+            "active_warehouse_name": self.active_warehouse.name if self.active_warehouse else None,
         }
 
         if include_roles:
@@ -2262,7 +2273,17 @@ class WarehouseTransfer(db.Model):
     transfer_date = db.Column(db.DateTime, default=get_current_time, nullable=False, index=True)
     transferred_by_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False)
     notes = db.Column(db.Text, nullable=True)
-    status = db.Column(db.String(50), nullable=False, default="completed", index=True)  # pending, completed, cancelled
+    status = db.Column(db.String(50), nullable=False, default="completed", index=True)
+    # Allowed values: pending_receipt, received, cancelled, completed (legacy for kit transfers)
+
+    # Two-step receipt workflow fields
+    received_by_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=True, index=True)
+    received_date = db.Column(db.DateTime, nullable=True)
+    source_location = db.Column(db.String(200), nullable=True)
+    destination_location = db.Column(db.String(200), nullable=True)
+    cancelled_by_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=True)
+    cancelled_date = db.Column(db.DateTime, nullable=True)
+    cancel_reason = db.Column(db.String(500), nullable=True)
 
     # Relationships
     from_warehouse = db.relationship("Warehouse", foreign_keys=[from_warehouse_id])
@@ -2270,22 +2291,42 @@ class WarehouseTransfer(db.Model):
     to_kit = db.relationship("Kit", foreign_keys=[to_kit_id])
     from_kit = db.relationship("Kit", foreign_keys=[from_kit_id])
     transferred_by = db.relationship("User", foreign_keys=[transferred_by_id])
+    received_by = db.relationship("User", foreign_keys=[received_by_id])
+    cancelled_by = db.relationship("User", foreign_keys=[cancelled_by_id])
+
+    @property
+    def is_pending(self):
+        return self.status == "pending_receipt"
 
     def to_dict(self):
         """Convert transfer to dictionary representation."""
         return {
             "id": self.id,
+            "from_warehouse_id": self.from_warehouse_id,
+            "to_warehouse_id": self.to_warehouse_id,
             "from_warehouse": self.from_warehouse.name if self.from_warehouse else None,
             "to_warehouse": self.to_warehouse.name if self.to_warehouse else None,
+            "to_kit_id": self.to_kit_id,
+            "from_kit_id": self.from_kit_id,
             "to_kit": self.to_kit.name if self.to_kit else None,
             "from_kit": self.from_kit.name if self.from_kit else None,
             "item_type": self.item_type,
             "item_id": self.item_id,
             "quantity": self.quantity,
             "transfer_date": self.transfer_date.isoformat() if self.transfer_date else None,
-            "transferred_by": self.transferred_by.username if self.transferred_by else None,
+            "transferred_by_id": self.transferred_by_id,
+            "transferred_by": self.transferred_by.name if self.transferred_by else None,
+            "received_by_id": self.received_by_id,
+            "received_by": self.received_by.name if self.received_by else None,
+            "received_date": self.received_date.isoformat() if self.received_date else None,
+            "source_location": self.source_location,
+            "destination_location": self.destination_location,
+            "cancelled_by_id": self.cancelled_by_id,
+            "cancelled_by": self.cancelled_by.name if self.cancelled_by else None,
+            "cancelled_date": self.cancelled_date.isoformat() if self.cancelled_date else None,
+            "cancel_reason": self.cancel_reason,
             "notes": self.notes,
-            "status": self.status
+            "status": self.status,
         }
 
 

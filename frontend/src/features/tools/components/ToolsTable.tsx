@@ -21,6 +21,8 @@ import { useGetToolsQuery, useDeleteToolMutation } from '../services/toolsApi';
 import type { Tool, ToolStatus, CalibrationStatus } from '../types';
 import { LabelPrintModal } from '@/components/shared/LabelPrintModal';
 import { PermissionGuard } from '@features/auth/components/PermissionGuard';
+import { useActiveWarehouse } from '@features/warehouses/hooks/useActiveWarehouse';
+import { Alert, Switch } from 'antd';
 
 interface ToolsTableProps {
   onView: (tool: Tool) => void;
@@ -32,11 +34,16 @@ export const ToolsTable = ({ onView, onEdit }: ToolsTableProps) => {
   const [pageSize, setPageSize] = useState(50);
   const [searchQuery, setSearchQuery] = useState('');
   const [printModalTool, setPrintModalTool] = useState<{ id: number; description: string } | null>(null);
+  const [showAllWarehouses, setShowAllWarehouses] = useState(false);
+
+  const { activeWarehouseId, activeWarehouseName } = useActiveWarehouse();
 
   const { data, isLoading, isFetching } = useGetToolsQuery({
     page,
     per_page: pageSize,
     q: searchQuery || undefined,
+    warehouse_id:
+      !showAllWarehouses && activeWarehouseId ? activeWarehouseId : undefined,
   });
 
   const [deleteTool] = useDeleteToolMutation();
@@ -202,7 +209,15 @@ export const ToolsTable = ({ onView, onEdit }: ToolsTableProps) => {
 
   return (
     <div>
-      <div style={{ marginBottom: 16 }}>
+      <div
+        style={{
+          marginBottom: 16,
+          display: 'flex',
+          alignItems: 'center',
+          flexWrap: 'wrap',
+          gap: 16,
+        }}
+      >
         <Input
           placeholder="Search tools..."
           prefix={<SearchOutlined />}
@@ -212,7 +227,28 @@ export const ToolsTable = ({ onView, onEdit }: ToolsTableProps) => {
           style={{ maxWidth: 400 }}
           allowClear
         />
+        {activeWarehouseId && (
+          <Space>
+            <span>All warehouses</span>
+            <Switch
+              size="small"
+              checked={showAllWarehouses}
+              onChange={(value) => {
+                setShowAllWarehouses(value);
+                setPage(1);
+              }}
+            />
+          </Space>
+        )}
       </div>
+      {activeWarehouseId && showAllWarehouses && (
+        <Alert
+          type="info"
+          showIcon
+          style={{ marginBottom: 12 }}
+          message={`Viewing tools across all warehouses. Check-in/out is only allowed for items in ${activeWarehouseName || 'your active warehouse'}.`}
+        />
+      )}
 
       <Table
         columns={columns}

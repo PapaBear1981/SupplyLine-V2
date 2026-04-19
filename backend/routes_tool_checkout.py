@@ -22,7 +22,9 @@ from models import (
     UserActivity,
     db,
 )
+from utils.error_handler import ValidationError
 from utils.transaction_helper import record_tool_checkout, record_tool_return
+from utils.warehouse_scope import assert_active_warehouse_matches
 
 
 logger = logging.getLogger(__name__)
@@ -159,6 +161,12 @@ def register_tool_checkout_routes(app):
             tool = db.session.get(Tool, tool_id)
             if not tool:
                 return jsonify({"error": f"Tool with ID {tool_id} not found"}), 404
+
+            # Enforce warehouse scope — user must be working in this tool's warehouse
+            try:
+                assert_active_warehouse_matches(tool)
+            except ValidationError as scope_err:
+                return jsonify({"error": str(scope_err), "code": "WAREHOUSE_SCOPE"}), 409
 
             # Get the user checking out the tool
             checkout_user = db.session.get(User, checkout_user_id)
@@ -370,6 +378,19 @@ def register_tool_checkout_routes(app):
                     failed += 1
                     continue
 
+                # Enforce warehouse scope per tool
+                try:
+                    assert_active_warehouse_matches(tool)
+                except ValidationError as scope_err:
+                    results.append({
+                        "tool_id": tool_id,
+                        "tool_number": tool.tool_number,
+                        "success": False,
+                        "error": str(scope_err),
+                    })
+                    failed += 1
+                    continue
+
                 # Check availability
                 blocking_reasons = []
 
@@ -537,6 +558,12 @@ def register_tool_checkout_routes(app):
             tool = checkout.tool
             if not tool:
                 return jsonify({"error": "Tool not found for this checkout"}), 404
+
+            # Enforce warehouse scope — you check tools in to their home warehouse
+            try:
+                assert_active_warehouse_matches(tool)
+            except ValidationError as scope_err:
+                return jsonify({"error": str(scope_err), "code": "WAREHOUSE_SCOPE"}), 409
 
             # Location is required on check-in
             location = (data.get("location") or "").strip()

@@ -554,6 +554,7 @@ def register_auth_routes(app):
                     "employee_number": user_payload["employee_number"],
                     "is_admin": user_payload["is_admin"],
                     "department": user_payload["department"],
+                    "active_warehouse_id": user_payload.get("active_warehouse_id"),
                     "permissions": user_payload.get("permissions", [])
                 }
             }), 200

@@ -97,6 +97,12 @@ export const ALL_MENU_ITEMS: MenuItemWithPermission[] = [
     permission: 'page.warehouses',
   },
   {
+    key: ROUTES.TRANSFERS,
+    icon: <SwapOutlined />,
+    label: 'Transfers',
+    permission: 'transfer.view',
+  },
+  {
     key: ROUTES.REPORTS,
     icon: <FileTextOutlined />,
     label: 'Reports',

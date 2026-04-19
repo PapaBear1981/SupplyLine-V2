@@ -59,6 +59,8 @@ export interface User {
   role_permissions?: string[];  // Role-based permissions only
   user_permissions?: UserPermission[];  // User-specific grants/denies
   is_totp_enabled?: boolean;
+  active_warehouse_id?: number | null;
+  active_warehouse_name?: string | null;
 }
 
 export interface Department {

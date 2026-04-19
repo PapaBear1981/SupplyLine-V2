@@ -36,6 +36,7 @@ PERMISSIONS: list[tuple[str, str, str]] = [
     ("warehouse.delete", "Delete warehouses", "Warehouse Management"),
     ("warehouse.transfer", "Transfer items between warehouses", "Warehouse Management"),
     ("warehouse.inventory", "Manage warehouse inventory", "Warehouse Management"),
+    ("warehouse.switch_active", "Change the user's active warehouse", "Warehouse Management"),
 
     # --- Tool / Checkout ---
     ("checkout.view", "View tool checkouts", "Checkouts"),
@@ -75,7 +76,10 @@ PERMISSIONS: list[tuple[str, str, str]] = [
     ("transfer.create", "Create new transfers", "Transfer Management"),
     ("transfer.approve", "Approve transfers", "Transfer Management"),
     ("transfer.complete", "Complete transfers", "Transfer Management"),
-    ("transfer.cancel", "Cancel transfers", "Transfer Management"),
+    ("transfer.cancel", "Cancel transfers (admin)", "Transfer Management"),
+    ("transfer.initiate", "Initiate warehouse-to-warehouse transfers", "Transfer Management"),
+    ("transfer.receive", "Receive transfers and assign destination location", "Transfer Management"),
+    ("transfer.cancel_own", "Cancel transfers the user initiated", "Transfer Management"),
 
     # --- Announcements ---
     ("announcement.view", "View announcements", "Announcement Management"),

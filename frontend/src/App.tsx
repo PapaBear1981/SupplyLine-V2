@@ -19,6 +19,7 @@ import { ChemicalsPage } from '@features/chemicals/pages/ChemicalsPage';
 import { ChemicalForecastPage } from '@features/chemicals/pages/ChemicalForecastPage';
 import { MobileChemicalForecast } from '@features/chemicals/components/mobile';
 import { WarehousesPage } from '@features/warehouses/pages/WarehousesPage';
+import { TransfersPage } from '@features/transfers/pages/TransfersPage';
 import { SettingsPage } from '@features/settings/pages/SettingsPage';
 import { ProfilePage } from '@features/profile/pages/ProfilePage';
 import { UsersPage } from '@features/users/pages/UsersPage';
@@ -144,6 +145,7 @@ function AppContent() {
                   />
 
                   <Route path={ROUTES.WAREHOUSES} element={<WarehousesPage />} />
+                  <Route path={ROUTES.TRANSFERS} element={<TransfersPage />} />
                   <Route path={ROUTES.REPORTS} element={<ReportsPage />} />
                   <Route
                     path={ROUTES.USERS}

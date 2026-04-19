@@ -29,6 +29,7 @@ from utils.validation import (
     validate_schema,
     validate_warehouse_id,
 )
+from utils.warehouse_scope import assert_active_warehouse_matches
 
 
 logger = logging.getLogger(__name__)
@@ -438,6 +439,9 @@ def register_chemical_routes(app):
         # Get the chemical
         chemical = Chemical.query.get_or_404(id)
 
+        # Enforce warehouse scope — user must be working in the chemical's warehouse
+        assert_active_warehouse_matches(chemical)
+
         # Check if chemical can be issued
         if chemical.status == "expired":
             raise ValidationError("Cannot issue an expired chemical")
@@ -728,6 +732,10 @@ def register_chemical_routes(app):
     @handle_errors
     def chemical_return_route(id):
         chemical = Chemical.query.get_or_404(id)
+
+        # Enforce warehouse scope — returns also write to the chemical's warehouse
+        assert_active_warehouse_matches(chemical)
+
         data = request.get_json() or {}
         current_user_id = request.current_user.get("user_id")
 
