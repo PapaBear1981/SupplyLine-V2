@@ -1145,69 +1145,74 @@ def register_chemical_routes(app):
             print(f"Error in mark chemical as ordered route: {e!s}")
             return jsonify({"error": "An error occurred while marking the chemical as ordered"}), 500
 
-    # Get, update, or delete a specific chemical
-    @app.route("/api/chemicals/<int:id>", methods=["GET", "PUT", "DELETE"])
-    @materials_manager_required
+    # Get a specific chemical — any authenticated user (including Inventory Viewers)
+    @app.route("/api/chemicals/<int:id>", methods=["GET"])
+    @jwt_required
     @handle_errors
-    def chemical_detail_route(id):
-        current_user_id = request.current_user.get("user_id")
-        # Get the chemical
+    def chemical_get_route(id):
         chemical = Chemical.query.get_or_404(id)
 
-        if request.method == "GET":
-            # Update status based on expiration and stock level
-            try:
-                is_archived = chemical.is_archived
-            except Exception:
-                is_archived = False
+        # Update status based on expiration and stock level
+        try:
+            is_archived = chemical.is_archived
+        except Exception:
+            is_archived = False
 
-            if not is_archived:  # Only update non-archived chemicals
-                if chemical.is_expired():
-                    chemical.status = "expired"
+        if not is_archived:  # Only update non-archived chemicals
+            if chemical.is_expired():
+                chemical.status = "expired"
 
-                    # Auto-archive expired chemicals if the columns exist
-                    try:
-                        chemical.is_archived = True
-                        chemical.archived_reason = "expired"
-                        chemical.archived_date = datetime.utcnow()
+                # Auto-archive expired chemicals if the columns exist
+                try:
+                    chemical.is_archived = True
+                    chemical.archived_reason = "expired"
+                    chemical.archived_date = datetime.utcnow()
 
-                        # Add log for archiving
-                        AuditLog.log(
-                            user_id=None,  # System action
-                            action="chemical_archived",
-                            resource_type="chemical",
-                            resource_id=chemical.id,
-                            details={
-                                "part_number": chemical.part_number,
-                                "lot_number": chemical.lot_number,
-                                "reason": "expired",
-                                "auto_archived": True
-                            },
-                            ip_address=request.remote_addr if hasattr(request, "remote_addr") else None
-                        )
+                    # Add log for archiving
+                    AuditLog.log(
+                        user_id=None,  # System action
+                        action="chemical_archived",
+                        resource_type="chemical",
+                        resource_id=chemical.id,
+                        details={
+                            "part_number": chemical.part_number,
+                            "lot_number": chemical.lot_number,
+                            "reason": "expired",
+                            "auto_archived": True
+                        },
+                        ip_address=request.remote_addr if hasattr(request, "remote_addr") else None
+                    )
 
-                        # Update reorder status for expired chemicals
-                        chemical.update_reorder_status()
-                    except Exception:
-                        # If the columns don't exist, just update the status
-                        pass
-                elif chemical.quantity <= 0:
-                    chemical.status = "out_of_stock"
-                    # Update reorder status for out-of-stock chemicals
+                    # Update reorder status for expired chemicals
                     chemical.update_reorder_status()
-                elif chemical.is_low_stock():
-                    chemical.status = "low_stock"
-                    # Update reorder status for low-stock chemicals
-                    chemical.update_reorder_status()
+                except Exception:
+                    # If the columns don't exist, just update the status
+                    pass
+            elif chemical.quantity <= 0:
+                chemical.status = "out_of_stock"
+                # Update reorder status for out-of-stock chemicals
+                chemical.update_reorder_status()
+            elif chemical.is_low_stock():
+                chemical.status = "low_stock"
+                # Update reorder status for low-stock chemicals
+                chemical.update_reorder_status()
 
-                # Check if chemical is expiring soon (within 30 days)
-                if chemical.is_expiring_soon(30):
-                    # Add a flag to the chemical data
-                    chemical.expiring_soon = True
+            # Check if chemical is expiring soon (within 30 days)
+            if chemical.is_expiring_soon(30):
+                # Add a flag to the chemical data
+                chemical.expiring_soon = True
 
-                db.session.commit()
+            db.session.commit()
 
-            return jsonify(chemical.to_dict())
+        return jsonify(chemical.to_dict())
+
+    # Update or delete a specific chemical — Materials department or admin only
+    @app.route("/api/chemicals/<int:id>", methods=["PUT", "DELETE"])
+    @materials_manager_required
+    @handle_errors
+    def chemical_modify_route(id):
+        current_user_id = request.current_user.get("user_id")
+        chemical = Chemical.query.get_or_404(id)
 
         if request.method == "PUT":
             # Update chemical

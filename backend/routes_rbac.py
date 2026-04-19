@@ -173,44 +173,8 @@ def register_rbac_routes(app):
         user = User.query.get_or_404(user_id)
         return jsonify([role.to_dict() for role in user.roles])
 
-    # Update user roles
-    @app.route("/api/users/<int:user_id>/roles", methods=["PUT"])
-    @permission_required("user.edit")
-    def update_user_roles(user_id):
-        user = User.query.get_or_404(user_id)
-        data = request.get_json() or {}
-        current_user_id = request.current_user.get("user_id")
-
-        if "roles" not in data or not isinstance(data["roles"], list):
-            return jsonify({"error": "Roles list is required"}), 400
-
-        # Remove all existing user-role associations
-        UserRole.query.filter_by(user_id=user.id).delete()
-
-        # Add new roles
-        for role_id in data["roles"]:
-            role = db.session.get(Role, role_id)
-            if role:
-                user_role = UserRole(user_id=user.id, role_id=role.id)
-                db.session.add(user_role)
-
-        db.session.commit()
-
-        # Log the action
-        AuditLog.log(
-            user_id=current_user_id,
-            action="update_user_roles",
-            resource_type="user",
-            resource_id=user.id,
-            details={
-                "user_name": user.name,
-                "role_ids": data["roles"]
-            },
-            ip_address=request.remote_addr
-        )
-        db.session.commit()
-
-        return jsonify([role.to_dict() for role in user.roles])
+    # NOTE: PUT /api/users/<int:user_id>/roles is handled by routes_permissions.py
+    # (update_user_roles) to avoid duplicate endpoint registration.
 
     # Get current user permissions
     @app.route("/api/auth/permissions", methods=["GET"])

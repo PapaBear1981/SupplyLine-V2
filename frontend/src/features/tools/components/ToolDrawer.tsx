@@ -31,6 +31,7 @@ import {
 import { ToolForm } from './ToolForm';
 import type { ToolFormData, ToolStatus, CalibrationStatus } from '../types';
 import { LabelPrintModal } from '@/components/shared/LabelPrintModal';
+import { PermissionGuard } from '@features/auth/components/PermissionGuard';
 
 interface ToolDrawerProps {
   open: boolean;
@@ -260,13 +261,15 @@ export const ToolDrawer = ({ open, mode: initialMode, toolId, onClose, onSuccess
           >
             Print Label
           </Button>
-          <Button
-            icon={<EditOutlined />}
-            onClick={() => setMode('edit')}
-            aria-label="Edit tool details"
-          >
-            Edit
-          </Button>
+          <PermissionGuard permission="tool.edit">
+            <Button
+              icon={<EditOutlined />}
+              onClick={() => setMode('edit')}
+              aria-label="Edit tool details"
+            >
+              Edit
+            </Button>
+          </PermissionGuard>
         </Space>
       );
     }

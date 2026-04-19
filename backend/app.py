@@ -348,6 +348,41 @@ def create_app():
                 "error_message": str(e)
             })
 
+    # Ensure the Inventory Viewer role exists (idempotent — safe on every startup)
+    if not is_testing_env:
+        try:
+            with app.app_context():
+                from models import Permission, Role, RolePermission
+                _viewer_role = Role.query.filter_by(name="Inventory Viewer").first()
+                if not _viewer_role:
+                    _viewer_role = Role(
+                        name="Inventory Viewer",
+                        description="Read-only access to tooling and chemicals inventory",
+                        is_system_role=True,
+                    )
+                    db.session.add(_viewer_role)
+                    db.session.flush()
+                    logger.info("Created 'Inventory Viewer' role")
+
+                _viewer_perms = [
+                    "tool.view",
+                    "chemical.view",
+                    "page.tools",
+                    "page.chemicals",
+                    "page.profile",
+                ]
+                for _perm_name in _viewer_perms:
+                    _perm = Permission.query.filter_by(name=_perm_name).first()
+                    if _perm and not RolePermission.query.filter_by(
+                        role_id=_viewer_role.id, permission_id=_perm.id
+                    ).first():
+                        db.session.add(RolePermission(role_id=_viewer_role.id, permission_id=_perm.id))
+
+                db.session.commit()
+                logger.info("Inventory Viewer role permissions verified/applied")
+        except Exception as e:
+            logger.warning("Inventory Viewer role setup warning (non-fatal): %s", str(e))
+
     # Register main routes
     register_routes(app)
 

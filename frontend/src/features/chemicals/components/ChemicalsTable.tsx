@@ -26,6 +26,7 @@ import {
   useGetChemicalsQuery,
 } from '../services/chemicalsApi';
 import type { Chemical, ChemicalStatus } from '../types';
+import { PermissionGuard } from '@features/auth/components/PermissionGuard';
 
 const { Text } = Typography;
 
@@ -170,30 +171,36 @@ export const ChemicalsTable = ({ onView, onEdit, onIssue }: ChemicalsTableProps)
             <Tooltip title="View Details">
               <Button type="text" icon={<EyeOutlined />} onClick={() => onView(record)} />
             </Tooltip>
-            <Tooltip title={canIssue ? 'Issue' : 'Cannot issue (expired or out of stock)'}>
-              <Button
-                type="text"
-                icon={<ExportOutlined />}
-                onClick={() => onIssue(record)}
-                disabled={!canIssue}
-              />
-            </Tooltip>
-            <Tooltip title="Edit">
-              <Button type="text" icon={<EditOutlined />} onClick={() => onEdit(record)} />
-            </Tooltip>
-            <Popconfirm
-              title="Delete chemical?"
-              description="This action cannot be undone."
-              onConfirm={() => handleDelete(record.id)}
-              okText="Yes"
-              cancelText="No"
-              okButtonProps={{ danger: true }}
-              icon={<ExclamationCircleOutlined style={{ color: 'red' }} />}
-            >
-              <Tooltip title="Delete">
-                <Button type="text" danger icon={<DeleteOutlined />} />
+            <PermissionGuard permission="chemical.issue">
+              <Tooltip title={canIssue ? 'Issue' : 'Cannot issue (expired or out of stock)'}>
+                <Button
+                  type="text"
+                  icon={<ExportOutlined />}
+                  onClick={() => onIssue(record)}
+                  disabled={!canIssue}
+                />
               </Tooltip>
-            </Popconfirm>
+            </PermissionGuard>
+            <PermissionGuard permission="chemical.edit">
+              <Tooltip title="Edit">
+                <Button type="text" icon={<EditOutlined />} onClick={() => onEdit(record)} />
+              </Tooltip>
+            </PermissionGuard>
+            <PermissionGuard permission="chemical.delete">
+              <Popconfirm
+                title="Delete chemical?"
+                description="This action cannot be undone."
+                onConfirm={() => handleDelete(record.id)}
+                okText="Yes"
+                cancelText="No"
+                okButtonProps={{ danger: true }}
+                icon={<ExclamationCircleOutlined style={{ color: 'red' }} />}
+              >
+                <Tooltip title="Delete">
+                  <Button type="text" danger icon={<DeleteOutlined />} />
+                </Tooltip>
+              </Popconfirm>
+            </PermissionGuard>
           </Space>
         );
       },
