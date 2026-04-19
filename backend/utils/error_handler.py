@@ -454,8 +454,11 @@ def validate_input(data, required_fields, optional_fields=None):
     if not isinstance(data, dict):
         raise ValidationError("Invalid input format")
 
-    # Check required fields
-    missing_fields = [field for field in required_fields if field not in data or not data[field]]
+    # Check required fields (0 and False are valid values, only None and empty strings are missing)
+    missing_fields = [
+        field for field in required_fields
+        if field not in data or data[field] is None or (isinstance(data[field], str) and not data[field].strip())
+    ]
     if missing_fields:
         raise ValidationError(f"Missing required fields: {', '.join(missing_fields)}")
 

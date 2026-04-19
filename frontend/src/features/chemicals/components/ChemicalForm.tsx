@@ -112,10 +112,21 @@ export const ChemicalForm = ({ form, initialValues, onSubmit, onCancel, loading 
       >
         <Select placeholder="Select unit">
           <Option value="each">Each</Option>
+          <Option value="tube">Tube</Option>
+          <Option value="tubes">Tubes</Option>
+          <Option value="can">Can</Option>
+          <Option value="cartridge">Cartridge</Option>
+          <Option value="kit">Kit</Option>
+          <Option value="roll">Roll</Option>
+          <Option value="oz">Ounces (oz)</Option>
           <Option value="ml">Milliliters (ml)</Option>
           <Option value="l">Liters (l)</Option>
-          <Option value="oz">Ounces (oz)</Option>
           <Option value="gal">Gallons (gal)</Option>
+          <Option value="gallon">Gallon</Option>
+          <Option value="quart">Quart</Option>
+          <Option value="g">Grams (g)</Option>
+          <Option value="kg">Kilograms (kg)</Option>
+          <Option value="lb">Pounds (lb)</Option>
         </Select>
       </Form.Item>
 
