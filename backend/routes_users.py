@@ -146,7 +146,8 @@ def user_detail_route(id):
         if "email" in data:
             user.email = data["email"]
         if "phone" in data:
-            user.phone = data["phone"] or None
+            phone_value = (data["phone"] or "").strip()
+            user.phone = phone_value or None
         if "is_admin" in data:
             user.is_admin = data["is_admin"]
         if "is_active" in data:

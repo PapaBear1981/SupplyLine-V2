@@ -112,7 +112,7 @@ def update_profile():
         user.name = f"{first_name} {last_name}"
         if email:
             user.email = email
-        user.phone = phone or None
+        user.phone = phone
 
         db.session.commit()
 

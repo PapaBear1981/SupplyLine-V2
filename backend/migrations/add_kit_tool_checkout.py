@@ -7,7 +7,6 @@ Different from kit_items (permanent transfers) and checkouts (user checkouts).
 
 import os
 import sqlite3
-import sys
 
 db_dir = os.path.join(
     os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))),
@@ -21,7 +20,7 @@ def run_migration():
 
     if not os.path.exists(db_path):
         print(f"Error: Database not found at {db_path}")
-        sys.exit(1)
+        return
 
     conn = sqlite3.connect(db_path)
     cursor = conn.cursor()
@@ -60,6 +59,10 @@ def run_migration():
             cursor.execute(
                 "CREATE INDEX idx_kit_tool_checkouts_status ON kit_tool_checkouts(status)"
             )
+            cursor.execute(
+                "CREATE UNIQUE INDEX uq_kit_tool_checkouts_active_tool "
+                "ON kit_tool_checkouts(tool_id) WHERE status = 'active'"
+            )
             print("kit_tool_checkouts table created.")
         else:
             print("kit_tool_checkouts table already exists, skipping.")
@@ -72,7 +75,7 @@ def run_migration():
         print(f"Migration failed: {e}")
         import traceback
         traceback.print_exc()
-        sys.exit(1)
+        raise
     finally:
         conn.close()
 

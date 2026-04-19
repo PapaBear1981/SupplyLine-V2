@@ -150,7 +150,7 @@ class User(db.Model):
     account_locked_until = db.Column(db.DateTime, nullable=True)
     last_failed_login = db.Column(db.DateTime, nullable=True)
 
-    # TOTP Two-Factor Authentication fields
+    # Contact information
     phone = db.Column(db.String(30), nullable=True)
 
     # TOTP Two-Factor Authentication fields

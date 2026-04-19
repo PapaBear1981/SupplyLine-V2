@@ -18,6 +18,7 @@ import logging
 from datetime import datetime
 
 from flask import jsonify, request
+from sqlalchemy.exc import IntegrityError
 
 from auth.jwt_manager import jwt_required, permission_required
 from models import AuditLog, Checkout, Tool, ToolHistory, UserActivity, db
@@ -203,6 +204,10 @@ def register_kit_tool_checkout_routes(app):
                 }
             ), 201
 
+        except IntegrityError:
+            db.session.rollback()
+            logger.warning("Concurrent checkout attempt for tool_id=%s", data.get("tool_id"))
+            return jsonify({"error": "Tool is already deployed to a kit (concurrent request)"}), 409
         except Exception:
             db.session.rollback()
             logger.exception("Error sending tool to kit")
