@@ -20,8 +20,10 @@ import {
 import dayjs from 'dayjs';
 import { UserForm } from './UserForm';
 import {
+  useAssignUserRolesMutation,
   useCreateUserMutation,
   useGetDepartmentsQuery,
+  useGetRolesQuery,
   useGetUserQuery,
   useUnlockUserMutation,
   useUpdateUserMutation,
@@ -52,10 +54,12 @@ export const UserDrawer = ({
     skip: !userId || initialMode === 'create',
   });
   const { data: departments } = useGetDepartmentsQuery();
+  const { data: roles } = useGetRolesQuery();
 
   const [createUser, { isLoading: isCreating }] = useCreateUserMutation();
   const [updateUser, { isLoading: isUpdating }] = useUpdateUserMutation();
   const [unlockUser, { isLoading: isUnlocking }] = useUnlockUserMutation();
+  const [assignUserRoles] = useAssignUserRolesMutation();
 
   useEffect(() => {
     // Update mode asynchronously to avoid cascading renders
@@ -79,6 +83,7 @@ export const UserDrawer = ({
         is_admin: user.is_admin,
         is_active: user.is_active,
         password: undefined,
+        role_ids: user.roles?.map((r) => r.id) ?? [],
       });
     }
   }, [user, mode, form]);
@@ -117,7 +122,9 @@ export const UserDrawer = ({
         if (!values.password) {
           delete updatePayload.password;
         }
-        await updateUser({ id: userId, data: updatePayload }).unwrap();
+        const { role_ids, ...profilePayload } = updatePayload;
+        await updateUser({ id: userId, data: profilePayload }).unwrap();
+        await assignUserRoles({ userId, role_ids: role_ids ?? [] }).unwrap();
         message.success('User updated successfully');
       }
       onSuccess?.();
@@ -301,6 +308,7 @@ export const UserDrawer = ({
         form={form}
         mode={mode}
         departments={departments}
+        roles={roles}
         onSubmit={handleSubmit}
         onCancel={() => {
           if (mode === 'create') {

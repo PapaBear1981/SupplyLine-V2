@@ -5,6 +5,7 @@ import type {
   User,
   UserFormValues,
   UserListResponse,
+  UserRole,
   UsersQueryParams,
 } from '../types';
 
@@ -82,6 +83,23 @@ export const usersApi = baseApi.injectEndpoints({
             ]
           : [{ type: 'Department' as const, id: 'LIST' }],
     }),
+
+    getRoles: builder.query<UserRole[], void>({
+      query: () => '/api/roles',
+      providesTags: ['Role'],
+    }),
+
+    assignUserRoles: builder.mutation<User, { userId: number; role_ids: number[] }>({
+      query: ({ userId, role_ids }) => ({
+        url: `/api/users/${userId}/roles`,
+        method: 'PUT',
+        body: { role_ids },
+      }),
+      invalidatesTags: (_result, _error, { userId }) => [
+        { type: 'User' as const, id: userId },
+        { type: 'User' as const, id: 'LIST' },
+      ],
+    }),
   }),
 });
 
@@ -94,4 +112,6 @@ export const {
   useDeleteUserMutation,
   useUnlockUserMutation,
   useGetDepartmentsQuery,
+  useGetRolesQuery,
+  useAssignUserRolesMutation,
 } = usersApi;
