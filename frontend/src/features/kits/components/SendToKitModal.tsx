@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import {
   Modal,
   Form,
@@ -42,15 +42,14 @@ const SendToKitModal = ({ visible, kitId, kitName, onClose }: SendToKitModalProp
 
   const availableTools = toolsData?.tools || [];
 
-  useEffect(() => {
-    if (!visible) {
-      form.resetFields();
-      setSelectedToolId(null);
-      setToolSearch('');
-    }
-  }, [visible, form]);
-
   const selectedTool = availableTools.find((t) => t.id === selectedToolId);
+
+  const handleClose = () => {
+    form.resetFields();
+    setSelectedToolId(null);
+    setToolSearch('');
+    onClose();
+  };
 
   const handleSubmit = async () => {
     try {
@@ -67,7 +66,7 @@ const SendToKitModal = ({ visible, kitId, kitName, onClose }: SendToKitModalProp
       await sendToolToKit({ kitId, data: payload }).unwrap();
 
       message.success(`Tool sent to kit ${kitName} successfully`);
-      onClose();
+      handleClose();
     } catch (error: unknown) {
       const err = error as { data?: { error?: string; blocking_reasons?: string[] } };
       if (err?.data?.blocking_reasons?.length) {
@@ -88,7 +87,7 @@ const SendToKitModal = ({ visible, kitId, kitName, onClose }: SendToKitModalProp
       }
       open={visible}
       onOk={handleSubmit}
-      onCancel={onClose}
+      onCancel={handleClose}
       okText="Send to Kit"
       confirmLoading={isSending}
       width={520}

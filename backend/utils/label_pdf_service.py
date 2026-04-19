@@ -215,7 +215,6 @@ def _draw_label(
     body_x   = lx + PAD
     body_w   = LW - 2 * PAD
     body_y   = ly + PAD
-    body_h   = body_top - ly - PAD
 
     # QR code — centred horizontally, with a small gap below the header so the
     # quiet zone is never adjacent to the dark header strip.

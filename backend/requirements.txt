@@ -70,7 +70,7 @@ packaging==25.0
     # via
     #   gunicorn
     #   pytest
-pillow==12.1.1
+pillow==12.2.0
     # via
     #   reportlab
     #   weasyprint

@@ -89,7 +89,10 @@ ignore = [
     "PT019",   # pytest fixture without value (false positive)
     "PT028",   # pytest parameter with default (intentional)
     "RUF001",  # ambiguous unicode (false positive)
+    "RUF002",  # ambiguous unicode in docstrings (intentional in label size descriptions e.g. 4×6)
+    "RUF003",  # ambiguous unicode in comments (intentional in label size descriptions)
     "F811",    # redefinition (will be fixed manually if needed)
+    "N806",    # uppercase variable in function (intentional for layout constants e.g. LW, LH, PAD)
 ]
 
 # Allow autofix for all enabled rules
