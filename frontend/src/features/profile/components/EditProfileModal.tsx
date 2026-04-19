@@ -34,7 +34,7 @@ export const EditProfileModal = ({ open, onClose, user }: EditProfileModalProps)
 
   const handleSubmit = async (values: { first_name: string; last_name: string; email: string; phone?: string }) => {
     try {
-      const updatedUser = await updateProfile({ ...values, phone: values.phone?.trim() || null }).unwrap();
+      const updatedUser = await updateProfile({ ...values, phone: values.phone?.trim() || undefined }).unwrap();
 
       // Update the user in Redux state
       const token = localStorage.getItem('access_token');
