@@ -17,8 +17,8 @@ from werkzeug.exceptions import BadRequest
 
 import utils as password_utils
 from auth import (
-    JWTManager,
     TRUSTED_DEVICE_COOKIE,
+    JWTManager,
     clear_trusted_device_cookie,
     jwt_required,
     revoke_all_for_user,

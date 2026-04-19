@@ -299,7 +299,7 @@ class TestMaxPerUserPruning:
         user, secret, password = _make_totp_user(db_session)
         # Issue 4 devices on separate "clients" by re-creating cookies.
         created_ids = []
-        for i in range(4):
+        for _i in range(4):
             _clear_client_cookie(client, TRUSTED_DEVICE_COOKIE)
             _login(client, user, password)
             resp = _verify_totp(client, user, secret, trust_device=True)

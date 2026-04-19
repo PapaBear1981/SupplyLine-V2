@@ -184,12 +184,12 @@ def get_current_prefix_from_request() -> str | None:
 
 __all__ = [
     "TRUSTED_DEVICE_COOKIE",
-    "issue_trusted_device",
-    "validate_trusted_device_token",
-    "touch_trusted_device",
-    "revoke_device",
-    "revoke_all_for_user",
-    "set_trusted_device_cookie",
     "clear_trusted_device_cookie",
     "get_current_prefix_from_request",
+    "issue_trusted_device",
+    "revoke_all_for_user",
+    "revoke_device",
+    "set_trusted_device_cookie",
+    "touch_trusted_device",
+    "validate_trusted_device_token",
 ]

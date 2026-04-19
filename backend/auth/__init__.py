@@ -27,8 +27,8 @@ from .trusted_devices import (
 
 
 __all__ = [
-    "JWTManager",
     "TRUSTED_DEVICE_COOKIE",
+    "JWTManager",
     "admin_required",
     "clear_trusted_device_cookie",
     "csrf_required",
