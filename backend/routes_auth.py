@@ -198,8 +198,6 @@ def register_auth_routes(app):
                         action="user_login_trusted_device",
                         resource_type="auth",
                         details={
-                            "name": user.name,
-                            "employee_number": user.employee_number,
                             "trusted_device_id": device.id,
                         },
                         ip_address=request.remote_addr,

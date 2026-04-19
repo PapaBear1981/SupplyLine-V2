@@ -258,7 +258,6 @@ def register_admin_routes(app):
                 resource_type="user",
                 resource_id=user.id,
                 details={
-                    "target_user": user.employee_number,
                     "force_change": force_change,
                     "revoked_trusted_devices": revoked_devices,
                 }

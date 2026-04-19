@@ -26,6 +26,8 @@ services:
       - PYTHONPATH=/app
       - TZ=UTC
       - DISABLE_MANDATORY_2FA=true
+      - TRUSTED_DEVICE_TTL_DAYS=30
+      - TRUSTED_DEVICE_MAX_PER_USER=10
     networks:
       - app-network
     healthcheck:

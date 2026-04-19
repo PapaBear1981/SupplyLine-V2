@@ -233,7 +233,6 @@ def change_password():
             resource_type="user",
             resource_id=user.id,
             details={
-                "user_name": user.name,
                 "revoked_trusted_devices": revoked_devices,
             },
             ip_address=request.remote_addr

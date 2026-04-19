@@ -97,9 +97,8 @@ def register_password_reset_routes(app):
                 resource_type="user",
                 resource_id=user_id,
                 details={
-                    "target_name": target_user.name,
-                    "target_employee": target_user.employee_number,
-                    "revoked_trusted_devices": revoked_devices,
+                    "target_user_id": target_user.id,
+                    "revoked_trusted_device_count": revoked_devices,
                 },
                 ip_address=request.remote_addr
             )

@@ -182,13 +182,11 @@ class TestLoginShortcutWithTrustedDevice:
 
 class TestBackupCodeTrustDevice:
     def test_backup_code_verify_issues_cookie(self, client, db_session):
-        import json as _json
-
         from werkzeug.security import generate_password_hash
 
         user, _secret, _password = _make_totp_user(db_session)
         # Seed a single backup code.
-        user.backup_codes = _json.dumps([generate_password_hash("ABCD1234")])
+        user.backup_codes = json.dumps([generate_password_hash("ABCD1234")])
         db.session.commit()
 
         response = client.post(
@@ -231,7 +229,7 @@ class TestTrustedDeviceManagementRoutes:
         response = client.delete(f"/api/auth/trusted-devices/{device_id}")
         assert response.status_code == 200
 
-        row = TrustedDevice.query.get(device_id)
+        row = db.session.get(TrustedDevice, device_id)
         assert row.revoked_at is not None
 
         # Next login falls back to TOTP.
@@ -320,5 +318,5 @@ class TestMaxPerUserPruning:
         assert active == 3
 
         # The very first device should be the one that was pruned.
-        first = TrustedDevice.query.get(created_ids[0])
+        first = db.session.get(TrustedDevice, created_ids[0])
         assert first.revoked_at is not None

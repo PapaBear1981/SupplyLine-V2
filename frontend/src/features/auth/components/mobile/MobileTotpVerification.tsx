@@ -77,6 +77,15 @@ export const MobileTotpVerification = ({
           Enter the 6-digit code from your authenticator app.
         </p>
 
+        <div className="mobile-totp-trust-device">
+          <Checkbox
+            checked={trustDevice}
+            onChange={(value) => setTrustDevice(value)}
+          >
+            Trust this device for 30 days
+          </Checkbox>
+        </div>
+
         <div className="mobile-totp-input-wrapper">
           <Input
             className="mobile-totp-input"
@@ -101,15 +110,6 @@ export const MobileTotpVerification = ({
             }}
             maxLength={6}
           />
-        </div>
-
-        <div className="mobile-totp-trust-device">
-          <Checkbox
-            checked={trustDevice}
-            onChange={(value) => setTrustDevice(value)}
-          >
-            Trust this device for 30 days
-          </Checkbox>
         </div>
 
         <Button

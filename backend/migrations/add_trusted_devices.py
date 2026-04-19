@@ -15,8 +15,7 @@ def ensure_trusted_devices_table(inspector):
     """Ensure the trusted_devices table and its indexes exist."""
     from models import db
 
-    if "trusted_devices" in inspector.get_table_names():
-        return
+    table_exists = "trusted_devices" in inspector.get_table_names()
 
     dialect = db.engine.dialect.name
     if dialect == "sqlite":
@@ -26,26 +25,27 @@ def ensure_trusted_devices_table(inspector):
         pk_clause = "id SERIAL PRIMARY KEY"
         timestamp_type = "TIMESTAMP"
 
-    logger.info("Creating trusted_devices table")
-    with db.engine.connect() as conn:
-        conn.execute(db.text(
-            f"""
-            CREATE TABLE IF NOT EXISTS trusted_devices (
-                {pk_clause},
-                user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-                token_hash VARCHAR(64) NOT NULL UNIQUE,
-                token_prefix VARCHAR(12) NOT NULL,
-                device_label VARCHAR(120) NOT NULL DEFAULT 'Unknown device',
-                user_agent VARCHAR(512),
-                ip_address VARCHAR(64),
-                created_at {timestamp_type} NOT NULL,
-                last_used_at {timestamp_type},
-                expires_at {timestamp_type} NOT NULL,
-                revoked_at {timestamp_type}
-            )
-            """
-        ))
-        conn.commit()
+    if not table_exists:
+        logger.info("Creating trusted_devices table")
+        with db.engine.connect() as conn:
+            conn.execute(db.text(
+                f"""
+                CREATE TABLE IF NOT EXISTS trusted_devices (
+                    {pk_clause},
+                    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                    token_hash VARCHAR(64) NOT NULL UNIQUE,
+                    token_prefix VARCHAR(12) NOT NULL,
+                    device_label VARCHAR(120) NOT NULL DEFAULT 'Unknown device',
+                    user_agent VARCHAR(512),
+                    ip_address VARCHAR(64),
+                    created_at {timestamp_type} NOT NULL,
+                    last_used_at {timestamp_type},
+                    expires_at {timestamp_type} NOT NULL,
+                    revoked_at {timestamp_type}
+                )
+                """
+            ))
+            conn.commit()
 
     logger.info("Creating indexes on trusted_devices")
     with db.engine.connect() as conn:

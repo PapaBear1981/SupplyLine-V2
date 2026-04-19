@@ -19,6 +19,7 @@ from flask import current_app, jsonify, request
 
 from auth import (
     JWTManager,
+    clear_trusted_device_cookie,
     issue_trusted_device,
     jwt_required,
     revoke_all_for_user,
@@ -277,7 +278,7 @@ def register_totp_routes(app):
             data = request.get_json() or {}
             employee_number = data.get("employee_number")
             code = data.get("code", "").strip()
-            trust_device = bool(data.get("trust_device", False))
+            trust_device = data.get("trust_device") is True
 
             if not employee_number or not code:
                 return jsonify({
@@ -366,30 +367,38 @@ def register_totp_routes(app):
 
             trusted_device_issued = False
             if trust_device:
-                token, device = issue_trusted_device(
-                    user,
-                    request.headers.get("User-Agent"),
-                    request.remote_addr,
-                )
-                db.session.add(UserActivity(
-                    user_id=user.id,
-                    activity_type="trusted_device_created",
-                    description=f"Trusted device issued (id={device.id}, label={device.device_label})",
-                    ip_address=request.remote_addr,
-                ))
-                AuditLog.log(
-                    user_id=user.id,
-                    action="trusted_device_created",
-                    resource_type="trusted_device",
-                    resource_id=device.id,
-                    details={
-                        "label": device.device_label,
-                        "ttl_days": current_app.config.get("TRUSTED_DEVICE_TTL_DAYS", 30),
-                    },
-                    ip_address=request.remote_addr,
-                )
-                db.session.commit()
-                trusted_device_issued = True
+                try:
+                    token, device = issue_trusted_device(
+                        user,
+                        request.headers.get("User-Agent"),
+                        request.remote_addr,
+                    )
+                    db.session.add(UserActivity(
+                        user_id=user.id,
+                        activity_type="trusted_device_created",
+                        description=f"Trusted device issued (id={device.id}, label={device.device_label})",
+                        ip_address=request.remote_addr,
+                    ))
+                    AuditLog.log(
+                        user_id=user.id,
+                        action="trusted_device_created",
+                        resource_type="trusted_device",
+                        resource_id=device.id,
+                        details={
+                            "label": device.device_label,
+                            "ttl_days": current_app.config.get("TRUSTED_DEVICE_TTL_DAYS", 30),
+                        },
+                        ip_address=request.remote_addr,
+                    )
+                    db.session.commit()
+                    trusted_device_issued = True
+                except Exception:
+                    db.session.rollback()
+                    logger.warning(
+                        "Failed to issue trusted device after TOTP login for user %s",
+                        user.id,
+                        exc_info=True,
+                    )
 
             # Set tokens in HttpOnly cookies
             response = jsonify({
@@ -513,11 +522,13 @@ def register_totp_routes(app):
 
             logger.info(f"TOTP disabled for user {user_id}")
 
-            return jsonify({
+            response = jsonify({
                 "message": "Two-factor authentication has been disabled.",
                 "is_totp_enabled": False,
                 "revoked_trusted_devices": revoked_devices,
-            }), 200
+            })
+            clear_trusted_device_cookie(response)
+            return response, 200
 
         except Exception as e:
             logger.error(f"TOTP disable error: {e!s}")
@@ -623,7 +634,7 @@ def register_totp_routes(app):
             data = request.get_json()
             employee_number = data.get("employee_number")
             backup_code = data.get("code")
-            trust_device = bool(data.get("trust_device", False))
+            trust_device = data.get("trust_device") is True
 
             if not employee_number or not backup_code:
                 return jsonify({
@@ -712,31 +723,39 @@ def register_totp_routes(app):
 
             trusted_device_issued = False
             if trust_device:
-                token, device = issue_trusted_device(
-                    user,
-                    request.headers.get("User-Agent"),
-                    request.remote_addr,
-                )
-                db.session.add(UserActivity(
-                    user_id=user.id,
-                    activity_type="trusted_device_created",
-                    description=f"Trusted device issued via backup code (id={device.id}, label={device.device_label})",
-                    ip_address=request.remote_addr,
-                ))
-                AuditLog.log(
-                    user_id=user.id,
-                    action="trusted_device_created",
-                    resource_type="trusted_device",
-                    resource_id=device.id,
-                    details={
-                        "label": device.device_label,
-                        "via": "backup_code",
-                        "ttl_days": current_app.config.get("TRUSTED_DEVICE_TTL_DAYS", 30),
-                    },
-                    ip_address=request.remote_addr,
-                )
-                db.session.commit()
-                trusted_device_issued = True
+                try:
+                    token, device = issue_trusted_device(
+                        user,
+                        request.headers.get("User-Agent"),
+                        request.remote_addr,
+                    )
+                    db.session.add(UserActivity(
+                        user_id=user.id,
+                        activity_type="trusted_device_created",
+                        description=f"Trusted device issued via backup code (id={device.id}, label={device.device_label})",
+                        ip_address=request.remote_addr,
+                    ))
+                    AuditLog.log(
+                        user_id=user.id,
+                        action="trusted_device_created",
+                        resource_type="trusted_device",
+                        resource_id=device.id,
+                        details={
+                            "label": device.device_label,
+                            "via": "backup_code",
+                            "ttl_days": current_app.config.get("TRUSTED_DEVICE_TTL_DAYS", 30),
+                        },
+                        ip_address=request.remote_addr,
+                    )
+                    db.session.commit()
+                    trusted_device_issued = True
+                except Exception:
+                    db.session.rollback()
+                    logger.warning(
+                        "Failed to issue trusted device after backup-code login for user %s",
+                        user.id,
+                        exc_info=True,
+                    )
 
             response = jsonify({
                 "message": "Login successful",
