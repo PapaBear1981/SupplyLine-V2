@@ -6,6 +6,7 @@ import { ChemicalDrawer } from '../components/ChemicalDrawer';
 import { ChemicalIssuanceModal } from '../components/ChemicalIssuanceModal';
 import { MobileChemicalsList } from '../components/mobile';
 import { useIsMobile } from '@shared/hooks/useMobile';
+import { PermissionGuard } from '@features/auth/components/PermissionGuard';
 import type { Chemical } from '../types';
 
 const { Title } = Typography;
@@ -68,9 +69,11 @@ export const ChemicalsPage = () => {
           Chemicals
         </Title>
         <Space>
-          <Button type="primary" icon={<PlusOutlined />} onClick={handleCreate}>
-            Add Chemical
-          </Button>
+          <PermissionGuard permission="chemical.create">
+            <Button type="primary" icon={<PlusOutlined />} onClick={handleCreate}>
+              Add Chemical
+            </Button>
+          </PermissionGuard>
         </Space>
       </div>
 

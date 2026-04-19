@@ -135,6 +135,18 @@ export const UserForm = ({
         <Input placeholder="name@company.com" />
       </Form.Item>
 
+      {roleOptions.length > 0 && (
+        <Form.Item label="Roles" name="role_ids">
+          <Select
+            mode="multiple"
+            placeholder="Select roles"
+            options={roleOptions}
+            optionFilterProp="label"
+            allowClear
+          />
+        </Form.Item>
+      )}
+
       <Form.Item
         label="Phone Number"
         name="phone"

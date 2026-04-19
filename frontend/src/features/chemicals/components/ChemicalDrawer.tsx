@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Drawer, Descriptions, Tag, Button, Space, Spin, message, Form, Typography } from 'antd';
 import { EditOutlined, QrcodeOutlined } from '@ant-design/icons';
+import { PermissionGuard } from '@features/auth/components/PermissionGuard';
 import dayjs from 'dayjs';
 import {
   useCreateChemicalMutation,
@@ -146,9 +147,11 @@ export const ChemicalDrawer = ({
           <Button icon={<QrcodeOutlined />} onClick={() => setPrintModalOpen(true)}>
             Print Label
           </Button>
-          <Button icon={<EditOutlined />} onClick={() => setMode('edit')}>
-            Edit
-          </Button>
+          <PermissionGuard permission="chemical.edit">
+            <Button icon={<EditOutlined />} onClick={() => setMode('edit')}>
+              Edit
+            </Button>
+          </PermissionGuard>
         </Space>
       );
     }

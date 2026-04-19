@@ -6,6 +6,7 @@ import { ToolDrawer } from '../components/ToolDrawer';
 import { QuickCheckoutModal } from '@features/tool-checkout/components/QuickCheckoutModal';
 import { MobileToolsList } from '../components/mobile';
 import { useIsMobile } from '@shared/hooks/useMobile';
+import { PermissionGuard } from '@features/auth/components/PermissionGuard';
 import type { Tool } from '../types';
 
 const { Title } = Typography;
@@ -57,19 +58,23 @@ export const ToolsPage = () => {
           Tools
         </Title>
         <Space>
-          <Button
-            icon={<SwapOutlined />}
-            onClick={() => setCheckoutModalOpen(true)}
-          >
-            Checkout
-          </Button>
-          <Button
-            type="primary"
-            icon={<PlusOutlined />}
-            onClick={handleCreate}
-          >
-            Add Tool
-          </Button>
+          <PermissionGuard permission="checkout.create">
+            <Button
+              icon={<SwapOutlined />}
+              onClick={() => setCheckoutModalOpen(true)}
+            >
+              Checkout
+            </Button>
+          </PermissionGuard>
+          <PermissionGuard permission="tool.create">
+            <Button
+              type="primary"
+              icon={<PlusOutlined />}
+              onClick={handleCreate}
+            >
+              Add Tool
+            </Button>
+          </PermissionGuard>
         </Space>
       </div>
 

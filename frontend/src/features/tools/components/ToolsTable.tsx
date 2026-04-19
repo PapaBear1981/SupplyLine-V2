@@ -20,6 +20,7 @@ import {
 import { useGetToolsQuery, useDeleteToolMutation } from '../services/toolsApi';
 import type { Tool, ToolStatus, CalibrationStatus } from '../types';
 import { LabelPrintModal } from '@/components/shared/LabelPrintModal';
+import { PermissionGuard } from '@features/auth/components/PermissionGuard';
 
 interface ToolsTableProps {
   onView: (tool: Tool) => void;
@@ -164,13 +165,15 @@ export const ToolsTable = ({ onView, onEdit }: ToolsTableProps) => {
               onClick={() => onView(record)}
             />
           </Tooltip>
-          <Tooltip title="Edit">
-            <Button
-              type="text"
-              icon={<EditOutlined />}
-              onClick={() => onEdit(record)}
-            />
-          </Tooltip>
+          <PermissionGuard permission="tool.edit">
+            <Tooltip title="Edit">
+              <Button
+                type="text"
+                icon={<EditOutlined />}
+                onClick={() => onEdit(record)}
+              />
+            </Tooltip>
+          </PermissionGuard>
           <Tooltip title="Print Label">
             <Button
               type="text"
@@ -178,18 +181,20 @@ export const ToolsTable = ({ onView, onEdit }: ToolsTableProps) => {
               onClick={() => setPrintModalTool({ id: record.id, description: record.tool_number || record.description || '' })}
             />
           </Tooltip>
-          <Popconfirm
-            title="Delete tool?"
-            description="This action cannot be undone."
-            onConfirm={() => handleDelete(record.id)}
-            okText="Yes"
-            cancelText="No"
-            okButtonProps={{ danger: true }}
-          >
-            <Tooltip title="Delete">
-              <Button type="text" danger icon={<DeleteOutlined />} />
-            </Tooltip>
-          </Popconfirm>
+          <PermissionGuard permission="tool.delete">
+            <Popconfirm
+              title="Delete tool?"
+              description="This action cannot be undone."
+              onConfirm={() => handleDelete(record.id)}
+              okText="Yes"
+              cancelText="No"
+              okButtonProps={{ danger: true }}
+            >
+              <Tooltip title="Delete">
+                <Button type="text" danger icon={<DeleteOutlined />} />
+              </Tooltip>
+            </Popconfirm>
+          </PermissionGuard>
         </Space>
       ),
     },
