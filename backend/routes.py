@@ -37,6 +37,7 @@ from routes_history import register_history_routes
 from routes_inventory import register_inventory_routes
 from routes_kit_messages import register_kit_message_routes
 from routes_kit_reorders import register_kit_reorder_routes
+from routes_kit_tool_checkout import register_kit_tool_checkout_routes
 from routes_kit_transfers import register_kit_transfer_routes
 from routes_kits import register_kit_routes
 from routes_message_search import register_message_search_routes
@@ -240,6 +241,7 @@ def register_routes(app):
     register_kit_transfer_routes(app)
     register_kit_reorder_routes(app)
     register_kit_message_routes(app)
+    register_kit_tool_checkout_routes(app)
     register_order_routes(app)
     register_user_request_routes(app)
     register_bug_report_routes(app)

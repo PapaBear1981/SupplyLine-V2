@@ -465,6 +465,55 @@ export type KitWizardResponse =
   | KitWizardStep3Response
   | KitWizardStep4Response;
 
+// Kit Tool Checkout — tool temporarily deployed to a field kit
+export interface KitToolCheckout {
+  id: number;
+  tool_id: number;
+  tool_number?: string;
+  tool_description?: string;
+  tool_serial_number?: string;
+  tool_condition?: string;
+  tool_location?: string;
+  kit_id: number;
+  kit_name?: string;
+  kit_status?: KitStatus;
+  checked_out_by_id: number;
+  checked_out_by_name?: string;
+  checkout_date: string;
+  expected_return_date?: string | null;
+  return_date?: string | null;
+  returned_by_id?: number | null;
+  returned_by_name?: string | null;
+  previous_location?: string | null;
+  previous_warehouse_id?: number | null;
+  notes?: string | null;
+  return_notes?: string | null;
+  status: 'active' | 'returned';
+}
+
+export interface KitToolCheckoutStats {
+  total_in_field: number;
+  kits_with_tools: number;
+  overdue: number;
+}
+
+export interface KitToolCheckoutsResponse {
+  kit_id: number;
+  kit_name: string;
+  checkouts: KitToolCheckout[];
+  total: number;
+}
+
+export interface SendToolToKitFormData {
+  tool_id: number;
+  notes?: string;
+  expected_return_date?: string;
+}
+
+export interface ReturnToolFromKitFormData {
+  return_notes?: string;
+}
+
 // Recent Activity
 export interface KitActivity {
   id: string;

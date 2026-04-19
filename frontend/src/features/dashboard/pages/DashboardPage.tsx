@@ -34,6 +34,7 @@ import {
   InventoryPieChart,
   AnnouncementsPanel,
   OnCallCard,
+  FieldToolsCard,
 } from '../components';
 import { MobileDashboard } from '../components/mobile';
 
@@ -368,10 +369,13 @@ export const DashboardPage = () => {
         </Col>
       </Row>
 
-      {/* Kit Location Map */}
+      {/* Kit Location Map + Field Tools */}
       <Row gutter={[16, 16]} style={{ marginBottom: 24 }}>
-        <Col span={24}>
+        <Col xs={24} lg={16}>
           <KitLocationMap height={400} />
+        </Col>
+        <Col xs={24} lg={8}>
+          <FieldToolsCard />
         </Col>
       </Row>
 
