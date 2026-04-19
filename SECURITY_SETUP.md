@@ -60,6 +60,32 @@ python -c "import secrets; print(secrets.token_urlsafe(64))"
    docker-compose up -d
    ```
 
+### Optional: Trusted Device Tokens
+
+Users who complete 2FA can opt to mark a device as trusted so subsequent logins
+from that device only require the password. The token is stored as a SHA-256
+hash in the `trusted_devices` table and sent to the browser as the HttpOnly
+`trusted_device_token` cookie. Passwords are always still required; trusted
+devices only skip the TOTP/backup-code step.
+
+Configurable via environment variables (sensible defaults apply):
+
+- `TRUSTED_DEVICE_TTL_DAYS` — lifetime of a trusted-device token (default `30`).
+  Set to `0` to disable issuance entirely.
+- `TRUSTED_DEVICE_MAX_PER_USER` — cap on concurrent active trusted devices per
+  user (default `10`). The oldest active device is auto-revoked when the cap is
+  exceeded.
+
+Trusted devices are automatically revoked when: the user changes their own
+password, an admin resets their password, or the user disables 2FA. Users can
+also list and revoke their trusted devices from **Profile → Trusted Devices**.
+
+Run the migration once after upgrading:
+
+```bash
+python backend/migrations/add_trusted_devices.py
+```
+
 ### Security Best Practices
 
 1. **Never commit `.env` files** to version control

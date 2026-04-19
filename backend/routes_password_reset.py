@@ -5,6 +5,7 @@ from datetime import datetime
 from flask import current_app, jsonify, request
 
 from auth import admin_required
+from auth.trusted_devices import revoke_all_for_user
 from models import AuditLog, User, db
 
 
@@ -83,6 +84,9 @@ def register_password_reset_routes(app):
             # Update password changed timestamp
             target_user.password_changed_at = datetime.utcnow()
 
+            # Password reset invalidates trusted devices for the target user.
+            revoked_devices = revoke_all_for_user(target_user.id, "password_reset_by_admin")
+
             # Commit the changes
             db.session.commit()
 
@@ -92,7 +96,11 @@ def register_password_reset_routes(app):
                 action="admin_password_reset",
                 resource_type="user",
                 resource_id=user_id,
-                details={"target_name": target_user.name, "target_employee": target_user.employee_number},
+                details={
+                    "target_name": target_user.name,
+                    "target_employee": target_user.employee_number,
+                    "revoked_trusted_devices": revoked_devices,
+                },
                 ip_address=request.remote_addr
             )
 

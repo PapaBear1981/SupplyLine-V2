@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Button, Toast, Input } from 'antd-mobile';
+import { Button, Checkbox, Toast, Input } from 'antd-mobile';
 import { KeyOutlined, ArrowLeftOutlined } from '@ant-design/icons';
 import { useVerifyBackupCodeMutation } from '../../services/authApi';
 import type { BackupCodeVerifyResponse } from '../../types';
@@ -23,6 +23,7 @@ export const MobileBackupCodeForm = ({
   onBack,
 }: MobileBackupCodeFormProps) => {
   const [code, setCode] = useState('');
+  const [trustDevice, setTrustDevice] = useState(false);
   const [verifyBackupCode, { isLoading }] = useVerifyBackupCodeMutation();
 
   const handleVerify = async () => {
@@ -35,6 +36,7 @@ export const MobileBackupCodeForm = ({
       const result = await verifyBackupCode({
         employee_number: employeeNumber,
         code: code.trim().toUpperCase(),
+        trust_device: trustDevice,
       }).unwrap();
 
       const codesRemaining = result.codes_remaining ?? 0;
@@ -82,6 +84,15 @@ export const MobileBackupCodeForm = ({
             }}
             maxLength={8}
           />
+        </div>
+
+        <div className="mobile-totp-trust-device">
+          <Checkbox
+            checked={trustDevice}
+            onChange={(value) => setTrustDevice(value)}
+          >
+            Trust this device for 30 days
+          </Checkbox>
         </div>
 
         <Button

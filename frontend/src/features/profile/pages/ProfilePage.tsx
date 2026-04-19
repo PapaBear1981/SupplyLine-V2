@@ -33,6 +33,7 @@ import { MobileProfile } from '../components/mobile';
 import { useIsMobile } from '@shared/hooks/useMobile';
 import { TotpSetupModal } from '../components/TotpSetupModal';
 import { TotpDisableModal } from '../components/TotpDisableModal';
+import { TrustedDevicesSection } from '../components/TrustedDevicesSection';
 
 const { Title, Text } = Typography;
 
@@ -281,6 +282,8 @@ export const ProfilePage = () => {
             )}
           </Space>
         </Card>
+
+        {user.is_totp_enabled && <TrustedDevicesSection />}
       </Space>
 
       {/* Modals */}

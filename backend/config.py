@@ -171,6 +171,10 @@ class Config:
         "Strict-Transport-Security": "max-age=31536000; includeSubDomains"
     }
 
+    # Trusted device settings - let users skip 2FA on devices they've verified
+    TRUSTED_DEVICE_TTL_DAYS = int(os.environ.get("TRUSTED_DEVICE_TTL_DAYS", 30))
+    TRUSTED_DEVICE_MAX_PER_USER = int(os.environ.get("TRUSTED_DEVICE_MAX_PER_USER", 10))
+
     # Account lockout settings
     ACCOUNT_LOCKOUT = {
         "MAX_FAILED_ATTEMPTS": int(os.environ.get("MAX_FAILED_ATTEMPTS", 5)),  # Number of failed attempts before account is locked

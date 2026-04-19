@@ -1,4 +1,4 @@
-import { Form, Input, Button, Typography, message } from 'antd';
+import { Form, Input, Button, Checkbox, Typography, message } from 'antd';
 import { SafetyCertificateOutlined, ArrowLeftOutlined, KeyOutlined } from '@ant-design/icons';
 import { motion } from 'framer-motion';
 import { useVerifyTotpMutation } from '../services/authApi';
@@ -23,11 +23,12 @@ export const TotpVerificationForm = ({
 }: TotpVerificationFormProps) => {
   const [verifyTotp, { isLoading }] = useVerifyTotpMutation();
 
-  const handleSubmit = async (values: { code: string }) => {
+  const handleSubmit = async (values: { code: string; trust_device?: boolean }) => {
     try {
       const result = await verifyTotp({
         employee_number: employeeNumber,
         code: values.code,
+        trust_device: Boolean(values.trust_device),
       }).unwrap();
 
       if (onSuccess) {
@@ -88,6 +89,19 @@ export const TotpVerificationForm = ({
             autoFocus
           />
         </Form.Item>
+
+        <Form.Item
+          name="trust_device"
+          valuePropName="checked"
+          style={{ marginBottom: 12 }}
+        >
+          <Checkbox>
+            Trust this device for 30 days (skip 2FA next time)
+          </Checkbox>
+        </Form.Item>
+        <Text type="secondary" style={{ display: 'block', fontSize: 12, marginBottom: 16 }}>
+          Only enable on devices you control. You can revoke trusted devices from your profile.
+        </Text>
 
         <Form.Item style={{ marginBottom: 16 }}>
           <motion.div whileHover={buttonHover} whileTap={buttonTap}>

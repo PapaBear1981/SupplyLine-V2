@@ -39,6 +39,45 @@ class PasswordHistory(db.Model):
     user = db.relationship("User", back_populates="password_histories")
 
 
+class TrustedDevice(db.Model):
+    __tablename__ = "trusted_devices"
+
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(
+        db.Integer,
+        db.ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    token_hash = db.Column(db.String(64), nullable=False, unique=True)
+    token_prefix = db.Column(db.String(12), nullable=False, index=True)
+    device_label = db.Column(db.String(120), nullable=False, default="Unknown device")
+    user_agent = db.Column(db.String(512), nullable=True)
+    ip_address = db.Column(db.String(64), nullable=True)
+    created_at = db.Column(db.DateTime, nullable=False, default=get_current_time)
+    last_used_at = db.Column(db.DateTime, nullable=True)
+    expires_at = db.Column(db.DateTime, nullable=False)
+    revoked_at = db.Column(db.DateTime, nullable=True, index=True)
+
+    user = db.relationship("User", back_populates="trusted_devices")
+
+    @property
+    def is_active(self):
+        return self.revoked_at is None and self.expires_at > get_current_time()
+
+    def to_dict(self, current_prefix=None):
+        return {
+            "id": self.id,
+            "device_label": self.device_label,
+            "user_agent": self.user_agent,
+            "ip_address": self.ip_address,
+            "created_at": self.created_at.isoformat() if self.created_at else None,
+            "last_used_at": self.last_used_at.isoformat() if self.last_used_at else None,
+            "expires_at": self.expires_at.isoformat() if self.expires_at else None,
+            "is_current": bool(current_prefix) and current_prefix == self.token_prefix,
+        }
+
+
 class Tool(db.Model):
     __tablename__ = "tools"
     id = db.Column(db.Integer, primary_key=True)
@@ -166,6 +205,13 @@ class User(db.Model):
         order_by="PasswordHistory.created_at.desc()",
         cascade="all, delete-orphan",
         lazy="dynamic"
+    )
+    trusted_devices = db.relationship(
+        "TrustedDevice",
+        back_populates="user",
+        order_by="TrustedDevice.created_at.desc()",
+        cascade="all, delete-orphan",
+        lazy="dynamic",
     )
 
     # Enhanced messaging relationships

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Form, Input, Button, Typography, Alert, Space, message } from 'antd';
+import { Form, Input, Button, Checkbox, Typography, Alert, Space, message } from 'antd';
 import { SafetyCertificateOutlined, ArrowLeftOutlined, KeyOutlined } from '@ant-design/icons';
 import { motion } from 'framer-motion';
 import { useVerifyBackupCodeMutation } from '../services/authApi';
@@ -19,12 +19,13 @@ export const BackupCodeForm = ({ employeeNumber, onBack, onSuccess }: BackupCode
   const [verifyBackupCode, { isLoading }] = useVerifyBackupCodeMutation();
   const [error, setError] = useState<string>('');
 
-  const handleSubmit = async (values: { code: string }) => {
+  const handleSubmit = async (values: { code: string; trust_device?: boolean }) => {
     try {
       setError('');
       const result = await verifyBackupCode({
         employee_number: employeeNumber,
         code: values.code.trim().toUpperCase(),
+        trust_device: Boolean(values.trust_device),
       }).unwrap();
 
       const codesRemaining = result.codes_remaining || 0;
@@ -166,6 +167,16 @@ export const BackupCodeForm = ({ employeeNumber, onBack, onSuccess }: BackupCode
               },
             }}
           />
+        </Form.Item>
+
+        <Form.Item
+          name="trust_device"
+          valuePropName="checked"
+          style={{ marginBottom: 8 }}
+        >
+          <Checkbox>
+            Trust this device for 30 days (skip 2FA next time)
+          </Checkbox>
         </Form.Item>
 
         <Form.Item style={{ marginBottom: 0 }}>

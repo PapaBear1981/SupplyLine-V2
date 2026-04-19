@@ -16,7 +16,15 @@ from flask import current_app, jsonify, request
 from werkzeug.exceptions import BadRequest
 
 import utils as password_utils
-from auth import JWTManager, jwt_required
+from auth import (
+    JWTManager,
+    TRUSTED_DEVICE_COOKIE,
+    clear_trusted_device_cookie,
+    jwt_required,
+    revoke_all_for_user,
+    touch_trusted_device,
+    validate_trusted_device_token,
+)
 from models import AuditLog, User, UserActivity, db
 from utils.rate_limiter import rate_limit
 
@@ -159,6 +167,76 @@ def register_auth_routes(app):
 
             # Check if TOTP 2FA is enabled
             if hasattr(user, "is_totp_enabled") and user.is_totp_enabled:
+                # Look for a trusted-device cookie and see if it lets us skip TOTP.
+                trusted_cookie = request.cookies.get(TRUSTED_DEVICE_COOKIE)
+                device = None
+                if trusted_cookie:
+                    device = validate_trusted_device_token(trusted_cookie, user.id)
+                    if device is None:
+                        db.session.add(UserActivity(
+                            user_id=user.id,
+                            activity_type="trusted_device_rejected",
+                            description=(
+                                "trusted_device_token cookie was invalid, "
+                                "expired, revoked, or for another user"
+                            ),
+                            ip_address=request.remote_addr,
+                        ))
+                        db.session.commit()
+
+                if device is not None:
+                    touch_trusted_device(device, request.remote_addr)
+
+                    db.session.add(UserActivity(
+                        user_id=user.id,
+                        activity_type="login_trusted_device",
+                        description=f"Login via trusted device (id={device.id})",
+                        ip_address=request.remote_addr,
+                    ))
+                    AuditLog.log(
+                        user_id=user.id,
+                        action="user_login_trusted_device",
+                        resource_type="auth",
+                        details={
+                            "name": user.name,
+                            "employee_number": user.employee_number,
+                            "trusted_device_id": device.id,
+                        },
+                        ip_address=request.remote_addr,
+                    )
+                    db.session.commit()
+
+                    tokens = JWTManager.generate_tokens(user)
+
+                    response = jsonify({
+                        "message": "Login successful",
+                        "user": user.to_dict(include_roles=True, include_permissions=True),
+                        "access_token": tokens["access_token"],
+                        "refresh_token": tokens["refresh_token"],
+                        "expires_in": tokens["expires_in"],
+                        "used_trusted_device": True,
+                    })
+                    response.set_cookie(
+                        "access_token",
+                        value=tokens["access_token"],
+                        max_age=int(tokens["expires_in"]),
+                        httponly=True,
+                        secure=current_app.config.get("SESSION_COOKIE_SECURE", True),
+                        samesite=current_app.config.get("COOKIE_SAMESITE", "Lax"),
+                        path="/",
+                    )
+                    refresh_token_max_age = 2592000 if remember_me else 604800
+                    response.set_cookie(
+                        "refresh_token",
+                        value=tokens["refresh_token"],
+                        max_age=refresh_token_max_age,
+                        httponly=True,
+                        secure=current_app.config.get("SESSION_COOKIE_SECURE", True),
+                        samesite=current_app.config.get("COOKIE_SAMESITE", "Lax"),
+                        path="/",
+                    )
+                    return response, 200
+
                 # Don't issue tokens yet - require TOTP verification
                 logger.info(f"TOTP required for user {user.id}")
 
@@ -171,12 +249,16 @@ def register_auth_routes(app):
                 db.session.add(activity)
                 db.session.commit()
 
-                return jsonify({
+                response = jsonify({
                     "message": "Two-factor authentication required",
                     "code": "TOTP_REQUIRED",
                     "requires_totp": True,
                     "employee_number": user.employee_number
-                }), 200
+                })
+                if trusted_cookie:
+                    # Cookie was present but invalid — clear it so the browser stops sending it.
+                    clear_trusted_device_cookie(response)
+                return response, 200
 
             # MANDATORY 2FA: Check if user needs to set up TOTP (not enabled yet)
             # Skip in testing mode or if DISABLE_MANDATORY_2FA env var is set
@@ -553,6 +635,17 @@ def register_auth_routes(app):
             # Update password and clear force_password_change flag
             user.set_password(new_password)
             user.force_password_change = False
+
+            # A password change invalidates all trusted devices.
+            revoked_devices = revoke_all_for_user(user.id, "password_changed")
+            if revoked_devices:
+                db.session.add(UserActivity(
+                    user_id=user.id,
+                    activity_type="trusted_devices_wiped",
+                    description=f"Revoked {revoked_devices} trusted devices due to password change",
+                    ip_address=request.remote_addr,
+                ))
+
             db.session.commit()
 
             # Log password change
@@ -569,7 +662,11 @@ def register_auth_routes(app):
                 action="password_change",
                 resource_type="user",
                 resource_id=user.id,
-                details={"name": user.name, "forced": True},
+                details={
+                    "name": user.name,
+                    "forced": True,
+                    "revoked_trusted_devices": revoked_devices,
+                },
                 ip_address=request.remote_addr
             )
             db.session.commit()
@@ -607,6 +704,9 @@ def register_auth_routes(app):
                 samesite=current_app.config.get("COOKIE_SAMESITE", "Lax"),
                 path="/"
             )
+
+            # Clear any trusted-device cookie — it's been invalidated by the password change.
+            clear_trusted_device_cookie(response)
 
             return response, 200
 
