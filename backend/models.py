@@ -195,7 +195,12 @@ class User(db.Model):
     # Active warehouse context — which warehouse the user is currently working in
     active_warehouse_id = db.Column(
         db.Integer,
-        db.ForeignKey("warehouses.id", ondelete="SET NULL"),
+        db.ForeignKey(
+            "warehouses.id",
+            ondelete="SET NULL",
+            use_alter=True,
+            name="fk_users_active_warehouse_id",
+        ),
         nullable=True,
         index=True,
     )
