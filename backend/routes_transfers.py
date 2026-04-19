@@ -493,19 +493,18 @@ def _receive_transfer(*, transfer_id, destination_location, received_notes, user
     if transfer.item_type == "tool":
         item.warehouse_id = to_warehouse.id
         item.location = dest_location
-    else:  # chemical
-        # Partial-quantity transfer → split the lot on receipt.
-        if transfer.quantity and transfer.quantity < (item.quantity or 0):
-            child = create_child_chemical(
-                parent_chemical=item,
-                quantity=transfer.quantity,
-                destination_warehouse_id=to_warehouse.id,
-            )
-            child.location = dest_location
-            db.session.add(child)
-        else:
-            item.warehouse_id = to_warehouse.id
-            item.location = dest_location
+    elif transfer.quantity and transfer.quantity < (item.quantity or 0):
+        # Partial-quantity chemical transfer → split the lot on receipt.
+        child = create_child_chemical(
+            parent_chemical=item,
+            quantity=transfer.quantity,
+            destination_warehouse_id=to_warehouse.id,
+        )
+        child.location = dest_location
+        db.session.add(child)
+    else:
+        item.warehouse_id = to_warehouse.id
+        item.location = dest_location
 
     transfer.status = STATUS_RECEIVED
     transfer.received_by_id = user_id

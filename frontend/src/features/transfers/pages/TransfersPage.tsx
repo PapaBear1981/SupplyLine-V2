@@ -26,10 +26,6 @@ export const TransfersPage = () => {
   const canCancelOwn = usePermission('transfer.cancel_own');
   const isAdmin = useAppSelector((s) => s.auth.user?.is_admin);
 
-  if (isMobile) {
-    return <MobileTransfersPage />;
-  }
-
   const [tab, setTab] = useState<'inbound' | 'outbound' | 'history'>('inbound');
   const [page, setPage] = useState(1);
 
@@ -40,6 +36,10 @@ export const TransfersPage = () => {
   const inbound = useListInboundTransfersQuery({ page, per_page: 20 });
   const outbound = useListOutboundTransfersQuery({ page, per_page: 20 });
   const history = useListTransfersQuery({ page, per_page: 20 });
+
+  if (isMobile) {
+    return <MobileTransfersPage />;
+  }
 
   const canCancelRow = (t: Transfer) =>
     isAdmin || (canCancelOwn && t.transferred_by_id === currentUserId);

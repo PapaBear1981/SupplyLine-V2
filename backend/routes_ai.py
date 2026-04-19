@@ -2623,7 +2623,7 @@ def _tool_initiate_transfer(
         return {"error": "Cannot initiate this transfer.", "blocking_reasons": blocking}
 
     try:
-        transfer, err, status = _initiate_transfer(
+        transfer, err, _ = _initiate_transfer(
             to_warehouse_id=dst.id,
             item_type=item_type,
             item_id=item.id,
@@ -2705,7 +2705,7 @@ def _tool_receive_transfer(
         return preview
 
     try:
-        result, err, status = _receive_transfer(
+        result, err, _ = _receive_transfer(
             transfer_id=transfer_id,
             destination_location=destination_location.strip(),
             received_notes=received_notes,
@@ -2776,7 +2776,7 @@ def _tool_cancel_transfer(
         return preview
 
     try:
-        result, err, status = _cancel_transfer(
+        result, err, _ = _cancel_transfer(
             transfer_id=transfer_id,
             cancel_reason=cancel_reason.strip(),
             user_id=_user_id,
