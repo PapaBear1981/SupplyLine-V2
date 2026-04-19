@@ -10,7 +10,7 @@ This module provides API endpoints for managing permissions, including:
 from flask import jsonify, request
 
 from auth import admin_required, jwt_required, permission_required
-from models import AuditLog, Permission, Role, User, UserPermission, UserRole, db
+from models import AuditLog, Permission, User, UserPermission, db
 
 
 def register_permission_routes(app):
@@ -368,51 +368,6 @@ def register_permission_routes(app):
         permissions = permissions_query.order_by(Permission.category, Permission.name).all()
 
         return jsonify([p.to_dict() for p in permissions])
-
-    # ==================== Roles ====================
-
-    @app.route("/api/roles", methods=["GET"])
-    @jwt_required
-    def get_all_roles():
-        """Get all roles available in the system."""
-        roles = Role.query.order_by(Role.name).all()
-        return jsonify([role.to_dict() for role in roles])
-
-    @app.route("/api/users/<int:user_id>/roles", methods=["PUT"])
-    @permission_required("user.manage")
-    def update_user_roles(user_id):
-        """Replace the full set of roles for a user."""
-        user = User.query.get_or_404(user_id)
-        data = request.get_json() or {}
-        role_ids = data.get("role_ids", [])
-        current_user_id = request.current_user.get("user_id")
-
-        if not isinstance(role_ids, list):
-            return jsonify({"error": "role_ids must be a list"}), 400
-
-        # Validate all role IDs exist
-        roles = Role.query.filter(Role.id.in_(role_ids)).all() if role_ids else []
-        if len(roles) != len(role_ids):
-            return jsonify({"error": "One or more role IDs are invalid"}), 400
-
-        # Delete existing user roles and replace
-        UserRole.query.filter_by(user_id=user_id).delete()
-        for role in roles:
-            db.session.add(UserRole(user_id=user_id, role_id=role.id))
-
-        db.session.commit()
-
-        AuditLog.log(
-            user_id=current_user_id,
-            action="update_user_roles",
-            resource_type="user",
-            resource_id=user_id,
-            details={"role_ids": role_ids, "role_names": [r.name for r in roles]},
-            ip_address=request.remote_addr,
-        )
-        db.session.commit()
-
-        return jsonify(user.to_dict(include_roles=True))
 
     # ==================== Permission Matrix ====================
 

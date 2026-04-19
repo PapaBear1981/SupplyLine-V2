@@ -93,7 +93,7 @@ export const usersApi = baseApi.injectEndpoints({
       query: ({ userId, role_ids }) => ({
         url: `/api/users/${userId}/roles`,
         method: 'PUT',
-        body: { role_ids },
+        body: { roles: role_ids },
       }),
       invalidatesTags: (_result, _error, { userId }) => [
         { type: 'User' as const, id: userId },
