@@ -6,6 +6,7 @@ export interface OnCallUser {
   employee_number: string;
   department: string | null;
   email: string | null;
+  phone: string | null;
   avatar: string | null;
 }
 

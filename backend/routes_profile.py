@@ -61,7 +61,8 @@ def get_profile():
             "role": "admin" if user.is_admin else "user",
             "department_id": user.department,
             "is_active": user.is_active,
-            "avatar": user.avatar
+            "avatar": user.avatar,
+            "phone": user.phone,
         }
 
         return jsonify(profile_data), 200
@@ -90,6 +91,7 @@ def update_profile():
         first_name = data.get("first_name", "").strip()
         last_name = data.get("last_name", "").strip()
         email = data.get("email", "").strip()
+        phone = data.get("phone", "").strip() if data.get("phone") is not None else None
 
         # Validate inputs
         if not first_name or not last_name:
@@ -108,6 +110,7 @@ def update_profile():
         user.name = f"{first_name} {last_name}"
         if email:
             user.email = email
+        user.phone = phone or None
 
         db.session.commit()
 

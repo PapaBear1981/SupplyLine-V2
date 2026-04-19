@@ -29,6 +29,7 @@ def _serialize_user_brief(user: User | None) -> dict | None:
         "employee_number": user.employee_number,
         "department": user.department,
         "email": user.email,
+        "phone": user.phone,
         "avatar": user.avatar,
     }
 
