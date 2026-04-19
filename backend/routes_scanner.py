@@ -25,7 +25,7 @@ def register_scanner_routes(app):
             # ── URL-format QR codes (printed labels) ──────────────────────────
             # Labels now encode full URLs like https://host/tool-view/{id}.
             # Check for these patterns first so callers always receive itemData.
-            tool_url = re.search(r'/tool-view/(\d+)', code)
+            tool_url = re.search(r"/tool-view/(\d+)", code)
             if tool_url:
                 tool = Tool.query.get(int(tool_url.group(1)))
                 if tool:
@@ -44,7 +44,7 @@ def register_scanner_routes(app):
                         }
                     })
 
-            chemical_url = re.search(r'/chemical-view/(\d+)', code)
+            chemical_url = re.search(r"/chemical-view/(\d+)", code)
             if chemical_url:
                 chemical = Chemical.query.get(int(chemical_url.group(1)))
                 if chemical:
@@ -62,7 +62,7 @@ def register_scanner_routes(app):
                         }
                     })
 
-            kit_url = re.search(r'/kits?/(\d+)', code)
+            kit_url = re.search(r"/kits?/(\d+)", code)
             if kit_url:
                 return jsonify({
                     "item_type": "kit",

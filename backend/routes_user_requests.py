@@ -1287,15 +1287,6 @@ def register_user_request_routes(app):
         ))
 
         # ── Audit log events ─────────────────────────────────────────────────
-        ACTION_LABELS = {
-            "status_changed": "Status Changed",
-            "buyer_assigned": "Buyer Assigned",
-            "items_ordered": "Items Ordered",
-            "items_received": "Items Received",
-            "items_cancelled": "Items Cancelled",
-            "cancelled": "Request Cancelled",
-        }
-
         STATUS_DESCRIPTIONS = {
             "under_review": "Request placed under review",
             "pending_fulfillment": "Request approved for fulfillment",

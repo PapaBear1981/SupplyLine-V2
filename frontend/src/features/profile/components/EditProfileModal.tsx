@@ -27,13 +27,14 @@ export const EditProfileModal = ({ open, onClose, user }: EditProfileModalProps)
         first_name: firstName,
         last_name: lastName,
         email: user.email,
+        phone: user.phone,
       });
     }
   }, [open, user, form]);
 
-  const handleSubmit = async (values: { first_name: string; last_name: string; email: string }) => {
+  const handleSubmit = async (values: { first_name: string; last_name: string; email: string; phone?: string }) => {
     try {
-      const updatedUser = await updateProfile(values).unwrap();
+      const updatedUser = await updateProfile({ ...values, phone: values.phone?.trim() || undefined }).unwrap();
 
       // Update the user in Redux state
       const token = localStorage.getItem('access_token');
@@ -100,6 +101,16 @@ export const EditProfileModal = ({ open, onClose, user }: EditProfileModalProps)
           ]}
         >
           <Input placeholder="Enter your email" type="email" />
+        </Form.Item>
+
+        <Form.Item
+          label="Phone Number"
+          name="phone"
+          rules={[
+            { pattern: /^[0-9()\-+\s]{7,20}$/, message: 'Please enter a valid phone number' },
+          ]}
+        >
+          <Input placeholder="e.g. (555) 123-4567" type="tel" maxLength={20} />
         </Form.Item>
       </Form>
     </Modal>

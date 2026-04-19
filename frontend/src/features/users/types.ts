@@ -43,6 +43,7 @@ export interface User {
   employee_number: string;
   department: string | null;
   email: string | null;
+  phone?: string | null;
   is_admin: boolean;
   is_active: boolean;
   avatar?: string | null;
@@ -79,6 +80,7 @@ export interface UserFormValues {
   employee_number: string;
   department: string;
   email?: string | null;
+  phone?: string | null;
   is_admin?: boolean;
   is_active?: boolean;
   password?: string;

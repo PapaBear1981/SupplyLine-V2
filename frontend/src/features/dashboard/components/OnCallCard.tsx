@@ -85,6 +85,24 @@ const OnCallRole = ({ label, description, icon, accentColor, entry }: OnCallRole
               #{user.employee_number}
               {user.department ? ` · ${user.department}` : ''}
             </Text>
+            {user.phone && (
+              <Tooltip title={`Call ${user.name}`}>
+                <a
+                  href={`tel:${user.phone}`}
+                  style={{
+                    fontSize: 12,
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: 4,
+                    marginTop: 2,
+                    fontWeight: 500,
+                  }}
+                >
+                  <PhoneOutlined />
+                  {user.phone}
+                </a>
+              </Tooltip>
+            )}
             {user.email && (
               <Tooltip title={`Email ${user.name}`}>
                 <a

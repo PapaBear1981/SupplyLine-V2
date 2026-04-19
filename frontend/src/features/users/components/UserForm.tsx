@@ -148,6 +148,28 @@ export const UserForm = ({
       )}
 
       <Form.Item
+        label="Phone Number"
+        name="phone"
+        rules={[
+          { pattern: /^[0-9()\-+\s]{7,20}$/, message: 'Please enter a valid phone number' },
+        ]}
+      >
+        <Input placeholder="e.g. (555) 123-4567" type="tel" maxLength={20} />
+      </Form.Item>
+
+      {roleOptions.length > 0 && (
+        <Form.Item label="Roles" name="role_ids">
+          <Select
+            mode="multiple"
+            placeholder="Select roles"
+            options={roleOptions}
+            optionFilterProp="label"
+            allowClear
+          />
+        </Form.Item>
+      )}
+
+      <Form.Item
         label="Password"
         name="password"
         rules={
