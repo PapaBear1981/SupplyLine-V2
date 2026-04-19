@@ -236,6 +236,10 @@ def register_tool_checkout_routes(app):
             old_status = tool.status
             tool.status = "checked_out"
 
+            location = data.get("location")
+            if location:
+                tool.location = location
+
             db.session.flush()  # Get the checkout ID
 
             # Record in tool history
@@ -251,6 +255,7 @@ def register_tool_checkout_routes(app):
                     "work_order": data.get("work_order"),
                     "project": data.get("project"),
                     "notes": data.get("notes"),
+                    "location": location,
                 },
                 related_checkout_id=checkout.id,
                 old_status=old_status,
@@ -422,6 +427,10 @@ def register_tool_checkout_routes(app):
                     old_status = tool.status
                     tool.status = "checked_out"
 
+                    location = data.get("location")
+                    if location:
+                        tool.location = location
+
                     db.session.flush()
 
                     history_entry = ToolHistory.create_event(
@@ -436,6 +445,7 @@ def register_tool_checkout_routes(app):
                             "work_order": data.get("work_order"),
                             "project": data.get("project"),
                             "notes": data.get("notes"),
+                            "location": location,
                             "batch": True,
                         },
                         related_checkout_id=checkout.id,
@@ -1120,6 +1130,7 @@ def register_tool_checkout_routes(app):
                     "calibration_status": tool.calibration_status,
                     "available": available,
                     "checked_out_to": active_checkout.user.name if active_checkout and active_checkout.user else None,
+                    "location": tool.location,
                 })
 
             return jsonify({"tools": results}), 200

@@ -118,6 +118,7 @@ export interface ToolSearchResult {
   calibration_status: string;
   available: boolean;
   checked_out_to: string | null;
+  location?: string | null;
 }
 
 // Checkout statistics
@@ -152,6 +153,7 @@ export interface CheckoutRequest {
   condition_at_checkout?: ToolCondition;
   work_order?: string;
   project?: string;
+  location?: string;
 }
 
 export interface BatchCheckoutRequest {
@@ -162,6 +164,7 @@ export interface BatchCheckoutRequest {
   condition_at_checkout?: ToolCondition;
   work_order?: string;
   project?: string;
+  location?: string;
 }
 
 export interface BatchCheckoutResult {

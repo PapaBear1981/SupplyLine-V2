@@ -111,6 +111,9 @@ export const MobileToolCheckout = () => {
       Toast.show({ content: 'Tool already in cart', icon: 'fail' });
       return;
     }
+    if (cartItems.length === 0 && tool.location) {
+      checkoutForm.setFieldsValue({ location: tool.location });
+    }
     setCartItems(prev => [...prev, tool]);
     setSearchQuery('');
   };
@@ -147,7 +150,12 @@ export const MobileToolCheckout = () => {
           calibration_status: 'ok',
           available: true,
           checked_out_to: null,
+          location: typeof data['location'] === 'string' ? String(data['location']) : null,
         };
+        if (cartItems.length === 0) {
+          const loc = typeof data['location'] === 'string' ? String(data['location']) : '';
+          if (loc) checkoutForm.setFieldsValue({ location: loc });
+        }
         setCartItems(prev => [...prev, scannedTool]);
         setShowCheckoutPopup(true);
       },
@@ -210,6 +218,7 @@ export const MobileToolCheckout = () => {
           condition_at_checkout: conditionVal || 'Good',
           notes: values.notes || undefined,
           work_order: values.work_order || undefined,
+          location: values.location || undefined,
         }).unwrap();
         Toast.show({ content: `Checked out to ${selectedUser.name}`, icon: 'success' });
         resetCheckoutState();
@@ -231,6 +240,7 @@ export const MobileToolCheckout = () => {
           condition_at_checkout: conditionVal || 'Good',
           notes: values.notes || undefined,
           work_order: values.work_order || undefined,
+          location: values.location || undefined,
         }).unwrap();
         setBatchResults(result.results);
         resetCheckoutState();
@@ -629,6 +639,9 @@ export const MobileToolCheckout = () => {
             </Form.Item>
             <Form.Item name="work_order" label="Work Order">
               <Input placeholder="Enter work order (optional)" />
+            </Form.Item>
+            <Form.Item name="location" label="Checkout Location">
+              <Input placeholder="Where is this tool going? (e.g. Hangar 3, Bay 12)" />
             </Form.Item>
             <Form.Item name="notes" label="Notes">
               <TextArea
