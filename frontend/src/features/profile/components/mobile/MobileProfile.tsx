@@ -28,6 +28,7 @@ import {
   useUpdateProfileMutation,
   useChangePasswordMutation,
 } from '../../services/profileApi';
+import { TrustedDevicesSection } from '../TrustedDevicesSection';
 import './MobileProfile.css';
 
 export const MobileProfile = () => {
@@ -274,6 +275,9 @@ export const MobileProfile = () => {
           </List.Item>
         </List>
       </Card>
+
+      {/* Trusted Devices */}
+      {user.is_totp_enabled && <TrustedDevicesSection />}
 
       {/* Edit Profile Popup */}
       <Popup

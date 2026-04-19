@@ -1,10 +1,8 @@
-import { useEffect } from 'react';
-import { Form, Checkbox, Button, Typography, message } from 'antd';
+import { Form, Button, Typography, message } from 'antd';
 import { UserOutlined, LockOutlined } from '@ant-design/icons';
 import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { useLoginMutation } from '../../services/authApi';
-import { useRememberMe } from '../../hooks/useRememberMe';
 import { AnimatedInput } from '../shared/AnimatedInput';
 import { formVariants, buttonHover, buttonTap } from '../../styles/animations';
 import type { LoginRequest, LoginResponse } from '../../types';
@@ -19,31 +17,12 @@ interface LoginFormProps {
 export const LoginForm = ({ onSuccess }: LoginFormProps) => {
   const [form] = Form.useForm();
   const [login, { isLoading }] = useLoginMutation();
-  const { savedEmployeeNumber, saveEmployeeNumber, clearRememberMe } = useRememberMe();
-
-  // Pre-fill employee number and remember me checkbox if saved
-  useEffect(() => {
-    if (savedEmployeeNumber) {
-      form.setFieldsValue({
-        employee_number: savedEmployeeNumber,
-        remember_me: true
-      });
-    }
-  }, [savedEmployeeNumber, form]);
-
-  const handleSubmit = async (values: LoginRequest & { remember_me?: boolean }) => {
+  const handleSubmit = async (values: LoginRequest) => {
     try {
       const result = await login({
         employee_number: values.employee_number,
         password: values.password,
       }).unwrap();
-
-      // Handle remember me
-      if (values.remember_me) {
-        saveEmployeeNumber(values.employee_number);
-      } else {
-        clearRememberMe();
-      }
 
       onSuccess(result);
     } catch (error: unknown) {
@@ -106,14 +85,6 @@ export const LoginForm = ({ onSuccess }: LoginFormProps) => {
         />
 
         <div className="login-form-actions">
-          <Form.Item name="remember_me" valuePropName="checked" style={{ marginBottom: 0 }}>
-            <Checkbox>
-              <Text type="secondary" style={{ fontSize: '14px' }}>
-                Remember me
-              </Text>
-            </Checkbox>
-          </Form.Item>
-
           <Link to="/forgot-password" className="forgot-password-link">
             Forgot password?
           </Link>

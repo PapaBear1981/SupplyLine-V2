@@ -68,3 +68,12 @@
   color: var(--login-text-tertiary) !important;
   font-size: 13px;
 }
+
+.mobile-totp-trust-device {
+  width: 100%;
+  display: flex;
+  justify-content: flex-start;
+  color: var(--login-text-secondary);
+  font-size: 14px;
+  margin-top: -4px;
+}

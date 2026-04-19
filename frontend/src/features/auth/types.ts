@@ -15,6 +15,7 @@ export interface LoginResponse {
   requires_totp_setup?: boolean;
   setup_token?: string;
   employee_number?: string;
+  used_trusted_device?: boolean;
 }
 
 export interface AuthState {
@@ -51,6 +52,7 @@ export interface TotpVerifySetupResponse {
 export interface TotpVerifyRequest {
   employee_number: string;
   code: string;
+  trust_device?: boolean;
 }
 
 export interface TotpVerifyResponse {
@@ -58,6 +60,7 @@ export interface TotpVerifyResponse {
   user: User;
   access_token: string;
   refresh_token: string;
+  trusted_device_issued?: boolean;
 }
 
 export interface TotpDisableRequest {
@@ -79,6 +82,7 @@ export interface BackupCodesResponse {
 export interface BackupCodeVerifyRequest {
   employee_number: string;
   code: string;
+  trust_device?: boolean;
 }
 
 export interface BackupCodeVerifyResponse {
@@ -88,4 +92,26 @@ export interface BackupCodeVerifyResponse {
   refresh_token: string;
   expires_in: number;
   codes_remaining: number;
+  trusted_device_issued?: boolean;
+}
+
+// Trusted Devices
+export interface TrustedDevice {
+  id: number;
+  device_label: string;
+  user_agent: string | null;
+  ip_address: string | null;
+  created_at: string | null;
+  last_used_at: string | null;
+  expires_at: string | null;
+  is_current: boolean;
+}
+
+export interface TrustedDeviceListResponse {
+  devices: TrustedDevice[];
+}
+
+export interface RevokeAllTrustedDevicesResponse {
+  message: string;
+  count: number;
 }

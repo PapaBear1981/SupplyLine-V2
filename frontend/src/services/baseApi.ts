@@ -146,6 +146,7 @@ export const baseApi = createApi({
     'AISettings',
     'BugReport',
     'OnCall',
+    'TrustedDevice',
   ],
   endpoints: () => ({}),
 });

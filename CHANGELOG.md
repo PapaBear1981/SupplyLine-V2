@@ -2,6 +2,25 @@
 
 All notable changes to this project will be documented in this file.
 
+## [Unreleased]
+
+### Added
+
+- **Trusted device tokens for 2FA.** Users who complete TOTP or backup-code
+  verification can opt in to "Trust this device for 30 days" so subsequent
+  logins from that device skip the 2FA challenge (password is still required).
+  Trusted devices can be listed and revoked from **Profile → Trusted Devices**
+  and are automatically revoked on password change, admin password reset, and
+  TOTP disable. Configure via `TRUSTED_DEVICE_TTL_DAYS` and
+  `TRUSTED_DEVICE_MAX_PER_USER`. Run `python backend/migrations/add_trusted_devices.py`
+  after upgrading.
+
+### Fixed
+
+- Backup-code login (`POST /api/auth/totp/verify-backup-code`) no longer crashes
+  with `JWTManager has no attribute 'from_config'`; it now issues tokens via the
+  shared `JWTManager.generate_tokens()` helper.
+
 ## [5.2.0] - 2025-11-08 - Enhanced Messaging, Order Management & UI Modernization
 
 ### 🚀 MAJOR FEATURE RELEASE

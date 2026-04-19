@@ -10,6 +10,7 @@ from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 import utils as password_utils
 from auth import admin_required
 from auth.jwt_manager import jwt_required
+from auth.trusted_devices import revoke_all_for_user
 from models import Announcement, AuditLog, Department, Role, User, UserRole, db
 from models_messaging import UserPresence
 from utils.decorators import login_required
@@ -245,6 +246,9 @@ def register_admin_routes(app):
                 user.force_password_change = True
             user.password_changed_at = datetime.now(UTC)
 
+            # Password reset invalidates trusted devices for the target user.
+            revoked_devices = revoke_all_for_user(user.id, "password_changed_by_admin")
+
             db.session.commit()
 
             # Log audit
@@ -253,10 +257,16 @@ def register_admin_routes(app):
                 action="user.password_reset",
                 resource_type="user",
                 resource_id=user.id,
-                details={"target_user": user.employee_number, "force_change": force_change}
+                details={
+                    "force_change": force_change,
+                    "revoked_trusted_devices": revoked_devices,
+                }
             )
 
-            return jsonify({"message": "Password reset successfully"})
+            return jsonify({
+                "message": "Password reset successfully",
+                "revoked_trusted_devices": revoked_devices,
+            })
         except SQLAlchemyError:
             logger.exception("Error resetting password")
             db.session.rollback()

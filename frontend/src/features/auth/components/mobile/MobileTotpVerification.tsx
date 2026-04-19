@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { Button, Toast, Input } from 'antd-mobile';
+import { Button, Checkbox, Toast, Input } from 'antd-mobile';
 import { SafetyCertificateOutlined, ArrowLeftOutlined, KeyOutlined } from '@ant-design/icons';
 import { useVerifyTotpMutation } from '../../services/authApi';
 import type { LoginResponse } from '../../types';
@@ -25,6 +25,7 @@ export const MobileTotpVerification = ({
   onUseBackupCode,
 }: MobileTotpVerificationProps) => {
   const [code, setCode] = useState('');
+  const [trustDevice, setTrustDevice] = useState(false);
   const [verifyTotp, { isLoading }] = useVerifyTotpMutation();
 
   // Ref-based timer so rapid re-renders don't pile up stale callbacks,
@@ -52,6 +53,7 @@ export const MobileTotpVerification = ({
       const result = await verifyTotp({
         employee_number: employeeNumber,
         code: submittedCode,
+        trust_device: trustDevice,
       }).unwrap();
       onSuccess(result as LoginResponse);
     } catch (error: unknown) {
@@ -74,6 +76,15 @@ export const MobileTotpVerification = ({
         <p className="mobile-totp-subtitle">
           Enter the 6-digit code from your authenticator app.
         </p>
+
+        <div className="mobile-totp-trust-device">
+          <Checkbox
+            checked={trustDevice}
+            onChange={(value) => setTrustDevice(value)}
+          >
+            Trust this device for 30 days
+          </Checkbox>
+        </div>
 
         <div className="mobile-totp-input-wrapper">
           <Input

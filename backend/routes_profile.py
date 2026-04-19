@@ -16,6 +16,7 @@ from flask import Blueprint, current_app, jsonify, request
 from werkzeug.utils import secure_filename
 
 from auth.jwt_manager import jwt_required as login_required
+from auth.trusted_devices import revoke_all_for_user
 from models import AuditLog, User, UserActivity, db
 
 
@@ -210,6 +211,17 @@ def change_password():
         # Update password
         user.set_password(new_password)
         user.force_password_change = False
+
+        # Password change invalidates trusted devices.
+        revoked_devices = revoke_all_for_user(user.id, "password_changed")
+        if revoked_devices:
+            db.session.add(UserActivity(
+                user_id=user.id,
+                activity_type="trusted_devices_wiped",
+                description=f"Revoked {revoked_devices} trusted devices due to password change",
+                ip_address=request.remote_addr,
+            ))
+
         db.session.commit()
 
         # Log activity
@@ -227,7 +239,7 @@ def change_password():
             resource_type="user",
             resource_id=user.id,
             details={
-                "user_name": user.name
+                "revoked_trusted_devices": revoked_devices,
             },
             ip_address=request.remote_addr
         )
