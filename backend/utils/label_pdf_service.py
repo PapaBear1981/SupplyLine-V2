@@ -28,6 +28,7 @@ from reportlab.lib.units import inch
 from reportlab.lib.utils import ImageReader
 from reportlab.pdfgen import canvas as rl_canvas
 
+
 # ── Page ──────────────────────────────────────────────────────────────────────
 # Always a 4"×6" sticker regardless of which label size is selected.
 PAGE_W = 4 * inch   # 288 pt

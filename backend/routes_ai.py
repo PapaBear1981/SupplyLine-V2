@@ -1758,9 +1758,8 @@ def _tool_checkout_tool(
                     "Could you specify the full name so I can identify the right person?"
                 ),
             }
-        else:
-            target_user_id = matches[0].id
-            target_user_name = matches[0].name
+        target_user_id = matches[0].id
+        target_user_name = matches[0].name
 
     if target_user_name is None:
         current_user_obj = db.session.get(User, _user_id)
