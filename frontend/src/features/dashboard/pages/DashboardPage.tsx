@@ -31,9 +31,9 @@ import {
   StatCard,
   AlertsPanel,
   RecentActivity,
-  InventoryPieChart,
   AnnouncementsPanel,
   OnCallCard,
+  FieldToolsCard,
 } from '../components';
 import { MobileDashboard } from '../components/mobile';
 
@@ -207,13 +207,6 @@ export const DashboardPage = () => {
     return alertsList;
   }, [toolStats, chemicalStats, kitStats]);
 
-  // Chart data
-  const toolStatusChartData = useMemo(() => [
-    { name: 'Available', value: toolStats.available, color: '#52c41a' },
-    { name: 'Checked Out', value: toolStats.checkedOut, color: '#1890ff' },
-    { name: 'Maintenance', value: toolStats.maintenance, color: '#faad14' },
-  ].filter(item => item.value > 0), [toolStats]);
-
   const handleRefreshAlerts = () => {
     refetchTools();
     refetchChemicals();
@@ -347,11 +340,7 @@ export const DashboardPage = () => {
       {/* Charts Row */}
       <Row gutter={[24, 24]} style={{ marginBottom: 24 }}>
         <Col xs={24} lg={8}>
-          <InventoryPieChart
-            title="Tool Status"
-            data={toolStatusChartData}
-            loading={toolsLoading}
-          />
+          <FieldToolsCard />
         </Col>
         <Col xs={24} lg={8}>
           <AnnouncementsPanel

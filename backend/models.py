@@ -150,6 +150,9 @@ class User(db.Model):
     account_locked_until = db.Column(db.DateTime, nullable=True)
     last_failed_login = db.Column(db.DateTime, nullable=True)
 
+    # Contact information
+    phone = db.Column(db.String(30), nullable=True)
+
     # TOTP Two-Factor Authentication fields
     totp_secret = db.Column(db.String(255), nullable=True)  # Fernet-encrypted Base32 secret
     is_totp_enabled = db.Column(db.Boolean, default=False)
@@ -458,7 +461,8 @@ class User(db.Model):
             "avatar": self.avatar,
             "force_password_change": self.force_password_change,
             "password_changed_at": self.password_changed_at.isoformat() if self.password_changed_at else None,
-            "is_totp_enabled": self.is_totp_enabled
+            "is_totp_enabled": self.is_totp_enabled,
+            "phone": self.phone,
         }
 
         if include_roles:

@@ -14,6 +14,7 @@ import {
   Descriptions,
   Divider,
   Alert,
+  theme,
 } from 'antd';
 import {
   PhoneOutlined,
@@ -39,6 +40,7 @@ interface OnCallFormValues {
 }
 
 export const OnCallManagement = () => {
+  const { token } = theme.useToken();
   const { data: oncall, isLoading } = useGetAdminOnCallPersonnelQuery();
   const { data: users = [], isLoading: usersLoading } = useGetUsersQuery();
   const [updateOnCall, { isLoading: isUpdating }] = useUpdateOnCallPersonnelMutation();
@@ -92,7 +94,7 @@ export const OnCallManagement = () => {
       <Card
         size="small"
         bordered
-        style={{ background: 'var(--component-bg, #fafafa)' }}
+        style={{ background: token.colorFillAlter }}
       >
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
           <span
@@ -125,6 +127,14 @@ export const OnCallManagement = () => {
                 #{user.employee_number}
                 {user.department ? ` · ${user.department}` : ''}
               </Text>
+              {user.phone && (
+                <div style={{ marginTop: 2 }}>
+                  <a href={`tel:${user.phone}`} style={{ fontSize: 12, display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                    <PhoneOutlined />
+                    {user.phone}
+                  </a>
+                </div>
+              )}
             </div>
           </div>
         ) : (

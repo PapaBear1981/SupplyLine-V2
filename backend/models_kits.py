@@ -541,6 +541,69 @@ class KitReorderRequest(db.Model):
         }
 
 
+class KitToolCheckout(db.Model):
+    """
+    KitToolCheckout model for tracking tools sent to kits in the field.
+
+    This is distinct from the regular Checkout model (which handles tool-to-user checkouts)
+    and from KitItem (which handles permanent warehouse-to-kit transfers).
+
+    A KitToolCheckout represents a temporary deployment of a tool to a field kit.
+    The tool retains its warehouse ownership and can be returned to its original location.
+    """
+    __tablename__ = "kit_tool_checkouts"
+
+    id = db.Column(db.Integer, primary_key=True)
+    tool_id = db.Column(db.Integer, db.ForeignKey("tools.id"), nullable=False, index=True)
+    kit_id = db.Column(db.Integer, db.ForeignKey("kits.id"), nullable=False, index=True)
+    checked_out_by_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False)
+    checkout_date = db.Column(db.DateTime, default=get_current_time, nullable=False)
+    expected_return_date = db.Column(db.DateTime, nullable=True)
+    return_date = db.Column(db.DateTime, nullable=True)  # NULL = still in field
+    returned_by_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=True)
+
+    # Saved pre-checkout state for restoration on return
+    previous_location = db.Column(db.String(255), nullable=True)
+    previous_warehouse_id = db.Column(db.Integer, nullable=True)
+
+    notes = db.Column(db.String(1000), nullable=True)
+    return_notes = db.Column(db.String(1000), nullable=True)
+    status = db.Column(db.String(20), nullable=False, default="active")  # active, returned
+
+    # Relationships
+    tool = db.relationship("Tool", foreign_keys=[tool_id])
+    kit = db.relationship("Kit", foreign_keys=[kit_id])
+    checked_out_by = db.relationship("User", foreign_keys=[checked_out_by_id])
+    returned_by = db.relationship("User", foreign_keys=[returned_by_id])
+
+    def to_dict(self):
+        """Convert model to dictionary"""
+        return {
+            "id": self.id,
+            "tool_id": self.tool_id,
+            "tool_number": self.tool.tool_number if self.tool else None,
+            "tool_description": self.tool.description if self.tool else None,
+            "tool_serial_number": self.tool.serial_number if self.tool else None,
+            "tool_condition": self.tool.condition if self.tool else None,
+            "tool_location": self.tool.location if self.tool else None,
+            "kit_id": self.kit_id,
+            "kit_name": self.kit.name if self.kit else None,
+            "kit_status": self.kit.status if self.kit else None,
+            "checked_out_by_id": self.checked_out_by_id,
+            "checked_out_by_name": self.checked_out_by.name if self.checked_out_by else None,
+            "checkout_date": self.checkout_date.isoformat() if self.checkout_date else None,
+            "expected_return_date": self.expected_return_date.isoformat() if self.expected_return_date else None,
+            "return_date": self.return_date.isoformat() if self.return_date else None,
+            "returned_by_id": self.returned_by_id,
+            "returned_by_name": self.returned_by.name if self.returned_by else None,
+            "previous_location": self.previous_location,
+            "previous_warehouse_id": self.previous_warehouse_id,
+            "notes": self.notes,
+            "return_notes": self.return_notes,
+            "status": self.status,
+        }
+
+
 class KitMessage(db.Model):
     """
     KitMessage model for messaging between mechanics and stores personnel.

@@ -38,9 +38,11 @@ import KitBoxManager from '../components/KitBoxManager';
 import KitItemList from '../components/KitItemList';
 import KitIssuanceHistory from '../components/KitIssuanceHistory';
 import KitReordersManager from '../components/KitReordersManager';
+import KitToolsTab from '../components/KitToolsTab';
 import EditKitModal from '../components/EditKitModal';
 import { MobileKitDetailPage } from '../components/mobile';
 import { useIsMobile } from '@shared/hooks/useMobile';
+import { useGetKitToolCheckoutsQuery } from '../services/kitsApi';
 
 const { Title, Text } = Typography;
 const { TabPane } = Tabs;
@@ -56,7 +58,10 @@ const KitDetailView = () => {
   const { data: kit, isLoading, error, refetch } = useGetKitQuery(kitId);
   const { data: alerts } = useGetKitAlertsQuery(kitId);
   const { data: analytics } = useGetKitAnalyticsQuery({ kitId, days: 30 });
+  const { data: kitToolCheckouts } = useGetKitToolCheckoutsQuery({ kitId, include_returned: false });
   const [deleteKit, { isLoading: isDeleting }] = useDeleteKitMutation();
+
+  const activeFieldToolCount = kitToolCheckouts?.total || 0;
 
   // Render mobile version if on mobile device
   if (isMobile) {
@@ -301,6 +306,20 @@ const KitDetailView = () => {
               key="reorders"
             >
               <KitReordersManager kitId={kitId} />
+            </TabPane>
+
+            <TabPane
+              tab={
+                <span>
+                  <ToolOutlined /> Field Tools
+                  {activeFieldToolCount > 0 && (
+                    <Badge count={activeFieldToolCount} style={{ marginLeft: 8 }} />
+                  )}
+                </span>
+              }
+              key="field-tools"
+            >
+              <KitToolsTab kitId={kitId} kitName={kit.name} />
             </TabPane>
 
             <TabPane tab="Messages" key="messages">

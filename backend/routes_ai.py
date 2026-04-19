@@ -1749,7 +1749,7 @@ def _tool_checkout_tool(
             return {
                 "error": f"There is no active user named '{query_str}' in the system. Please check the name and try again.",
             }
-        elif len(matches) > 1:
+        if len(matches) > 1:
             names = ", ".join(u.name for u in matches[:8])
             return {
                 "needs_clarification": True,
@@ -1758,9 +1758,8 @@ def _tool_checkout_tool(
                     "Could you specify the full name so I can identify the right person?"
                 ),
             }
-        else:
-            target_user_id = matches[0].id
-            target_user_name = matches[0].name
+        target_user_id = matches[0].id
+        target_user_name = matches[0].name
 
     if target_user_name is None:
         current_user_obj = db.session.get(User, _user_id)
@@ -2349,7 +2348,7 @@ def _tool_issue_chemical(
         ).all()
         if len(matches) == 0:
             return {"error": f"No active user found matching '{query_str}'. Please check the name or employee number."}
-        elif len(matches) > 1:
+        if len(matches) > 1:
             names = ", ".join(u.name for u in matches[:8])
             return {
                 "needs_clarification": True,

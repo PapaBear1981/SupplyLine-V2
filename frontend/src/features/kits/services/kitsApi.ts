@@ -26,6 +26,11 @@ import type {
   KitLocationFormData,
   CreateReorderRequest,
   ReorderFilters,
+  KitToolCheckout,
+  KitToolCheckoutStats,
+  KitToolCheckoutsResponse,
+  SendToolToKitFormData,
+  ReturnToolFromKitFormData,
 } from '../types';
 
 export const kitsApi = baseApi.injectEndpoints({
@@ -537,6 +542,61 @@ export const kitsApi = baseApi.injectEndpoints({
       ],
     }),
 
+    // ==================== Kit Tool Checkouts (Field Deployments) ====================
+    sendToolToKit: builder.mutation<
+      { message: string; kit_tool_checkout: KitToolCheckout },
+      { kitId: number; data: SendToolToKitFormData }
+    >({
+      query: ({ kitId, data }) => ({
+        url: `/api/kits/${kitId}/tool-checkouts`,
+        method: 'POST',
+        body: data,
+      }),
+      invalidatesTags: (_result, _error, { kitId }) => [
+        { type: 'Kit', id: kitId },
+        { type: 'Kit', id: 'FIELD_TOOLS' },
+      ],
+    }),
+
+    returnToolFromKit: builder.mutation<
+      { message: string; kit_tool_checkout: KitToolCheckout },
+      { checkoutId: number; data: ReturnToolFromKitFormData }
+    >({
+      query: ({ checkoutId, data }) => ({
+        url: `/api/kit-tool-checkouts/${checkoutId}/return`,
+        method: 'POST',
+        body: data,
+      }),
+      invalidatesTags: ['Kit'],
+    }),
+
+    getKitToolCheckouts: builder.query<
+      KitToolCheckoutsResponse,
+      { kitId: number; include_returned?: boolean }
+    >({
+      query: ({ kitId, include_returned = false }) => ({
+        url: `/api/kits/${kitId}/tool-checkouts`,
+        params: { include_returned },
+      }),
+      providesTags: (_result, _error, { kitId }) => [
+        { type: 'Kit', id: kitId },
+        { type: 'Kit', id: 'FIELD_TOOLS' },
+      ],
+    }),
+
+    getActiveKitToolCheckouts: builder.query<
+      { checkouts: KitToolCheckout[]; total: number },
+      void
+    >({
+      query: () => '/api/kit-tool-checkouts/active',
+      providesTags: [{ type: 'Kit', id: 'FIELD_TOOLS' }],
+    }),
+
+    getKitToolCheckoutStats: builder.query<KitToolCheckoutStats, void>({
+      query: () => '/api/kit-tool-checkouts/stats',
+      providesTags: [{ type: 'Kit', id: 'FIELD_TOOLS' }],
+    }),
+
     printKitItemLabel: builder.mutation<
       Blob,
       { kitId: number; itemId: number; itemType: 'tool' | 'chemical' | 'expendable'; labelSize: LabelSize; codeType: CodeType }
@@ -626,4 +686,11 @@ export const {
   useCancelReorderMutation,
   useUpdateReorderMutation,
   usePrintKitItemLabelMutation,
+
+  // Kit Tool Checkouts (Field Deployments)
+  useSendToolToKitMutation,
+  useReturnToolFromKitMutation,
+  useGetKitToolCheckoutsQuery,
+  useGetActiveKitToolCheckoutsQuery,
+  useGetKitToolCheckoutStatsQuery,
 } = kitsApi;

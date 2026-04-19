@@ -20,8 +20,10 @@ import {
 import dayjs from 'dayjs';
 import { UserForm } from './UserForm';
 import {
+  useAssignUserRolesMutation,
   useCreateUserMutation,
   useGetDepartmentsQuery,
+  useGetRolesQuery,
   useGetUserQuery,
   useUnlockUserMutation,
   useUpdateUserMutation,
@@ -52,10 +54,12 @@ export const UserDrawer = ({
     skip: !userId || initialMode === 'create',
   });
   const { data: departments } = useGetDepartmentsQuery();
+  const { data: roles } = useGetRolesQuery();
 
   const [createUser, { isLoading: isCreating }] = useCreateUserMutation();
   const [updateUser, { isLoading: isUpdating }] = useUpdateUserMutation();
   const [unlockUser, { isLoading: isUnlocking }] = useUnlockUserMutation();
+  const [assignUserRoles] = useAssignUserRolesMutation();
 
   useEffect(() => {
     // Update mode asynchronously to avoid cascading renders
@@ -75,9 +79,11 @@ export const UserDrawer = ({
         employee_number: user.employee_number,
         department: user.department || undefined,
         email: user.email || undefined,
+        phone: user.phone || undefined,
         is_admin: user.is_admin,
         is_active: user.is_active,
         password: undefined,
+        role_ids: user.roles?.map((r) => r.id) ?? [],
       });
     }
   }, [user, mode, form]);
@@ -109,14 +115,27 @@ export const UserDrawer = ({
           is_active: values.is_active,
           password: values.password,
         };
-        await createUser(createPayload).unwrap();
+        const newUser = await createUser(createPayload).unwrap();
+        if (values.role_ids && values.role_ids.length > 0) {
+          await assignUserRoles({ userId: newUser.id, role_ids: values.role_ids }).unwrap();
+        }
         message.success('User created successfully');
       } else if (userId) {
         const updatePayload: Partial<UserFormValues> = { ...values };
         if (!values.password) {
           delete updatePayload.password;
         }
-        await updateUser({ id: userId, data: updatePayload }).unwrap();
+        const { role_ids, ...profilePayload } = updatePayload;
+        try {
+          await updateUser({ id: userId, data: profilePayload }).unwrap();
+        } catch (profileErr: unknown) {
+          const e = profileErr as { data?: { error?: string; details?: string[] } };
+          const msg = e?.data?.error || 'Failed to update user profile.';
+          const details = e?.data?.details;
+          message.error(details?.length ? `${msg}: ${details.join(', ')}` : msg);
+          return;
+        }
+        await assignUserRoles({ userId, role_ids: role_ids ?? [] }).unwrap();
         message.success('User updated successfully');
       }
       onSuccess?.();
@@ -300,6 +319,7 @@ export const UserDrawer = ({
         form={form}
         mode={mode}
         departments={departments}
+        roles={roles}
         onSubmit={handleSubmit}
         onCancel={() => {
           if (mode === 'create') {

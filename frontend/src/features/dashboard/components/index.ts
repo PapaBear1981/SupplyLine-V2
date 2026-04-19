@@ -6,3 +6,4 @@ export { InventoryPieChart, ActivityChart } from './InventoryCharts';
 export { QuickActions } from './QuickActions';
 export { AnnouncementsPanel } from './AnnouncementsPanel';
 export { OnCallCard } from './OnCallCard';
+export { FieldToolsCard } from './FieldToolsCard';

@@ -16,8 +16,8 @@ import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-from app import create_app  # noqa: E402
-from models import Permission, db  # noqa: E402
+from app import create_app
+from models import Permission, db
 
 
 PERMISSIONS: list[tuple[str, str, str]] = [

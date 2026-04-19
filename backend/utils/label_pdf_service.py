@@ -28,6 +28,7 @@ from reportlab.lib.units import inch
 from reportlab.lib.utils import ImageReader
 from reportlab.pdfgen import canvas as rl_canvas
 
+
 # ── Page ──────────────────────────────────────────────────────────────────────
 # Always a 4"×6" sticker regardless of which label size is selected.
 PAGE_W = 4 * inch   # 288 pt
@@ -215,7 +216,6 @@ def _draw_label(
     body_x   = lx + PAD
     body_w   = LW - 2 * PAD
     body_y   = ly + PAD
-    body_h   = body_top - ly - PAD
 
     # QR code — centred horizontally, with a small gap below the header so the
     # quiet zone is never adjacent to the dark header strip.

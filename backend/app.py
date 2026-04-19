@@ -308,6 +308,10 @@ def create_app():
                     _auto_add_col("procurement_orders", "fulfillment_quantity INTEGER NULL", "fulfillment_quantity", ord_cols)
                     _auto_add_col("procurement_orders", "is_internal_fulfillment BOOLEAN NOT NULL DEFAULT 0", "is_internal_fulfillment", ord_cols)
 
+                if "users" in tables:
+                    user_cols = {c["name"] for c in inspector.get_columns("users")}
+                    _auto_add_col("users", "phone VARCHAR(30) NULL", "phone", user_cols)
+
                 # Widen users.totp_secret: stores Fernet-encrypted secret (~140 chars),
                 # not the 32-char Base32 plaintext the original schema assumed.
                 if "users" in tables:
