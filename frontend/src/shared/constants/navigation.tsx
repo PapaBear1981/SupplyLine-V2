@@ -9,6 +9,7 @@ import {
   UserOutlined,
   SettingOutlined,
   SwapOutlined,
+  RetweetOutlined,
   ShoppingCartOutlined,
   FormOutlined,
   BarChartOutlined,
@@ -98,7 +99,7 @@ export const ALL_MENU_ITEMS: MenuItemWithPermission[] = [
   },
   {
     key: ROUTES.TRANSFERS,
-    icon: <SwapOutlined />,
+    icon: <RetweetOutlined />,
     label: 'Transfers',
     permission: 'transfer.view',
   },

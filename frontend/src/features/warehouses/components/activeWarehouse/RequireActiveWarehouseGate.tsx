@@ -31,10 +31,13 @@ export const RequireActiveWarehouseGate = () => {
 
   if (!user) return null;
   if (user.is_admin) return null;
-  if (activeWarehouseId) return null;
-  // If the backend already has a warehouse on the user profile, we don't
-  // need to prompt — the header dropdown or the next API call will hydrate.
+  // Backend/JWT is the source of truth for whether the user has an
+  // active warehouse. Don't let a stale localStorage value silence the
+  // prompt — only stand down if the profile also reports one.
   if (user.active_warehouse_id) return null;
+  // If somehow the slice has a value without a matching server record,
+  // fall through and require selection anyway.
+  void activeWarehouseId;
 
   const handleSelect = async (value: number) => {
     try {

@@ -24,10 +24,17 @@ export const CancelTransferModal = ({
   if (!transfer) return null;
 
   const submit = async (values: Record<string, unknown>) => {
+    const reason = (values.cancel_reason as string)?.trim();
+    if (!reason) {
+      form.setFields([
+        { name: 'cancel_reason', errors: ['Please provide a non-empty reason'] },
+      ]);
+      return;
+    }
     try {
       await cancel({
         id: transfer.id,
-        data: { cancel_reason: (values.cancel_reason as string).trim() },
+        data: { cancel_reason: reason },
       }).unwrap();
       message.success(`Transfer #${transfer.id} cancelled.`);
       onClose();
@@ -45,9 +52,9 @@ export const CancelTransferModal = ({
       onOk={() => form.submit()}
       okText="Cancel transfer"
       okButtonProps={{ loading: isLoading, danger: true }}
-      destroyOnClose
+      destroyOnHidden
     >
-      <Form form={form} layout="vertical" onFinish={submit}>
+      <Form form={form} layout="vertical" onFinish={submit} preserve={false}>
         <Form.Item
           label="Reason"
           name="cancel_reason"

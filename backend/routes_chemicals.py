@@ -773,6 +773,19 @@ def register_chemical_routes(app):
             if not warehouse.is_active:
                 raise ValidationError("Selected warehouse is inactive")
 
+        # A return must stay in the chemical's current warehouse — moving stock
+        # across warehouses has to go through the two-step transfer workflow so
+        # the shipment is recorded and the receiver assigns a location.
+        if (
+            warehouse_id
+            and warehouse_id != chemical.warehouse_id
+            and not request.current_user.get("is_admin")
+        ):
+            raise ValidationError(
+                "Returns must stay in the chemical's current warehouse. "
+                "Use a warehouse transfer to relocate this lot."
+            )
+
         location = data.get("location") or chemical.location
         notes = data.get("notes")
 

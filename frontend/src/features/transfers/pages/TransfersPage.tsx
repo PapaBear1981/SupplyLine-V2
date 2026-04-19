@@ -22,6 +22,7 @@ const { Title, Text } = Typography;
 export const TransfersPage = () => {
   const isMobile = useIsMobile();
   const currentUserId = useAppSelector((s) => s.auth.user?.id);
+  const canView = usePermission('transfer.view');
   const canReceive = usePermission('transfer.receive');
   const canCancelOwn = usePermission('transfer.cancel_own');
   const isAdmin = useAppSelector((s) => s.auth.user?.is_admin);
@@ -36,6 +37,15 @@ export const TransfersPage = () => {
   const inbound = useListInboundTransfersQuery({ page, per_page: 20 });
   const outbound = useListOutboundTransfersQuery({ page, per_page: 20 });
   const history = useListTransfersQuery({ page, per_page: 20 });
+
+  if (!canView && !isAdmin) {
+    return (
+      <div style={{ padding: 24 }}>
+        <Title level={3}>Transfers</Title>
+        <Text type="secondary">You don't have permission to view transfers.</Text>
+      </div>
+    );
+  }
 
   if (isMobile) {
     return <MobileTransfersPage />;

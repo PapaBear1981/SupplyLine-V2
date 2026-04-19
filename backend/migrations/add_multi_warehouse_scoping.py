@@ -11,7 +11,7 @@ import sqlite3
 
 
 USER_COLUMN_DEFINITIONS = [
-    ("active_warehouse_id", "INTEGER REFERENCES warehouses(id)"),
+    ("active_warehouse_id", "INTEGER REFERENCES warehouses(id) ON DELETE SET NULL"),
 ]
 
 TRANSFER_COLUMN_DEFINITIONS = [

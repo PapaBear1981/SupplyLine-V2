@@ -61,7 +61,7 @@ export const ReceiveTransferModal = ({
       onOk={() => form.submit()}
       okText="Receive"
       okButtonProps={{ loading: isLoading }}
-      destroyOnClose
+      destroyOnHidden
     >
       <Descriptions bordered size="small" column={1} style={{ marginBottom: 16 }}>
         <Descriptions.Item label="Item">
@@ -91,7 +91,7 @@ export const ReceiveTransferModal = ({
         )}
       </Descriptions>
 
-      <Form form={form} layout="vertical" onFinish={submit}>
+      <Form form={form} layout="vertical" onFinish={submit} preserve={false}>
         <Form.Item
           label="Destination location"
           name="destination_location"

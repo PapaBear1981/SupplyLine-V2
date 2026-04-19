@@ -327,14 +327,35 @@ def transfer_warehouse_to_warehouse_legacy():
         if item.warehouse_id != from_warehouse.id:
             return jsonify({"error": f"{data['item_type'].title()} is not in the source warehouse"}), 400
 
-        item.warehouse_id = to_warehouse.id
+        qty = max(1, int(data.get("quantity", 1)))
+        moved_item = item
+
+        if data["item_type"] == "chemical":
+            available_qty = item.quantity or 0
+            if qty > available_qty:
+                return jsonify({
+                    "error": f"Only {available_qty} {item.unit or 'units'} available",
+                }), 400
+            if qty < available_qty:
+                # Partial move — split the lot so the remainder stays in source.
+                moved_item = create_child_chemical(
+                    parent_chemical=item,
+                    quantity=qty,
+                    destination_warehouse_id=to_warehouse.id,
+                )
+                db.session.add(moved_item)
+                db.session.flush()
+            else:
+                item.warehouse_id = to_warehouse.id
+        else:
+            item.warehouse_id = to_warehouse.id
 
         transfer = WarehouseTransfer(
             from_warehouse_id=from_warehouse.id,
             to_warehouse_id=to_warehouse.id,
             item_type=data["item_type"],
-            item_id=data["item_id"],
-            quantity=data.get("quantity", 1),
+            item_id=moved_item.id,
+            quantity=qty,
             transfer_date=datetime.now(),
             transferred_by_id=current_user_id,
             received_by_id=current_user_id,
@@ -346,9 +367,9 @@ def transfer_warehouse_to_warehouse_legacy():
         record_transaction(
             db=db,
             item_type=data["item_type"],
-            item_id=data["item_id"],
+            item_id=moved_item.id,
             transaction_type="transfer",
-            quantity=data.get("quantity", 1),
+            quantity=qty,
             user_id=current_user_id,
             from_location=from_warehouse.name,
             to_location=to_warehouse.name,
@@ -406,9 +427,35 @@ def _initiate_transfer(*, to_warehouse_id, item_type, item_id, quantity, notes,
     if item_type == "tool" and item.status == "checked_out":
         return None, "Tool is checked out — must be returned first", 409
 
+    # Tool already reserved by another pending transfer
+    if item_type == "tool":
+        existing_pending = WarehouseTransfer.query.filter_by(
+            item_type="tool",
+            item_id=item.id,
+            status=STATUS_PENDING,
+        ).first()
+        if existing_pending:
+            return None, (
+                f"Tool already has a pending transfer (#{existing_pending.id}). "
+                "Cancel it or wait for receipt before initiating another."
+            ), 409
+
     qty = max(1, int(quantity or 1))
-    if item_type == "chemical" and qty > (item.quantity or 0):
-        return None, f"Only {item.quantity} {item.unit or 'units'} available", 400
+    if item_type == "chemical":
+        # Reserve quantity against existing pending transfers so two inits can't
+        # oversubscribe the same lot.
+        pending_qty = (
+            db.session.query(db.func.coalesce(db.func.sum(WarehouseTransfer.quantity), 0))
+            .filter_by(item_type="chemical", item_id=item.id, status=STATUS_PENDING)
+            .scalar()
+            or 0
+        )
+        available = (item.quantity or 0) - int(pending_qty)
+        if qty > available:
+            return None, (
+                f"Only {available} {item.unit or 'units'} available "
+                f"after {int(pending_qty)} reserved by pending transfers"
+            ), 400
 
     transfer = WarehouseTransfer(
         from_warehouse_id=from_warehouse.id,
@@ -807,6 +854,16 @@ def get_transfer_detail(transfer_id):
     transfer = db.session.get(WarehouseTransfer, transfer_id)
     if not transfer:
         return jsonify({"error": "Transfer not found"}), 404
+
+    # Non-admins can only see transfers that involve their active warehouse
+    # (either as source or destination). This keeps other warehouses'
+    # shipment histories private.
+    payload_user = request.current_user or {}
+    if not payload_user.get("is_admin"):
+        active_id = payload_user.get("active_warehouse_id")
+        if active_id not in (transfer.from_warehouse_id, transfer.to_warehouse_id):
+            return jsonify({"error": "Transfer not found"}), 404
+
     payload = transfer.to_dict()
 
     item = _load_tool_or_chemical(transfer.item_type, transfer.item_id)

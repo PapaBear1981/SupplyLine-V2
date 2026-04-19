@@ -6,6 +6,9 @@ export type TransferStatus =
 
 export type TransferItemType = 'tool' | 'chemical' | 'expendable';
 
+// Initiate only supports tool and chemical; expendables use a different flow.
+export type InitiateTransferItemType = 'tool' | 'chemical';
+
 export interface Transfer {
   id: number;
   from_warehouse_id?: number | null;
@@ -62,7 +65,7 @@ export interface TransfersQueryParams {
 
 export interface InitiateTransferPayload {
   to_warehouse_id: number;
-  item_type: TransferItemType;
+  item_type: InitiateTransferItemType;
   item_id: number;
   quantity?: number;
   notes?: string;

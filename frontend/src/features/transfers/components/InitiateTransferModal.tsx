@@ -14,7 +14,10 @@ import {
 import { useActiveWarehouse } from '@features/warehouses/hooks/useActiveWarehouse';
 import { useGetWarehousesQuery } from '@features/warehouses/services/warehousesApi';
 import { useInitiateTransferMutation } from '../services/transfersApi';
-import type { InitiateTransferPayload, TransferItemType } from '../types';
+import type {
+  InitiateTransferItemType,
+  InitiateTransferPayload,
+} from '../types';
 
 const { Text } = Typography;
 
@@ -24,7 +27,7 @@ export interface InitiateTransferModalProps {
   /** Optional preset: locks the item type and item id. Used when opening
       from a tool/chemical row or from the checkout warehouse-mismatch guard. */
   preset?: {
-    itemType: TransferItemType;
+    itemType: InitiateTransferItemType;
     itemId: number;
     itemLabel?: string;
     sourceWarehouseId?: number | null;
@@ -50,7 +53,7 @@ export const InitiateTransferModal = ({
       .map((w) => ({ label: w.name, value: w.id }));
   }, [warehousesData, activeWarehouseId]);
 
-  const itemType: TransferItemType = Form.useWatch('item_type', form) || 'tool';
+  const itemType: InitiateTransferItemType = Form.useWatch('item_type', form) || 'tool';
 
   useEffect(() => {
     if (open) {
@@ -66,7 +69,7 @@ export const InitiateTransferModal = ({
   const submit = async (values: Record<string, unknown>) => {
     const payload: InitiateTransferPayload = {
       to_warehouse_id: values.to_warehouse_id as number,
-      item_type: values.item_type as TransferItemType,
+      item_type: values.item_type as InitiateTransferItemType,
       item_id: Number(values.item_id),
       quantity: Number(values.quantity) || 1,
       notes: (values.notes as string) || undefined,
@@ -91,7 +94,7 @@ export const InitiateTransferModal = ({
       onOk={() => form.submit()}
       okText="Initiate"
       okButtonProps={{ loading: isLoading }}
-      destroyOnClose
+      destroyOnHidden
     >
       {!activeWarehouseId && (
         <Alert
@@ -116,7 +119,7 @@ export const InitiateTransferModal = ({
         description="The destination user will assign the physical location on receipt."
       />
 
-      <Form form={form} layout="vertical" onFinish={submit} disabled={!activeWarehouseId}>
+      <Form form={form} layout="vertical" onFinish={submit} disabled={!activeWarehouseId} preserve={false}>
         <Form.Item
           label="Item type"
           name="item_type"

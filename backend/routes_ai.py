@@ -1299,7 +1299,7 @@ def _execute_tool(name: str, args: dict, user_id: int | None = None, is_admin: b
         if name == "get_my_active_warehouse":
             return _tool_get_my_active_warehouse(_user_id=user_id)
         if name == "list_pending_transfers":
-            return _tool_list_pending_transfers(**args, _user_id=user_id)
+            return _tool_list_pending_transfers(**args, _user_id=user_id, _is_admin=is_admin)
         if name == "initiate_transfer":
             return _tool_initiate_transfer(**args, _user_id=user_id, _is_admin=is_admin)
         if name == "receive_transfer":
@@ -2477,10 +2477,13 @@ def _tool_list_pending_transfers(
     direction: str = "inbound",
     status: str = "pending_receipt",
     _user_id: int | None = None,
+    _is_admin: bool = False,
 ) -> dict:
     if not _user_id:
         return {"error": "Cannot determine current user. Please log in again."}
     user = db.session.get(User, _user_id)
+    if not _is_admin and "transfer.view" not in _user_permissions(user):
+        return {"error": "You don't have permission to view transfers."}
     if not user or not user.active_warehouse_id:
         return {
             "transfers": [],
@@ -2644,10 +2647,10 @@ def _tool_initiate_transfer(
             ),
             "transfer_id": transfer.id,
         }
-    except Exception as exc:
+    except Exception:
         db.session.rollback()
         logger.exception("AI initiate_transfer failed")
-        return {"error": str(exc)}
+        return {"error": "Could not initiate transfer. The administrator can check the server log for details."}
 
 
 def _tool_receive_transfer(
@@ -2678,6 +2681,11 @@ def _tool_receive_transfer(
         return {"error": f"Transfer {transfer_id} not found."}
     if transfer.status != "pending_receipt":
         return {"error": f"Transfer is not awaiting receipt (status={transfer.status})."}
+
+    # Receipt must happen in the destination warehouse — don't even leak
+    # preview metadata to users whose active warehouse isn't the destination.
+    if not _is_admin and transfer.to_warehouse_id != user.active_warehouse_id:
+        return {"error": "Transfer is not inbound to your active warehouse."}
 
     from_wh = transfer.from_warehouse.name if transfer.from_warehouse else "Unknown"
     to_wh = transfer.to_warehouse.name if transfer.to_warehouse else "Unknown"
@@ -2725,10 +2733,10 @@ def _tool_receive_transfer(
             ),
             "transfer": result.to_dict(),
         }
-    except Exception as exc:
+    except Exception:
         db.session.rollback()
         logger.exception("AI receive_transfer failed")
-        return {"error": str(exc)}
+        return {"error": "Could not receive transfer. The administrator can check the server log for details."}
 
 
 def _tool_cancel_transfer(
@@ -2791,10 +2799,10 @@ def _tool_cancel_transfer(
             "message": f"Transfer #{transfer_id} cancelled.",
             "transfer": result.to_dict(),
         }
-    except Exception as exc:
+    except Exception:
         db.session.rollback()
         logger.exception("AI cancel_transfer failed")
-        return {"error": str(exc)}
+        return {"error": "Could not cancel transfer. The administrator can check the server log for details."}
 
 
 def _user_permissions(user: User | None) -> set[str]:

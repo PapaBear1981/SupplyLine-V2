@@ -33,21 +33,22 @@ export const ActiveWarehouseSelect = () => {
     [data]
   );
 
-  // If the backend user has an active warehouse but the slice hasn't
-  // synced yet (fresh login), hydrate it from the user object.
+  // Sync the slice with backend truth. If the profile has no active
+  // warehouse, clear any stale value from localStorage.
   useEffect(() => {
-    if (
-      user?.active_warehouse_id &&
-      activeWarehouseId !== user.active_warehouse_id
-    ) {
+    if (!user) return;
+    const serverId = user.active_warehouse_id ?? null;
+    if (serverId && serverId !== activeWarehouseId) {
       dispatch(
         setLocalActiveWarehouse({
-          id: user.active_warehouse_id ?? null,
+          id: serverId,
           name: user.active_warehouse_name ?? null,
         })
       );
+    } else if (!serverId && activeWarehouseId) {
+      dispatch(setLocalActiveWarehouse({ id: null, name: null }));
     }
-  }, [user?.active_warehouse_id, user?.active_warehouse_name, activeWarehouseId, dispatch]);
+  }, [user, user?.active_warehouse_id, user?.active_warehouse_name, activeWarehouseId, dispatch]);
 
   const handleChange = async (value: number) => {
     try {

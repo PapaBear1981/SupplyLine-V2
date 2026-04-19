@@ -30,19 +30,22 @@ export function useActiveWarehouse() {
         })
       );
 
-      // Pull the freshly-issued JWT + updated user object back into auth
+      // Pull the freshly-issued JWT + updated user object back into auth.
+      // Only include token/expiry when the server actually rotated the token —
+      // dispatching { token: null } would clear the session in authSlice.
       if (user) {
-        dispatch(
-          setCredentials({
-            user: {
-              ...user,
-              active_warehouse_id: result.active_warehouse_id,
-              active_warehouse_name: result.active_warehouse?.name ?? null,
-            },
-            token: result.tokens?.access_token ?? null,
-            expiresIn: result.tokens?.expires_in,
-          })
-        );
+        const payload: Parameters<typeof setCredentials>[0] = {
+          user: {
+            ...user,
+            active_warehouse_id: result.active_warehouse_id,
+            active_warehouse_name: result.active_warehouse?.name ?? null,
+          },
+        };
+        if (result.tokens?.access_token) {
+          payload.token = result.tokens.access_token;
+          payload.expiresIn = result.tokens.expires_in;
+        }
+        dispatch(setCredentials(payload));
       }
 
       return result;

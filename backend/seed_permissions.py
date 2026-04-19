@@ -140,17 +140,21 @@ PERMISSIONS: list[tuple[str, str, str]] = [
 def run():
     app = create_app()
     with app.app_context():
-        existing = {p.name for p in Permission.query.all()}
+        existing = {p.name: p for p in Permission.query.all()}
         created = 0
-        skipped = 0
+        updated = 0
         for name, description, category in PERMISSIONS:
             if name in existing:
-                skipped += 1
+                perm = existing[name]
+                if perm.description != description or perm.category != category:
+                    perm.description = description
+                    perm.category = category
+                    updated += 1
                 continue
             db.session.add(Permission(name=name, description=description, category=category))
             created += 1
         db.session.commit()
-        print(f"Seed complete: {created} created, {skipped} already present.")
+        print(f"Seed complete: {created} created, {updated} updated, {len(existing) - updated} unchanged.")
 
 
 if __name__ == "__main__":

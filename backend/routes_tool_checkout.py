@@ -387,6 +387,7 @@ def register_tool_checkout_routes(app):
                         "tool_number": tool.tool_number,
                         "success": False,
                         "error": str(scope_err),
+                        "code": "WAREHOUSE_SCOPE",
                     })
                     failed += 1
                     continue
