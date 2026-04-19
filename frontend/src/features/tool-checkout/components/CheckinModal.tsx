@@ -56,6 +56,7 @@ export const CheckinModal = ({ open, checkout, onClose }: CheckinModalProps) => 
   useEffect(() => {
     if (open && checkout) {
       form.setFieldsValue({
+        location: checkout.tool_location || '',
         condition_at_return: checkout.condition_at_checkout,
         damage_reported: false,
       });
@@ -69,6 +70,7 @@ export const CheckinModal = ({ open, checkout, onClose }: CheckinModalProps) => 
       const result = await checkinTool({
         checkoutId: checkout.id,
         data: {
+          location: values.location as string,
           condition_at_return: values.condition_at_return as ToolCondition | undefined,
           return_notes: values.return_notes as string | undefined,
           damage_reported: values.damage_reported as boolean,
@@ -206,6 +208,14 @@ export const CheckinModal = ({ open, checkout, onClose }: CheckinModalProps) => 
           damage_reported: false,
         }}
       >
+        <Form.Item
+          label="Return Location"
+          name="location"
+          rules={[{ required: true, message: 'Please enter where the tool is being stored' }]}
+        >
+          <Input placeholder="Where is this tool being stored? (e.g. Hangar 3, Tool Crib, Bay 12)" />
+        </Form.Item>
+
         <Form.Item
           label="Condition at Return"
           name="condition_at_return"

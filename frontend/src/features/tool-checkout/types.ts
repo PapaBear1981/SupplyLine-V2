@@ -56,6 +56,7 @@ export interface ToolCheckout {
   serial_number?: string;
   tool_description?: string;
   tool_category?: string;
+  tool_location?: string | null;
   user_name?: string;
   user_employee_number?: string;
   user_department?: string;
@@ -153,7 +154,6 @@ export interface CheckoutRequest {
   condition_at_checkout?: ToolCondition;
   work_order?: string;
   project?: string;
-  location?: string;
 }
 
 export interface BatchCheckoutRequest {
@@ -164,7 +164,6 @@ export interface BatchCheckoutRequest {
   condition_at_checkout?: ToolCondition;
   work_order?: string;
   project?: string;
-  location?: string;
 }
 
 export interface BatchCheckoutResult {
@@ -183,6 +182,7 @@ export interface BatchCheckoutResponse {
 }
 
 export interface CheckinRequest {
+  location: string;
   condition_at_return?: ToolCondition;
   return_notes?: string;
   damage_reported?: boolean;

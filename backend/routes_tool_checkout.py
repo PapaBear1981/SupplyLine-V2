@@ -236,10 +236,6 @@ def register_tool_checkout_routes(app):
             old_status = tool.status
             tool.status = "checked_out"
 
-            location = data.get("location")
-            if location:
-                tool.location = location
-
             db.session.flush()  # Get the checkout ID
 
             # Record in tool history
@@ -255,7 +251,6 @@ def register_tool_checkout_routes(app):
                     "work_order": data.get("work_order"),
                     "project": data.get("project"),
                     "notes": data.get("notes"),
-                    "location": location,
                 },
                 related_checkout_id=checkout.id,
                 old_status=old_status,
@@ -427,10 +422,6 @@ def register_tool_checkout_routes(app):
                     old_status = tool.status
                     tool.status = "checked_out"
 
-                    location = data.get("location")
-                    if location:
-                        tool.location = location
-
                     db.session.flush()
 
                     history_entry = ToolHistory.create_event(
@@ -445,7 +436,6 @@ def register_tool_checkout_routes(app):
                             "work_order": data.get("work_order"),
                             "project": data.get("project"),
                             "notes": data.get("notes"),
-                            "location": location,
                             "batch": True,
                         },
                         related_checkout_id=checkout.id,
@@ -548,6 +538,11 @@ def register_tool_checkout_routes(app):
             if not tool:
                 return jsonify({"error": "Tool not found for this checkout"}), 404
 
+            # Location is required on check-in
+            location = (data.get("location") or "").strip()
+            if not location:
+                return jsonify({"error": "Return location is required"}), 400
+
             # Process return details
             condition_at_return = data.get("condition_at_return") or data.get("condition")
             return_notes = data.get("return_notes") or data.get("notes")
@@ -567,9 +562,11 @@ def register_tool_checkout_routes(app):
                 checkout.damage_severity = damage_severity
                 checkout.damage_reported_date = datetime.now()
 
-            # Update tool status and condition
+            # Update tool status, condition, and location
             old_status = tool.status
             old_condition = tool.condition
+
+            tool.location = location
 
             if damage_reported and damage_severity in ["severe", "unusable"]:
                 # Put tool in maintenance if severely damaged
@@ -593,6 +590,7 @@ def register_tool_checkout_routes(app):
                     "original_user_name": checkout.user.name if checkout.user else "Unknown",
                     "checked_in_by_id": current_user_id,
                     "condition_at_return": condition_at_return,
+                    "return_location": location,
                     "notes": return_notes,
                     "checkout_date": checkout.checkout_date.isoformat() if checkout.checkout_date else None,
                 },

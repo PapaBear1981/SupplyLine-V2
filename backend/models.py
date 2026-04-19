@@ -584,6 +584,7 @@ class Checkout(db.Model):
             result["serial_number"] = self.tool.serial_number
             result["tool_description"] = self.tool.description
             result["tool_category"] = self.tool.category
+            result["tool_location"] = self.tool.location
 
         if include_user and self.user:
             result["user_name"] = self.user.name

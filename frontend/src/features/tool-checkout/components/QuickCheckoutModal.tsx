@@ -111,7 +111,6 @@ export const QuickCheckoutModal = ({ open, onClose }: QuickCheckoutModalProps) =
         condition_at_checkout: values.condition_at_checkout as ToolCondition | undefined,
         work_order: values.work_order as string | undefined,
         project: values.project as string | undefined,
-        location: values.location as string | undefined,
       }).unwrap();
 
       setBatchResults(result.results);
@@ -368,9 +367,6 @@ export const QuickCheckoutModal = ({ open, onClose }: QuickCheckoutModalProps) =
           type="primary"
           disabled={!selectedUser}
           onClick={() => {
-            if (selectedTools.length === 1 && selectedTools[0].location) {
-              form.setFieldsValue({ location: selectedTools[0].location });
-            }
             setStep('details');
           }}
         >
@@ -456,10 +452,6 @@ export const QuickCheckoutModal = ({ open, onClose }: QuickCheckoutModalProps) =
 
         <Form.Item label="Project" name="project">
           <Input placeholder="Project name (optional)" />
-        </Form.Item>
-
-        <Form.Item label="Checkout Location" name="location">
-          <Input placeholder="Where is this tool going? (e.g. Hangar 3, Bay 12)" />
         </Form.Item>
 
         <Form.Item label="Notes" name="notes">
