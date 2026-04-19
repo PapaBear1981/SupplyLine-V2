@@ -1749,7 +1749,7 @@ def _tool_checkout_tool(
             return {
                 "error": f"There is no active user named '{query_str}' in the system. Please check the name and try again.",
             }
-        elif len(matches) > 1:
+        if len(matches) > 1:
             names = ", ".join(u.name for u in matches[:8])
             return {
                 "needs_clarification": True,
@@ -2349,7 +2349,7 @@ def _tool_issue_chemical(
         ).all()
         if len(matches) == 0:
             return {"error": f"No active user found matching '{query_str}'. Please check the name or employee number."}
-        elif len(matches) > 1:
+        if len(matches) > 1:
             names = ", ".join(u.name for u in matches[:8])
             return {
                 "needs_clarification": True,

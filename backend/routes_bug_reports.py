@@ -1,7 +1,5 @@
 """Bug report routes — submit, list, update, and delete bug reports."""
 
-from datetime import datetime
-
 from flask import jsonify, request
 
 from auth import jwt_required, permission_required

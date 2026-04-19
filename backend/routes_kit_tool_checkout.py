@@ -23,6 +23,7 @@ from auth.jwt_manager import jwt_required, permission_required
 from models import AuditLog, Checkout, Tool, ToolHistory, UserActivity, db
 from models_kits import Kit, KitToolCheckout
 
+
 logger = logging.getLogger(__name__)
 
 
