@@ -1,6 +1,7 @@
 """GitHub issue creation for bug reports."""
 
 import logging
+from urllib.parse import quote
 
 import requests
 
@@ -23,11 +24,11 @@ def create_github_issue(report: dict, token: str, owner: str, repo: str) -> dict
     Returns {"number": int, "html_url": str} on success, None on failure.
     Never raises — all errors are logged and swallowed so callers stay unblocked.
     """
-    title = f"[Bug] {report.get('title', 'Untitled')}"
+    title = f"[Bug] {report.get('title') or 'Untitled'}"
 
-    severity = report.get("severity", "medium")
+    severity = report.get("severity") or "medium"
     reported_by = report.get("reported_by_name") or "Unknown"
-    description = report.get("description", "")
+    description = report.get("description") or ""
     steps = report.get("steps_to_reproduce") or ""
     page = report.get("page_context") or ""
 
@@ -66,7 +67,7 @@ def create_github_issue(report: dict, token: str, owner: str, repo: str) -> dict
 
     try:
         resp = requests.post(
-            f"{GITHUB_API_BASE}/repos/{owner}/{repo}/issues",
+            f"{GITHUB_API_BASE}/repos/{quote(owner, safe='')}/{quote(repo, safe='')}/issues",
             json=payload,
             headers=headers,
             timeout=10,

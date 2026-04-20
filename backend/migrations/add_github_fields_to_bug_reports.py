@@ -8,14 +8,26 @@ import sys
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
+from flask import Flask
 from sqlalchemy import inspect, text
 
-from app import create_app
+from config import Config
 from models import db
 
 
+def _create_migration_app():
+    """Minimal Flask app — only config + db, no routes or scheduled services."""
+    app = Flask(__name__)
+    app.config.from_object(Config)
+    runtime_db_url = os.environ.get("DATABASE_URL")
+    if runtime_db_url:
+        app.config["SQLALCHEMY_DATABASE_URI"] = runtime_db_url
+    db.init_app(app)
+    return app
+
+
 def migrate():
-    app = create_app()
+    app = _create_migration_app()
 
     with app.app_context():
         inspector = inspect(db.engine)

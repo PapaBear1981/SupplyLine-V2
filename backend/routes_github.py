@@ -52,8 +52,10 @@ def register_github_routes(app):
     @permission_required("system.settings")
     def update_github_settings():
         data    = request.get_json() or {}
-        user_id = getattr(request.current_user, "id", None) or (
-            request.current_user.get("user_id") if isinstance(request.current_user, dict) else None
+        user_id = (
+            request.current_user.get("user_id")
+            if isinstance(request.current_user, dict)
+            else getattr(request.current_user, "id", None)
         )
 
         if "enabled" in data:

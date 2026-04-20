@@ -195,16 +195,25 @@ export const BugReportManagement = () => {
       title: 'GitHub',
       dataIndex: 'github_issue_url',
       width: 80,
-      render: (url: string | null, record) =>
-        url ? (
-          <Tooltip title={`GitHub Issue #${record.github_issue_number}`}>
-            <a href={url} target="_blank" rel="noopener noreferrer">
+      render: (url: string | null, record) => {
+        const issueLabel = record.github_issue_number
+          ? `GitHub Issue #${record.github_issue_number}`
+          : 'GitHub issue';
+        return url ? (
+          <Tooltip title={issueLabel}>
+            <a
+              href={url}
+              target="_blank"
+              rel="noopener noreferrer"
+              aria-label={`Open ${issueLabel} in a new tab`}
+            >
               <GithubOutlined style={{ fontSize: 16 }} />
             </a>
           </Tooltip>
         ) : (
           <Text type="secondary">—</Text>
-        ),
+        );
+      },
     },
     {
       title: 'Actions',
