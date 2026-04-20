@@ -6,7 +6,8 @@ import time
 
 from flask import Flask
 from flask_cors import CORS
-from sqlalchemy import inspect as sa_inspect, text as sa_text
+from sqlalchemy import inspect as sa_inspect
+from sqlalchemy import text as sa_text
 
 from config import Config
 from models import db
