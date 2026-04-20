@@ -38,15 +38,16 @@ export const TransfersTable = ({
         <Space direction="vertical" size={0}>
           <Tag>{record.item_type}</Tag>
           <Text strong>
-            {record.item_snapshot?.description ||
-              record.item_snapshot?.identifier ||
-              `ID ${record.item_id}`}
+            {record.item_snapshot?.identifier || `ID ${record.item_id}`}
           </Text>
+          {record.item_snapshot?.description && (
+            <Text type="secondary">{record.item_snapshot.description}</Text>
+          )}
           {record.item_snapshot?.serial_number && (
-            <Text type="secondary">S/N {record.item_snapshot.serial_number}</Text>
+            <Text type="secondary">S/N: {record.item_snapshot.serial_number}</Text>
           )}
           {record.item_snapshot?.lot_number && (
-            <Text type="secondary">Lot {record.item_snapshot.lot_number}</Text>
+            <Text type="secondary">Lot: {record.item_snapshot.lot_number}</Text>
           )}
         </Space>
       ),

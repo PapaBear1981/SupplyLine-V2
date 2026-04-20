@@ -5,9 +5,9 @@ import os
 import time
 
 from flask import Flask
-
-# from flask_session import Session  # Disabled due to Flask 3.x compatibility issues - using JWT instead
 from flask_cors import CORS
+from sqlalchemy import inspect as sa_inspect
+from sqlalchemy import text as sa_text
 
 from config import Config
 from models import db
@@ -263,7 +263,6 @@ def create_app():
         # db.engine.connect() uses SQLAlchemy Core — works on both SQLite and
         # PostgreSQL, unlike raw_connection() which is DBAPI-driver-specific.
         try:
-            from sqlalchemy import inspect as sa_inspect, text as sa_text
             with app.app_context():
                 inspector = sa_inspect(db.engine)
                 tables = set(inspector.get_table_names())
