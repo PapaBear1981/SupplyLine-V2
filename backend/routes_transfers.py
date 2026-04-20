@@ -472,6 +472,10 @@ def _initiate_transfer(*, to_warehouse_id, item_type, item_id, quantity, notes,
     db.session.add(transfer)
     db.session.flush()
 
+    # Mark tool as in-transit so it can't be checked out or transferred again
+    if item_type == "tool":
+        item.status = "in_transfer"
+
     if item_type == "tool":
         history = ToolHistory.create_event(
             tool_id=item.id,
@@ -540,6 +544,7 @@ def _receive_transfer(*, transfer_id, destination_location, received_notes, user
     if transfer.item_type == "tool":
         item.warehouse_id = to_warehouse.id
         item.location = dest_location
+        item.status = "available"  # restore from in_transfer
     elif transfer.quantity and transfer.quantity < (item.quantity or 0):
         # Partial-quantity chemical transfer → split the lot on receipt.
         child = create_child_chemical(
@@ -627,6 +632,12 @@ def _cancel_transfer(*, transfer_id, cancel_reason, user_id, is_admin):
     transfer.cancelled_date = datetime.now()
     transfer.cancel_reason = str(cancel_reason).strip()
 
+    # Restore tool availability so it can be used again
+    if transfer.item_type == "tool":
+        item = _load_tool_or_chemical("tool", transfer.item_id)
+        if item and item.status == "in_transfer":
+            item.status = "available"
+
     AuditLog.log(
         user_id=user_id,
         action="transfer_cancelled",
@@ -641,6 +652,86 @@ def _cancel_transfer(*, transfer_id, cancel_reason, user_id, is_admin):
     )
 
     return transfer, None, None
+
+
+@transfers_bp.route("/transfers/lookup-item", methods=["GET"])
+@permission_required("transfer.initiate")
+def lookup_transfer_item():
+    """
+    Resolve a tool or chemical to its database ID using human-readable identifiers.
+
+    Query params:
+        item_type (str): 'tool' | 'chemical'
+        warehouse_id (int): warehouse to search within (defaults to user's active warehouse)
+        tool_number (str): required when item_type='tool'
+        serial_number (str): required when item_type='tool'
+        part_number (str): required when item_type='chemical'
+        lot_number (str): required when item_type='chemical'
+
+    Returns:
+        { item: { id, description, ... } }
+    """
+    item_type = (request.args.get("item_type") or "").strip().lower()
+    warehouse_id = request.args.get("warehouse_id", type=int) or get_active_warehouse_id()
+
+    if not warehouse_id:
+        return jsonify({"error": "No warehouse specified and no active warehouse set"}), 400
+
+    warehouse = db.session.get(Warehouse, warehouse_id)
+    if not warehouse:
+        return jsonify({"error": "Warehouse not found"}), 404
+
+    if item_type == "tool":
+        tool_number = (request.args.get("tool_number") or "").strip()
+        serial_number = (request.args.get("serial_number") or "").strip()
+        if not tool_number or not serial_number:
+            return jsonify({"error": "tool_number and serial_number are required"}), 400
+        item = Tool.query.filter(
+            Tool.tool_number == tool_number,
+            Tool.serial_number == serial_number,
+            Tool.warehouse_id == warehouse_id,
+        ).first()
+        if not item:
+            return jsonify({"error": f"No tool with number '{tool_number}' and serial '{serial_number}' found in {warehouse.name}"}), 404
+        return jsonify({
+            "item": {
+                "id": item.id,
+                "description": item.description,
+                "tool_number": item.tool_number,
+                "serial_number": item.serial_number,
+                "location": item.location,
+                "status": item.status,
+                "category": item.category,
+            }
+        })
+
+    if item_type == "chemical":
+        part_number = (request.args.get("part_number") or "").strip()
+        lot_number = (request.args.get("lot_number") or "").strip()
+        if not part_number or not lot_number:
+            return jsonify({"error": "part_number and lot_number are required"}), 400
+        item = Chemical.query.filter(
+            Chemical.part_number == part_number,
+            Chemical.lot_number == lot_number,
+            Chemical.warehouse_id == warehouse_id,
+        ).first()
+        if not item:
+            return jsonify({"error": f"No chemical with part number '{part_number}' and lot '{lot_number}' found in {warehouse.name}"}), 404
+        return jsonify({
+            "item": {
+                "id": item.id,
+                "description": item.description,
+                "part_number": item.part_number,
+                "lot_number": item.lot_number,
+                "quantity": item.quantity,
+                "unit": item.unit,
+                "location": item.location,
+                "status": item.status,
+                "category": item.category,
+            }
+        })
+
+    return jsonify({"error": "item_type must be 'tool' or 'chemical'"}), 400
 
 
 @transfers_bp.route("/transfers/initiate", methods=["POST"])

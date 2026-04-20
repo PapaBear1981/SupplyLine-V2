@@ -1,6 +1,7 @@
-import { useEffect, useMemo } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Alert,
+  Card,
   Form,
   Input,
   InputNumber,
@@ -8,16 +9,19 @@ import {
   Segmented,
   Select,
   Space,
+  Tag,
   Typography,
   message,
+  theme,
 } from 'antd';
 import { useActiveWarehouse } from '@features/warehouses/hooks/useActiveWarehouse';
 import { useGetWarehousesQuery } from '@features/warehouses/services/warehousesApi';
+import { useGetToolsQuery } from '@features/tools/services/toolsApi';
+import { useGetChemicalsQuery } from '@features/chemicals/services/chemicalsApi';
+import type { Tool } from '@features/tools/types';
+import type { Chemical } from '@features/chemicals/types';
 import { useInitiateTransferMutation } from '../services/transfersApi';
-import type {
-  InitiateTransferItemType,
-  InitiateTransferPayload,
-} from '../types';
+import type { InitiateTransferItemType, InitiateTransferPayload } from '../types';
 
 const { Text } = Typography;
 
@@ -40,6 +44,7 @@ export const InitiateTransferModal = ({
   preset,
 }: InitiateTransferModalProps) => {
   const [form] = Form.useForm();
+  const { token } = theme.useToken();
   const { activeWarehouseId, activeWarehouseName } = useActiveWarehouse();
   const { data: warehousesData } = useGetWarehousesQuery({
     include_inactive: false,
@@ -47,30 +52,117 @@ export const InitiateTransferModal = ({
   });
   const [initiate, { isLoading }] = useInitiateTransferMutation();
 
-  const destinationOptions = useMemo(() => {
-    return (warehousesData?.warehouses || [])
-      .filter((w) => w.is_active && w.id !== activeWarehouseId)
-      .map((w) => ({ label: w.name, value: w.id }));
-  }, [warehousesData, activeWarehouseId]);
+  const itemType: InitiateTransferItemType = Form.useWatch('item_type', form) ?? 'tool';
 
-  const itemType: InitiateTransferItemType = Form.useWatch('item_type', form) || 'tool';
+  // Search text drives the autocomplete queries
+  const [itemSearch, setItemSearch] = useState('');
 
+  // Resolved item — stored in state so the button enables reactively
+  const [resolvedTool, setResolvedTool] = useState<Tool | null>(null);
+  const [resolvedChemical, setResolvedChemical] = useState<Chemical | null>(null);
+
+  const resolvedId =
+    preset?.itemId ?? (itemType === 'tool' ? resolvedTool?.id : resolvedChemical?.id);
+  const resolvedItem = itemType === 'tool' ? resolvedTool : resolvedChemical;
+
+  // Autocomplete data — always scoped to the active warehouse
+  const { data: toolsData, isFetching: toolsFetching } = useGetToolsQuery(
+    { page: 1, per_page: 30, q: itemSearch || undefined, warehouse_id: activeWarehouseId ?? undefined, status: 'available' },
+    { skip: !activeWarehouseId || !!preset?.itemId || itemType !== 'tool' }
+  );
+
+  const { data: chemicalsData, isFetching: chemsFetching } = useGetChemicalsQuery(
+    { page: 1, per_page: 30, q: itemSearch || undefined, warehouse_id: activeWarehouseId ?? undefined },
+    { skip: !activeWarehouseId || !!preset?.itemId || itemType !== 'chemical' }
+  );
+
+  type ItemOption = { value: number; label: string; item: Tool | Chemical };
+
+  const toolOptions: ItemOption[] = useMemo(
+    () =>
+      (toolsData?.tools ?? []).map((t) => ({
+        value: t.id,
+        label: `${t.tool_number} · S/N ${t.serial_number}${t.description ? ` — ${t.description}` : ''}`,
+        item: t as Tool | Chemical,
+      })),
+    [toolsData]
+  );
+
+  const chemicalOptions: ItemOption[] = useMemo(
+    () =>
+      (chemicalsData?.chemicals ?? []).map((c) => ({
+        value: c.id,
+        label: `${c.part_number} / ${c.lot_number}${c.description ? ` — ${c.description}` : ''} (${c.quantity} ${c.unit})`,
+        item: c as Tool | Chemical,
+      })),
+    [chemicalsData]
+  );
+
+  const destinationOptions = useMemo(
+    () =>
+      (warehousesData?.warehouses || [])
+        .filter((w) => w.is_active && w.id !== activeWarehouseId)
+        .map((w) => ({ label: w.name, value: w.id })),
+    [warehousesData, activeWarehouseId]
+  );
+
+  // Reset all state when the modal opens — use a ref to track previous open
+  // state so we can call setState in a timeout (avoids cascading-render lint rule)
+  const prevOpenRef = useRef(false);
   useEffect(() => {
-    if (open) {
-      form.resetFields();
-      form.setFieldsValue({
-        item_type: preset?.itemType || 'tool',
-        item_id: preset?.itemId,
-        quantity: 1,
-      });
+    if (open && !prevOpenRef.current) {
+      const t = setTimeout(() => {
+        form.resetFields();
+        form.setFieldsValue({ item_type: preset?.itemType ?? 'tool', quantity: 1 });
+        setItemSearch('');
+        setResolvedTool(null);
+        setResolvedChemical(null);
+      }, 0);
+      return () => clearTimeout(t);
     }
+    prevOpenRef.current = open;
   }, [open, preset, form]);
 
+  // Keep quantity within available stock when a chemical is selected
+  useEffect(() => {
+    if (resolvedChemical) {
+      const current = form.getFieldValue('quantity') as number | undefined;
+      if (!current || current > resolvedChemical.quantity) {
+        form.setFieldsValue({ quantity: Math.min(current ?? 1, resolvedChemical.quantity) });
+      }
+    }
+  }, [resolvedChemical, form]);
+
+  const handleItemSelect = (
+    _value: number,
+    option: unknown
+  ) => {
+    const opt = option as { item: Tool | Chemical };
+    if (itemType === 'tool') {
+      setResolvedTool(opt.item as Tool);
+      setResolvedChemical(null);
+    } else {
+      setResolvedChemical(opt.item as Chemical);
+      setResolvedTool(null);
+    }
+    setItemSearch('');
+  };
+
+  const clearResolved = () => {
+    setResolvedTool(null);
+    setResolvedChemical(null);
+    setItemSearch('');
+  };
+
   const submit = async (values: Record<string, unknown>) => {
+    if (!resolvedId) {
+      message.error('Select an item before initiating a transfer.');
+      return;
+    }
     const payload: InitiateTransferPayload = {
       to_warehouse_id: values.to_warehouse_id as number,
       item_type: values.item_type as InitiateTransferItemType,
-      item_id: Number(values.item_id),
+      item_id: resolvedId,
       quantity: Number(values.quantity) || 1,
       notes: (values.notes as string) || undefined,
     };
@@ -93,7 +185,7 @@ export const InitiateTransferModal = ({
       onCancel={onClose}
       onOk={() => form.submit()}
       okText="Initiate"
-      okButtonProps={{ loading: isLoading }}
+      okButtonProps={{ loading: isLoading, disabled: !resolvedId }}
       destroyOnHidden
     >
       {!activeWarehouseId && (
@@ -119,7 +211,13 @@ export const InitiateTransferModal = ({
         description="The destination user will assign the physical location on receipt."
       />
 
-      <Form form={form} layout="vertical" onFinish={submit} disabled={!activeWarehouseId} preserve={false}>
+      <Form
+        form={form}
+        layout="vertical"
+        onFinish={submit}
+        disabled={!activeWarehouseId}
+        preserve={false}
+      >
         <Form.Item
           label="Item type"
           name="item_type"
@@ -131,17 +229,98 @@ export const InitiateTransferModal = ({
               { label: 'Chemical', value: 'chemical' },
             ]}
             disabled={Boolean(preset?.itemType)}
+            onChange={clearResolved}
           />
         </Form.Item>
 
-        <Form.Item
-          label={preset?.itemLabel ? `Item (${preset.itemLabel})` : 'Item ID'}
-          name="item_id"
-          rules={[{ required: true, message: 'Required' }]}
-          help="Use the tool / chemical row's ID. The initiate-from-row flow pre-fills this."
-        >
-          <InputNumber style={{ width: '100%' }} min={1} disabled={Boolean(preset?.itemId)} />
-        </Form.Item>
+        {/* ---- Item selection ---- */}
+        {preset?.itemId ? (
+          <Form.Item label="Item">
+            <Input
+              value={preset.itemLabel ?? `${preset.itemType} #${preset.itemId}`}
+              disabled
+            />
+          </Form.Item>
+        ) : (
+          <Form.Item
+            label={itemType === 'tool' ? 'Tool' : 'Chemical'}
+            required
+            help={
+              itemType === 'tool'
+                ? 'Search by tool number, serial number, or description'
+                : 'Search by part number, lot number, or description'
+            }
+          >
+            <Select
+              showSearch
+              filterOption={false}
+              onSearch={setItemSearch}
+              onChange={handleItemSelect}
+              onClear={clearResolved}
+              allowClear
+              loading={toolsFetching || chemsFetching}
+              placeholder={
+                itemType === 'tool'
+                  ? 'Type to search tools in this warehouse…'
+                  : 'Type to search chemicals in this warehouse…'
+              }
+              options={itemType === 'tool' ? toolOptions : chemicalOptions}
+              notFoundContent={
+                itemSearch.length > 0
+                  ? `No ${itemType}s found matching "${itemSearch}"`
+                  : `Type to search ${itemType}s in ${activeWarehouseName ?? 'your warehouse'}`
+              }
+              style={{ width: '100%' }}
+            />
+          </Form.Item>
+        )}
+
+        {/* ---- Found item confirmation card ---- */}
+        {resolvedItem && (
+          <Card
+            size="small"
+            style={{
+              marginBottom: 12,
+              background: token.colorSuccessBg,
+              borderColor: token.colorSuccessBorder,
+            }}
+          >
+            <Space direction="vertical" size={2} style={{ width: '100%' }}>
+              <Space>
+                <Tag color="success">Found</Tag>
+                <Text strong>{resolvedItem.description}</Text>
+              </Space>
+              {itemType === 'tool' ? (
+                <>
+                  <Text type="secondary">
+                    Tool #: {(resolvedItem as Tool).tool_number}
+                    {' · '}S/N: {(resolvedItem as Tool).serial_number}
+                  </Text>
+                  {resolvedItem.location && (
+                    <Text type="secondary">Location: {resolvedItem.location}</Text>
+                  )}
+                  {(resolvedItem as Tool).status && (
+                    <Text type="secondary">Status: {(resolvedItem as Tool).status}</Text>
+                  )}
+                </>
+              ) : (
+                <>
+                  <Text type="secondary">
+                    P/N: {(resolvedItem as Chemical).part_number}
+                    {' · '}Lot: {(resolvedItem as Chemical).lot_number}
+                  </Text>
+                  <Text type="secondary">
+                    Available: {(resolvedItem as Chemical).quantity}{' '}
+                    {(resolvedItem as Chemical).unit}
+                  </Text>
+                  {resolvedItem.location && (
+                    <Text type="secondary">Location: {resolvedItem.location}</Text>
+                  )}
+                </>
+              )}
+            </Space>
+          </Card>
+        )}
 
         <Form.Item
           label="Destination warehouse"
@@ -158,16 +337,44 @@ export const InitiateTransferModal = ({
 
         {itemType === 'chemical' && (
           <Form.Item
-            label="Quantity"
+            label={
+              resolvedChemical
+                ? `Quantity (max ${resolvedChemical.quantity} ${resolvedChemical.unit})`
+                : 'Quantity'
+            }
             name="quantity"
-            rules={[{ required: true, message: 'Required' }]}
+            rules={[
+              { required: true, message: 'Required' },
+              {
+                validator: (_, value) => {
+                  if (
+                    resolvedChemical &&
+                    value > resolvedChemical.quantity
+                  ) {
+                    return Promise.reject(
+                      new Error(
+                        `Cannot exceed available quantity (${resolvedChemical.quantity})`
+                      )
+                    );
+                  }
+                  return Promise.resolve();
+                },
+              },
+            ]}
           >
-            <InputNumber min={1} style={{ width: '100%' }} />
+            <InputNumber
+              min={1}
+              max={resolvedChemical?.quantity}
+              style={{ width: '100%' }}
+            />
           </Form.Item>
         )}
 
         <Form.Item label="Notes (optional)" name="notes">
-          <Input.TextArea rows={2} placeholder="Shipping method, tracking number, etc." />
+          <Input.TextArea
+            rows={2}
+            placeholder="Shipping method, tracking number, etc."
+          />
         </Form.Item>
       </Form>
     </Modal>

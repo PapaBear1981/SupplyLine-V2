@@ -86,10 +86,14 @@ export const ChemicalsTable = ({ onView, onEdit, onIssue }: ChemicalsTableProps)
       width: 140,
       sorter: (a, b) => a.part_number.localeCompare(b.part_number),
       render: (text, record) => (
-        <Space size={6}>
+        <Space direction="vertical" size={2}>
           <Text strong>{text}</Text>
-          {record.expiring_soon && <Tag color="orange">Expiring Soon</Tag>}
-          {record.is_archived && <Tag color="default">Archived</Tag>}
+          {(record.expiring_soon || record.is_archived) && (
+            <Space size={4}>
+              {record.expiring_soon && <Tag color="orange">Expiring Soon</Tag>}
+              {record.is_archived && <Tag color="default">Archived</Tag>}
+            </Space>
+          )}
         </Space>
       ),
     },
@@ -160,13 +164,15 @@ export const ChemicalsTable = ({ onView, onEdit, onIssue }: ChemicalsTableProps)
         (a.expiration_date ? dayjs(a.expiration_date).valueOf() : 0) -
         (b.expiration_date ? dayjs(b.expiration_date).valueOf() : 0),
     },
-    {
-      title: 'Warehouse',
-      dataIndex: 'warehouse_name',
-      key: 'warehouse_name',
-      width: 160,
-      render: (_text, record) => record.warehouse_name || record.warehouse_id || '—',
-    },
+    ...(showAllWarehouses
+      ? [{
+          title: 'Warehouse',
+          dataIndex: 'warehouse_name',
+          key: 'warehouse_name',
+          width: 160,
+          render: (_text: unknown, record: Chemical) => record.warehouse_name || '—',
+        }]
+      : []),
     {
       title: 'Actions',
       key: 'actions',

@@ -34,12 +34,13 @@ export const activeWarehouseApi = baseApi.injectEndpoints({
         method: 'POST',
         body,
       }),
-      // Scope changes invalidate tool & chemical lists so they re-fetch
+      // Invalidate all Transfer, Tool and Chemical cache entries so every
+      // warehouse-scoped list re-fetches with the new JWT after the switch.
       invalidatesTags: [
         { type: 'ActiveWarehouse', id: 'ME' },
         { type: 'Tool', id: 'LIST' },
         { type: 'Chemical', id: 'LIST' },
-        { type: 'Transfer', id: 'LIST' },
+        { type: 'Transfer' as const },   // clears inbound, outbound, list (all warehouses)
         { type: 'User', id: 'ME' },
       ],
     }),

@@ -61,6 +61,9 @@ export interface TransfersQueryParams {
   status?: TransferStatus | 'all';
   direction?: 'inbound' | 'outbound' | 'all';
   item_type?: TransferItemType;
+  /** Used as a cache-key discriminator so RTK Query re-fetches when the
+   *  active warehouse changes. The backend reads warehouse from the JWT. */
+  activeWarehouseId?: number | null;
 }
 
 export interface InitiateTransferPayload {
@@ -70,6 +73,39 @@ export interface InitiateTransferPayload {
   quantity?: number;
   notes?: string;
 }
+
+export interface ItemLookupParams {
+  item_type: InitiateTransferItemType;
+  warehouse_id: number;
+  tool_number?: string;
+  serial_number?: string;
+  part_number?: string;
+  lot_number?: string;
+}
+
+export interface ToolLookupResult {
+  id: number;
+  description?: string | null;
+  tool_number: string;
+  serial_number: string;
+  location?: string | null;
+  status?: string | null;
+  category?: string | null;
+}
+
+export interface ChemicalLookupResult {
+  id: number;
+  description?: string | null;
+  part_number: string;
+  lot_number: string;
+  quantity: number;
+  unit: string;
+  location?: string | null;
+  status?: string | null;
+  category?: string | null;
+}
+
+export type ItemLookupResult = ToolLookupResult | ChemicalLookupResult;
 
 export interface ReceiveTransferPayload {
   destination_location: string;

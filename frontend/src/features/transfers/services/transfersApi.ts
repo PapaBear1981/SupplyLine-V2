@@ -2,14 +2,19 @@ import { baseApi } from '@services/baseApi';
 import type {
   CancelTransferPayload,
   InitiateTransferPayload,
+  ItemLookupParams,
+  ItemLookupResult,
   ReceiveTransferPayload,
   Transfer,
   TransfersListResponse,
   TransfersQueryParams,
 } from '../types';
 
+// Broad invalidation: clears all Transfer entries so both warehouse-keyed
+// and unkeyed inbound/outbound caches are evicted after a write.
 const WRITE_INVALIDATIONS = [
   { type: 'Transfer' as const, id: 'LIST' },
+  { type: 'Transfer' as const },
   { type: 'Tool' as const, id: 'LIST' },
   { type: 'Chemical' as const, id: 'LIST' },
 ];
@@ -44,7 +49,11 @@ export const transfersApi = baseApi.injectEndpoints({
           },
         };
       },
-      providesTags: [{ type: 'Transfer', id: 'INBOUND' }],
+      // Keyed by warehouse so the cache is invalidated on warehouse switch
+      providesTags: (_r, _e, params) => {
+        const wh = (params as TransfersQueryParams)?.activeWarehouseId;
+        return [{ type: 'Transfer', id: wh ? `INBOUND_${wh}` : 'INBOUND' }];
+      },
     }),
 
     listOutboundTransfers: builder.query<TransfersListResponse, TransfersQueryParams | void>({
@@ -59,7 +68,10 @@ export const transfersApi = baseApi.injectEndpoints({
           },
         };
       },
-      providesTags: [{ type: 'Transfer', id: 'OUTBOUND' }],
+      providesTags: (_r, _e, params) => {
+        const wh = (params as TransfersQueryParams)?.activeWarehouseId;
+        return [{ type: 'Transfer', id: wh ? `OUTBOUND_${wh}` : 'OUTBOUND' }];
+      },
     }),
 
     getTransfer: builder.query<{ transfer: Transfer }, number>({
@@ -116,6 +128,13 @@ export const transfersApi = baseApi.injectEndpoints({
         { type: 'Transfer', id: 'OUTBOUND' },
       ],
     }),
+
+    lookupTransferItem: builder.query<{ item: ItemLookupResult }, ItemLookupParams>({
+      query: (params) => ({
+        url: '/api/transfers/lookup-item',
+        params,
+      }),
+    }),
   }),
 });
 
@@ -127,4 +146,5 @@ export const {
   useInitiateTransferMutation,
   useReceiveTransferMutation,
   useCancelTransferMutation,
+  useLookupTransferItemQuery,
 } = transfersApi;

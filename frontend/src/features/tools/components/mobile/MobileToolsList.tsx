@@ -40,6 +40,7 @@ const statusColors: Record<ToolStatus, string> = {
   checked_out: '#1890ff',
   maintenance: '#faad14',
   retired: '#8c8c8c',
+  in_transfer: '#722ed1',
 };
 
 // Calibration status color mapping

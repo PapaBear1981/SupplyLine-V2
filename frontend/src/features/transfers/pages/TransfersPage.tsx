@@ -5,6 +5,7 @@ import { useAppSelector } from '@app/hooks';
 import { useIsMobile } from '@shared/hooks/useMobile';
 import { PermissionGuard } from '@features/auth/components/PermissionGuard';
 import { usePermission } from '@features/auth/hooks/usePermission';
+import { useActiveWarehouse } from '@features/warehouses/hooks/useActiveWarehouse';
 import { MobileTransfersPage } from '../components/mobile/MobileTransfersPage';
 import {
   useListInboundTransfersQuery,
@@ -34,9 +35,13 @@ export const TransfersPage = () => {
   const [receiveTarget, setReceiveTarget] = useState<Transfer | null>(null);
   const [cancelTarget, setCancelTarget] = useState<Transfer | null>(null);
 
-  const inbound = useListInboundTransfersQuery({ page, per_page: 20 });
-  const outbound = useListOutboundTransfersQuery({ page, per_page: 20 });
-  const history = useListTransfersQuery({ page, per_page: 20 });
+  const { activeWarehouseId } = useActiveWarehouse();
+
+  // Pass activeWarehouseId so RTK Query uses a warehouse-scoped cache key.
+  // When the user switches warehouses the ID changes, forcing a fresh fetch.
+  const inbound = useListInboundTransfersQuery({ page, per_page: 20, activeWarehouseId });
+  const outbound = useListOutboundTransfersQuery({ page, per_page: 20, activeWarehouseId });
+  const history = useListTransfersQuery({ page, per_page: 20, activeWarehouseId });
 
   if (!canView && !isAdmin) {
     return (

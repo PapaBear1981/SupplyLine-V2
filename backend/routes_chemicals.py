@@ -148,6 +148,7 @@ def register_chemical_routes(app):
         status = request.args.get("status")
         search = request.args.get("q")
         show_archived = request.args.get("archived", "false").lower() == "true"
+        warehouse_id = request.args.get("warehouse_id", type=int)
 
         # Validate pagination parameters
         if page < 1:
@@ -167,6 +168,8 @@ def register_chemical_routes(app):
             logger.warning("is_archived column not found, skipping archived filter")
 
         # Apply filters if provided
+        if warehouse_id:
+            query = query.filter(Chemical.warehouse_id == warehouse_id)
         if category:
             query = query.filter(Chemical.category == category)
         if status:

@@ -12,6 +12,11 @@ import {
   Timeline,
   Empty,
   Image,
+  Modal,
+  Select,
+  Input,
+  DatePicker,
+  Typography,
 } from 'antd';
 import {
   EditOutlined,
@@ -19,6 +24,7 @@ import {
   HistoryOutlined,
   InfoCircleOutlined,
   PrinterOutlined,
+  ToolOutlined,
 } from '@ant-design/icons';
 import dayjs from 'dayjs';
 import {
@@ -41,10 +47,24 @@ interface ToolDrawerProps {
   onSuccess?: () => void;
 }
 
+const MAINTENANCE_TYPES = [
+  'Scheduled Maintenance',
+  'Repair',
+  'Calibration',
+  'Inspection',
+  'Cleaning / Lubrication',
+  'Parts Replacement',
+  'Other',
+];
+
+const { Text } = Typography;
+
 export const ToolDrawer = ({ open, mode: initialMode, toolId, onClose, onSuccess }: ToolDrawerProps) => {
   const [mode, setMode] = useState(initialMode);
   const [form] = Form.useForm();
   const [printModalOpen, setPrintModalOpen] = useState(false);
+  const [maintModalOpen, setMaintModalOpen] = useState(false);
+  const [maintForm] = Form.useForm();
 
   // Fetch tool data if viewing or editing
   const { data: tool, isLoading } = useGetToolQuery(toolId!, {
@@ -90,6 +110,31 @@ export const ToolDrawer = ({ open, mode: initialMode, toolId, onClose, onSuccess
     }
   };
 
+  const handleMaintenanceSubmit = async () => {
+    try {
+      const values = await maintForm.validateFields();
+      await updateTool({
+        id: toolId!,
+        data: {
+          status: 'maintenance',
+          status_reason: `${values.maintenance_type}${values.description ? `: ${values.description}` : ''}`,
+          maintenance_return_date: values.return_date
+            ? (values.return_date as ReturnType<typeof dayjs>).format('YYYY-MM-DD')
+            : undefined,
+        },
+      }).unwrap();
+      message.success('Tool checked out for maintenance');
+      setMaintModalOpen(false);
+      maintForm.resetFields();
+      onSuccess?.();
+    } catch (err: unknown) {
+      const e = err as { errorFields?: unknown; data?: { error?: string } };
+      if (!e.errorFields) {
+        message.error(e.data?.error || 'Failed to update tool status');
+      }
+    }
+  };
+
   const handleCancel = () => {
     if (mode === 'edit') {
       setMode('view');
@@ -105,6 +150,7 @@ export const ToolDrawer = ({ open, mode: initialMode, toolId, onClose, onSuccess
       checked_out: 'blue',
       maintenance: 'orange',
       retired: 'red',
+      in_transfer: 'purple',
     };
     return colors[status] || 'default';
   };
@@ -262,6 +308,15 @@ export const ToolDrawer = ({ open, mode: initialMode, toolId, onClose, onSuccess
             Print Label
           </Button>
           <PermissionGuard permission="tool.edit">
+            {tool.status === 'available' && (
+              <Button
+                icon={<ToolOutlined />}
+                onClick={() => { maintForm.resetFields(); setMaintModalOpen(true); }}
+                aria-label="Check out for maintenance"
+              >
+                Maintenance
+              </Button>
+            )}
             <Button
               icon={<EditOutlined />}
               onClick={() => setMode('edit')}
@@ -344,6 +399,54 @@ export const ToolDrawer = ({ open, mode: initialMode, toolId, onClose, onSuccess
           itemDescription={tool.tool_number}
         />
       )}
+
+      {/* Maintenance checkout modal */}
+      <Modal
+        open={maintModalOpen}
+        title={
+          <Space>
+            <ToolOutlined />
+            <span>Check Out for Maintenance</span>
+          </Space>
+        }
+        onCancel={() => { setMaintModalOpen(false); maintForm.resetFields(); }}
+        onOk={handleMaintenanceSubmit}
+        okText="Confirm"
+        okButtonProps={{ loading: isUpdating }}
+        destroyOnClose
+      >
+        {tool && (
+          <Text type="secondary" style={{ display: 'block', marginBottom: 16 }}>
+            {tool.tool_number} — S/N {tool.serial_number}
+            {tool.description ? ` — ${tool.description}` : ''}
+          </Text>
+        )}
+        <Form form={maintForm} layout="vertical">
+          <Form.Item
+            label="Maintenance type"
+            name="maintenance_type"
+            rules={[{ required: true, message: 'Select a maintenance type' }]}
+          >
+            <Select
+              options={MAINTENANCE_TYPES.map((t) => ({ label: t, value: t }))}
+              placeholder="Select type…"
+            />
+          </Form.Item>
+          <Form.Item label="Description (optional)" name="description">
+            <Input.TextArea
+              rows={3}
+              placeholder="Describe the issue or work to be performed…"
+            />
+          </Form.Item>
+          <Form.Item label="Expected return to service" name="return_date">
+            <DatePicker
+              style={{ width: '100%' }}
+              disabledDate={(d) => d.isBefore(dayjs(), 'day')}
+              placeholder="Select date…"
+            />
+          </Form.Item>
+        </Form>
+      </Modal>
     </Drawer>
   );
 };

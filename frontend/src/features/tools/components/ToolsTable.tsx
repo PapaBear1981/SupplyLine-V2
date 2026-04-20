@@ -64,6 +64,7 @@ export const ToolsTable = ({ onView, onEdit }: ToolsTableProps) => {
       checked_out: 'blue',
       maintenance: 'orange',
       retired: 'red',
+      in_transfer: 'purple',
     };
     return colors[status] || 'default';
   };
@@ -117,6 +118,15 @@ export const ToolsTable = ({ onView, onEdit }: ToolsTableProps) => {
       key: 'location',
       width: 150,
     },
+    ...(showAllWarehouses
+      ? [{
+          title: 'Warehouse',
+          dataIndex: 'warehouse_name',
+          key: 'warehouse_name',
+          width: 160,
+          render: (_: unknown, record: Tool) => record.warehouse_name || '—',
+        }]
+      : []),
     {
       title: 'Status',
       dataIndex: 'status',
@@ -132,6 +142,7 @@ export const ToolsTable = ({ onView, onEdit }: ToolsTableProps) => {
       filters: [
         { text: 'Available', value: 'available' },
         { text: 'Checked Out', value: 'checked_out' },
+        { text: 'In Transfer', value: 'in_transfer' },
         { text: 'Maintenance', value: 'maintenance' },
         { text: 'Retired', value: 'retired' },
       ],

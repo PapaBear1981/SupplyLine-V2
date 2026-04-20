@@ -1,5 +1,5 @@
 // Tool status types
-export type ToolStatus = 'available' | 'checked_out' | 'maintenance' | 'retired';
+export type ToolStatus = 'available' | 'checked_out' | 'maintenance' | 'retired' | 'in_transfer';
 export type CalibrationStatus = 'current' | 'due_soon' | 'overdue' | 'not_applicable';
 
 // Main Tool interface
@@ -14,6 +14,7 @@ export interface Tool {
   category: string;
   status: ToolStatus;
   status_reason?: string | null;
+  maintenance_return_date?: string | null;
   warehouse_id?: number | null;
   warehouse_name?: string | null;
   created_at: string;
@@ -43,6 +44,7 @@ export interface ToolFormData {
   category?: string;
   status?: ToolStatus;
   status_reason?: string;
+  maintenance_return_date?: string;
   warehouse_id?: number;
 
   // Calibration fields

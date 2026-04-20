@@ -88,8 +88,9 @@ class Tool(db.Model):
     condition = db.Column(db.String)
     location = db.Column(db.String)
     category = db.Column(db.String, nullable=True, default="General")
-    status = db.Column(db.String, nullable=True, default="available")  # available, checked_out, maintenance, retired
+    status = db.Column(db.String, nullable=True, default="available")  # available, checked_out, maintenance, retired, in_transfer
     status_reason = db.Column(db.String, nullable=True)  # Reason for maintenance or retirement
+    maintenance_return_date = db.Column(db.DateTime, nullable=True)  # Expected return to service date
     warehouse_id = db.Column(db.Integer, db.ForeignKey("warehouses.id"), nullable=True, index=True)
     created_at = db.Column(db.DateTime, default=get_current_time)
 
@@ -115,6 +116,7 @@ class Tool(db.Model):
             "category": self.category,
             "status": self.status,
             "status_reason": self.status_reason,
+            "maintenance_return_date": self.maintenance_return_date.isoformat() if self.maintenance_return_date else None,
             "warehouse_id": self.warehouse_id,
             "warehouse_name": self.warehouse.name if self.warehouse else None,
             "created_at": self.created_at.isoformat(),
