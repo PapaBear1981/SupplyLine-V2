@@ -770,7 +770,17 @@ def initiate_transfer_route():
         if value in (None, ""):
             return jsonify({"error": f"Missing required field: {name}"}), 400
 
-    active = get_active_warehouse_id()
+    payload = getattr(request, "current_user", None) or {}
+    is_admin = bool(payload.get("is_admin"))
+
+    # Admins may override the source warehouse via the request body.
+    # Non-admins are always locked to their JWT active warehouse.
+    from_warehouse_id_override = data.get("from_warehouse_id")
+    if is_admin and from_warehouse_id_override:
+        active = int(from_warehouse_id_override)
+    else:
+        active = get_active_warehouse_id()
+
     if active is None:
         return jsonify({
             "error": "No active warehouse selected. Pick one from the header.",
@@ -888,9 +898,13 @@ def list_inbound_transfers():
     """
     List transfers arriving at the user's active warehouse.
     Defaults to ``status=pending_receipt`` when not specified.
+    Admins see all inbound transfers across every warehouse.
     """
+    payload = getattr(request, "current_user", None) or {}
+    is_admin = bool(payload.get("is_admin"))
+
     active = get_active_warehouse_id()
-    if active is None:
+    if not is_admin and active is None:
         return jsonify({"transfers": [], "total": 0, "page": 1, "per_page": 0, "pages": 0}), 200
 
     status_filter = request.args.get("status", STATUS_PENDING)
@@ -898,9 +912,12 @@ def list_inbound_transfers():
     per_page = int(request.args.get("per_page", 50))
 
     query = WarehouseTransfer.query.filter(
-        WarehouseTransfer.to_warehouse_id == active,
         WarehouseTransfer.from_warehouse_id.isnot(None),
     )
+    # Non-admins are scoped to their active warehouse; admins see all warehouses.
+    if not is_admin:
+        query = query.filter(WarehouseTransfer.to_warehouse_id == active)
+
     if status_filter and status_filter != "all":
         query = query.filter(WarehouseTransfer.status == status_filter)
 
@@ -921,9 +938,13 @@ def list_inbound_transfers():
 def list_outbound_transfers():
     """
     List transfers leaving the user's active warehouse (any status).
+    Admins see all outbound transfers across every warehouse.
     """
+    payload = getattr(request, "current_user", None) or {}
+    is_admin = bool(payload.get("is_admin"))
+
     active = get_active_warehouse_id()
-    if active is None:
+    if not is_admin and active is None:
         return jsonify({"transfers": [], "total": 0, "page": 1, "per_page": 0, "pages": 0}), 200
 
     status_filter = request.args.get("status")
@@ -931,9 +952,12 @@ def list_outbound_transfers():
     per_page = int(request.args.get("per_page", 50))
 
     query = WarehouseTransfer.query.filter(
-        WarehouseTransfer.from_warehouse_id == active,
         WarehouseTransfer.to_warehouse_id.isnot(None),
     )
+    # Non-admins are scoped to their active warehouse; admins see all warehouses.
+    if not is_admin:
+        query = query.filter(WarehouseTransfer.from_warehouse_id == active)
+
     if status_filter and status_filter != "all":
         query = query.filter(WarehouseTransfer.status == status_filter)
 

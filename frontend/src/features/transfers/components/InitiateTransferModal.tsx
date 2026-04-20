@@ -14,6 +14,7 @@ import {
   message,
   theme,
 } from 'antd';
+import { useAppSelector } from '@app/hooks';
 import { useActiveWarehouse } from '@features/warehouses/hooks/useActiveWarehouse';
 import { useGetWarehousesQuery } from '@features/warehouses/services/warehousesApi';
 import { useGetToolsQuery } from '@features/tools/services/toolsApi';
@@ -45,6 +46,7 @@ export const InitiateTransferModal = ({
 }: InitiateTransferModalProps) => {
   const [form] = Form.useForm();
   const { token } = theme.useToken();
+  const isAdmin = useAppSelector((s) => s.auth.user?.is_admin);
   const { activeWarehouseId, activeWarehouseName } = useActiveWarehouse();
   const { data: warehousesData } = useGetWarehousesQuery({
     include_inactive: false,
@@ -53,6 +55,15 @@ export const InitiateTransferModal = ({
   const [initiate, { isLoading }] = useInitiateTransferMutation();
 
   const itemType: InitiateTransferItemType = Form.useWatch('item_type', form) ?? 'tool';
+
+  // Admins can pick any source warehouse without changing the header selector.
+  // Non-admins are always locked to their active warehouse.
+  const [adminSourceId, setAdminSourceId] = useState<number | null>(null);
+  const sourceWarehouseId = isAdmin ? (adminSourceId ?? activeWarehouseId) : activeWarehouseId;
+  const sourceWarehouseName = useMemo(() => {
+    if (!isAdmin || adminSourceId == null) return activeWarehouseName;
+    return warehousesData?.warehouses.find((w) => w.id === adminSourceId)?.name ?? activeWarehouseName;
+  }, [isAdmin, adminSourceId, activeWarehouseName, warehousesData]);
 
   // Search text drives the autocomplete queries
   const [itemSearch, setItemSearch] = useState('');
@@ -65,15 +76,15 @@ export const InitiateTransferModal = ({
     preset?.itemId ?? (itemType === 'tool' ? resolvedTool?.id : resolvedChemical?.id);
   const resolvedItem = itemType === 'tool' ? resolvedTool : resolvedChemical;
 
-  // Autocomplete data — always scoped to the active warehouse
+  // Autocomplete data — scoped to the source warehouse
   const { data: toolsData, isFetching: toolsFetching } = useGetToolsQuery(
-    { page: 1, per_page: 30, q: itemSearch || undefined, warehouse_id: activeWarehouseId ?? undefined, status: 'available' },
-    { skip: !activeWarehouseId || !!preset?.itemId || itemType !== 'tool' }
+    { page: 1, per_page: 30, q: itemSearch || undefined, warehouse_id: sourceWarehouseId ?? undefined, status: 'available' },
+    { skip: !sourceWarehouseId || !!preset?.itemId || itemType !== 'tool' }
   );
 
   const { data: chemicalsData, isFetching: chemsFetching } = useGetChemicalsQuery(
-    { page: 1, per_page: 30, q: itemSearch || undefined, warehouse_id: activeWarehouseId ?? undefined },
-    { skip: !activeWarehouseId || !!preset?.itemId || itemType !== 'chemical' }
+    { page: 1, per_page: 30, q: itemSearch || undefined, warehouse_id: sourceWarehouseId ?? undefined },
+    { skip: !sourceWarehouseId || !!preset?.itemId || itemType !== 'chemical' }
   );
 
   type ItemOption = { value: number; label: string; item: Tool | Chemical };
@@ -101,9 +112,17 @@ export const InitiateTransferModal = ({
   const destinationOptions = useMemo(
     () =>
       (warehousesData?.warehouses || [])
-        .filter((w) => w.is_active && w.id !== activeWarehouseId)
+        .filter((w) => w.is_active && w.id !== sourceWarehouseId)
         .map((w) => ({ label: w.name, value: w.id })),
-    [warehousesData, activeWarehouseId]
+    [warehousesData, sourceWarehouseId]
+  );
+
+  const allWarehouseOptions = useMemo(
+    () =>
+      (warehousesData?.warehouses || [])
+        .filter((w) => w.is_active)
+        .map((w) => ({ label: w.name, value: w.id })),
+    [warehousesData]
   );
 
   // Reset all state when the modal opens — use a ref to track previous open
@@ -117,6 +136,7 @@ export const InitiateTransferModal = ({
         setItemSearch('');
         setResolvedTool(null);
         setResolvedChemical(null);
+        setAdminSourceId(null);
       }, 0);
       return () => clearTimeout(t);
     }
@@ -162,15 +182,19 @@ export const InitiateTransferModal = ({
       message.error('Select an item before initiating a transfer.');
       return;
     }
-    const payload: InitiateTransferPayload = {
+    const transferPayload: InitiateTransferPayload = {
       to_warehouse_id: values.to_warehouse_id as number,
       item_type: values.item_type as InitiateTransferItemType,
       item_id: resolvedId,
       quantity: Number(values.quantity) || 1,
       notes: (values.notes as string) || undefined,
+      // If admin chose a different source warehouse, include it so the backend uses it.
+      ...(isAdmin && adminSourceId != null && adminSourceId !== activeWarehouseId
+        ? { from_warehouse_id: adminSourceId }
+        : {}),
     };
     try {
-      const result = await initiate(payload).unwrap();
+      const result = await initiate(transferPayload).unwrap();
       message.success(
         `Transfer initiated — awaiting receipt at destination (#${result.transfer.id}).`
       );
@@ -191,34 +215,54 @@ export const InitiateTransferModal = ({
       okButtonProps={{ loading: isLoading, disabled: !resolvedId }}
       destroyOnHidden
     >
-      {!activeWarehouseId && (
+      {!sourceWarehouseId && (
         <Alert
           type="warning"
           showIcon
           style={{ marginBottom: 16 }}
-          message="No active warehouse"
-          description="Pick an active warehouse in the header before initiating transfers."
+          message="No source warehouse"
+          description={
+            isAdmin
+              ? 'Select a source warehouse below.'
+              : 'Pick an active warehouse in the header before initiating transfers.'
+          }
         />
       )}
 
-      <Alert
-        type="info"
-        showIcon
-        style={{ marginBottom: 16 }}
-        message={
-          <Space>
-            <Text>Source:</Text>
-            <Text strong>{activeWarehouseName || 'Your active warehouse'}</Text>
-          </Space>
-        }
-        description="The destination user will assign the physical location on receipt."
-      />
+      {isAdmin ? (
+        <Form.Item label="Source warehouse" style={{ marginBottom: 16 }}>
+          <Select
+            options={allWarehouseOptions}
+            value={adminSourceId ?? activeWarehouseId ?? undefined}
+            onChange={(val: number) => {
+              setAdminSourceId(val);
+              clearResolved();
+            }}
+            placeholder="Select source warehouse"
+            showSearch
+            optionFilterProp="label"
+          />
+        </Form.Item>
+      ) : (
+        <Alert
+          type="info"
+          showIcon
+          style={{ marginBottom: 16 }}
+          message={
+            <Space>
+              <Text>Source:</Text>
+              <Text strong>{sourceWarehouseName || 'Your active warehouse'}</Text>
+            </Space>
+          }
+          description="The destination user will assign the physical location on receipt."
+        />
+      )}
 
       <Form
         form={form}
         layout="vertical"
         onFinish={submit}
-        disabled={!activeWarehouseId}
+        disabled={!sourceWarehouseId}
         preserve={false}
       >
         <Form.Item

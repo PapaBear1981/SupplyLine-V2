@@ -72,6 +72,8 @@ export interface InitiateTransferPayload {
   item_id: number;
   quantity?: number;
   notes?: string;
+  /** Admin-only: override the source warehouse instead of using the JWT active warehouse. */
+  from_warehouse_id?: number;
 }
 
 export interface ItemLookupParams {
