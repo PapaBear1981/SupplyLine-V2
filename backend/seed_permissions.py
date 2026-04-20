@@ -36,6 +36,7 @@ PERMISSIONS: list[tuple[str, str, str]] = [
     ("warehouse.delete", "Delete warehouses", "Warehouse Management"),
     ("warehouse.transfer", "Transfer items between warehouses", "Warehouse Management"),
     ("warehouse.inventory", "Manage warehouse inventory", "Warehouse Management"),
+    ("warehouse.switch_active", "Change the user's active warehouse", "Warehouse Management"),
 
     # --- Tool / Checkout ---
     ("checkout.view", "View tool checkouts", "Checkouts"),
@@ -75,7 +76,10 @@ PERMISSIONS: list[tuple[str, str, str]] = [
     ("transfer.create", "Create new transfers", "Transfer Management"),
     ("transfer.approve", "Approve transfers", "Transfer Management"),
     ("transfer.complete", "Complete transfers", "Transfer Management"),
-    ("transfer.cancel", "Cancel transfers", "Transfer Management"),
+    ("transfer.cancel", "Cancel transfers (admin)", "Transfer Management"),
+    ("transfer.initiate", "Initiate warehouse-to-warehouse transfers", "Transfer Management"),
+    ("transfer.receive", "Receive transfers and assign destination location", "Transfer Management"),
+    ("transfer.cancel_own", "Cancel transfers the user initiated", "Transfer Management"),
 
     # --- Announcements ---
     ("announcement.view", "View announcements", "Announcement Management"),
@@ -136,17 +140,24 @@ PERMISSIONS: list[tuple[str, str, str]] = [
 def run():
     app = create_app()
     with app.app_context():
-        existing = {p.name for p in Permission.query.all()}
+        existing = {p.name: p for p in Permission.query.all()}
         created = 0
-        skipped = 0
+        updated = 0
+        unchanged = 0
         for name, description, category in PERMISSIONS:
             if name in existing:
-                skipped += 1
+                perm = existing[name]
+                if perm.description != description or perm.category != category:
+                    perm.description = description
+                    perm.category = category
+                    updated += 1
+                else:
+                    unchanged += 1
                 continue
             db.session.add(Permission(name=name, description=description, category=category))
             created += 1
         db.session.commit()
-        print(f"Seed complete: {created} created, {skipped} already present.")
+        print(f"Seed complete: {created} created, {updated} updated, {unchanged} unchanged.")
 
 
 if __name__ == "__main__":

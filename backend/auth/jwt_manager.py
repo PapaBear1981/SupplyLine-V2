@@ -51,6 +51,7 @@ class JWTManager:
             "employee_number": user.employee_number,
             "is_admin": user.is_admin,
             "department": user.department,
+            "active_warehouse_id": user.active_warehouse_id,
             "permissions": user.get_effective_permissions(),  # Use effective permissions (role + user-specific)
             "iat": now,
             "exp": now + timedelta(minutes=access_token_minutes),

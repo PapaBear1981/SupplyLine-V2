@@ -147,6 +147,8 @@ export const baseApi = createApi({
     'BugReport',
     'OnCall',
     'TrustedDevice',
+    'Transfer',
+    'ActiveWarehouse',
   ],
   endpoints: () => ({}),
 });

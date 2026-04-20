@@ -32,6 +32,7 @@ from models import (
     UserActivity,
     UserRequest,
     Warehouse,
+    WarehouseTransfer,
     db,
 )
 from models_kits import Kit, KitBox, KitItem, KitReorderRequest, KitTransfer
@@ -87,6 +88,8 @@ OLLAMA_TOOL_NAMES = {
     "get_kits",
     "get_kit_contents",
     "get_warehouses",
+    "get_my_active_warehouse",
+    "list_pending_transfers",
     "get_fulfillment_requests",
     "checkout_tool",
     "return_tool",
@@ -94,6 +97,9 @@ OLLAMA_TOOL_NAMES = {
     "return_chemical",
     "create_request",
     "transfer_item",
+    "initiate_transfer",
+    "receive_transfer",
+    "cancel_transfer",
     "forecast_chemicals",
     "report_bug",
 }
@@ -554,6 +560,127 @@ TOOL_DEFINITIONS = [
                 },
             },
             "required": [],
+        },
+    },
+    {
+        "name": "get_my_active_warehouse",
+        "description": (
+            "Return the warehouse the current user is actively working in. "
+            "Call this before initiating transfers or checking stock so you scope to the right location."
+        ),
+        "parameters": {"type": "object", "properties": {}, "required": []},
+    },
+    {
+        "name": "list_pending_transfers",
+        "description": (
+            "List warehouse-to-warehouse transfers the user can act on. "
+            "direction=inbound returns transfers arriving at the user's active warehouse. "
+            "direction=outbound returns transfers leaving it. "
+            "Use to find transfer_id values for receive_transfer / cancel_transfer."
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "direction": {
+                    "type": "string",
+                    "enum": ["inbound", "outbound", "all"],
+                    "description": "Which transfers to show. Default: inbound.",
+                },
+                "status": {
+                    "type": "string",
+                    "enum": ["pending_receipt", "received", "cancelled", "all"],
+                    "description": "Filter by status. Default: pending_receipt.",
+                },
+            },
+            "required": [],
+        },
+    },
+    {
+        "name": "initiate_transfer",
+        "description": (
+            "Start a warehouse-to-warehouse transfer of a tool or chemical. "
+            "Creates a pending record that a destination-warehouse user must then receive. "
+            "Source is always the current user's active warehouse. "
+            "Call with confirmed=false first to preview; only confirmed=true after explicit yes."
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "item_query": {
+                    "type": "string",
+                    "description": "Tool or chemical description, serial number, or part number.",
+                },
+                "to_warehouse": {
+                    "type": "string",
+                    "description": "Destination warehouse name (partial match ok).",
+                },
+                "quantity": {
+                    "type": "integer",
+                    "description": "Quantity to transfer. Tools always = 1.",
+                },
+                "notes": {"type": "string", "description": "Optional notes."},
+                "confirmed": {
+                    "type": "boolean",
+                    "description": "false = preview (default). true = create the pending transfer.",
+                },
+            },
+            "required": ["item_query", "to_warehouse"],
+        },
+    },
+    {
+        "name": "receive_transfer",
+        "description": (
+            "Acknowledge receipt of a pending warehouse transfer arriving at the user's active warehouse. "
+            "Assigns the item's new physical location and finalises the warehouse move. "
+            "Call with confirmed=false first to preview."
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "transfer_id": {
+                    "type": "integer",
+                    "description": "Transfer ID. Use list_pending_transfers to find it.",
+                },
+                "destination_location": {
+                    "type": "string",
+                    "description": "Physical location within the destination warehouse (e.g. 'Shelf 2A', 'Bin B3').",
+                },
+                "received_notes": {
+                    "type": "string",
+                    "description": "Optional receipt notes.",
+                },
+                "confirmed": {
+                    "type": "boolean",
+                    "description": "false = preview (default). true = finalise receipt.",
+                },
+            },
+            "required": ["transfer_id", "destination_location"],
+        },
+    },
+    {
+        "name": "cancel_transfer",
+        "description": (
+            "Cancel a pending warehouse transfer. No inventory changes are made. "
+            "Only the initiator or an admin can cancel. "
+            "Call with confirmed=false first to preview."
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "transfer_id": {
+                    "type": "integer",
+                    "description": "Transfer ID to cancel.",
+                },
+                "cancel_reason": {
+                    "type": "string",
+                    "description": "Why the transfer is being cancelled.",
+                },
+                "confirmed": {
+                    "type": "boolean",
+                    "description": "false = preview (default). true = cancel.",
+                },
+            },
+            "required": ["transfer_id", "cancel_reason"],
         },
     },
     {
@@ -1169,6 +1296,16 @@ def _execute_tool(name: str, args: dict, user_id: int | None = None, is_admin: b
             return _tool_issue_chemical(**args, _user_id=user_id)
         if name == "transfer_item":
             return _tool_transfer_item(**args, _user_id=user_id)
+        if name == "get_my_active_warehouse":
+            return _tool_get_my_active_warehouse(_user_id=user_id)
+        if name == "list_pending_transfers":
+            return _tool_list_pending_transfers(**args, _user_id=user_id, _is_admin=is_admin)
+        if name == "initiate_transfer":
+            return _tool_initiate_transfer(**args, _user_id=user_id, _is_admin=is_admin)
+        if name == "receive_transfer":
+            return _tool_receive_transfer(**args, _user_id=user_id, _is_admin=is_admin)
+        if name == "cancel_transfer":
+            return _tool_cancel_transfer(**args, _user_id=user_id, _is_admin=is_admin)
         if name == "get_chemical_issuances":
             return _tool_get_chemical_issuances(**args)
         if name == "return_chemical":
@@ -2306,6 +2443,376 @@ def _tool_transfer_item(
         "message": f"Transferred {quantity}x {item_label} from {from_label} to {to_label} successfully.",
         "transfer_id": transfer.id,
     }
+
+
+# ─── Warehouse active-context + two-step transfer tools ──────────────────────
+
+
+def _tool_get_my_active_warehouse(_user_id: int | None = None) -> dict:
+    if not _user_id:
+        return {"error": "Cannot determine current user. Please log in again."}
+    user = db.session.get(User, _user_id)
+    if not user:
+        return {"error": "User not found."}
+    if not user.active_warehouse:
+        return {
+            "active_warehouse": None,
+            "message": (
+                "You don't have an active warehouse set. "
+                "Pick one from the warehouse switcher in the header to proceed."
+            ),
+        }
+    wh = user.active_warehouse
+    return {
+        "active_warehouse": {
+            "id": wh.id,
+            "name": wh.name,
+            "warehouse_type": wh.warehouse_type,
+            "is_active": wh.is_active,
+        }
+    }
+
+
+def _tool_list_pending_transfers(
+    direction: str = "inbound",
+    status: str = "pending_receipt",
+    _user_id: int | None = None,
+    _is_admin: bool = False,
+) -> dict:
+    if not _user_id:
+        return {"error": "Cannot determine current user. Please log in again."}
+    user = db.session.get(User, _user_id)
+    if not _is_admin and "transfer.view" not in _user_permissions(user):
+        return {"error": "You don't have permission to view transfers."}
+    if not user or not user.active_warehouse_id:
+        return {
+            "transfers": [],
+            "message": "No active warehouse — set one first to see pending transfers.",
+        }
+
+    direction = (direction or "inbound").lower()
+    status = (status or "pending_receipt").lower()
+
+    query = WarehouseTransfer.query
+    if direction == "inbound":
+        query = query.filter(WarehouseTransfer.to_warehouse_id == user.active_warehouse_id)
+    elif direction == "outbound":
+        query = query.filter(WarehouseTransfer.from_warehouse_id == user.active_warehouse_id)
+    elif direction == "all":
+        query = query.filter(
+            db.or_(
+                WarehouseTransfer.to_warehouse_id == user.active_warehouse_id,
+                WarehouseTransfer.from_warehouse_id == user.active_warehouse_id,
+            )
+        )
+    else:
+        return {"error": "direction must be one of inbound | outbound | all."}
+
+    if status != "all":
+        query = query.filter(WarehouseTransfer.status == status)
+
+    rows = query.order_by(WarehouseTransfer.transfer_date.desc()).limit(25).all()
+    return {
+        "transfers": [t.to_dict() for t in rows],
+        "count": len(rows),
+        "direction": direction,
+        "status_filter": status,
+    }
+
+
+def _tool_initiate_transfer(
+    item_query: str = "",
+    to_warehouse: str = "",
+    quantity: int = 1,
+    notes: str = "",
+    confirmed: bool = False,
+    _user_id: int | None = None,
+    _is_admin: bool = False,
+) -> dict:
+    """AI-side helper for POST /api/transfers/initiate."""
+    from routes_transfers import _initiate_transfer  # local to avoid circular import
+
+    if not _user_id:
+        return {"error": "Cannot determine current user. Please log in again."}
+    if not item_query:
+        return {"error": "Please specify what item to transfer (name, serial, or part number)."}
+    if not to_warehouse:
+        return {"error": "Please specify the destination warehouse name."}
+
+    user = db.session.get(User, _user_id)
+    if not user or not user.active_warehouse_id:
+        return {"error": "You have no active warehouse. Pick one from the header first."}
+
+    if not _is_admin and "transfer.initiate" not in _user_permissions(user):
+        return {"error": "You don't have permission to initiate transfers (transfer.initiate)."}
+
+    src_warehouse = user.active_warehouse
+    dst = Warehouse.query.filter(Warehouse.name.ilike(f"%{to_warehouse}%")).first()
+    if not dst:
+        return {"error": f"Destination warehouse '{to_warehouse}' not found."}
+    if dst.id == src_warehouse.id:
+        return {"error": "Source and destination warehouses must be different."}
+    if not dst.is_active:
+        return {"error": f"Destination warehouse '{dst.name}' is inactive."}
+
+    # Locate the item in the active (source) warehouse
+    tool = Tool.query.filter(
+        Tool.warehouse_id == src_warehouse.id,
+        db.or_(
+            Tool.description.ilike(f"%{item_query}%"),
+            Tool.serial_number.ilike(f"%{item_query}%"),
+            Tool.tool_number.ilike(f"%{item_query}%"),
+        ),
+    ).first()
+
+    chem = None
+    if tool is None:
+        chem = Chemical.query.filter(
+            Chemical.warehouse_id == src_warehouse.id,
+            db.or_(
+                Chemical.description.ilike(f"%{item_query}%"),
+                Chemical.part_number.ilike(f"%{item_query}%"),
+                Chemical.lot_number.ilike(f"%{item_query}%"),
+            ),
+        ).first()
+
+    if tool is None and chem is None:
+        return {
+            "error": (
+                f"'{item_query}' not found in your active warehouse ({src_warehouse.name}). "
+                f"Use search_tools / search_chemicals first."
+            )
+        }
+
+    item_type = "tool" if tool else "chemical"
+    item = tool or chem
+    qty = 1 if item_type == "tool" else max(1, int(quantity or 1))
+
+    label = (
+        f"{item.description} (S/N {item.serial_number})"
+        if item_type == "tool"
+        else f"{item.description} — P/N {item.part_number}, Lot {item.lot_number}"
+    )
+
+    blocking = []
+    if item_type == "tool" and item.status == "checked_out":
+        blocking.append("Tool is checked out — must be returned before it can be transferred.")
+    if item_type == "chemical" and qty > (item.quantity or 0):
+        blocking.append(f"Requested quantity ({qty}) exceeds available stock ({item.quantity} {item.unit}).")
+
+    preview = {
+        "action": "initiate_transfer",
+        "item": label,
+        "item_type": item_type,
+        "quantity": qty,
+        "from_warehouse": src_warehouse.name,
+        "to_warehouse": dst.name,
+        "notes": notes or None,
+        "blocking_reasons": blocking,
+        "can_proceed": not blocking,
+    }
+
+    if not confirmed:
+        preview["status"] = "preview"
+        preview["message"] = (
+            "Ready to initiate transfer. The destination will have to receive it to finalise. "
+            "Reply 'confirm' to proceed."
+            if not blocking
+            else "Cannot initiate — see blocking_reasons above."
+        )
+        return preview
+
+    if blocking:
+        return {"error": "Cannot initiate this transfer.", "blocking_reasons": blocking}
+
+    try:
+        transfer, err, _ = _initiate_transfer(
+            to_warehouse_id=dst.id,
+            item_type=item_type,
+            item_id=item.id,
+            quantity=qty,
+            notes=notes,
+            user_id=_user_id,
+            source_warehouse_id=src_warehouse.id,
+        )
+        if err:
+            db.session.rollback()
+            return {"error": err}
+        db.session.commit()
+        return {
+            "status": "success",
+            "message": (
+                f"Transfer initiated: {qty}× {label} from {src_warehouse.name} to {dst.name}. "
+                f"Awaiting receipt."
+            ),
+            "transfer_id": transfer.id,
+        }
+    except Exception:
+        db.session.rollback()
+        logger.exception("AI initiate_transfer failed")
+        return {"error": "Could not initiate transfer. The administrator can check the server log for details."}
+
+
+def _tool_receive_transfer(
+    transfer_id: int | None = None,
+    destination_location: str = "",
+    received_notes: str = "",
+    confirmed: bool = False,
+    _user_id: int | None = None,
+    _is_admin: bool = False,
+) -> dict:
+    from routes_transfers import _receive_transfer  # local to avoid circular import
+
+    if not _user_id:
+        return {"error": "Cannot determine current user. Please log in again."}
+    if not transfer_id:
+        return {"error": "transfer_id is required. Use list_pending_transfers to find it."}
+    if not destination_location or not destination_location.strip():
+        return {"error": "destination_location is required (e.g. 'Shelf 2A')."}
+
+    user = db.session.get(User, _user_id)
+    if not user:
+        return {"error": "User not found."}
+    if not _is_admin and "transfer.receive" not in _user_permissions(user):
+        return {"error": "You don't have permission to receive transfers (transfer.receive)."}
+
+    transfer = db.session.get(WarehouseTransfer, transfer_id)
+    if not transfer:
+        return {"error": f"Transfer {transfer_id} not found."}
+    if transfer.status != "pending_receipt":
+        return {"error": f"Transfer is not awaiting receipt (status={transfer.status})."}
+
+    # Receipt must happen in the destination warehouse — don't even leak
+    # preview metadata to users whose active warehouse isn't the destination.
+    if not _is_admin and transfer.to_warehouse_id != user.active_warehouse_id:
+        return {"error": "Transfer is not inbound to your active warehouse."}
+
+    from_wh = transfer.from_warehouse.name if transfer.from_warehouse else "Unknown"
+    to_wh = transfer.to_warehouse.name if transfer.to_warehouse else "Unknown"
+
+    preview = {
+        "action": "receive_transfer",
+        "transfer_id": transfer_id,
+        "item_type": transfer.item_type,
+        "item_id": transfer.item_id,
+        "quantity": transfer.quantity,
+        "from_warehouse": from_wh,
+        "to_warehouse": to_wh,
+        "destination_location": destination_location.strip(),
+        "received_notes": received_notes or None,
+        "can_proceed": True,
+    }
+
+    if not confirmed:
+        preview["status"] = "preview"
+        preview["message"] = (
+            f"Ready to receive transfer #{transfer_id} "
+            f"({transfer.quantity}× {transfer.item_type} from {from_wh}) "
+            f"into {to_wh} at '{destination_location.strip()}'. Reply 'confirm' to proceed."
+        )
+        return preview
+
+    try:
+        result, err, _ = _receive_transfer(
+            transfer_id=transfer_id,
+            destination_location=destination_location.strip(),
+            received_notes=received_notes,
+            user_id=_user_id,
+            active_warehouse_id=user.active_warehouse_id,
+            is_admin=_is_admin,
+        )
+        if err:
+            db.session.rollback()
+            return {"error": err}
+        db.session.commit()
+        return {
+            "status": "success",
+            "message": (
+                f"Transfer #{transfer_id} received into {to_wh} at "
+                f"'{destination_location.strip()}'."
+            ),
+            "transfer": result.to_dict(),
+        }
+    except Exception:
+        db.session.rollback()
+        logger.exception("AI receive_transfer failed")
+        return {"error": "Could not receive transfer. The administrator can check the server log for details."}
+
+
+def _tool_cancel_transfer(
+    transfer_id: int | None = None,
+    cancel_reason: str = "",
+    confirmed: bool = False,
+    _user_id: int | None = None,
+    _is_admin: bool = False,
+) -> dict:
+    from routes_transfers import _cancel_transfer  # local to avoid circular import
+
+    if not _user_id:
+        return {"error": "Cannot determine current user. Please log in again."}
+    if not transfer_id:
+        return {"error": "transfer_id is required."}
+    if not cancel_reason or not cancel_reason.strip():
+        return {"error": "cancel_reason is required."}
+
+    user = db.session.get(User, _user_id)
+    transfer = db.session.get(WarehouseTransfer, transfer_id)
+    if not transfer:
+        return {"error": f"Transfer {transfer_id} not found."}
+    if transfer.status != "pending_receipt":
+        return {"error": f"Only pending transfers can be cancelled (status={transfer.status})."}
+
+    user_perms = _user_permissions(user) if user else set()
+    can_cancel = _is_admin or (
+        transfer.transferred_by_id == _user_id and "transfer.cancel_own" in user_perms
+    )
+    if not can_cancel:
+        return {"error": "Only the initiator (with transfer.cancel_own) or an admin can cancel."}
+
+    preview = {
+        "action": "cancel_transfer",
+        "transfer_id": transfer_id,
+        "cancel_reason": cancel_reason.strip(),
+        "item_type": transfer.item_type,
+        "item_id": transfer.item_id,
+    }
+    if not confirmed:
+        preview["status"] = "preview"
+        preview["message"] = (
+            f"Ready to cancel transfer #{transfer_id}. Reply 'confirm' to proceed."
+        )
+        return preview
+
+    try:
+        result, err, _ = _cancel_transfer(
+            transfer_id=transfer_id,
+            cancel_reason=cancel_reason.strip(),
+            user_id=_user_id,
+            is_admin=_is_admin,
+        )
+        if err:
+            db.session.rollback()
+            return {"error": err}
+        db.session.commit()
+        return {
+            "status": "success",
+            "message": f"Transfer #{transfer_id} cancelled.",
+            "transfer": result.to_dict(),
+        }
+    except Exception:
+        db.session.rollback()
+        logger.exception("AI cancel_transfer failed")
+        return {"error": "Could not cancel transfer. The administrator can check the server log for details."}
+
+
+def _user_permissions(user: User | None) -> set[str]:
+    """Fetch effective permissions for a user (or empty set)."""
+    if not user:
+        return set()
+    try:
+        return set(user.get_effective_permissions())
+    except Exception:
+        return set()
 
 
 def _tool_issue_chemical(
@@ -4176,6 +4683,18 @@ Action tools:
     (warehouse→warehouse, warehouse→kit, kit→warehouse, kit→kit)
     Tip: use get_warehouses and get_kits first to confirm names, then
     use search_tools / get_kit_contents to confirm the item exists at the source.
+    NOTE: for warehouse→warehouse moves, prefer the two-step workflow below —
+    use initiate_transfer (source) + receive_transfer (destination) instead.
+- get_my_active_warehouse — return the warehouse the current user is working in.
+    Call this first before initiate_transfer so you know what the source is.
+- list_pending_transfers — see inbound/outbound pending warehouse transfers.
+    Use to find transfer_id values.
+- initiate_transfer — begin a warehouse-to-warehouse move (source = user's active warehouse).
+    Creates a pending record that someone at the destination warehouse must then receive.
+    Always preview first (confirmed=false). Tool must not be checked out.
+- receive_transfer — acknowledge a pending transfer that arrived at the user's active warehouse,
+    assigning its physical location (e.g. "Shelf 2A"). Always preview first.
+- cancel_transfer — cancel a pending transfer. Initiator or admin only. Always preview first.
 - flag_tool_for_service — remove a tool from service for maintenance or permanent retirement
     (requires tool manager role or admin)
 - return_tool_to_service — bring a tool back from maintenance to available

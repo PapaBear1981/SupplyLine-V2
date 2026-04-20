@@ -262,14 +262,18 @@ def create_app():
         # Inspector-based checks make this idempotent and safe on every startup.
         try:
             from sqlalchemy import inspect as sa_inspect
-            from sqlalchemy import text as sa_text
             with app.app_context():
                 inspector = sa_inspect(db.engine)
                 tables = set(inspector.get_table_names())
+                # Use a raw engine connection for DDL so SQLite commits schema changes
+                # reliably. db.session.execute() for DDL can be silently rolled back
+                # if anything in the session is later rolled back.
+                _ddl_conn = db.engine.raw_connection()
 
                 def _auto_add_col(table, col_sql, col_name, existing_cols):
                     if col_name not in existing_cols:
-                        db.session.execute(sa_text(f"ALTER TABLE {table} ADD COLUMN {col_sql}"))
+                        _ddl_conn.execute(f"ALTER TABLE {table} ADD COLUMN {col_sql}")
+                        _ddl_conn.commit()
                         logger.info("Phase 2 auto-migration: added %s.%s", table, col_name)
 
                 if "user_requests" in tables:
@@ -286,48 +290,93 @@ def create_app():
                     _auto_add_col("user_requests", "return_destination VARCHAR(200) NOT NULL DEFAULT 'Main Warehouse / Stores'", "return_destination", req_cols)
                     _auto_add_col("user_requests", "external_reference VARCHAR(200) NULL", "external_reference", req_cols)
                     # Migrate legacy priority values (idempotent — only rows with old values are affected)
-                    db.session.execute(sa_text("UPDATE user_requests SET priority = 'routine' WHERE priority IN ('low', 'normal')"))
-                    db.session.execute(sa_text("UPDATE user_requests SET priority = 'urgent' WHERE priority = 'high'"))
-                    db.session.execute(sa_text("UPDATE user_requests SET priority = 'aog' WHERE priority = 'critical'"))
+                    _ddl_conn.execute("UPDATE user_requests SET priority = 'routine' WHERE priority IN ('low', 'normal')")
+                    _ddl_conn.execute("UPDATE user_requests SET priority = 'urgent' WHERE priority = 'high'")
+                    _ddl_conn.execute("UPDATE user_requests SET priority = 'aog' WHERE priority = 'critical'")
                     # Migrate legacy status values (idempotent)
-                    db.session.execute(sa_text("UPDATE user_requests SET status = 'needs_info' WHERE status = 'awaiting_info'"))
-                    db.session.execute(sa_text("UPDATE user_requests SET status = 'pending_fulfillment' WHERE status IN ('in_progress', 'ordered')"))
-                    db.session.execute(sa_text("UPDATE user_requests SET status = 'partially_fulfilled' WHERE status IN ('partially_ordered', 'partially_received')"))
-                    db.session.execute(sa_text("UPDATE user_requests SET status = 'fulfilled' WHERE status = 'received'"))
+                    _ddl_conn.execute("UPDATE user_requests SET status = 'needs_info' WHERE status = 'awaiting_info'")
+                    _ddl_conn.execute("UPDATE user_requests SET status = 'pending_fulfillment' WHERE status IN ('in_progress', 'ordered')")
+                    _ddl_conn.execute("UPDATE user_requests SET status = 'partially_fulfilled' WHERE status IN ('partially_ordered', 'partially_received')")
+                    _ddl_conn.execute("UPDATE user_requests SET status = 'fulfilled' WHERE status = 'received'")
+                    _ddl_conn.commit()
 
                 if "procurement_orders" in tables:
                     ord_cols = {c["name"] for c in inspector.get_columns("procurement_orders")}
                     _auto_add_col("procurement_orders", "request_id INTEGER NULL", "request_id", ord_cols)
                     if "request_id" not in ord_cols:
-                        db.session.execute(sa_text(
+                        _ddl_conn.execute(
                             "CREATE INDEX IF NOT EXISTS idx_procurement_orders_request_id "
                             "ON procurement_orders(request_id)"
-                        ))
+                        )
+                        _ddl_conn.commit()
                     _auto_add_col("procurement_orders", "source_location VARCHAR(200) NULL", "source_location", ord_cols)
                     _auto_add_col("procurement_orders", "fulfillment_action_type VARCHAR(50) NULL", "fulfillment_action_type", ord_cols)
                     _auto_add_col("procurement_orders", "fulfillment_quantity INTEGER NULL", "fulfillment_quantity", ord_cols)
                     _auto_add_col("procurement_orders", "is_internal_fulfillment BOOLEAN NOT NULL DEFAULT 0", "is_internal_fulfillment", ord_cols)
 
+                if "tools" in tables:
+                    tool_cols = {c["name"] for c in inspector.get_columns("tools")}
+                    _auto_add_col("tools", "maintenance_return_date DATETIME NULL", "maintenance_return_date", tool_cols)
+
                 if "users" in tables:
                     user_cols = {c["name"] for c in inspector.get_columns("users")}
                     _auto_add_col("users", "phone VARCHAR(30) NULL", "phone", user_cols)
+                    # Multi-warehouse scoping (added in multi-warehouse branch)
+                    _auto_add_col("users", "active_warehouse_id INTEGER REFERENCES warehouses(id) ON DELETE SET NULL", "active_warehouse_id", user_cols)
+                    if "active_warehouse_id" not in user_cols:
+                        _ddl_conn.execute(
+                            "CREATE INDEX IF NOT EXISTS ix_users_active_warehouse_id "
+                            "ON users(active_warehouse_id)"
+                        )
+                        # Backfill: assign the main warehouse as the default for existing users
+                        _ddl_conn.execute(
+                            "UPDATE users SET active_warehouse_id = ("
+                            "  SELECT id FROM warehouses"
+                            "  WHERE warehouse_type = 'main' AND is_active = 1"
+                            "  ORDER BY id LIMIT 1"
+                            ") WHERE active_warehouse_id IS NULL"
+                        )
+                        _ddl_conn.commit()
+                        logger.info("Phase 2 auto-migration: backfilled users.active_warehouse_id from main warehouse")
+
+                if "warehouse_transfers" in tables:
+                    xfer_cols = {c["name"] for c in inspector.get_columns("warehouse_transfers")}
+                    _auto_add_col("warehouse_transfers", "received_by_id INTEGER REFERENCES users(id)", "received_by_id", xfer_cols)
+                    _auto_add_col("warehouse_transfers", "received_date DATETIME", "received_date", xfer_cols)
+                    _auto_add_col("warehouse_transfers", "source_location VARCHAR(200)", "source_location", xfer_cols)
+                    _auto_add_col("warehouse_transfers", "destination_location VARCHAR(200)", "destination_location", xfer_cols)
+                    _auto_add_col("warehouse_transfers", "cancelled_by_id INTEGER REFERENCES users(id)", "cancelled_by_id", xfer_cols)
+                    _auto_add_col("warehouse_transfers", "cancelled_date DATETIME", "cancelled_date", xfer_cols)
+                    _auto_add_col("warehouse_transfers", "cancel_reason VARCHAR(500)", "cancel_reason", xfer_cols)
+                    if "received_by_id" not in xfer_cols:
+                        _ddl_conn.execute(
+                            "CREATE INDEX IF NOT EXISTS ix_warehouse_transfers_received_by_id "
+                            "ON warehouse_transfers(received_by_id)"
+                        )
+                        _ddl_conn.commit()
 
                 # Widen users.totp_secret: stores Fernet-encrypted secret (~140 chars),
                 # not the 32-char Base32 plaintext the original schema assumed.
+                # Wrapped in its own try/except because ALTER COLUMN is PostgreSQL-only
+                # syntax — it fails on SQLite and must not prevent the outer commit.
                 if "users" in tables:
-                    totp_col = next(
-                        (c for c in inspector.get_columns("users") if c["name"] == "totp_secret"),
-                        None,
-                    )
-                    col_type = totp_col.get("type") if totp_col else None
-                    existing_length = getattr(col_type, "length", None)
-                    if existing_length is not None and existing_length < 255:
-                        db.session.execute(sa_text(
-                            "ALTER TABLE users ALTER COLUMN totp_secret TYPE VARCHAR(255)"
-                        ))
-                        logger.info("Phase 2 auto-migration: widened users.totp_secret to VARCHAR(255)")
+                    try:
+                        totp_col = next(
+                            (c for c in inspector.get_columns("users") if c["name"] == "totp_secret"),
+                            None,
+                        )
+                        col_type = totp_col.get("type") if totp_col else None
+                        existing_length = getattr(col_type, "length", None)
+                        if existing_length is not None and existing_length < 255:
+                            _ddl_conn.execute(
+                                "ALTER TABLE users ALTER COLUMN totp_secret TYPE VARCHAR(255)"
+                            )
+                            _ddl_conn.commit()
+                            logger.info("Phase 2 auto-migration: widened users.totp_secret to VARCHAR(255)")
+                    except Exception as totp_exc:
+                        logger.debug("Phase 2 auto-migration: totp_secret widen skipped (%s)", totp_exc)
 
-                db.session.commit()
+                _ddl_conn.close()
                 logger.info("Phase 2 auto-migrations verified/applied successfully")
         except Exception as e:
             logger.warning("Phase 2 auto-migration warning (non-fatal): %s", str(e))

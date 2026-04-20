@@ -9,6 +9,7 @@ import {
   UserOutlined,
   SettingOutlined,
   SwapOutlined,
+  RetweetOutlined,
   ShoppingCartOutlined,
   FormOutlined,
   BarChartOutlined,
@@ -95,6 +96,12 @@ export const ALL_MENU_ITEMS: MenuItemWithPermission[] = [
     icon: <HomeOutlined />,
     label: 'Warehouses',
     permission: 'page.warehouses',
+  },
+  {
+    key: ROUTES.TRANSFERS,
+    icon: <RetweetOutlined />,
+    label: 'Transfers',
+    permission: 'transfer.view',
   },
   {
     key: ROUTES.REPORTS,

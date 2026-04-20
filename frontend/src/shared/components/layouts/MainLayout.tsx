@@ -27,6 +27,8 @@ import { ROUTES } from '@shared/constants/routes';
 import { useActivityTracker } from '@shared/hooks/useActivityTracker';
 import { SessionExpiryWarning } from '@shared/components/SessionExpiryWarning';
 import { AIAssistant } from '@features/ai/components/AIAssistant';
+import { ActiveWarehouseSelect } from '@features/warehouses/components/activeWarehouse/ActiveWarehouseSelect';
+import { RequireActiveWarehouseGate } from '@features/warehouses/components/activeWarehouse/RequireActiveWarehouseGate';
 
 const { Header, Sider, Content } = Layout;
 const { Text } = Typography;
@@ -101,6 +103,7 @@ export const MainLayout = () => {
     <>
       <SessionExpiryWarning />
       <AIAssistant />
+      <RequireActiveWarehouseGate />
       <Layout style={{ minHeight: '100vh' }}>
         <Sider
         trigger={null}
@@ -170,18 +173,21 @@ export const MainLayout = () => {
             )}
           </div>
 
-          <Dropdown menu={{ items: userMenuItems }} placement="bottomRight">
-            <Space style={{ cursor: 'pointer' }}>
-              <Avatar
-                icon={<UserOutlined />}
-                src={user?.avatar}
-                size={64}
-              />
-              <Text strong>
-                {user?.name || user?.employee_number}
-              </Text>
-            </Space>
-          </Dropdown>
+          <Space size="large">
+            <ActiveWarehouseSelect />
+            <Dropdown menu={{ items: userMenuItems }} placement="bottomRight">
+              <Space style={{ cursor: 'pointer' }}>
+                <Avatar
+                  icon={<UserOutlined />}
+                  src={user?.avatar}
+                  size={64}
+                />
+                <Text strong>
+                  {user?.name || user?.employee_number}
+                </Text>
+              </Space>
+            </Dropdown>
+          </Space>
         </Header>
         <Content
           style={{

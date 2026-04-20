@@ -29,6 +29,7 @@ from utils.validation import (
     validate_schema,
     validate_warehouse_id,
 )
+from utils.warehouse_scope import assert_active_warehouse_matches
 
 
 logger = logging.getLogger(__name__)
@@ -147,6 +148,7 @@ def register_chemical_routes(app):
         status = request.args.get("status")
         search = request.args.get("q")
         show_archived = request.args.get("archived", "false").lower() == "true"
+        warehouse_id = request.args.get("warehouse_id", type=int)
 
         # Validate pagination parameters
         if page < 1:
@@ -166,6 +168,8 @@ def register_chemical_routes(app):
             logger.warning("is_archived column not found, skipping archived filter")
 
         # Apply filters if provided
+        if warehouse_id:
+            query = query.filter(Chemical.warehouse_id == warehouse_id)
         if category:
             query = query.filter(Chemical.category == category)
         if status:
@@ -437,6 +441,9 @@ def register_chemical_routes(app):
 
         # Get the chemical
         chemical = Chemical.query.get_or_404(id)
+
+        # Enforce warehouse scope — user must be working in the chemical's warehouse
+        assert_active_warehouse_matches(chemical)
 
         # Check if chemical can be issued
         if chemical.status == "expired":
@@ -728,6 +735,10 @@ def register_chemical_routes(app):
     @handle_errors
     def chemical_return_route(id):
         chemical = Chemical.query.get_or_404(id)
+
+        # Enforce warehouse scope — returns also write to the chemical's warehouse
+        assert_active_warehouse_matches(chemical)
+
         data = request.get_json() or {}
         current_user_id = request.current_user.get("user_id")
 
@@ -764,6 +775,19 @@ def register_chemical_routes(app):
                 raise ValidationError("Selected warehouse does not exist")
             if not warehouse.is_active:
                 raise ValidationError("Selected warehouse is inactive")
+
+        # A return must stay in the chemical's current warehouse — moving stock
+        # across warehouses has to go through the two-step transfer workflow so
+        # the shipment is recorded and the receiver assigns a location.
+        if (
+            warehouse_id
+            and warehouse_id != chemical.warehouse_id
+            and not request.current_user.get("is_admin")
+        ):
+            raise ValidationError(
+                "Returns must stay in the chemical's current warehouse. "
+                "Use a warehouse transfer to relocate this lot."
+            )
 
         location = data.get("location") or chemical.location
         notes = data.get("notes")

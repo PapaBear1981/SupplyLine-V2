@@ -883,14 +883,25 @@ def register_routes(app):
             if per_page < 1 or per_page > 1000:
                 return jsonify({"error": "Per page must be between 1 and 1000"}), 400
 
+            warehouse_id = request.args.get("warehouse_id", type=int)
+            status_filter = request.args.get("status")
+
             logger.debug("Tools list requested", extra={
                 "has_search_query": bool(search_query),
                 "page": page,
-                "per_page": per_page
+                "per_page": per_page,
+                "warehouse_id": warehouse_id,
+                "status_filter": status_filter,
             })
 
             # Build query
             query = Tool.query
+
+            if warehouse_id:
+                query = query.filter(Tool.warehouse_id == warehouse_id)
+
+            if status_filter:
+                query = query.filter(Tool.status == status_filter)
 
             if search_query:
                 search_term = f"%{search_query.lower()}%"
@@ -921,6 +932,10 @@ def register_routes(app):
             except Exception:
                 logger.exception("Error during pagination")
                 return jsonify({"error": "Failed to retrieve tools"}), 500
+
+            # Pre-fetch warehouse names to avoid N+1 lazy-load issues
+            from models import Warehouse
+            warehouse_names = {w.id: w.name for w in Warehouse.query.with_entities(Warehouse.id, Warehouse.name).all()}
 
             # Get checkout status for each tool
             tool_status = {}
@@ -957,6 +972,7 @@ def register_routes(app):
                 "status": tool_status.get(t.id, getattr(t, "status", "available")),  # Use 'available' if status attribute doesn't exist
                 "status_reason": getattr(t, "status_reason", None) if getattr(t, "status", "available") in ["maintenance", "retired"] else None,
                 "warehouse_id": t.warehouse_id,
+                "warehouse_name": warehouse_names.get(t.warehouse_id),
                 "kit_id": tool_kit_info.get(t.id, {}).get("kit_id"),
                 "kit_name": tool_kit_info.get(t.id, {}).get("kit_name"),
                 "box_id": tool_kit_info.get(t.id, {}).get("box_id"),
@@ -1266,6 +1282,38 @@ def register_routes(app):
                 if hasattr(tool, "update_calibration_status"):
                     tool.update_calibration_status()
 
+        # Status/maintenance workflow fields require tool.edit permission
+        status_fields = {"status", "status_reason", "maintenance_return_date"}
+        if status_fields & data.keys():
+            user_payload = getattr(request, "current_user", {}) or {}
+            user_permissions = set(user_payload.get("permissions") or [])
+            if not user_payload.get("is_admin") and "tool.edit" not in user_permissions:
+                return jsonify({"error": "tool.edit permission required to update tool status"}), 403
+            # Also enforce active-warehouse scope for non-admins
+            if not user_payload.get("is_admin"):
+                active_wh = user_payload.get("active_warehouse_id")
+                if active_wh and tool.warehouse_id and tool.warehouse_id != active_wh:
+                    return jsonify({"error": "Cannot update status of a tool in another warehouse", "code": "WAREHOUSE_SCOPE"}), 403
+
+        if "status" in data:
+            allowed_statuses = ("available", "checked_out", "maintenance", "retired", "in_transfer")
+            if data["status"] not in allowed_statuses:
+                return jsonify({"error": f"Invalid status. Must be one of: {', '.join(allowed_statuses)}"}), 400
+            tool.status = data["status"]
+
+        if "status_reason" in data:
+            tool.status_reason = data["status_reason"] or None
+
+        if "maintenance_return_date" in data:
+            raw = data["maintenance_return_date"]
+            if raw:
+                try:
+                    tool.maintenance_return_date = datetime.fromisoformat(raw[:10])
+                except (ValueError, TypeError):
+                    return jsonify({"error": "maintenance_return_date must be ISO date (YYYY-MM-DD)"}), 400
+            else:
+                tool.maintenance_return_date = None
+
         db.session.commit()
 
         # Verify the update in the database
@@ -1302,6 +1350,9 @@ def register_routes(app):
             "last_calibration_date": updated_tool.last_calibration_date.isoformat() if hasattr(updated_tool, "last_calibration_date") and updated_tool.last_calibration_date else None,
             "next_calibration_date": updated_tool.next_calibration_date.isoformat() if hasattr(updated_tool, "next_calibration_date") and updated_tool.next_calibration_date else None,
             "calibration_status": getattr(updated_tool, "calibration_status", "not_applicable"),
+            "status": updated_tool.status,
+            "status_reason": updated_tool.status_reason,
+            "maintenance_return_date": updated_tool.maintenance_return_date.isoformat() if getattr(updated_tool, "maintenance_return_date", None) else None,
             "message": "Tool updated successfully"
         }
 

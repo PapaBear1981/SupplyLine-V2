@@ -1,8 +1,10 @@
 import { useState } from 'react';
 import {
+  Alert,
   Table,
   Button,
   Space,
+  Switch,
   Tag,
   Input,
   Tooltip,
@@ -27,6 +29,7 @@ import {
 } from '../services/chemicalsApi';
 import type { Chemical, ChemicalStatus } from '../types';
 import { PermissionGuard } from '@features/auth/components/PermissionGuard';
+import { useActiveWarehouse } from '@features/warehouses/hooks/useActiveWarehouse';
 
 const { Text } = Typography;
 
@@ -41,11 +44,16 @@ export const ChemicalsTable = ({ onView, onEdit, onIssue }: ChemicalsTableProps)
   const [pageSize, setPageSize] = useState(50);
   const [searchQuery, setSearchQuery] = useState('');
   const [committedSearch, setCommittedSearch] = useState('');
+  const [showAllWarehouses, setShowAllWarehouses] = useState(false);
+
+  const { activeWarehouseId, activeWarehouseName } = useActiveWarehouse();
 
   const { data, isLoading, isFetching } = useGetChemicalsQuery({
     page,
     per_page: pageSize,
     q: committedSearch || undefined,
+    warehouse_id:
+      !showAllWarehouses && activeWarehouseId ? activeWarehouseId : undefined,
   });
 
   const [deleteChemical] = useDeleteChemicalMutation();
@@ -78,10 +86,14 @@ export const ChemicalsTable = ({ onView, onEdit, onIssue }: ChemicalsTableProps)
       width: 140,
       sorter: (a, b) => a.part_number.localeCompare(b.part_number),
       render: (text, record) => (
-        <Space size={6}>
+        <Space direction="vertical" size={2}>
           <Text strong>{text}</Text>
-          {record.expiring_soon && <Tag color="orange">Expiring Soon</Tag>}
-          {record.is_archived && <Tag color="default">Archived</Tag>}
+          {(record.expiring_soon || record.is_archived) && (
+            <Space size={4}>
+              {record.expiring_soon && <Tag color="orange">Expiring Soon</Tag>}
+              {record.is_archived && <Tag color="default">Archived</Tag>}
+            </Space>
+          )}
         </Space>
       ),
     },
@@ -152,13 +164,15 @@ export const ChemicalsTable = ({ onView, onEdit, onIssue }: ChemicalsTableProps)
         (a.expiration_date ? dayjs(a.expiration_date).valueOf() : 0) -
         (b.expiration_date ? dayjs(b.expiration_date).valueOf() : 0),
     },
-    {
-      title: 'Warehouse',
-      dataIndex: 'warehouse_name',
-      key: 'warehouse_name',
-      width: 160,
-      render: (_text, record) => record.warehouse_name || record.warehouse_id || '—',
-    },
+    ...(showAllWarehouses
+      ? [{
+          title: 'Warehouse',
+          dataIndex: 'warehouse_name',
+          key: 'warehouse_name',
+          width: 160,
+          render: (_text: unknown, record: Chemical) => record.warehouse_name || '—',
+        }]
+      : []),
     {
       title: 'Actions',
       key: 'actions',
@@ -209,7 +223,15 @@ export const ChemicalsTable = ({ onView, onEdit, onIssue }: ChemicalsTableProps)
 
   return (
     <div>
-      <div style={{ marginBottom: 16 }}>
+      <div
+        style={{
+          marginBottom: 16,
+          display: 'flex',
+          alignItems: 'center',
+          flexWrap: 'wrap',
+          gap: 16,
+        }}
+      >
         <Input
           placeholder="Search chemicals..."
           prefix={<SearchOutlined />}
@@ -227,7 +249,28 @@ export const ChemicalsTable = ({ onView, onEdit, onIssue }: ChemicalsTableProps)
             setPage(1);
           }}
         />
+        {activeWarehouseId && (
+          <Space>
+            <span>All warehouses</span>
+            <Switch
+              size="small"
+              checked={showAllWarehouses}
+              onChange={(value) => {
+                setShowAllWarehouses(value);
+                setPage(1);
+              }}
+            />
+          </Space>
+        )}
       </div>
+      {activeWarehouseId && showAllWarehouses && (
+        <Alert
+          type="info"
+          showIcon
+          style={{ marginBottom: 12 }}
+          message={`Viewing chemicals across all warehouses. Issue/return is only allowed for items in ${activeWarehouseName || 'your active warehouse'}.`}
+        />
+      )}
 
       <Table
         columns={columns}

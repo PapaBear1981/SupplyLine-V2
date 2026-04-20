@@ -74,6 +74,7 @@ export interface ChemicalsQueryParams {
   status?: ChemicalStatus;
   category?: string;
   archived?: boolean;
+  warehouse_id?: number;
 }
 
 export interface ChemicalIssuanceFormData {

@@ -2,7 +2,7 @@ import { useMemo } from 'react';
 import { Row, Col, Spin } from 'antd';
 import {
   ToolOutlined,
-  ExperimentOutlined,
+  SwapOutlined,
   InboxOutlined,
   HomeOutlined,
   WarningOutlined,
@@ -24,6 +24,8 @@ import { useGetChemicalsQuery } from '@features/chemicals/services/chemicalsApi'
 import { useGetKitsQuery, useGetRecentKitActivityQuery, useGetReorderReportQuery } from '@features/kits/services/kitsApi';
 import { useGetWarehousesQuery } from '@features/warehouses/services/warehousesApi';
 import { useGetAnnouncementsQuery, useGetOnlineUsersQuery } from '@features/admin/services/adminApi';
+import { useListInboundTransfersQuery } from '@features/transfers/services/transfersApi';
+import { useActiveWarehouse } from '@features/warehouses/hooks/useActiveWarehouse';
 
 // Components
 import {
@@ -50,9 +52,21 @@ export const DashboardPage = () => {
   const { themeConfig } = useTheme();
   const primaryColor = COLOR_THEMES[themeConfig.colorTheme].primary;
 
+  const { activeWarehouseId } = useActiveWarehouse();
+
   // Fetch data
   const { data: toolsData, isLoading: toolsLoading, refetch: refetchTools } = useGetToolsQuery({ per_page: 1000 });
   const { data: chemicalsData, isLoading: chemicalsLoading, refetch: refetchChemicals } = useGetChemicalsQuery({ per_page: 1000 });
+
+  // Warehouse-scoped counts for the top stat cards
+  const { data: inboundData, isLoading: inboundLoading } = useListInboundTransfersQuery(
+    { per_page: 1, activeWarehouseId },
+    { skip: !activeWarehouseId }
+  );
+  const { data: maintenanceData, isLoading: maintenanceLoading } = useGetToolsQuery(
+    { per_page: 1, status: 'maintenance', warehouse_id: activeWarehouseId ?? undefined },
+    { skip: !activeWarehouseId }
+  );
   const { data: kitsData, isLoading: kitsLoading, refetch: refetchKits } = useGetKitsQuery();
   const { data: warehousesData, isLoading: warehousesLoading } = useGetWarehousesQuery();
   const { data: onlineUsersData } = useGetOnlineUsersQuery(undefined, { pollingInterval: 30000 }); // Poll every 30 seconds
@@ -249,24 +263,22 @@ export const DashboardPage = () => {
       {/* Stats Grid */}
       <div className={styles.statsGrid}>
         <StatCard
-          title="Total Tools"
-          value={toolStats.total}
-          icon={<ToolOutlined />}
+          title="Inbound Transfers"
+          value={inboundData?.total ?? 0}
+          icon={<SwapOutlined />}
           iconBg="rgba(24, 144, 255, 0.1)"
           iconColor="#1890ff"
-          loading={toolsLoading}
-          onClick={() => navigate(ROUTES.TOOLS)}
-          trend={toolStats.checkedOut > 0 ? { value: toolStats.checkedOut, label: 'checked out', type: 'neutral' } : undefined}
+          loading={inboundLoading}
+          onClick={() => navigate(ROUTES.TRANSFERS)}
         />
         <StatCard
-          title="Chemicals"
-          value={chemicalStats.total}
-          icon={<ExperimentOutlined />}
-          iconBg="rgba(82, 196, 26, 0.1)"
-          iconColor="#52c41a"
-          loading={chemicalsLoading}
-          onClick={() => navigate(ROUTES.CHEMICALS)}
-          trend={chemicalStats.lowStock > 0 ? { value: chemicalStats.lowStock, label: 'low stock', type: 'warning' as const } : undefined}
+          title="Tools in Maintenance"
+          value={maintenanceData?.total ?? 0}
+          icon={<ToolOutlined />}
+          iconBg="rgba(250, 173, 20, 0.1)"
+          iconColor="#faad14"
+          loading={maintenanceLoading}
+          onClick={() => navigate(ROUTES.TOOLS)}
         />
         <StatCard
           title="Active Kits"
