@@ -11,6 +11,7 @@ import {
   RobotOutlined,
   BugOutlined,
   PhoneOutlined,
+  GithubOutlined,
 } from '@ant-design/icons';
 import { AdminOverview } from '../components/AdminOverview';
 import { UserManagement } from '../components/UserManagement';
@@ -21,6 +22,7 @@ import { AircraftTypeManagement } from '../components/AircraftTypeManagement';
 import { PermissionOverview } from '../components/PermissionOverview';
 import { SystemSettings } from '../components/SystemSettings';
 import { AISettings } from '../components/AISettings';
+import { GitHubSettings } from '../components/GitHubSettings';
 import { BugReportManagement } from '../components/BugReportManagement';
 import { OnCallManagement } from '../components/OnCallManagement';
 
@@ -127,6 +129,16 @@ export const AdminPage = () => {
         </span>
       ),
       children: <AISettings />,
+    },
+    {
+      key: 'github',
+      label: (
+        <span>
+          <GithubOutlined />
+          GitHub
+        </span>
+      ),
+      children: <GitHubSettings />,
     },
     {
       key: 'bug-reports',

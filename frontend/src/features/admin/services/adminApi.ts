@@ -14,7 +14,10 @@ import type {
   UserRole,
   OnlineUsersResponse,
   BugReport,
+  CreateBugReportRequest,
   UpdateBugReportRequest,
+  GitHubSettings,
+  UpdateGitHubSettingsRequest,
 } from '../types';
 
 export const adminApi = baseApi.injectEndpoints({
@@ -163,6 +166,15 @@ export const adminApi = baseApi.injectEndpoints({
       providesTags: ['BugReport'],
     }),
 
+    createBugReport: builder.mutation<BugReport, CreateBugReportRequest>({
+      query: (body) => ({
+        url: '/api/bug-reports',
+        method: 'POST',
+        body,
+      }),
+      invalidatesTags: ['BugReport'],
+    }),
+
     updateBugReport: builder.mutation<BugReport, UpdateBugReportRequest>({
       query: ({ id, ...body }) => ({
         url: `/api/bug-reports/${id}`,
@@ -178,6 +190,21 @@ export const adminApi = baseApi.injectEndpoints({
         method: 'DELETE',
       }),
       invalidatesTags: ['BugReport'],
+    }),
+
+    // GitHub Settings
+    getGitHubSettings: builder.query<GitHubSettings, void>({
+      query: () => '/api/github/settings',
+      providesTags: ['GitHubSettings'],
+    }),
+
+    updateGitHubSettings: builder.mutation<GitHubSettings, UpdateGitHubSettingsRequest>({
+      query: (body) => ({
+        url: '/api/github/settings',
+        method: 'PUT',
+        body,
+      }),
+      invalidatesTags: ['GitHubSettings'],
     }),
   }),
 });
@@ -202,6 +229,9 @@ export const {
   useUpdateRoleMutation,
   useDeleteRoleMutation,
   useGetBugReportsQuery,
+  useCreateBugReportMutation,
   useUpdateBugReportMutation,
   useDeleteBugReportMutation,
+  useGetGitHubSettingsQuery,
+  useUpdateGitHubSettingsMutation,
 } = adminApi;

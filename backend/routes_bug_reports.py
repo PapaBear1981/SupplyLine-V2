@@ -1,9 +1,44 @@
 """Bug report routes — submit, list, update, and delete bug reports."""
 
+import logging
+
 from flask import jsonify, request
 
 from auth import jwt_required, permission_required
-from models import BugReport, db, get_current_time
+from models import BugReport, SystemSetting, db, get_current_time
+
+logger = logging.getLogger(__name__)
+
+
+def _try_create_github_issue(report: BugReport) -> None:
+    """Best-effort GitHub issue creation — never raises, never blocks the response."""
+    try:
+        enabled_row = SystemSetting.query.filter_by(key="github.enabled").first()
+        if not enabled_row or enabled_row.value != "true":
+            return
+
+        token_row = SystemSetting.query.filter_by(key="github.token").first()
+        owner_row = SystemSetting.query.filter_by(key="github.owner").first()
+        repo_row  = SystemSetting.query.filter_by(key="github.repo").first()
+
+        token = token_row.value if token_row else ""
+        owner = owner_row.value if owner_row else ""
+        repo  = repo_row.value if repo_row else ""
+
+        if not (token and owner and repo):
+            logger.warning("GitHub integration enabled but token/owner/repo not fully configured")
+            return
+
+        from utils.github_service import create_github_issue
+        result = create_github_issue(report.to_dict(), token=token, owner=owner, repo=repo)
+
+        if result:
+            report.github_issue_number = result["number"]
+            report.github_issue_url    = result["html_url"]
+            db.session.commit()
+            logger.info("Created GitHub issue #%s for bug report %s", result["number"], report.id)
+    except Exception:
+        logger.warning("Unexpected error during GitHub issue creation", exc_info=True)
 
 
 def register_bug_report_routes(app):
@@ -50,6 +85,9 @@ def register_bug_report_routes(app):
         )
         db.session.add(report)
         db.session.commit()
+
+        _try_create_github_issue(report)
+
         return jsonify(report.to_dict()), 201
 
     @app.route("/api/bug-reports/<int:report_id>", methods=["PUT"])

@@ -94,6 +94,16 @@ export interface BugReport {
   created_at: string;
   updated_at: string | null;
   resolved_at: string | null;
+  github_issue_number: number | null;
+  github_issue_url: string | null;
+}
+
+export interface CreateBugReportRequest {
+  title: string;
+  description: string;
+  severity?: BugSeverity;
+  page_context?: string;
+  steps_to_reproduce?: string;
 }
 
 export interface UpdateBugReportRequest {
@@ -102,4 +112,18 @@ export interface UpdateBugReportRequest {
   severity?: BugSeverity;
   resolution_notes?: string;
   title?: string;
+}
+
+export interface GitHubSettings {
+  enabled: boolean;
+  token_set: boolean;
+  owner: string;
+  repo: string;
+}
+
+export interface UpdateGitHubSettingsRequest {
+  enabled?: boolean;
+  token?: string;
+  owner?: string;
+  repo?: string;
 }
