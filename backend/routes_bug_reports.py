@@ -7,6 +7,7 @@ from flask import jsonify, request
 from auth import jwt_required, permission_required
 from models import BugReport, SystemSetting, db, get_current_time
 
+
 logger = logging.getLogger(__name__)
 
 

@@ -4,6 +4,7 @@ import logging
 
 import requests
 
+
 logger = logging.getLogger(__name__)
 
 SEVERITY_LABELS = {

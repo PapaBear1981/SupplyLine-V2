@@ -7,6 +7,7 @@ from flask import jsonify, request
 from auth import jwt_required, permission_required
 from models import SystemSetting, db
 
+
 logger = logging.getLogger(__name__)
 
 GITHUB_ENABLED_KEY = "github.enabled"
