@@ -59,6 +59,34 @@ def _load_tool_or_chemical(item_type, item_id):
     return None
 
 
+def _build_item_snapshot(item_type, item_id):
+    """Return an item_snapshot dict for a transfer, or None if the item can't be loaded."""
+    item = _load_tool_or_chemical(item_type, item_id)
+    if item is None:
+        return None
+    return {
+        "id": item.id,
+        "description": getattr(item, "description", None),
+        "identifier": (
+            getattr(item, "tool_number", None)
+            or getattr(item, "part_number", None)
+        ),
+        "serial_number": getattr(item, "serial_number", None),
+        "lot_number": getattr(item, "lot_number", None),
+        "current_warehouse_id": getattr(item, "warehouse_id", None),
+        "current_location": getattr(item, "location", None),
+    }
+
+
+def _transfer_dict_with_snapshot(transfer):
+    """Serialize a WarehouseTransfer with item_snapshot included."""
+    d = transfer.to_dict()
+    snapshot = _build_item_snapshot(transfer.item_type, transfer.item_id)
+    if snapshot is not None:
+        d["item_snapshot"] = snapshot
+    return d
+
+
 @transfers_bp.route("/transfers/warehouse-to-kit", methods=["POST"])
 @jwt_required
 def transfer_warehouse_to_kit():
@@ -925,7 +953,7 @@ def list_inbound_transfers():
         page=page, per_page=per_page, error_out=False,
     )
     return jsonify({
-        "transfers": [t.to_dict() for t in pagination.items],
+        "transfers": [_transfer_dict_with_snapshot(t) for t in pagination.items],
         "total": pagination.total,
         "page": page,
         "per_page": per_page,
@@ -965,7 +993,7 @@ def list_outbound_transfers():
         page=page, per_page=per_page, error_out=False,
     )
     return jsonify({
-        "transfers": [t.to_dict() for t in pagination.items],
+        "transfers": [_transfer_dict_with_snapshot(t) for t in pagination.items],
         "total": pagination.total,
         "page": page,
         "per_page": per_page,
@@ -1165,7 +1193,7 @@ def get_transfers():
         )
 
         return jsonify({
-            "transfers": [transfer.to_dict() for transfer in pagination.items],
+            "transfers": [_transfer_dict_with_snapshot(transfer) for transfer in pagination.items],
             "total": pagination.total,
             "page": page,
             "per_page": per_page,
