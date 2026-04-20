@@ -87,6 +87,7 @@ export interface UserFormValues {
   is_active?: boolean;
   password?: string;
   role_ids?: number[];
+  active_warehouse_id?: number | null;
 }
 
 export interface CreateUserRequest extends UserFormValues {

@@ -152,6 +152,13 @@ def user_detail_route(id):
             user.is_admin = data["is_admin"]
         if "is_active" in data:
             user.is_active = data["is_active"]
+        if "active_warehouse_id" in data:
+            wh_id = data["active_warehouse_id"]
+            if wh_id is not None:
+                from models import Warehouse
+                if not db.session.get(Warehouse, int(wh_id)):
+                    return jsonify({"error": "Warehouse not found"}), 404
+            user.active_warehouse_id = wh_id if wh_id is None else int(wh_id)
         if data.get("password"):
             # Validate password strength
             is_valid, errors = password_utils.validate_password_strength(data["password"])

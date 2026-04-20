@@ -28,6 +28,7 @@ import {
   useUnlockUserMutation,
   useUpdateUserMutation,
 } from '../services/usersApi';
+import { useGetWarehousesQuery } from '@features/warehouses/services/warehousesApi';
 import type { CreateUserRequest, UserFormValues } from '../types';
 
 const { Text } = Typography;
@@ -55,6 +56,7 @@ export const UserDrawer = ({
   });
   const { data: departments } = useGetDepartmentsQuery();
   const { data: roles } = useGetRolesQuery();
+  const { data: warehousesData } = useGetWarehousesQuery({ include_inactive: false, per_page: 200 });
 
   const [createUser, { isLoading: isCreating }] = useCreateUserMutation();
   const [updateUser, { isLoading: isUpdating }] = useUpdateUserMutation();
@@ -84,6 +86,7 @@ export const UserDrawer = ({
         is_active: user.is_active,
         password: undefined,
         role_ids: user.roles?.map((r) => r.id) ?? [],
+        active_warehouse_id: user.active_warehouse_id ?? null,
       });
     }
   }, [user, mode, form]);
@@ -237,6 +240,9 @@ export const UserDrawer = ({
           <Descriptions.Item label="Department">
             {user.department || 'Not set'}
           </Descriptions.Item>
+          <Descriptions.Item label="Default Warehouse">
+            {user.active_warehouse_name || (user.active_warehouse_id ? `#${user.active_warehouse_id}` : 'Not set')}
+          </Descriptions.Item>
           <Descriptions.Item label="Email">
             {user.email || 'Not provided'}
           </Descriptions.Item>
@@ -320,6 +326,7 @@ export const UserDrawer = ({
         mode={mode}
         departments={departments}
         roles={roles}
+        warehouses={warehousesData?.warehouses}
         onSubmit={handleSubmit}
         onCancel={() => {
           if (mode === 'create') {

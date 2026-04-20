@@ -3,6 +3,7 @@ import { Button, Form, Input, Select, Space, Switch, Typography } from 'antd';
 import { CheckCircleFilled, CloseCircleFilled } from '@ant-design/icons';
 import type { FormInstance } from 'antd';
 import type { Department, UserFormValues, UserRole } from '../types';
+import type { Warehouse } from '@features/warehouses/types';
 
 const { Text } = Typography;
 
@@ -59,6 +60,7 @@ interface UserFormProps {
   mode: 'create' | 'edit';
   departments?: Department[];
   roles?: UserRole[];
+  warehouses?: Warehouse[];
   onSubmit: (values: UserFormValues) => void;
   onCancel: () => void;
   submitting?: boolean;
@@ -69,6 +71,7 @@ export const UserForm = ({
   mode,
   departments,
   roles,
+  warehouses,
   onSubmit,
   onCancel,
   submitting,
@@ -82,6 +85,11 @@ export const UserForm = ({
   const roleOptions = (roles || []).map((role) => ({
     label: role.name,
     value: role.id,
+  }));
+
+  const warehouseOptions = (warehouses || []).map((w) => ({
+    label: w.name,
+    value: w.id,
   }));
 
   // Watch password field for real-time validation display
@@ -157,13 +165,17 @@ export const UserForm = ({
         <Input placeholder="e.g. (555) 123-4567" type="tel" maxLength={20} />
       </Form.Item>
 
-      {roleOptions.length > 0 && (
-        <Form.Item label="Roles" name="role_ids">
+      {warehouseOptions.length > 0 && (
+        <Form.Item
+          label="Default Warehouse"
+          name="active_warehouse_id"
+          tooltip="The warehouse this user works from. They can also change this themselves via the header selector."
+        >
           <Select
-            mode="multiple"
-            placeholder="Select roles"
-            options={roleOptions}
+            placeholder="Select warehouse"
+            options={warehouseOptions}
             optionFilterProp="label"
+            showSearch
             allowClear
           />
         </Form.Item>

@@ -24,15 +24,33 @@ def _current_user_payload():
 
 
 def get_active_warehouse_id():
-    """Return the currently active warehouse id from the JWT payload, or None."""
+    """Return the currently active warehouse id from the JWT payload, or None.
+
+    Falls back to a live DB lookup when the JWT was issued before the
+    active_warehouse_id claim was added (tokens that pre-date the migration).
+    This lets existing sessions continue to work without a forced re-login.
+    """
     payload = _current_user_payload() or {}
     value = payload.get("active_warehouse_id")
-    if value in (None, ""):
-        return None
-    try:
-        return int(value)
-    except (TypeError, ValueError):
-        return None
+    if value not in (None, ""):
+        try:
+            return int(value)
+        except (TypeError, ValueError):
+            pass
+
+    # Token predates the claim — fall back to the database so the user
+    # doesn't have to log out and back in after a migration.
+    user_id = payload.get("user_id")
+    if user_id:
+        try:
+            from models import User  # local import to avoid circular dependency
+            user = User.query.get(int(user_id))
+            if user and user.active_warehouse_id:
+                return int(user.active_warehouse_id)
+        except Exception:
+            pass
+
+    return None
 
 
 def assert_active_warehouse_matches(item, *, allow_superadmin_override=True):
