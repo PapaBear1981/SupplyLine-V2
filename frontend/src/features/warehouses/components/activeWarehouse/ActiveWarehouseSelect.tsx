@@ -18,20 +18,29 @@ const { Text } = Typography;
  */
 export const ActiveWarehouseSelect = () => {
   const dispatch = useAppDispatch();
-  const { activeWarehouseId, setActiveWarehouse, isChanging } =
+  const { activeWarehouseId, activeWarehouseName, setActiveWarehouse, isChanging } =
     useActiveWarehouse();
   const user = useAppSelector((s) => s.auth.user);
 
   const { data } = useGetWarehousesQuery({ include_inactive: false, per_page: 200 });
 
-  const options = useMemo(
-    () =>
-      (data?.warehouses || []).map((w) => ({
-        label: w.name,
-        value: w.id,
-      })),
-    [data]
-  );
+  const options = useMemo(() => {
+    const list = (data?.warehouses || []).map((w) => ({
+      label: w.name,
+      value: w.id,
+    }));
+    // If the active warehouse isn't in the fetched list (e.g. materials users
+    // lack permission to list all warehouses), inject it from the slice so the
+    // Select shows the name instead of the raw numeric ID.
+    if (
+      activeWarehouseId &&
+      activeWarehouseName &&
+      !list.some((o) => o.value === activeWarehouseId)
+    ) {
+      list.unshift({ label: activeWarehouseName, value: activeWarehouseId });
+    }
+    return list;
+  }, [data, activeWarehouseId, activeWarehouseName]);
 
   // Sync the slice with backend truth. If the profile has no active
   // warehouse, clear any stale value from localStorage.
