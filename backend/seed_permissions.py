@@ -143,6 +143,7 @@ def run():
         existing = {p.name: p for p in Permission.query.all()}
         created = 0
         updated = 0
+        unchanged = 0
         for name, description, category in PERMISSIONS:
             if name in existing:
                 perm = existing[name]
@@ -150,11 +151,13 @@ def run():
                     perm.description = description
                     perm.category = category
                     updated += 1
+                else:
+                    unchanged += 1
                 continue
             db.session.add(Permission(name=name, description=description, category=category))
             created += 1
         db.session.commit()
-        print(f"Seed complete: {created} created, {updated} updated, {len(existing) - updated} unchanged.")
+        print(f"Seed complete: {created} created, {updated} updated, {unchanged} unchanged.")
 
 
 if __name__ == "__main__":

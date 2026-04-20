@@ -127,8 +127,11 @@ export const InitiateTransferModal = ({
   useEffect(() => {
     if (resolvedChemical) {
       const current = form.getFieldValue('quantity') as number | undefined;
-      if (!current || current > resolvedChemical.quantity) {
-        form.setFieldsValue({ quantity: Math.min(current ?? 1, resolvedChemical.quantity) });
+      const maxQty = resolvedChemical.quantity;
+      if (maxQty < 1) {
+        form.setFieldsValue({ quantity: 0 });
+      } else if (!current || current > maxQty) {
+        form.setFieldsValue({ quantity: Math.min(current ?? 1, maxQty) });
       }
     }
   }, [resolvedChemical, form]);
@@ -344,18 +347,15 @@ export const InitiateTransferModal = ({
             }
             name="quantity"
             rules={[
-              { required: true, message: 'Required' },
+              { required: true, message: 'Quantity is required' },
+              { type: 'number', min: 1, message: 'Must be at least 1' },
               {
                 validator: (_, value) => {
-                  if (
-                    resolvedChemical &&
-                    value > resolvedChemical.quantity
-                  ) {
-                    return Promise.reject(
-                      new Error(
-                        `Cannot exceed available quantity (${resolvedChemical.quantity})`
-                      )
-                    );
+                  if (resolvedChemical && resolvedChemical.quantity < 1) {
+                    return Promise.reject('This chemical is out of stock');
+                  }
+                  if (resolvedChemical && value > resolvedChemical.quantity) {
+                    return Promise.reject(`Only ${resolvedChemical.quantity} available`);
                   }
                   return Promise.resolve();
                 },

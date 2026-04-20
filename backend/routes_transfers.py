@@ -672,7 +672,17 @@ def lookup_transfer_item():
         { item: { id, description, ... } }
     """
     item_type = (request.args.get("item_type") or "").strip().lower()
-    warehouse_id = request.args.get("warehouse_id", type=int) or get_active_warehouse_id()
+    payload = getattr(request, "current_user", None) or {}
+    is_admin = bool(payload.get("is_admin"))
+    requested_warehouse_id = request.args.get("warehouse_id", type=int)
+    active_wh_id = get_active_warehouse_id()
+
+    if is_admin:
+        warehouse_id = requested_warehouse_id or active_wh_id
+    else:
+        warehouse_id = active_wh_id
+        if requested_warehouse_id and requested_warehouse_id != active_wh_id:
+            return jsonify({"error": "Cannot look up items in another warehouse"}), 403
 
     if not warehouse_id:
         return jsonify({"error": "No warehouse specified and no active warehouse set"}), 400
@@ -786,10 +796,10 @@ def initiate_transfer_route():
             "message": "Transfer initiated. Awaiting receipt at destination.",
             "transfer": transfer.to_dict(),
         }), 201
-    except Exception as e:
+    except Exception as _e:
         db.session.rollback()
         logger.exception("Failed to initiate transfer")
-        return jsonify({"error": str(e)}), 500
+        return jsonify({"error": "Failed to initiate transfer"}), 500
 
 
 @transfers_bp.route("/transfers/<int:transfer_id>/receive", methods=["POST"])
@@ -824,10 +834,10 @@ def receive_transfer_route(transfer_id):
             "message": "Transfer received.",
             "transfer": transfer.to_dict(),
         }), 200
-    except Exception as e:
+    except Exception as _e:
         db.session.rollback()
         logger.exception("Failed to receive transfer")
-        return jsonify({"error": str(e)}), 500
+        return jsonify({"error": "Failed to receive transfer"}), 500
 
 
 @transfers_bp.route("/transfers/<int:transfer_id>/cancel", methods=["POST"])
@@ -866,10 +876,10 @@ def cancel_transfer_route(transfer_id):
             "message": "Transfer cancelled.",
             "transfer": transfer.to_dict(),
         }), 200
-    except Exception as e:
+    except Exception as _e:
         db.session.rollback()
         logger.exception("Failed to cancel transfer")
-        return jsonify({"error": str(e)}), 500
+        return jsonify({"error": "Failed to cancel transfer"}), 500
 
 
 @transfers_bp.route("/transfers/inbound", methods=["GET"])

@@ -45,7 +45,7 @@ export const transfersApi = baseApi.injectEndpoints({
           params: {
             page: p.page || 1,
             per_page: p.per_page || 50,
-            status: p.status || 'pending_receipt',
+            ...((!p.status || p.status === 'all') ? { status: 'pending_receipt' } : { status: p.status }),
           },
         };
       },

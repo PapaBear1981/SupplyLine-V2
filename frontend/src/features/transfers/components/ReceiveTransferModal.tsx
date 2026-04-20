@@ -95,7 +95,15 @@ export const ReceiveTransferModal = ({
         <Form.Item
           label="Destination location"
           name="destination_location"
-          rules={[{ required: true, message: 'Where is it being stored?' }]}
+          rules={[
+            { required: true, message: 'Where is it being stored?' },
+            {
+              validator: (_, value: string) =>
+                value && value.trim().length > 0
+                  ? Promise.resolve()
+                  : Promise.reject('Location cannot be blank'),
+            },
+          ]}
         >
           <Input placeholder="e.g. Shelf 2A, Bin B3, Cabinet 7" autoFocus />
         </Form.Item>

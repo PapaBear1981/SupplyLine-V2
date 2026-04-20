@@ -1282,6 +1282,19 @@ def register_routes(app):
                 if hasattr(tool, "update_calibration_status"):
                     tool.update_calibration_status()
 
+        # Status/maintenance workflow fields require tool.edit permission
+        status_fields = {"status", "status_reason", "maintenance_return_date"}
+        if status_fields & data.keys():
+            user_payload = getattr(request, "current_user", {}) or {}
+            user_permissions = set(user_payload.get("permissions") or [])
+            if not user_payload.get("is_admin") and "tool.edit" not in user_permissions:
+                return jsonify({"error": "tool.edit permission required to update tool status"}), 403
+            # Also enforce active-warehouse scope for non-admins
+            if not user_payload.get("is_admin"):
+                active_wh = user_payload.get("active_warehouse_id")
+                if active_wh and tool.warehouse_id and tool.warehouse_id != active_wh:
+                    return jsonify({"error": "Cannot update status of a tool in another warehouse", "code": "WAREHOUSE_SCOPE"}), 403
+
         if "status" in data:
             allowed_statuses = ("available", "checked_out", "maintenance", "retired", "in_transfer")
             if data["status"] not in allowed_statuses:
