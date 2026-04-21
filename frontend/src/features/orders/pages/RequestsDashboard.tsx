@@ -241,7 +241,7 @@ export const RequestsDashboard: React.FC = () => {
   ];
 
   return (
-    <div style={{ padding: '0 0 24px' }}>
+    <div style={{ padding: '0 0 24px' }} data-testid="requests-page">
       <div style={{ marginBottom: 24 }}>
         <Row justify="space-between" align="middle">
           <Col>
@@ -261,6 +261,7 @@ export const RequestsDashboard: React.FC = () => {
                 icon={<PlusOutlined />}
                 onClick={() => navigate('/requests/new')}
                 size="large"
+                data-testid="requests-create-button"
               >
                 New Request
               </Button>
