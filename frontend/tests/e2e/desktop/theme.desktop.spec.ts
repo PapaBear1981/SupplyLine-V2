@@ -7,12 +7,13 @@ import { test, expect } from '@playwright/test';
  * `frontend/src/features/settings/contexts/ThemeContext.tsx`). A page
  * reload should pick up the same preference.
  *
- * Runs on desktop + mobile + tablet projects — the Settings page is
- * accessible on every viewport.
+ * Desktop-only: the mobile Settings page swaps the light/dark cards for
+ * an antd-mobile Switch with different testid semantics. A dedicated
+ * mobile theme spec can follow in a later iteration.
  */
 const STORAGE_KEY = 'supplyline-theme-config';
 
-test.describe('Theme persistence (shared)', () => {
+test.describe('Theme persistence (desktop)', () => {
   test.beforeEach(async ({ page }) => {
     await page.goto('/settings');
     await expect(page.getByTestId('settings-page')).toBeVisible();

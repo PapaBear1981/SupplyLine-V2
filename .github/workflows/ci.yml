@@ -210,6 +210,7 @@ jobs:
       JWT_SECRET_KEY: test-jwt-secret-key-for-ci-do-not-use-in-production
       DATABASE_URL: sqlite:///test.db
       DISABLE_MANDATORY_2FA: 'true'
+      DISABLE_RATE_LIMIT: 'true'
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -270,6 +271,7 @@ jobs:
           SECRET_KEY: test-secret-key-for-ci-do-not-use-in-production
           JWT_SECRET_KEY: test-jwt-secret-key-for-ci-do-not-use-in-production
           DISABLE_MANDATORY_2FA: 'true'
+          DISABLE_RATE_LIMIT: 'true'
 
       - name: Verify backend is running
         run: |

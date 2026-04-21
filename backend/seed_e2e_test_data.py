@@ -29,11 +29,12 @@ from models import (
     db,
 )
 from models_kits import AircraftType, Kit
+
 # models_messaging must be imported so SQLAlchemy can resolve the string
 # references on User (`created_channels` → Channel, etc.) at first query.
 # Omitting this import causes `User.query.filter_by(...)` to raise
 # InvalidRequestError("Channel is not defined").
-import models_messaging  # noqa: F401
+from models_messaging import Channel, ChannelMember, ChannelMessage  # noqa: F401
 
 
 # Setup logging
@@ -54,10 +55,13 @@ def reset_database():
     logger.info("Database reset complete")
 
 
-#: Deterministic TOTP secret for the TOTP001 E2E user. Base32-encoded.
-#: This value is used by the Playwright `auth-totp` spec (via `otplib`) to
-#: generate a valid 6-digit code at runtime. Never reuse this secret in prod.
-E2E_TOTP_SECRET = "JBSWY3DPEHPK3PXP"
+#: Deterministic TOTP secret for the TOTP001 E2E user. Base32-encoded,
+#: 32 chars = 20 bytes = 160 bits. Must be at least 16 bytes because
+#: otplib (v13+) enforces RFC 4226's 128-bit minimum; the classic short
+#: "JBSWY3DPEHPK3PXP" example is only 10 bytes and is rejected. Keep in
+#: sync with `frontend/tests/fixtures/test-data.ts` totpSecret.
+#: Never reuse this secret in production.
+E2E_TOTP_SECRET = "JBSWY3DPEHPK3PXPJBSWY3DPEHPK3PXP"
 
 
 def create_test_users():

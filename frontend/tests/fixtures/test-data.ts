@@ -40,7 +40,8 @@ export const TEST_USERS = {
     name: 'TOTP Test User',
     isAdmin: false,
     // Must match `E2E_TOTP_SECRET` in backend/seed_e2e_test_data.py.
-    totpSecret: 'JBSWY3DPEHPK3PXP',
+    // 32 base32 chars = 20 bytes; otplib v13 rejects anything under 16.
+    totpSecret: 'JBSWY3DPEHPK3PXPJBSWY3DPEHPK3PXP',
   },
   invalid: {
     username: 'INVALID',

@@ -1,7 +1,24 @@
-import { test as base, expect, type Page } from '@playwright/test';
+import { test as base, expect, type Locator, type Page } from '@playwright/test';
 import { TEST_USERS } from './test-data';
 
 type TestUser = keyof typeof TEST_USERS;
+
+/**
+ * Locate a form input across desktop antd and antd-mobile components.
+ *
+ * - Desktop `antd.Input` forwards `data-testid` onto the native `<input>`.
+ * - Mobile `antd-mobile.Input` wraps the native `<input>` in a div and
+ *   puts `data-testid` on that wrapper.
+ *
+ * Matching either `input[data-testid=X]` or `[data-testid=X] input` and
+ * taking the first match gives us a native input we can `.fill()` in both
+ * worlds.
+ */
+export function inputByTestId(page: Page, testId: string): Locator {
+  return page.locator(
+    `input[data-testid="${testId}"], [data-testid="${testId}"] input`,
+  ).first();
+}
 
 /**
  * Perform a password-only login against the live backend.
@@ -14,8 +31,8 @@ type TestUser = keyof typeof TEST_USERS;
 export async function loginAs(page: Page, userKey: Exclude<TestUser, 'invalid' | 'totp'> = 'admin'): Promise<void> {
   const creds = TEST_USERS[userKey];
   await page.goto('/login');
-  await page.getByTestId('login-username').fill(creds.username);
-  await page.getByTestId('login-password').fill(creds.password);
+  await inputByTestId(page, 'login-username').fill(creds.username);
+  await inputByTestId(page, 'login-password').fill(creds.password);
   await page.getByTestId('login-submit').click();
   await expect(page).toHaveURL(/\/dashboard/, { timeout: 20_000 });
   await expect(page.getByTestId('app-shell')).toBeVisible();

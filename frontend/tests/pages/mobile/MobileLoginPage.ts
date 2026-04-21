@@ -1,5 +1,6 @@
 import type { Page, Locator } from '@playwright/test';
 import { expect } from '@playwright/test';
+import { inputByTestId } from '../../fixtures/auth';
 import { TEST_USERS } from '../../fixtures/test-data';
 
 type CredKey = keyof typeof TEST_USERS;
@@ -17,11 +18,11 @@ export class MobileLoginPage {
   }
 
   get usernameInput(): Locator {
-    return this.page.getByTestId('login-username');
+    return inputByTestId(this.page, 'login-username');
   }
 
   get passwordInput(): Locator {
-    return this.page.getByTestId('login-password');
+    return inputByTestId(this.page, 'login-password');
   }
 
   get submitButton(): Locator {

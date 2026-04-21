@@ -1,6 +1,7 @@
 import { test as setup, expect } from '@playwright/test';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { inputByTestId } from '../fixtures/auth';
 import { TEST_USERS } from '../fixtures/test-data';
 
 /**
@@ -19,8 +20,8 @@ setup('authenticate as admin', async ({ page }) => {
 
   await page.goto('/login');
 
-  await page.getByTestId('login-username').fill(username);
-  await page.getByTestId('login-password').fill(password);
+  await inputByTestId(page, 'login-username').fill(username);
+  await inputByTestId(page, 'login-password').fill(password);
   await page.getByTestId('login-submit').click();
 
   // Expect a real redirect to the dashboard — no silent `.catch()` fallback.

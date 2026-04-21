@@ -3,6 +3,7 @@ Rate limiting utilities for API endpoints
 Provides simple in-memory rate limiting for security-sensitive endpoints
 """
 
+import os
 import threading
 from collections import defaultdict
 from datetime import datetime, timedelta
@@ -106,6 +107,15 @@ def rate_limit(limit=5, window=3600, key_func=None):
     def decorator(f):
         @wraps(f)
         def decorated_function(*args, **kwargs):
+            # E2E escape hatch: Playwright matrix jobs run the setup spec,
+            # auth-shared, and auth-totp specs in rapid succession on a fresh
+            # per-job backend. The 5/300s production limit is way below that
+            # burst, producing spurious 429s. Enable via DISABLE_RATE_LIMIT=true
+            # in the CI workflow only — unit tests don't set it, so
+            # `test_rate_limiting.py` continues to exercise the limiter.
+            if os.environ.get("DISABLE_RATE_LIMIT", "false").lower() == "true":
+                return f(*args, **kwargs)
+
             # Generate rate limit key
             if key_func:
                 key = key_func()

@@ -19,9 +19,16 @@ test.describe('Orders / Fulfillment (desktop)', () => {
     await expect(page.locator('.ant-tabs').first()).toBeVisible();
   });
 
-  test('New Fulfillment Action button is visible on the orders tab', async ({ page }) => {
+  test('New Fulfillment Action button is visible on the Orders tab', async ({ page }) => {
     await page.goto('/orders');
-    // activeTab defaults to 'orders', so the create button is rendered.
+    // activeTab defaults to 'requests'; the create button is conditionally
+    // rendered only when the Orders (fulfillment) tab is active. Click the
+    // tab by its accessible role+name so the selector is stable against
+    // icon + text markup.
+    const ordersTab = page.getByRole('tab', { name: /Fulfillment Queue/i });
+    await expect(ordersTab).toBeVisible({ timeout: 10_000 });
+    await ordersTab.click();
+    await expect(ordersTab).toHaveAttribute('aria-selected', 'true', { timeout: 5_000 });
     await expect(page.getByTestId('orders-create-button')).toBeVisible({ timeout: 10_000 });
   });
 });

@@ -6,6 +6,15 @@ const isCI = !!process.env.CI;
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 /**
+ * Absolute path to the shared storageState written by the `setup` project.
+ * Must match the path used in `tests/e2e/global-login.setup.ts`. Using a
+ * relative path here causes Playwright to resolve it against the worker's
+ * CWD (the test file's directory), producing ENOENT on every non-setup
+ * test.
+ */
+const STORAGE_STATE = path.resolve(__dirname, 'tests/.auth/user.json');
+
+/**
  * Playwright config for the SupplyLine-V2 web app.
  *
  * Projects split by filename suffix:
@@ -54,7 +63,7 @@ export default defineConfig({
       use: {
         ...devices['Desktop Chrome'],
         viewport: { width: 1440, height: 900 },
-        storageState: '.auth/user.json',
+        storageState: STORAGE_STATE,
       },
     },
     {
@@ -63,7 +72,7 @@ export default defineConfig({
       dependencies: ['setup'],
       use: {
         ...devices['iPhone 13'],
-        storageState: '.auth/user.json',
+        storageState: STORAGE_STATE,
       },
     },
     {
@@ -72,7 +81,7 @@ export default defineConfig({
       dependencies: ['setup'],
       use: {
         ...devices['Pixel 7'],
-        storageState: '.auth/user.json',
+        storageState: STORAGE_STATE,
       },
     },
     {
@@ -81,7 +90,7 @@ export default defineConfig({
       dependencies: ['setup'],
       use: {
         ...devices['iPad Pro 11'],
-        storageState: '.auth/user.json',
+        storageState: STORAGE_STATE,
       },
     },
   ],
