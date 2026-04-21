@@ -210,21 +210,25 @@ export const MobileLayout = () => {
       key: ROUTES.DASHBOARD,
       title: 'Dashboard',
       icon: <AppOutline />,
+      testid: 'mobile-tab-dashboard',
     },
     {
       key: 'menu',
       title: 'Menu',
       icon: <UnorderedListOutline />,
+      testid: 'mobile-tab-menu',
     },
     {
       key: ROUTES.PROFILE,
       title: 'Profile',
       icon: <UserOutline />,
+      testid: 'mobile-tab-profile',
     },
     {
       key: ROUTES.SETTINGS,
       title: 'Settings',
       icon: <SetOutline />,
+      testid: 'mobile-tab-settings',
     },
   ];
 
@@ -289,7 +293,12 @@ export const MobileLayout = () => {
           className="mobile-tabbar"
         >
           {tabs.map((tab) => (
-            <TabBar.Item key={tab.key} icon={tab.icon} title={tab.title} />
+            <TabBar.Item
+              key={tab.key}
+              icon={tab.icon}
+              title={tab.title}
+              data-testid={tab.testid}
+            />
           ))}
         </TabBar>
         <SafeArea position="bottom" />
@@ -307,9 +316,9 @@ export const MobileLayout = () => {
           overflow: 'auto',
         }}
       >
-        <div className="mobile-menu-popup">
+        <div className="mobile-menu-popup" data-testid="mobile-menu-popup">
           {/* User Info Header */}
-          <div className="mobile-menu-header">
+          <div className="mobile-menu-header" data-testid="mobile-menu-user">
             <Avatar
               src={user?.avatar || ''}
               style={{ '--size': '48px', '--border-radius': '50%' }}
@@ -332,6 +341,7 @@ export const MobileLayout = () => {
                   setMenuVisible(false);
                 }}
                 className={location.pathname === item.key ? 'active-menu-item' : ''}
+                data-testid={`mobile-menu-item-${item.key.replace(/^\//, '').replace(/\//g, '-') || 'root'}`}
               >
                 {item.label}
               </List.Item>
@@ -347,6 +357,7 @@ export const MobileLayout = () => {
                 handleLogout();
               }}
               className="logout-item"
+              data-testid="mobile-menu-logout"
             >
               <span style={{ color: '#ff4d4f' }}>Logout</span>
             </List.Item>

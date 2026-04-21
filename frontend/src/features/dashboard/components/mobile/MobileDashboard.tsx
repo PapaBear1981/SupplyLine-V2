@@ -223,9 +223,9 @@ export const MobileDashboard = () => {
   ];
 
   return (
-    <div className="mobile-dashboard">
+    <div className="mobile-dashboard" data-testid="mobile-dashboard">
       {/* Welcome Section */}
-      <div className="mobile-welcome">
+      <div className="mobile-welcome" data-testid="mobile-dashboard-welcome">
         <div className="welcome-text">
           <h2>Welcome back, {user?.name?.split(' ')[0] || 'User'}</h2>
           <p>{new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}</p>

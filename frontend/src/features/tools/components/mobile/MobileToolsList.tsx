@@ -212,6 +212,7 @@ export const MobileToolsList = () => {
     >
       <List.Item
         onClick={() => handleToolClick(tool)}
+        data-testid={`mobile-tool-item-${tool.id}`}
         prefix={
           <div className="tool-icon" style={{ background: `${statusColors[tool.status]}15`, color: statusColors[tool.status] }}>
             <ToolOutlined />
@@ -248,7 +249,7 @@ export const MobileToolsList = () => {
   );
 
   return (
-    <div className="mobile-tools-list">
+    <div className="mobile-tools-list" data-testid="mobile-tools-list">
       {/* Search Bar */}
       <div className="search-bar-container">
         <SearchBar
@@ -256,10 +257,12 @@ export const MobileToolsList = () => {
           value={searchQuery}
           onChange={handleSearch}
           className="search-bar"
+          data-testid="mobile-tools-search"
         />
         <div
           className={`filter-button ${statusFilter ? 'active' : ''}`}
           onClick={() => setShowFilterPopup(true)}
+          data-testid="mobile-tools-filter-button"
         >
           <FilterOutline />
         </div>
@@ -312,6 +315,7 @@ export const MobileToolsList = () => {
           '--edge-distance': '16px',
         }}
         onClick={handleCreate}
+        data-testid="mobile-tools-create-button"
       >
         <AddOutline fontSize={24} />
       </FloatingBubble>
