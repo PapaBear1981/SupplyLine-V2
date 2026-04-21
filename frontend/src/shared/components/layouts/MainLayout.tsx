@@ -104,7 +104,7 @@ export const MainLayout = () => {
       <SessionExpiryWarning />
       <AIAssistant />
       <RequireActiveWarehouseGate />
-      <Layout style={{ minHeight: '100vh' }}>
+      <Layout style={{ minHeight: '100vh' }} data-testid="app-shell" data-shell-ready="true">
         <Sider
         trigger={null}
         collapsible

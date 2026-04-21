@@ -43,6 +43,7 @@ export const LoginForm = ({ onSuccess }: LoginFormProps) => {
       initial="hidden"
       animate="visible"
       className="login-form-container"
+      data-testid="login-form"
     >
       <div className="login-form-header">
         <Title level={2} style={{ marginBottom: 8 }}>
@@ -68,6 +69,7 @@ export const LoginForm = ({ onSuccess }: LoginFormProps) => {
           icon={<UserOutlined />}
           placeholder="e.g. 00421"
           autoFocus
+          data-testid="login-username"
           rules={[
             { required: true, message: 'Please input your employee number!' },
           ]}
@@ -79,6 +81,7 @@ export const LoginForm = ({ onSuccess }: LoginFormProps) => {
           type="password"
           icon={<LockOutlined />}
           placeholder="Enter your password"
+          data-testid="login-password"
           rules={[
             { required: true, message: 'Please input your password!' },
           ]}
@@ -99,6 +102,7 @@ export const LoginForm = ({ onSuccess }: LoginFormProps) => {
               block
               size="large"
               className="glass-button login-submit-button"
+              data-testid="login-submit"
             >
               Log In
             </Button>

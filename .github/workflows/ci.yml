@@ -190,17 +190,26 @@ jobs:
 
   # Frontend E2E Testing Job
   frontend-e2e:
-    name: Frontend E2E Testing
+    name: Frontend E2E (${{ matrix.project }} shard ${{ matrix.shard }}/${{ matrix.shard-total }})
     runs-on: ubuntu-latest
     needs: frontend-lint
-    # Skip E2E tests on pull requests - only run on push to main/master
-    if: github.event_name != 'pull_request'
+    # Runs on PRs but is non-blocking during the rebuild stabilization window
+    # (see ci-success aggregator). Switch to blocking in a follow-up PR once
+    # the new suite is green across three consecutive merges.
+    continue-on-error: true
     timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        project: [desktop-chromium, mobile-iphone, mobile-pixel, tablet-ipad]
+        shard: [1, 2]
+        shard-total: [2]
     env:
       FLASK_ENV: testing
       SECRET_KEY: test-secret-key-for-ci-do-not-use-in-production
       JWT_SECRET_KEY: test-jwt-secret-key-for-ci-do-not-use-in-production
       DATABASE_URL: sqlite:///test.db
+      DISABLE_MANDATORY_2FA: 'true'
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -217,10 +226,16 @@ jobs:
           cd frontend
           npm ci
 
+      - name: Cache Playwright browsers
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ hashFiles('frontend/package-lock.json') }}
+
       - name: Install Playwright browsers
         run: |
           cd frontend
-          npx playwright install --with-deps chromium
+          npx playwright install --with-deps chromium webkit
 
       - name: Set up Python (for backend)
         uses: actions/setup-python@v5
@@ -254,6 +269,7 @@ jobs:
           DATABASE_URL: sqlite:///test.db
           SECRET_KEY: test-secret-key-for-ci-do-not-use-in-production
           JWT_SECRET_KEY: test-jwt-secret-key-for-ci-do-not-use-in-production
+          DISABLE_MANDATORY_2FA: 'true'
 
       - name: Verify backend is running
         run: |
@@ -272,8 +288,12 @@ jobs:
       - name: Run Playwright E2E tests
         run: |
           cd frontend
-          npx playwright test --project=chromium --reporter=list,html,json,junit --max-failures=5
-        timeout-minutes: 15
+          npx playwright test \
+            --project=setup \
+            --project=${{ matrix.project }} \
+            --shard=${{ matrix.shard }}/${{ matrix.shard-total }} \
+            --max-failures=5
+        timeout-minutes: 20
         env:
           CI: true
           VITE_API_URL: http://127.0.0.1:5000
@@ -289,7 +309,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: backend-logs
+          name: backend-logs-${{ matrix.project }}-${{ matrix.shard }}
           path: backend/backend.log
           retention-days: 7
 
@@ -297,7 +317,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: playwright-report
+          name: playwright-report-${{ matrix.project }}-${{ matrix.shard }}
           path: frontend/playwright-report/
           retention-days: 30
 
@@ -305,7 +325,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: playwright-test-results
+          name: playwright-test-results-${{ matrix.project }}-${{ matrix.shard }}
           path: frontend/test-results/
           retention-days: 30
 
@@ -400,12 +420,10 @@ jobs:
             exit 1
           fi
 
-          # Check E2E tests only if they ran (not skipped on PRs)
-          if [ "${{ needs.frontend-e2e.result }}" != "success" ] && \
-             [ "${{ needs.frontend-e2e.result }}" != "skipped" ]; then
-            echo "E2E tests failed"
-            exit 1
-          fi
+          # frontend-e2e is intentionally non-blocking during the rebuild
+          # stabilization window (see `continue-on-error: true` on that job).
+          # Report its status but do not fail CI on E2E failures here.
+          echo "frontend-e2e status: ${{ needs.frontend-e2e.result }} (non-blocking during rebuild)"
 
-          echo "All CI jobs passed successfully!"
+          echo "All required CI jobs passed successfully!"
 

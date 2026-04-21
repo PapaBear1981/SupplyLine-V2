@@ -10,6 +10,7 @@ interface AnimatedInputProps extends InputProps {
   label?: string;
   rules?: Rule[];
   icon?: React.ReactNode;
+  'data-testid'?: string;
 }
 
 export const AnimatedInput = ({
@@ -18,6 +19,7 @@ export const AnimatedInput = ({
   rules,
   icon,
   type = 'text',
+  'data-testid': dataTestId,
   ...inputProps
 }: AnimatedInputProps) => {
   const InputComponent = type === 'password' ? Input.Password : Input;
@@ -30,6 +32,7 @@ export const AnimatedInput = ({
           prefix={icon}
           className="glass-input animated-input"
           autoComplete={type === 'password' ? 'current-password' : 'off'}
+          data-testid={dataTestId}
         />
       </Form.Item>
     </motion.div>

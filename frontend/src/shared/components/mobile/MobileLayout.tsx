@@ -247,7 +247,7 @@ export const MobileLayout = () => {
   };
 
   return (
-    <div className="mobile-layout">
+    <div className="mobile-layout" data-testid="app-shell" data-shell-ready="true">
       <div className="mobile-layout-header">
         <SafeArea position="top" />
         <NavBar
