@@ -243,7 +243,7 @@ export const DashboardPage = () => {
   }
 
   return (
-    <div className={styles.dashboard}>
+    <div className={styles.dashboard} data-testid="dashboard-page">
       {/* Welcome Section */}
       <div className={styles.welcomeSection}>
         <WelcomeCard

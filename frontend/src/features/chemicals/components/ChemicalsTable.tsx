@@ -248,6 +248,7 @@ export const ChemicalsTable = ({ onView, onEdit, onIssue }: ChemicalsTableProps)
             setCommittedSearch('');
             setPage(1);
           }}
+          data-testid="chemicals-search-input"
         />
         {activeWarehouseId && (
           <Space>
@@ -272,25 +273,27 @@ export const ChemicalsTable = ({ onView, onEdit, onIssue }: ChemicalsTableProps)
         />
       )}
 
-      <Table
-        columns={columns}
-        dataSource={data?.chemicals || []}
-        rowKey="id"
-        loading={isLoading || isFetching}
-        scroll={{ x: 1200 }}
-        pagination={{
-          current: page,
-          pageSize,
-          total: data?.pagination.total || 0,
-          showSizeChanger: true,
-          showTotal: (total) => `Total ${total} chemicals`,
-          pageSizeOptions: ['10', '25', '50', '100'],
-          onChange: (newPage, newPageSize) => {
-            setPage(newPage);
-            setPageSize(newPageSize);
-          },
-        }}
-      />
+      <div data-testid="chemicals-table">
+        <Table
+          columns={columns}
+          dataSource={data?.chemicals || []}
+          rowKey="id"
+          loading={isLoading || isFetching}
+          scroll={{ x: 1200 }}
+          pagination={{
+            current: page,
+            pageSize,
+            total: data?.pagination.total || 0,
+            showSizeChanger: true,
+            showTotal: (total) => `Total ${total} chemicals`,
+            pageSizeOptions: ['10', '25', '50', '100'],
+            onChange: (newPage, newPageSize) => {
+              setPage(newPage);
+              setPageSize(newPageSize);
+            },
+          }}
+        />
+      </div>
     </div>
   );
 };

@@ -238,6 +238,7 @@ export const ToolsTable = ({ onView, onEdit }: ToolsTableProps) => {
           onPressEnter={() => setPage(1)}
           style={{ maxWidth: 400 }}
           allowClear
+          data-testid="tools-search-input"
         />
         {activeWarehouseId && (
           <Space>
@@ -262,25 +263,27 @@ export const ToolsTable = ({ onView, onEdit }: ToolsTableProps) => {
         />
       )}
 
-      <Table
-        columns={columns}
-        dataSource={data?.tools || []}
-        rowKey="id"
-        loading={isLoading || isFetching}
-        scroll={{ x: 1200 }}
-        pagination={{
-          current: page,
-          pageSize,
-          total: data?.total || 0,
-          showSizeChanger: true,
-          showTotal: (total) => `Total ${total} tools`,
-          pageSizeOptions: ['10', '25', '50', '100'],
-          onChange: (newPage, newPageSize) => {
-            setPage(newPage);
-            setPageSize(newPageSize);
-          },
-        }}
-      />
+      <div data-testid="tools-table">
+        <Table
+          columns={columns}
+          dataSource={data?.tools || []}
+          rowKey="id"
+          loading={isLoading || isFetching}
+          scroll={{ x: 1200 }}
+          pagination={{
+            current: page,
+            pageSize,
+            total: data?.total || 0,
+            showSizeChanger: true,
+            showTotal: (total) => `Total ${total} tools`,
+            pageSizeOptions: ['10', '25', '50', '100'],
+            onChange: (newPage, newPageSize) => {
+              setPage(newPage);
+              setPageSize(newPageSize);
+            },
+          }}
+        />
+      </div>
 
       {printModalTool && (
         <LabelPrintModal

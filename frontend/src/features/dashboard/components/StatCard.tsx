@@ -17,6 +17,16 @@ interface StatCardProps {
   onClick?: () => void;
 }
 
+/**
+ * Convert a human title like "Tools in Maintenance" into the stable
+ * `dashboard-stat-tools-in-maintenance` testid slug used by E2E specs.
+ */
+const slugify = (title: string): string =>
+  title
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/(^-|-$)/g, '');
+
 export const StatCard = ({
   title,
   value,
@@ -34,6 +44,7 @@ export const StatCard = ({
       hoverable={!!onClick}
       onClick={onClick}
       styles={{ body: { padding: '20px' } }}
+      data-testid={`dashboard-stat-${slugify(title)}`}
     >
       <div className={styles.statCardInner}>
         <div

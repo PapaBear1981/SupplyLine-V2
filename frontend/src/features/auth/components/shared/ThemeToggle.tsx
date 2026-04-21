@@ -19,6 +19,7 @@ export const ThemeToggle = () => {
       whileTap={{ scale: 0.95 }}
       aria-label={`Switch to ${isDark ? 'light' : 'dark'} mode`}
       title={`Switch to ${isDark ? 'light' : 'dark'} mode`}
+      data-testid="theme-toggle"
     >
       <motion.div
         className="theme-toggle-icon-container"
