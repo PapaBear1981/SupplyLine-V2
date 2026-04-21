@@ -160,7 +160,7 @@ const KitsDashboard = () => {
   ];
 
   return (
-    <div style={{ padding: '24px' }}>
+    <div style={{ padding: '24px' }} data-testid="kits-page">
       <Row gutter={[16, 16]}>
         <Col span={24}>
           <Space style={{ width: '100%', justifyContent: 'space-between' }}>
@@ -172,6 +172,7 @@ const KitsDashboard = () => {
               icon={<PlusOutlined />}
               size="large"
               onClick={() => navigate('/kits/new')}
+              data-testid="kits-create-button"
             >
               Create New Kit
             </Button>

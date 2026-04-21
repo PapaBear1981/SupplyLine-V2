@@ -20,7 +20,7 @@ export const SettingsPage = () => {
   }
 
   return (
-    <div style={{ maxWidth: 1200, margin: '0 auto' }}>
+    <div style={{ maxWidth: 1200, margin: '0 auto' }} data-testid="settings-page">
       <Space direction="vertical" size="large" style={{ width: '100%' }}>
         <div>
           <Title level={2}>Settings</Title>
@@ -55,6 +55,7 @@ export const SettingsPage = () => {
                       cursor: 'pointer',
                     }}
                     onClick={() => setThemeMode('light')}
+                    data-testid="theme-mode-light"
                   >
                     <Space direction="vertical" align="center" style={{ width: '100%' }}>
                       <BulbOutlined style={{ fontSize: 32, color: '#faad14' }} />
@@ -73,6 +74,7 @@ export const SettingsPage = () => {
                       cursor: 'pointer',
                     }}
                     onClick={() => setThemeMode('dark')}
+                    data-testid="theme-mode-dark"
                   >
                     <Space direction="vertical" align="center" style={{ width: '100%' }}>
                       <BulbFilled style={{ fontSize: 32, color: '#8c8c8c' }} />

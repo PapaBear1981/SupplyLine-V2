@@ -68,7 +68,7 @@ export const MobileTotpVerification = ({
 
   return (
     <MobileAuthShell>
-      <div className="mobile-totp-verification">
+      <div className="mobile-totp-verification" data-testid="totp-form">
         <div className="mobile-totp-icon">
           <SafetyCertificateOutlined />
         </div>
@@ -109,6 +109,7 @@ export const MobileTotpVerification = ({
               }
             }}
             maxLength={6}
+            data-testid="totp-code-input"
           />
         </div>
 
@@ -121,6 +122,7 @@ export const MobileTotpVerification = ({
           onClick={() => {
             void handleVerify(code);
           }}
+          data-testid="totp-submit"
         >
           Verify Code
         </Button>

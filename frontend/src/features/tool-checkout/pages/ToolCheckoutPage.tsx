@@ -90,7 +90,7 @@ export const ToolCheckoutPage = () => {
   ];
 
   return (
-    <div>
+    <div data-testid="checkout-page">
       {/* Header */}
       <div
         style={{
@@ -115,6 +115,7 @@ export const ToolCheckoutPage = () => {
           size="large"
           icon={<PlusOutlined />}
           onClick={() => setCheckoutModalOpen(true)}
+          data-testid="checkout-create-button"
         >
           Checkout
         </Button>

@@ -54,7 +54,7 @@ export const ChemicalsPage = () => {
   };
 
   return (
-    <div>
+    <div data-testid="chemicals-page">
       <div
         style={{
           display: 'flex',
@@ -70,7 +70,12 @@ export const ChemicalsPage = () => {
         </Title>
         <Space>
           <PermissionGuard permission="chemical.create">
-            <Button type="primary" icon={<PlusOutlined />} onClick={handleCreate}>
+            <Button
+              type="primary"
+              icon={<PlusOutlined />}
+              onClick={handleCreate}
+              data-testid="chemicals-create-button"
+            >
               Add Chemical
             </Button>
           </PermissionGuard>

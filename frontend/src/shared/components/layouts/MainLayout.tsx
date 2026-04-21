@@ -78,13 +78,13 @@ export const MainLayout = () => {
     {
       key: 'profile',
       icon: <UserOutlined />,
-      label: 'Profile',
+      label: <span data-testid="user-menu-profile">Profile</span>,
       onClick: () => navigate(ROUTES.PROFILE),
     },
     {
       key: 'settings',
       icon: <SettingOutlined />,
-      label: 'Settings',
+      label: <span data-testid="user-menu-settings">Settings</span>,
       onClick: () => navigate(ROUTES.SETTINGS),
     },
     {
@@ -93,7 +93,7 @@ export const MainLayout = () => {
     {
       key: 'logout',
       icon: <LogoutOutlined />,
-      label: 'Logout',
+      label: <span data-testid="user-menu-logout">Logout</span>,
       onClick: handleLogout,
       danger: true,
     },
@@ -104,7 +104,7 @@ export const MainLayout = () => {
       <SessionExpiryWarning />
       <AIAssistant />
       <RequireActiveWarehouseGate />
-      <Layout style={{ minHeight: '100vh' }}>
+      <Layout style={{ minHeight: '100vh' }} data-testid="app-shell" data-shell-ready="true">
         <Sider
         trigger={null}
         collapsible
@@ -176,7 +176,7 @@ export const MainLayout = () => {
           <Space size="large">
             <ActiveWarehouseSelect />
             <Dropdown menu={{ items: userMenuItems }} placement="bottomRight">
-              <Space style={{ cursor: 'pointer' }}>
+              <Space style={{ cursor: 'pointer' }} data-testid="user-menu">
                 <Avatar
                   icon={<UserOutlined />}
                   src={user?.avatar}

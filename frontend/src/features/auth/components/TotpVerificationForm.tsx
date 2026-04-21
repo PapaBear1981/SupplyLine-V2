@@ -50,6 +50,7 @@ export const TotpVerificationForm = ({
       initial="hidden"
       animate="visible"
       className="totp-verification-container"
+      data-testid="totp-form"
     >
       <div className="totp-verification-header">
         <SafetyCertificateOutlined className="totp-icon" />
@@ -87,6 +88,7 @@ export const TotpVerificationForm = ({
             maxLength={6}
             className="glass-input totp-code-input"
             autoFocus
+            data-testid="totp-code-input"
           />
         </Form.Item>
 
@@ -112,6 +114,7 @@ export const TotpVerificationForm = ({
               block
               size="large"
               className="glass-button totp-submit-button"
+              data-testid="totp-submit"
             >
               Verify Code
             </Button>

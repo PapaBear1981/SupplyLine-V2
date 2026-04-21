@@ -717,7 +717,7 @@ export const OrdersDashboard: React.FC = () => {
   ];
 
   return (
-    <div style={{ padding: '0 0 24px' }}>
+    <div style={{ padding: '0 0 24px' }} data-testid="orders-page">
       <div style={{ marginBottom: 24 }}>
         <Row justify="space-between" align="middle">
           <Col>
@@ -740,6 +740,7 @@ export const OrdersDashboard: React.FC = () => {
                   icon={<PlusOutlined />}
                   onClick={handleCreateOrder}
                   size="large"
+                  data-testid="orders-create-button"
                 >
                   New Fulfillment Action
                 </Button>

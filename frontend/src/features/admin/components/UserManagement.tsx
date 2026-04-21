@@ -127,7 +127,7 @@ export const UserManagement = () => {
   };
 
   return (
-    <div>
+    <div data-testid="admin-users-section">
       <div
         style={{
           display: 'flex',
@@ -139,6 +139,7 @@ export const UserManagement = () => {
           type="primary"
           icon={<PlusOutlined />}
           onClick={handleCreate}
+          data-testid="admin-users-create-button"
         >
           Add User
         </Button>

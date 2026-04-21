@@ -63,7 +63,7 @@ export const TransfersPage = () => {
     tab === 'inbound' ? inbound : tab === 'outbound' ? outbound : history;
 
   return (
-    <div>
+    <div data-testid="transfers-page">
       <div
         style={{
           display: 'flex',
@@ -85,6 +85,7 @@ export const TransfersPage = () => {
               type="primary"
               icon={<PlusOutlined />}
               onClick={() => setInitiateOpen(true)}
+              data-testid="transfers-create-button"
             >
               Initiate transfer
             </Button>

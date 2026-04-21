@@ -30,6 +30,12 @@ from models import (
 )
 from models_kits import AircraftType, Kit
 
+# models_messaging must be imported so SQLAlchemy can resolve the string
+# references on User (`created_channels` → Channel, etc.) at first query.
+# Omitting this import causes `User.query.filter_by(...)` to raise
+# InvalidRequestError("Channel is not defined").
+from models_messaging import Channel, ChannelMember, ChannelMessage  # noqa: F401
+
 
 # Setup logging
 logging.basicConfig(level=logging.INFO)
@@ -47,6 +53,15 @@ def reset_database():
     db.drop_all()
     db.create_all()
     logger.info("Database reset complete")
+
+
+#: Deterministic TOTP secret for the TOTP001 E2E user. Base32-encoded,
+#: 32 chars = 20 bytes = 160 bits. Must be at least 16 bytes because
+#: otplib (v13+) enforces RFC 4226's 128-bit minimum; the classic short
+#: "JBSWY3DPEHPK3PXP" example is only 10 bytes and is rejected. Keep in
+#: sync with `frontend/tests/fixtures/test-data.ts` totpSecret.
+#: Never reuse this secret in production.
+E2E_TOTP_SECRET = "JBSWY3DPEHPK3PXPJBSWY3DPEHPK3PXP"
 
 
 def create_test_users():
@@ -88,6 +103,17 @@ def create_test_users():
             "department": "Engineering",
             "password": "password123",
             "is_admin": False
+        },
+        {
+            # TOTP-enabled user for the dedicated `auth-totp` E2E spec.
+            # The rest of the suite runs with DISABLE_MANDATORY_2FA=true so this
+            # user is the only one that exercises the real 2FA challenge path.
+            "name": "TOTP Test User",
+            "employee_number": "TOTP001",
+            "department": "Engineering",
+            "password": "totp123",
+            "is_admin": False,
+            "totp_secret": E2E_TOTP_SECRET,
         }
     ]
 
@@ -98,7 +124,7 @@ def create_test_users():
         if existing_user:
             logger.info(f"User already exists: {existing_user.name} ({existing_user.employee_number}), updating password...")
             existing_user.set_password(user_data["password"])
-            created_users.append(existing_user)
+            user = existing_user
         else:
             user = User(
                 name=user_data["name"],
@@ -110,8 +136,16 @@ def create_test_users():
             )
             user.set_password(user_data["password"])
             db.session.add(user)
-            created_users.append(user)
             logger.info(f"Created user: {user.name} ({user.employee_number})")
+
+        # Pre-enable TOTP for users that provide a deterministic secret.
+        # Stored encrypted at rest; the spec regenerates the live code via otplib.
+        if user_data.get("totp_secret") and hasattr(user, "set_totp_secret_encrypted"):
+            user.set_totp_secret_encrypted(user_data["totp_secret"])
+            user.is_totp_enabled = True
+            logger.info(f"  Enabled TOTP for {user.employee_number}")
+
+        created_users.append(user)
 
     db.session.commit()
 
@@ -512,6 +546,7 @@ def main():
             logger.info("Admin: ADMIN001 / admin123")
             logger.info("User: USER001 / user123")
             logger.info("Materials: MAT001 / materials123")
+            logger.info(f"TOTP User: TOTP001 / totp123 (TOTP secret: {E2E_TOTP_SECRET})")
             logger.info("=" * 60)
 
             return True

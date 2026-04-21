@@ -20,6 +20,38 @@ import { ROUTES } from './routes';
 export type MenuItem = Required<MenuProps>['items'][number];
 
 /**
+ * Map nav item keys to stable `data-testid` slugs used by Playwright specs.
+ * Keep in sync with the keys below — adding a nav item without a testid
+ * slug just renders a plain label, which is fine for non-tested screens.
+ */
+const NAV_TEST_IDS: Record<string, string> = {
+  [ROUTES.DASHBOARD]: 'nav-dashboard',
+  [ROUTES.TOOL_CHECKOUT]: 'nav-tool-checkout',
+  [ROUTES.TOOLS]: 'nav-tools',
+  [ROUTES.CHEMICALS]: 'nav-chemicals',
+  [ROUTES.CHEMICAL_FORECAST]: 'nav-chemicals-forecast',
+  [ROUTES.KITS]: 'nav-kits',
+  '/orders': 'nav-orders',
+  '/requests': 'nav-requests',
+  [ROUTES.WAREHOUSES]: 'nav-warehouses',
+  [ROUTES.TRANSFERS]: 'nav-transfers',
+  [ROUTES.REPORTS]: 'nav-reports',
+  [ROUTES.USERS]: 'nav-users',
+  [ROUTES.ADMIN]: 'nav-admin',
+};
+
+/**
+ * Wrap a string label in a span carrying a stable data-testid. antd Menu
+ * items accept ReactNode labels, so this is non-invasive and Playwright
+ * selectors (`page.getByTestId('nav-tools')`) land on the span inside the
+ * menu item; clicks bubble to `onClick` exactly as with a plain label.
+ */
+const taggedLabel = (key: string, label: string): ReactNode => {
+  const testId = NAV_TEST_IDS[key];
+  return testId ? <span data-testid={testId}>{label}</span> : label;
+};
+
+/**
  * Extended menu item with permission requirement.
  */
 interface MenuItemWithPermission {
@@ -150,13 +182,14 @@ export const getMenuItems = (isAdmin: boolean = false, permissions: string[] = [
         // Remove permission-related fields and return as MenuItem
         // eslint-disable-next-line @typescript-eslint/no-unused-vars
         const { permission, adminOnly, children, ...menuItem } = item;
+        const tagged = { ...menuItem, label: taggedLabel(item.key, item.label) };
         if (children) {
           return {
-            ...menuItem,
+            ...tagged,
             children: filterItems(children),
           } as MenuItem;
         }
-        return menuItem as MenuItem;
+        return tagged as MenuItem;
       });
   };
 

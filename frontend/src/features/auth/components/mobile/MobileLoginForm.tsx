@@ -59,7 +59,7 @@ export const MobileLoginForm = ({ onSuccess }: MobileLoginFormProps) => {
 
   return (
     <MobileAuthShell>
-      <div className="mobile-login-form">
+      <div className="mobile-login-form" data-testid="login-form">
       <div className="mobile-login-header">
         <h1 className="mobile-login-title">Welcome back</h1>
         <p className="mobile-login-subtitle">
@@ -78,6 +78,7 @@ export const MobileLoginForm = ({ onSuccess }: MobileLoginFormProps) => {
             block
             loading={isLoading}
             onClick={handleSubmit}
+            data-testid="login-submit"
           >
             Log In
           </Button>
@@ -92,6 +93,7 @@ export const MobileLoginForm = ({ onSuccess }: MobileLoginFormProps) => {
             placeholder="e.g. 00421"
             clearable
             autoComplete="off"
+            data-testid="login-username"
           />
         </Form.Item>
 
@@ -116,6 +118,7 @@ export const MobileLoginForm = ({ onSuccess }: MobileLoginFormProps) => {
               clearable
               type={showPassword ? 'text' : 'password'}
               autoComplete="off"
+              data-testid="login-password"
             />
             <button
               type="button"

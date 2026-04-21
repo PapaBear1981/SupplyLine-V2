@@ -10,7 +10,16 @@
     "preview": "vite preview",
     "test": "vitest",
     "test:run": "vitest run",
-    "test:coverage": "vitest run --coverage"
+    "test:coverage": "vitest run --coverage",
+    "test:e2e": "playwright test",
+    "test:e2e:ui": "playwright test --ui",
+    "test:e2e:desktop": "playwright test --project=setup --project=desktop-chromium",
+    "test:e2e:mobile": "playwright test --project=setup --project=mobile-iphone --project=mobile-pixel",
+    "test:e2e:tablet": "playwright test --project=setup --project=tablet-ipad",
+    "test:e2e:debug": "PWDEBUG=1 playwright test",
+    "test:e2e:headed": "playwright test --headed",
+    "test:e2e:report": "playwright show-report",
+    "test:e2e:seed": "cd ../backend && python seed_e2e_test_data.py"
   },
   "dependencies": {
     "@ant-design/icons": "^6.0.0",
@@ -47,6 +56,7 @@
     "eslint-plugin-react-refresh": "^0.4.24",
     "globals": "^16.5.0",
     "jsdom": "^27.4.0",
+    "otplib": "^13.4.0",
     "sass": "^1.94.2",
     "typescript": "~5.9.3",
     "typescript-eslint": "^8.46.4",

@@ -43,7 +43,7 @@ export const ToolsPage = () => {
   };
 
   return (
-    <div>
+    <div data-testid="tools-page">
       <div
         style={{
           display: 'flex',
@@ -62,6 +62,7 @@ export const ToolsPage = () => {
             <Button
               icon={<SwapOutlined />}
               onClick={() => setCheckoutModalOpen(true)}
+              data-testid="tools-checkout-button"
             >
               Checkout
             </Button>
@@ -71,6 +72,7 @@ export const ToolsPage = () => {
               type="primary"
               icon={<PlusOutlined />}
               onClick={handleCreate}
+              data-testid="tools-create-button"
             >
               Add Tool
             </Button>
