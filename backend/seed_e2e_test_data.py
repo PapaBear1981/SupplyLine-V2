@@ -29,6 +29,11 @@ from models import (
     db,
 )
 from models_kits import AircraftType, Kit
+# models_messaging must be imported so SQLAlchemy can resolve the string
+# references on User (`created_channels` → Channel, etc.) at first query.
+# Omitting this import causes `User.query.filter_by(...)` to raise
+# InvalidRequestError("Channel is not defined").
+import models_messaging  # noqa: F401
 
 
 # Setup logging
