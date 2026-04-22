@@ -36,16 +36,16 @@ def _warehouse(db_session, name="Test"):
 
 def _chemical(db_session, warehouse, **kwargs):
     from models import Chemical
-    defaults = dict(
-        part_number=f"P-{uuid.uuid4().hex[:6].upper()}",
-        lot_number=f"L-{uuid.uuid4().hex[:6].upper()}",
-        description="Test chemical",
-        quantity=100,
-        unit="oz",
-        status="available",
-        location="Shelf 1",
-        warehouse_id=warehouse.id,
-    )
+    defaults = {
+        "part_number": f"P-{uuid.uuid4().hex[:6].upper()}",
+        "lot_number": f"L-{uuid.uuid4().hex[:6].upper()}",
+        "description": "Test chemical",
+        "quantity": 100,
+        "unit": "oz",
+        "status": "available",
+        "location": "Shelf 1",
+        "warehouse_id": warehouse.id,
+    }
     defaults.update(kwargs)
     chem = Chemical(**defaults)
     db_session.add(chem)
@@ -151,13 +151,13 @@ class TestChemicalIssuanceEndpoint:
 
     def test_expired_chemical_rejected(self, client, admin_user, jwt_manager, db_session):
         """Expired chemicals cannot be issued — backend must enforce this."""
-        from datetime import date, timedelta
+        from datetime import datetime, timedelta, timezone
         wh = _warehouse(db_session)
         chem = _chemical(
             db_session, wh,
             quantity=20,
             status="expired",
-            expiration_date=date.today() - timedelta(days=1),
+            expiration_date=datetime.now(tz=timezone.utc).date() - timedelta(days=1),
         )
         headers = _issue_headers(client, jwt_manager, admin_user, wh, db_session)
 
