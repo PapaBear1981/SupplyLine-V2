@@ -59,7 +59,6 @@ export const MobileChemicalsList = () => {
   const [showDetailPopup, setShowDetailPopup] = useState(false);
   const [showFormPopup, setShowFormPopup] = useState(false);
   const [showIssuancePopup, setShowIssuancePopup] = useState(false);
-  const [userPickerVisible, setUserPickerVisible] = useState(false);
   const [selectedChemical, setSelectedChemical] = useState<Chemical | null>(null);
   const [formMode, setFormMode] = useState<'create' | 'edit'>('create');
   const [page, setPage] = useState(1);
@@ -95,10 +94,10 @@ export const MobileChemicalsList = () => {
   }, [warehousesData]);
 
   const userOptions = useMemo(() => {
-    return [(usersData || []).map(u => ({
+    return (usersData || []).map(u => ({
       label: `${u.name} (${u.employee_number})`,
       value: u.id,
-    }))];
+    }));
   }, [usersData]);
 
   const handleSearch = (value: string) => {
@@ -172,7 +171,7 @@ export const MobileChemicalsList = () => {
     issuanceForm.setFieldsValue({
       quantity: 1,
       hangar: '',
-      user_id: currentUser?.id ? [currentUser.id] : [],
+      user_id: currentUser?.id ?? null,
       work_order: '',
       purpose: '',
     });
@@ -189,7 +188,7 @@ export const MobileChemicalsList = () => {
         data: {
           quantity: values.quantity,
           hangar: values.hangar,
-          user_id: Array.isArray(values.user_id) ? values.user_id[0] : values.user_id,
+          user_id: values.user_id,
           work_order: values.work_order || undefined,
           purpose: values.purpose || undefined,
         },
@@ -302,7 +301,7 @@ export const MobileChemicalsList = () => {
   );
 
   return (
-    <div className="mobile-chemicals-list">
+    <div className="mobile-chemicals-list" data-testid="mobile-chemicals-list">
       {/* Search Bar */}
       <div className="search-bar-container">
         <SearchBar
@@ -518,7 +517,7 @@ export const MobileChemicalsList = () => {
         }}
       >
         {selectedChemical && (
-          <div className="form-popup">
+          <div className="form-popup" data-testid="mobile-chemicals-issuance-form">
             <div className="form-header">
               <span>Issue Chemical</span>
               <CloseOutline onClick={() => setShowIssuancePopup(false)} />
@@ -606,12 +605,7 @@ export const MobileChemicalsList = () => {
                 label="Issue To"
                 rules={[{ required: true, message: 'Please select a user' }]}
               >
-                <UserField
-                  columns={userOptions[0] || []}
-                  visible={userPickerVisible}
-                  onOpen={() => setUserPickerVisible(true)}
-                  onClose={() => setUserPickerVisible(false)}
-                />
+                <UserSelectField users={userOptions} />
               </Form.Item>
 
               <Form.Item
@@ -756,47 +750,96 @@ export const MobileChemicalsList = () => {
 };
 
 // ---------------------------------------------------------------------------
-// UserField — Form.Item-compatible wrapper for the user Picker.
-// antd-mobile's Picker doesn't propagate its confirmed value back through
-// Form.Item's trigger="onConfirm" pattern correctly (the children render
-// function doesn't reflect the updated value). Using a controlled visible
-// state + a read-only Input for display is the established pattern in this
-// codebase (see UnitField / DueDateField in MobileOrderCreationForm).
+// UserSelectField — Form.Item-compatible user picker with search.
+// Uses a bottom Popup + SearchBar + List instead of a Picker so it:
+//   1. Works correctly inside the issuance Popup (Picker is clipped by
+//      the parent's overflow:auto container and cannot be used here).
+//   2. Supports searching through users by name or employee number.
 // ---------------------------------------------------------------------------
 
-interface UserFieldProps {
-  value?: (number | null)[];
-  onChange?: (value: (number | null)[]) => void;
-  columns: { label: string; value: number }[];
-  visible: boolean;
-  onOpen: () => void;
-  onClose: () => void;
+interface UserSelectFieldProps {
+  value?: number | null;
+  onChange?: (value: number | null) => void;
+  users: { label: string; value: number }[];
 }
 
-const UserField = ({ value, onChange, columns, visible, onOpen, onClose }: UserFieldProps) => {
-  const userId = value?.[0];
-  const selectedUser = columns.find(opt => opt.value === userId);
+const UserSelectField = ({ value, onChange, users }: UserSelectFieldProps) => {
+  const [popupVisible, setPopupVisible] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+
+  const selectedUser = users.find(u => u.value === value);
+  const filteredUsers = searchQuery
+    ? users.filter(u => u.label.toLowerCase().includes(searchQuery.toLowerCase()))
+    : users;
+
+  const close = () => {
+    setPopupVisible(false);
+    setSearchQuery('');
+  };
+
   return (
     <>
-      <Input
-        placeholder="Select user"
-        value={selectedUser?.label ?? ''}
-        readOnly
-        onClick={(e) => {
-          e.preventDefault();
-          onOpen();
+      <div
+        data-testid="mobile-chemical-user-trigger"
+        onClick={() => setPopupVisible(true)}
+        style={{ cursor: 'pointer' }}
+      >
+        <Input
+          placeholder="Tap to select user"
+          value={selectedUser?.label ?? ''}
+          readOnly
+          style={{ pointerEvents: 'none' }}
+        />
+      </div>
+      <Popup
+        visible={popupVisible}
+        onMaskClick={close}
+        position="bottom"
+        bodyStyle={{
+          borderTopLeftRadius: 16,
+          borderTopRightRadius: 16,
+          height: '60vh',
+          display: 'flex',
+          flexDirection: 'column',
+          overflow: 'hidden',
         }}
-      />
-      <Picker
-        visible={visible}
-        columns={[columns]}
-        value={value ?? []}
-        onClose={onClose}
-        onConfirm={(val) => {
-          onChange?.(val as (number | null)[]);
-          onClose();
-        }}
-      />
+      >
+        <div style={{ padding: '12px 16px 8px', flexShrink: 0, borderBottom: '1px solid #f0f0f0' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+            <span style={{ fontWeight: 600, fontSize: 16 }}>Select User</span>
+            <CloseOutline onClick={close} style={{ fontSize: 20 }} />
+          </div>
+          <div data-testid="mobile-chemical-user-search">
+            <SearchBar
+              placeholder="Search by name or employee number..."
+              value={searchQuery}
+              onChange={setSearchQuery}
+            />
+          </div>
+        </div>
+        <div style={{ flex: 1, overflow: 'auto' }}>
+          {filteredUsers.length === 0 ? (
+            <Empty description="No users found" style={{ padding: '24px 0' }} />
+          ) : (
+            <List>
+              {filteredUsers.map(user => (
+                <List.Item
+                  key={user.value}
+                  data-testid={`mobile-chemical-user-option-${user.value}`}
+                  onClick={() => {
+                    onChange?.(user.value);
+                    close();
+                  }}
+                  arrow={false}
+                  style={value === user.value ? { background: '#e6f4ff' } : undefined}
+                >
+                  {user.label}
+                </List.Item>
+              ))}
+            </List>
+          )}
+        </div>
+      </Popup>
     </>
   );
 };
