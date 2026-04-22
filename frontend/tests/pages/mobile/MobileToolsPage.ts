@@ -27,12 +27,21 @@ export class MobileToolsPage extends BasePage {
     return this.page.getByTestId('mobile-tools-create-button');
   }
 
+  get detailPopup(): Locator {
+    return this.page.getByTestId('mobile-tool-detail-popup');
+  }
+
   toolItem(id: number | string): Locator {
     return this.page.getByTestId(`mobile-tool-item-${id}`);
   }
 
   async open(): Promise<void> {
     await this.goto('/tools');
+    await this.root.waitFor({ state: 'visible' });
+  }
+
+  async openWithDeepLink(toolId: number): Promise<void> {
+    await this.goto(`/tools?selected=${toolId}`);
     await this.root.waitFor({ state: 'visible' });
   }
 }

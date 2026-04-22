@@ -35,6 +35,20 @@ test.describe('Mobile tools list', () => {
     await expect(page.locator('text=T001').first()).toBeVisible();
   });
 
+  test('QR deep-link opens the tool detail popup for the scanned tool', async ({ page }) => {
+    const tools = new MobileToolsPage(page);
+    // Simulate what the QR scanner does: navigate to /tools?selected={id}
+    // Seeded tool T001 has database id 1.
+    await tools.openWithDeepLink(1);
+    // The detail popup must appear automatically without any user tap.
+    await expect(tools.detailPopup).toBeVisible({ timeout: 10_000 });
+    // The popup should show the scanned tool's number.
+    await expect(tools.detailPopup.getByText('T001')).toBeVisible();
+    // The ?selected param should have been cleared from the URL so the popup
+    // can be closed and re-opened independently.
+    await expect(page).toHaveURL(/\/tools(?!\?selected)/);
+  });
+
   // Same WebKit + antd-mobile FloatingBubble flake as
   // mobile-scanner.mobile.spec.ts — the tap fires but the Popup's
   // entry transition occasionally skips under the emulated iPhone

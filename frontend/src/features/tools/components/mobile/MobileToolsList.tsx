@@ -395,7 +395,7 @@ export const MobileToolsList = () => {
         }}
       >
         {selectedTool && (
-          <div className="detail-popup">
+          <div className="detail-popup" data-testid="mobile-tool-detail-popup">
             <div className="detail-header">
               <div className="detail-title">{selectedTool.tool_number}</div>
               <Tag color={statusColors[selectedTool.status]}>
