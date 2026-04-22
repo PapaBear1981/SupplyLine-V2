@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
   List,
@@ -101,7 +101,7 @@ const ToolHistoryTab = ({ toolId }: { toolId: number }) => {
               {dayjs(event.event_date).format('MMM D, YYYY h:mm A')} · {event.user_name}
             </span>
           }
-          style={{ '--border-inner': 'none' }}
+          style={{ '--border-inner': 'none' } as React.CSSProperties}
         >
           <span style={{ fontSize: 13 }}>{event.description}</span>
         </List.Item>
@@ -140,7 +140,7 @@ const ToolCalibrationTab = ({ toolId, requiresCalibration }: { toolId: number; r
               {cal.next_calibration_date && `Next: ${dayjs(cal.next_calibration_date).format('MMM D, YYYY')}`}
             </span>
           }
-          style={{ '--border-inner': 'none' }}
+          style={{ '--border-inner': 'none' } as React.CSSProperties}
         >
           <span style={{ fontSize: 13 }}>{dayjs(cal.calibration_date).format('MMM D, YYYY')}</span>
           {cal.calibration_notes && (

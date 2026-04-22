@@ -57,5 +57,5 @@ export type {
   AuditHistoryQueryParams,
   AuditHistoryResponse,
 } from './types';
-export { MobileToolCheckout } from './MobileToolCheckout';
+export { MobileToolCheckout } from './components/mobile/MobileToolCheckout';
 export { MobileToolAuditHistory } from './components/mobile/MobileToolAuditHistory';

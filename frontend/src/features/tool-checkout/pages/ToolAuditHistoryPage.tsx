@@ -17,7 +17,6 @@ import type { ColumnsType } from 'antd/es/table';
 import {
   SwapOutlined,
   LoginOutlined,
-  WarningOutlined,
   ToolOutlined,
   CalendarOutlined,
   SettingOutlined,

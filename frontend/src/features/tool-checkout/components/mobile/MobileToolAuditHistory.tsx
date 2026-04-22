@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import React, { useState, useCallback } from 'react';
 import {
   List,
   SearchBar,
@@ -10,6 +10,7 @@ import {
   Button,
   Empty,
 } from 'antd-mobile';
+import type { PickerValue } from 'antd-mobile/es/components/picker';
 import { FilterOutline } from 'antd-mobile-icons';
 import dayjs from 'dayjs';
 import { MobilePageScaffold } from '@shared/components/mobile/MobilePageScaffold';
@@ -87,8 +88,8 @@ export const MobileToolAuditHistory = () => {
     setAllItems([]);
   };
 
-  const handleEventTypeChange = (val: (string | null)[]) => {
-    const selected = (val[0] ?? '') as ToolHistoryEventType | '';
+  const handleEventTypeChange = (val: PickerValue[]) => {
+    const selected = ((val[0] as string) ?? '') as ToolHistoryEventType | '';
     setEventType(selected);
     setPage(1);
     setAllItems([]);
@@ -133,7 +134,7 @@ export const MobileToolAuditHistory = () => {
             {extra && ` · ${extra}`}
           </span>
         }
-        style={{ '--border-inner': 'none' }}
+        style={{ '--border-inner': 'none' } as React.CSSProperties}
       >
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <span style={{ fontSize: 13 }}>{event.description}</span>
