@@ -12,13 +12,11 @@ import {
   List,
   Space,
   DotLoading,
-  Badge,
   Popup,
   Button,
 } from 'antd-mobile';
 import {
   RightOutline,
-  ExclamationCircleOutline,
   ClockCircleOutline,
 } from 'antd-mobile-icons';
 import {
@@ -97,18 +95,6 @@ export const MobileDashboard = () => {
       pendingReorders: pendingReorders?.length || 0,
     };
   }, [kitsData, pendingReorders]);
-
-  // Calculate alert count
-  const alertCount = useMemo(() => {
-    let count = 0;
-    if (toolStats.calibrationOverdue > 0) count++;
-    if (chemicalStats.expired > 0) count++;
-    if (chemicalStats.outOfStock > 0) count++;
-    if (chemicalStats.lowStock > 0) count++;
-    if (toolStats.calibrationDue > 0) count++;
-    if (chemicalStats.expiringSoon > 0) count++;
-    return count;
-  }, [toolStats, chemicalStats]);
 
   // Get active announcements
   const activeAnnouncements = useMemo(() => {
@@ -230,13 +216,6 @@ export const MobileDashboard = () => {
           <h2>Welcome back, {user?.name?.split(' ')[0] || 'User'}</h2>
           <p>{new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}</p>
         </div>
-        {alertCount > 0 && (
-          <Badge content={alertCount} style={{ '--right': '0', '--top': '0' }}>
-            <div className="alert-badge" onClick={() => navigate(ROUTES.TOOLS)}>
-              <ExclamationCircleOutline fontSize={20} />
-            </div>
-          </Badge>
-        )}
       </div>
 
       {/* Announcement Banner */}
