@@ -39,8 +39,12 @@ test.describe('Warehouse transfers (desktop)', () => {
     // Click the History tab
     await page.locator('.ant-tabs-tab').filter({ hasText: 'History' }).click();
 
-    // The table should appear (Ant Design table wrapper)
-    await expect(page.locator('.ant-table')).toBeVisible({ timeout: 8_000 });
+    // Scope to the active tab pane — Ant Design keeps all pane content in the
+    // DOM, so `.ant-table` alone would match 3 elements (one per tab).
+    // Using `.ant-tabs-tabpane-active` guarantees exactly one match.
+    await expect(
+      page.locator('.ant-tabs-tabpane-active .ant-table'),
+    ).toBeVisible({ timeout: 8_000 });
 
     // No "Failed to load transfers." error message should appear
     await expect(page.getByText('Failed to load transfers.')).not.toBeVisible();
@@ -52,7 +56,11 @@ test.describe('Warehouse transfers (desktop)', () => {
 
     for (const tabLabel of ['Outbound', 'History', 'Inbound']) {
       await page.locator('.ant-tabs-tab').filter({ hasText: tabLabel }).click();
-      await expect(page.locator('.ant-table')).toBeVisible({ timeout: 8_000 });
+      // Scope to active pane to avoid strict-mode violations when multiple
+      // tab pane tables coexist in the DOM.
+      await expect(
+        page.locator('.ant-tabs-tabpane-active .ant-table'),
+      ).toBeVisible({ timeout: 8_000 });
       await expect(page.getByText('Failed to load transfers.')).not.toBeVisible();
     }
   });
