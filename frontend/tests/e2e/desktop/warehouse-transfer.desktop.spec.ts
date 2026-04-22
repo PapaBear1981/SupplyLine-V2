@@ -1,12 +1,12 @@
 import { test, expect } from '@playwright/test';
 
 /**
- * Warehouse transfers landing page + initiate-modal smoke.
+ * Warehouse transfers landing page — structure, tab navigation, and History
+ * tab smoke test.
  *
- * The full transfer flow (pick source/dest, select items, confirm)
- * mutates inventory in the seeded DB and belongs to a future integration
- * phase; here we only verify the page structure and that the initiate
- * modal can open.
+ * The full two-step transfer flow (initiate → receive) mutates inventory and
+ * belongs to a future integration phase; here we verify page structure, tab
+ * switching, and that the History tab renders its table (even when empty).
  */
 test.describe('Warehouse transfers (desktop)', () => {
   test('transfers page renders with its tabs and CTA', async ({ page }) => {
@@ -20,5 +20,48 @@ test.describe('Warehouse transfers (desktop)', () => {
     await page.goto('/transfers');
     await page.getByTestId('transfers-create-button').click();
     await expect(page.locator('.ant-modal').first()).toBeVisible({ timeout: 5_000 });
+  });
+
+  test('all three tabs — Inbound, Outbound, History — are present', async ({ page }) => {
+    await page.goto('/transfers');
+    await expect(page.getByTestId('transfers-page')).toBeVisible();
+
+    const tabs = page.locator('.ant-tabs-tab');
+    await expect(tabs.filter({ hasText: 'Inbound' })).toBeVisible();
+    await expect(tabs.filter({ hasText: 'Outbound' })).toBeVisible();
+    await expect(tabs.filter({ hasText: 'History' })).toBeVisible();
+  });
+
+  test('History tab renders a table without errors', async ({ page }) => {
+    await page.goto('/transfers');
+    await expect(page.getByTestId('transfers-page')).toBeVisible();
+
+    // Click the History tab
+    await page.locator('.ant-tabs-tab').filter({ hasText: 'History' }).click();
+
+    // Scope to the active tab pane — Ant Design keeps all pane content in the
+    // DOM, so `.ant-table` alone would match 3 elements (one per tab).
+    // Using `.ant-tabs-tabpane-active` guarantees exactly one match.
+    await expect(
+      page.locator('.ant-tabs-tabpane-active .ant-table'),
+    ).toBeVisible({ timeout: 8_000 });
+
+    // No "Failed to load transfers." error message should appear
+    await expect(page.getByText('Failed to load transfers.')).not.toBeVisible();
+  });
+
+  test('switching between tabs does not produce an error', async ({ page }) => {
+    await page.goto('/transfers');
+    await expect(page.getByTestId('transfers-page')).toBeVisible();
+
+    for (const tabLabel of ['Outbound', 'History', 'Inbound']) {
+      await page.locator('.ant-tabs-tab').filter({ hasText: tabLabel }).click();
+      // Scope to active pane to avoid strict-mode violations when multiple
+      // tab pane tables coexist in the DOM.
+      await expect(
+        page.locator('.ant-tabs-tabpane-active .ant-table'),
+      ).toBeVisible({ timeout: 8_000 });
+      await expect(page.getByText('Failed to load transfers.')).not.toBeVisible();
+    }
   });
 });

@@ -4,9 +4,9 @@ import { MobileNavigation } from '../../pages/mobile/MobileNavigation';
 /**
  * Warehouse transfers on a mobile viewport.
  *
- * Mirrors warehouse-transfer.desktop.spec.ts: verifies the page structure
- * and that the initiate-transfer modal opens. The full transfer flow belongs
- * to a future integration phase.
+ * Mirrors warehouse-transfer.desktop.spec.ts: verifies page structure, tab
+ * navigation (including the History tab), and that the initiate-transfer
+ * modal opens. The full transfer flow belongs to a future integration phase.
  *
  * Drives the live seeded backend via the shared authenticated storageState.
  */
@@ -30,5 +30,18 @@ test.describe('Warehouse transfers (mobile)', () => {
     await nav.goToMenuItem('transfers');
     await expect(page).toHaveURL(/\/transfers/);
     await expect(page.getByTestId('transfers-page')).toBeVisible({ timeout: 10_000 });
+  });
+
+  test('History tab renders without errors', async ({ page }) => {
+    await page.goto('/transfers');
+    await expect(page.getByTestId('transfers-page')).toBeVisible();
+
+    await page.locator('.ant-tabs-tab').filter({ hasText: 'History' }).click();
+
+    // Mobile renders a List or Empty — not a Table.  Wait for the content
+    // area to settle (List item OR the "No transfers" empty state).
+    await expect(
+      page.locator('.ant-list, .ant-empty').first()
+    ).toBeVisible({ timeout: 8_000 });
   });
 });
