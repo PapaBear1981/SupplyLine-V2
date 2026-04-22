@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
   List,
@@ -79,13 +79,15 @@ export const MobileToolsList = () => {
     skip: !deepLinkId,
   });
 
-  useEffect(() => {
-    if (deepLinkedTool) {
-      setSelectedTool(deepLinkedTool);
-      setShowDetailPopup(true);
-      setSearchParams({}, { replace: true });
-    }
-  }, [deepLinkedTool, setSearchParams]);
+  // Derive which tool to show and whether the detail popup is open — no effect needed.
+  // A deep-linked tool (from QR scan navigation) takes priority over a manually tapped one.
+  const activeDetailTool = deepLinkedTool ?? (showDetailPopup ? selectedTool : null);
+  const isDetailPopupOpen = !!activeDetailTool;
+
+  const handleCloseDetail = () => {
+    setShowDetailPopup(false);
+    if (deepLinkId) setSearchParams({}, { replace: true });
+  };
 
   // API queries
   const { data: toolsData, isLoading, isFetching, refetch } = useGetToolsQuery({
@@ -156,7 +158,7 @@ export const MobileToolsList = () => {
       requires_calibration: tool.requires_calibration,
       calibration_frequency_days: tool.calibration_frequency_days,
     });
-    setShowDetailPopup(false);
+    handleCloseDetail();
     setShowFormPopup(true);
   };
 
@@ -384,8 +386,8 @@ export const MobileToolsList = () => {
 
       {/* Tool Detail Popup */}
       <Popup
-        visible={showDetailPopup}
-        onMaskClick={() => setShowDetailPopup(false)}
+        visible={isDetailPopupOpen}
+        onMaskClick={handleCloseDetail}
         position="bottom"
         bodyStyle={{
           borderTopLeftRadius: 16,
@@ -394,42 +396,42 @@ export const MobileToolsList = () => {
           overflow: 'auto',
         }}
       >
-        {selectedTool && (
+        {activeDetailTool && (
           <div className="detail-popup" data-testid="mobile-tool-detail-popup">
             <div className="detail-header">
-              <div className="detail-title">{selectedTool.tool_number}</div>
-              <Tag color={statusColors[selectedTool.status]}>
-                {selectedTool.status.replace('_', ' ')}
+              <div className="detail-title">{activeDetailTool.tool_number}</div>
+              <Tag color={statusColors[activeDetailTool.status]}>
+                {activeDetailTool.status.replace('_', ' ')}
               </Tag>
             </div>
             <List>
-              <List.Item extra={selectedTool.serial_number}>Serial Number</List.Item>
-              {selectedTool.lot_number && (
-                <List.Item extra={selectedTool.lot_number}>Lot Number</List.Item>
+              <List.Item extra={activeDetailTool.serial_number}>Serial Number</List.Item>
+              {activeDetailTool.lot_number && (
+                <List.Item extra={activeDetailTool.lot_number}>Lot Number</List.Item>
               )}
-              <List.Item extra={selectedTool.description}>Description</List.Item>
-              <List.Item extra={selectedTool.condition}>Condition</List.Item>
-              <List.Item extra={selectedTool.location}>Location</List.Item>
-              <List.Item extra={selectedTool.category || 'N/A'}>Category</List.Item>
-              {selectedTool.warehouse_name && (
-                <List.Item extra={selectedTool.warehouse_name}>Warehouse</List.Item>
+              <List.Item extra={activeDetailTool.description}>Description</List.Item>
+              <List.Item extra={activeDetailTool.condition}>Condition</List.Item>
+              <List.Item extra={activeDetailTool.location}>Location</List.Item>
+              <List.Item extra={activeDetailTool.category || 'N/A'}>Category</List.Item>
+              {activeDetailTool.warehouse_name && (
+                <List.Item extra={activeDetailTool.warehouse_name}>Warehouse</List.Item>
               )}
-              {selectedTool.requires_calibration && (
+              {activeDetailTool.requires_calibration && (
                 <>
                   <List.Item extra={
-                    <Tag color={calibrationColors[selectedTool.calibration_status]}>
-                      {selectedTool.calibration_status.replace('_', ' ')}
+                    <Tag color={calibrationColors[activeDetailTool.calibration_status]}>
+                      {activeDetailTool.calibration_status.replace('_', ' ')}
                     </Tag>
                   }>
                     Calibration Status
                   </List.Item>
-                  {selectedTool.last_calibration_date && (
-                    <List.Item extra={dayjs(selectedTool.last_calibration_date).format('MMM D, YYYY')}>
+                  {activeDetailTool.last_calibration_date && (
+                    <List.Item extra={dayjs(activeDetailTool.last_calibration_date).format('MMM D, YYYY')}>
                       Last Calibration
                     </List.Item>
                   )}
-                  {selectedTool.next_calibration_date && (
-                    <List.Item extra={dayjs(selectedTool.next_calibration_date).format('MMM D, YYYY')}>
+                  {activeDetailTool.next_calibration_date && (
+                    <List.Item extra={dayjs(activeDetailTool.next_calibration_date).format('MMM D, YYYY')}>
                       Next Calibration
                     </List.Item>
                   )}
@@ -437,7 +439,7 @@ export const MobileToolsList = () => {
               )}
             </List>
             <div className="detail-actions">
-              <Button block color="primary" onClick={() => handleEdit(selectedTool)}>
+              <Button block color="primary" onClick={() => handleEdit(activeDetailTool)}>
                 Edit Tool
               </Button>
               <Button
@@ -445,8 +447,8 @@ export const MobileToolsList = () => {
                 color="primary"
                 fill="outline"
                 onClick={() => {
-                  setShowDetailPopup(false);
-                  navigate(`/tool-checkout?tool=${selectedTool.tool_number}`);
+                  handleCloseDetail();
+                  navigate(`/tool-checkout?tool=${activeDetailTool.tool_number}`);
                 }}
               >
                 Go to Checkout
@@ -466,12 +468,12 @@ export const MobileToolsList = () => {
       </Popup>
 
       {/* Mobile label sheet */}
-      {selectedTool && (
+      {activeDetailTool && (
         <MobileToolLabelSheet
           visible={labelSheetOpen}
           onClose={() => setLabelSheetOpen(false)}
-          toolId={selectedTool.id}
-          toolNumber={selectedTool.tool_number}
+          toolId={activeDetailTool.id}
+          toolNumber={activeDetailTool.tool_number}
         />
       )}
 
