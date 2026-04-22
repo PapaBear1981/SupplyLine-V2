@@ -16,7 +16,7 @@ from datetime import datetime
 
 from flask import jsonify, request
 
-from auth import department_required, jwt_required
+from auth import department_required
 from models import AuditLog, Chemical, Tool, Warehouse, db
 from models_kits import Kit, KitBox, KitExpendable, KitItem, KitTransfer
 from utils.error_handler import ValidationError, handle_errors
@@ -594,50 +594,6 @@ def register_kit_transfer_routes(app):
         data = request.get_json(silent=True) or {}
         response = _complete_transfer_internal(id, request.current_user["user_id"], box_id=data.get("box_id"))
         return jsonify(response), 200
-    @app.route("/api/transfers", methods=["GET"])
-    @jwt_required
-    @handle_errors
-    def get_transfers():
-        """Get all transfers with optional filtering"""
-        from sqlalchemy import or_
-
-        status = request.args.get("status")
-        kit_id = request.args.get("kit_id", type=int)  # Kit as either source or destination
-        from_kit_id = request.args.get("from_kit_id", type=int)
-        to_kit_id = request.args.get("to_kit_id", type=int)
-
-        query = KitTransfer.query
-
-        if status:
-            query = query.filter_by(status=status)
-
-        # If kit_id is provided, match transfers where kit is either source OR destination
-        if kit_id:
-            query = query.filter(
-                or_(
-                    (KitTransfer.from_location_type == "kit") & (KitTransfer.from_location_id == kit_id),
-                    (KitTransfer.to_location_type == "kit") & (KitTransfer.to_location_id == kit_id)
-                )
-            )
-        else:
-            # Otherwise use the specific from/to filters
-            if from_kit_id:
-                query = query.filter_by(from_location_type="kit", from_location_id=from_kit_id)
-
-            if to_kit_id:
-                query = query.filter_by(to_location_type="kit", to_location_id=to_kit_id)
-
-        transfers = query.order_by(KitTransfer.transfer_date.desc()).all()
-
-        return jsonify([transfer.to_dict() for transfer in transfers]), 200
-
-    @app.route("/api/transfers/<int:id>", methods=["GET"])
-    @jwt_required
-    @handle_errors
-    def get_transfer(id):
-        """Get transfer details"""
-        transfer = KitTransfer.query.get_or_404(id)
-        return jsonify(transfer.to_dict()), 200
 
     @app.route("/api/transfers/<int:id>/cancel", methods=["PUT"])
     @materials_required
