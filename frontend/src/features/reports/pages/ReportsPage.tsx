@@ -85,9 +85,9 @@ export function ReportsPage() {
     try {
       const response = await fetch(`/api/reports/export/${format}`, {
         method: 'POST',
+        credentials: 'include', // HttpOnly access_token cookie carries auth
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('access_token')}`,
         },
         body: JSON.stringify({
           report_type: currentReportType,

@@ -3,13 +3,26 @@ import type { PayloadAction } from '@reduxjs/toolkit';
 import type { AuthState, User } from '../types';
 import { setTokenExpiration } from '@services/baseApi';
 
-const storedToken = localStorage.getItem('access_token');
-const initialToken = storedToken && storedToken !== 'undefined' ? storedToken : null;
+// SECURITY: access_token is no longer persisted to localStorage. The token
+// lives only in the HttpOnly `access_token` cookie (set by the backend) and
+// in this Redux slice while the tab is open. Removing localStorage storage
+// closes the most common XSS-token-exfiltration path. On page reload, the
+// app boots unauthenticated in Redux but still has the cookie; the first
+// authenticated API call round-trips the cookie and backfills user state.
+//
+// One-time migration: clear any leftover tokens from prior versions so
+// browsers that still have them stop leaking them into Authorization headers.
+try {
+  localStorage.removeItem('access_token');
+  localStorage.removeItem('refresh_token');
+} catch {
+  // Storage may be unavailable (private mode); ignore.
+}
 
 const initialState: AuthState = {
   user: null,
-  token: initialToken,
-  isAuthenticated: !!initialToken,
+  token: null,
+  isAuthenticated: false,
 };
 
 const authSlice = createSlice({
@@ -25,19 +38,13 @@ const authSlice = createSlice({
       state.token = token;
       state.isAuthenticated = true;
 
-      if (token) {
-        localStorage.setItem('access_token', token);
+      // Initialize the inactivity clock so the session timer starts from now,
+      // not from a stale or zero value left over from a previous session.
+      localStorage.setItem('last_user_activity', Date.now().toString());
 
-        // Initialize the inactivity clock so the session timer starts from now,
-        // not from a stale or zero value left over from a previous session.
-        localStorage.setItem('last_user_activity', Date.now().toString());
-
-        // Set token expiration for automatic refresh
-        if (action.payload.expiresIn) {
-          setTokenExpiration(action.payload.expiresIn);
-        }
-      } else {
-        localStorage.removeItem('access_token');
+      // Set token expiration for automatic refresh.
+      if (action.payload.expiresIn) {
+        setTokenExpiration(action.payload.expiresIn);
       }
     },
     setSetupToken: (
@@ -61,7 +68,6 @@ const authSlice = createSlice({
       state.user = null;
       state.token = null;
       state.isAuthenticated = false;
-      localStorage.removeItem('access_token');
       localStorage.removeItem('token_expires_at');
       localStorage.removeItem('last_user_activity');
       sessionStorage.removeItem('setup_token');

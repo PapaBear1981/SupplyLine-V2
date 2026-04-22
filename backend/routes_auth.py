@@ -10,7 +10,6 @@ This module provides JWT-based authentication endpoints including:
 """
 
 import logging
-import os
 
 from flask import current_app, jsonify, request
 from werkzeug.exceptions import BadRequest
@@ -22,11 +21,13 @@ from auth import (
     clear_trusted_device_cookie,
     jwt_required,
     revoke_all_for_user,
+    revoke_refresh_jti,
     touch_trusted_device,
     validate_trusted_device_token,
 )
 from models import AuditLog, User, UserActivity, db
 from utils.rate_limiter import rate_limit
+from utils.test_mode import test_mode_allowed
 
 
 logger = logging.getLogger(__name__)
@@ -100,8 +101,25 @@ def register_auth_routes(app):
 
             # Verify password
             if not user.check_password(password):
-                # Increment failed login attempts
+                # Increment failed login attempts, and lock the account once the
+                # configured threshold is reached. increment_failed_login() on
+                # its own only bumps the counter — enforcement lives here.
                 user.increment_failed_login()
+                lockout_cfg = current_app.config.get("ACCOUNT_LOCKOUT", {}) or {}
+                max_attempts = int(lockout_cfg.get("MAX_FAILED_ATTEMPTS", 5))
+                if user.failed_login_attempts >= max_attempts:
+                    initial_minutes = int(lockout_cfg.get("INITIAL_LOCKOUT_MINUTES", 15))
+                    multiplier = int(lockout_cfg.get("LOCKOUT_MULTIPLIER", 2))
+                    max_minutes = int(lockout_cfg.get("MAX_LOCKOUT_MINUTES", 60))
+                    # Progressive backoff: each group of N failures beyond the
+                    # threshold doubles the lockout up to max_minutes.
+                    overflow = user.failed_login_attempts - max_attempts
+                    minutes = min(initial_minutes * (multiplier ** overflow), max_minutes)
+                    user.lock_account(minutes=minutes)
+                    logger.warning(
+                        "User %s locked for %d min after %d failed attempts",
+                        user.id, minutes, user.failed_login_attempts,
+                    )
                 db.session.commit()
 
                 logger.warning(f"Failed login attempt for user {user.id}: {user.failed_login_attempts} attempts")
@@ -115,6 +133,15 @@ def register_auth_routes(app):
                 )
                 db.session.add(activity)
                 db.session.commit()
+
+                # If this failure just locked the account, surface the lockout
+                # status to the client so the UI can show the proper message
+                # instead of telling the user to keep trying.
+                if user.is_locked():
+                    return jsonify({
+                        "error": "Account is temporarily locked due to multiple failed login attempts. Please try again later.",
+                        "code": "ACCOUNT_LOCKED",
+                    }), 423
 
                 # Return generic error - don't differentiate between bad password and bad username
                 return jsonify({
@@ -258,13 +285,15 @@ def register_auth_routes(app):
                     clear_trusted_device_cookie(response)
                 return response, 200
 
-            # MANDATORY 2FA: Check if user needs to set up TOTP (not enabled yet)
-            # Skip in testing mode or if DISABLE_MANDATORY_2FA env var is set
+            # MANDATORY 2FA: Check if user needs to set up TOTP (not enabled yet).
+            # The DISABLE_MANDATORY_2FA escape hatch only takes effect when
+            # FLASK_ENV is testing/development — see utils/test_mode.py. In
+            # production the flag is ignored (and startup aborts if it's set).
             if (
                 hasattr(user, "is_totp_enabled")
                 and not user.is_totp_enabled
                 and not current_app.config.get("TESTING", False)
-                and os.environ.get("DISABLE_MANDATORY_2FA", "false").lower() != "true"
+                and not test_mode_allowed("DISABLE_MANDATORY_2FA")
             ):
                 # Require TOTP setup before allowing login
                 logger.info(f"TOTP setup required for user {user.id}")
@@ -449,6 +478,25 @@ def register_auth_routes(app):
         try:
             user_payload = request.current_user
             user_id = user_payload["user_id"]
+
+            # Revoke the refresh token jti so a stolen refresh cookie can't
+            # be used after an explicit logout. The access cookie we clear
+            # below is short-lived; without this, a refresh token lifted
+            # via XSS before logout would stay valid for 7 days.
+            refresh_token = request.cookies.get("refresh_token")
+            if refresh_token:
+                try:
+                    import jwt as _jwt
+                    raw = _jwt.decode(
+                        refresh_token,
+                        current_app.config["JWT_SECRET_KEY"],
+                        algorithms=["HS256"],
+                        options={"verify_aud": False, "verify_iss": False},
+                    )
+                    if raw.get("jti") and raw.get("exp"):
+                        revoke_refresh_jti(raw["jti"], int(raw["exp"]))
+                except Exception as revoke_err:
+                    logger.warning("Could not revoke refresh jti on logout: %s", revoke_err)
 
             # Log logout activity
             activity = UserActivity(

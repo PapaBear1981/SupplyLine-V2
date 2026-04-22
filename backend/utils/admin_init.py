@@ -59,13 +59,16 @@ def create_secure_admin():
                     None,
                 )
 
-        # Create admin user
+        # Create admin user. force_password_change=True so the first login
+        # rotates whatever was pasted into INITIAL_ADMIN_PASSWORD — even a
+        # strong bootstrap password shouldn't be the long-lived admin secret.
         admin = User(
             name="System Administrator",
             employee_number="ADMIN001",
             department="IT",
             is_admin=True,
-            is_active=True
+            is_active=True,
+            force_password_change=True,
         )
 
         admin.set_password(admin_password)

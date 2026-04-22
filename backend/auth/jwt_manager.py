@@ -24,6 +24,49 @@ from models import User, db
 logger = logging.getLogger(__name__)
 
 
+# Issuer and audience claims. Embedded in every token we mint and verified on
+# every decode — stops a token signed with our secret for a different app /
+# environment from being accepted here. Keep these stable; changing them is a
+# breaking change that invalidates all outstanding tokens.
+JWT_ISSUER = "supplyline-mro-suite"
+JWT_AUDIENCE = "supplyline-users"
+
+
+# In-process refresh-token revocation list. Keyed by jti, valued by the
+# refresh-token exp (epoch seconds) so we can evict expired entries without
+# unbounded growth. This is per-process and flushes on restart — acceptable
+# for the current single-instance Render deployment, but must move to Redis
+# before horizontal scaling. See SECURITY_AUDIT_2026-04.md for context.
+_REVOKED_REFRESH_JTIS: dict[str, int] = {}
+_REVOCATION_CAP = 10_000
+
+
+def revoke_refresh_jti(jti: str, expires_at_epoch: int) -> None:
+    """Mark a refresh-token jti as invalid until its natural expiry."""
+    if not jti:
+        return
+    # Opportunistic eviction of already-expired entries before inserting.
+    now = int(datetime.now(UTC).timestamp())
+    if len(_REVOKED_REFRESH_JTIS) >= _REVOCATION_CAP:
+        for k in [k for k, v in _REVOKED_REFRESH_JTIS.items() if v <= now]:
+            _REVOKED_REFRESH_JTIS.pop(k, None)
+    _REVOKED_REFRESH_JTIS[jti] = expires_at_epoch
+
+
+def is_jti_revoked(jti: str) -> bool:
+    """True iff `jti` is in the revocation list and not yet past its exp."""
+    if not jti:
+        return False
+    exp = _REVOKED_REFRESH_JTIS.get(jti)
+    if exp is None:
+        return False
+    now = int(datetime.now(UTC).timestamp())
+    if exp <= now:
+        _REVOKED_REFRESH_JTIS.pop(jti, None)
+        return False
+    return True
+
+
 class JWTManager:
     """JWT Authentication Manager"""
 
@@ -46,6 +89,8 @@ class JWTManager:
 
         # Access token payload (configurable lifetime matching session timeout)
         access_payload = {
+            "iss": JWT_ISSUER,
+            "aud": JWT_AUDIENCE,
             "user_id": user.id,
             "user_name": user.name,
             "employee_number": user.employee_number,
@@ -61,6 +106,8 @@ class JWTManager:
 
         # Refresh token payload (long-lived: 7 days)
         refresh_payload = {
+            "iss": JWT_ISSUER,
+            "aud": JWT_AUDIENCE,
             "user_id": user.id,
             "iat": now,
             "exp": now + timedelta(days=7),
@@ -96,17 +143,39 @@ class JWTManager:
         """
         try:
             secret_key = current_app.config["JWT_SECRET_KEY"]
-            payload = jwt.decode(token, secret_key, algorithms=["HS256"])
+            payload = jwt.decode(
+                token,
+                secret_key,
+                algorithms=["HS256"],
+                audience=JWT_AUDIENCE,
+                issuer=JWT_ISSUER,
+                options={"require": ["exp", "iat", "iss", "aud"]},
+            )
 
             # Verify token type
             if payload.get("type") != token_type:
                 logger.warning(f"Token type mismatch. Expected: {token_type}, Got: {payload.get('type')}")
                 return None
 
+            # Refresh-token revocation list — rejects a jti that was explicitly
+            # invalidated on logout, password change, or admin reset.
+            if token_type == "refresh" and is_jti_revoked(payload.get("jti", "")):
+                logger.warning("Refresh token jti is revoked")
+                return None
+
             return payload
 
         except jwt.ExpiredSignatureError:
             logger.warning("Token has expired")
+            return None
+        except jwt.InvalidAudienceError:
+            logger.warning("Token audience mismatch")
+            return None
+        except jwt.InvalidIssuerError:
+            logger.warning("Token issuer mismatch")
+            return None
+        except jwt.MissingRequiredClaimError as e:
+            logger.warning(f"Token missing required claim: {e!s}")
             return None
         except jwt.InvalidTokenError as e:
             logger.warning(f"Invalid token: {e!s}")

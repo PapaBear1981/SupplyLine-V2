@@ -6,6 +6,13 @@ on:
   pull_request:
     branches: [ master, main ]
 
+# Least-privilege GITHUB_TOKEN. Individual jobs that need more (e.g. writing
+# check-runs, posting PR comments) should override `permissions:` at the job
+# level rather than bumping this default. Supply-chain risk mitigation: if a
+# pinned action is ever compromised, it can't push code or release assets.
+permissions:
+  contents: read
+
 jobs:
   # Backend Linting Job
   backend-lint:
@@ -255,7 +262,9 @@ jobs:
           cd backend
           python seed_e2e_test_data.py
         env:
+          FLASK_ENV: testing
           DATABASE_URL: sqlite:///test.db
+          SUPPLYLINE_ALLOW_DESTRUCTIVE_SEED: '1'
 
       - name: Start backend server
         run: |

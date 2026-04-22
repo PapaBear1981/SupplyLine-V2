@@ -456,8 +456,43 @@ def create_test_kits(aircraft_types, users):
     return created_kits
 
 
+def _abort_if_production():
+    """
+    Three-layer guard against running this destructive script on production data:
+
+    1. FLASK_ENV must be testing/development (not the Render default of production).
+    2. SUPPLYLINE_ALLOW_DESTRUCTIVE_SEED=1 must be explicitly set — stops an
+       operator with the right FLASK_ENV from running it by muscle memory.
+    3. The resolved DATABASE_URL must point at SQLite or localhost — a last
+       resort against a prod URL leaking into a testing environment.
+    """
+    env = os.environ.get("FLASK_ENV", "").strip().lower()
+    if env not in {"testing", "development", "dev"}:
+        raise SystemExit(
+            "seed_e2e_test_data.py refuses to run unless FLASK_ENV is "
+            f"testing or development (got: {env or '<unset>'})."
+        )
+    if os.environ.get("SUPPLYLINE_ALLOW_DESTRUCTIVE_SEED") != "1":
+        raise SystemExit(
+            "seed_e2e_test_data.py will db.drop_all(). Set "
+            "SUPPLYLINE_ALLOW_DESTRUCTIVE_SEED=1 to confirm."
+        )
+    db_uri = Config.SQLALCHEMY_DATABASE_URI or ""
+    safe = (
+        db_uri.startswith("sqlite:")
+        or "localhost" in db_uri
+        or "127.0.0.1" in db_uri
+    )
+    if not safe:
+        raise SystemExit(
+            f"Refusing to seed a non-local database: {db_uri}. "
+            "This script drops all tables."
+        )
+
+
 def main():
     """Main function to seed E2E test data"""
+    _abort_if_production()
     try:
         # Create Flask app
         app = Flask(__name__)

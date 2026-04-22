@@ -75,6 +75,10 @@ services:
         value: https://supplyline-frontend.onrender.com
       - key: PUBLIC_URL
         value: https://supplyline-backend.onrender.com
+      # Optional Sentry integration. Paste the Flask DSN into the Render
+      # dashboard to turn it on; leaving it unset disables Sentry entirely.
+      - key: SENTRY_DSN
+        sync: false
 
   # ============================================================
   # Frontend – React / Vite static site (always free on Render)

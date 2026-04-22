@@ -10,14 +10,20 @@ services:
       - flask_session:/flask_session
       - static_uploads:/app/static
     environment:
-      - FLASK_ENV=${FLASK_ENV:-production}
+      # docker-compose is a local dev tool; default to development so the
+      # DISABLE_MANDATORY_2FA flag below is honored. Render sets FLASK_ENV=production
+      # explicitly (render.yaml); nothing here bleeds into prod.
+      - FLASK_ENV=${FLASK_ENV:-development}
       - DB_PATH=/database
       - FLASK_DEBUG=${FLASK_DEBUG:-False}
       - FLASK_HOST=${FLASK_HOST:-0.0.0.0}
       - FLASK_PORT=${FLASK_PORT:-5000}
       - SECRET_KEY=${SECRET_KEY}
       - JWT_SECRET_KEY=${JWT_SECRET_KEY}
-      - INITIAL_ADMIN_PASSWORD=${INITIAL_ADMIN_PASSWORD:-admin123}
+      # No default here on purpose — the ${VAR:?message} form makes
+      # docker-compose exit with a clear error if the variable is unset.
+      # Previously defaulted to admin123 which is a known-weak credential.
+      - INITIAL_ADMIN_PASSWORD=${INITIAL_ADMIN_PASSWORD:?INITIAL_ADMIN_PASSWORD is required for docker-compose}
       - SESSION_COOKIE_SECURE=${SESSION_COOKIE_SECURE:-False}
       - CORS_ORIGINS=${CORS_ORIGINS:-http://localhost,http://localhost:3000,http://localhost:5173,http://localhost:80}
       - PYTHONDONTWRITEBYTECODE=1

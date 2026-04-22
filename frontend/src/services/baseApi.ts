@@ -34,16 +34,17 @@ export const setTokenExpiration = (expiresIn: number) => {
 const baseQuery = fetchBaseQuery({
   // Use empty string for production (proxied by nginx) or explicit URL for development
   baseUrl: import.meta.env.VITE_API_BASE_URL ?? '',
-  credentials: 'include', // Important: Include cookies for refresh token
+  credentials: 'include', // sends the HttpOnly access_token + refresh_token cookies
   prepareHeaders: (headers, { getState }) => {
-    // Get token from Redux state or localStorage
+    // The HttpOnly cookie is the authoritative auth mechanism. We still set
+    // the Authorization header from the in-memory Redux token when present
+    // (e.g. forced-TOTP setup flow) so multi-step auth endpoints keep
+    // working. localStorage is NO LONGER read — see authSlice.ts for why.
     const state = getState() as RootState;
-    const token = state.auth.token || localStorage.getItem('access_token');
-
+    const token = state.auth.token;
     if (token) {
       headers.set('Authorization', `Bearer ${token}`);
     }
-
     return headers;
   },
 });
