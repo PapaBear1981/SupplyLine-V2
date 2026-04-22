@@ -232,7 +232,7 @@ export const MobileDashboard = () => {
         </div>
         {alertCount > 0 && (
           <Badge content={alertCount} style={{ '--right': '0', '--top': '0' }}>
-            <div className="alert-badge" onClick={() => navigate(ROUTES.TOOLS)}>
+            <div className="alert-badge">
               <ExclamationCircleOutline fontSize={20} />
             </div>
           </Badge>
