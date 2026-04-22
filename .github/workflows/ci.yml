@@ -281,6 +281,14 @@ jobs:
           JWT_SECRET_KEY: test-jwt-secret-key-for-ci-do-not-use-in-production
           DISABLE_MANDATORY_2FA: 'true'
           DISABLE_RATE_LIMIT: 'true'
+          # CI backend runs over HTTP on localhost. Production cookie defaults
+          # to Secure=True (set via render.yaml). WebKit on HTTP drops Secure
+          # cookies (Chromium/Firefox give localhost a pass; WebKit-Linux as
+          # shipped with Playwright does not). Without this override the
+          # access_token cookie is silently discarded on the iPhone/iPad
+          # projects, breaking every spec that relies on the saved
+          # storageState. SameSite stays at the default Lax.
+          SESSION_COOKIE_SECURE: 'False'
 
       - name: Verify backend is running
         run: |
