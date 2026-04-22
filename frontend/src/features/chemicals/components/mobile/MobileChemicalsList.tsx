@@ -59,6 +59,7 @@ export const MobileChemicalsList = () => {
   const [showDetailPopup, setShowDetailPopup] = useState(false);
   const [showFormPopup, setShowFormPopup] = useState(false);
   const [showIssuancePopup, setShowIssuancePopup] = useState(false);
+  const [userPickerVisible, setUserPickerVisible] = useState(false);
   const [selectedChemical, setSelectedChemical] = useState<Chemical | null>(null);
   const [formMode, setFormMode] = useState<'create' | 'edit'>('create');
   const [page, setPage] = useState(1);
@@ -604,12 +605,13 @@ export const MobileChemicalsList = () => {
                 name="user_id"
                 label="Issue To"
                 rules={[{ required: true, message: 'Please select a user' }]}
-                trigger="onConfirm"
-                onClick={(_e, pickerRef) => pickerRef.current?.open()}
               >
-                <Picker columns={userOptions}>
-                  {(items) => items[0]?.label || 'Select user'}
-                </Picker>
+                <UserField
+                  columns={userOptions[0] || []}
+                  visible={userPickerVisible}
+                  onOpen={() => setUserPickerVisible(true)}
+                  onClose={() => setUserPickerVisible(false)}
+                />
               </Form.Item>
 
               <Form.Item
@@ -750,5 +752,51 @@ export const MobileChemicalsList = () => {
         </div>
       </Popup>
     </div>
+  );
+};
+
+// ---------------------------------------------------------------------------
+// UserField — Form.Item-compatible wrapper for the user Picker.
+// antd-mobile's Picker doesn't propagate its confirmed value back through
+// Form.Item's trigger="onConfirm" pattern correctly (the children render
+// function doesn't reflect the updated value). Using a controlled visible
+// state + a read-only Input for display is the established pattern in this
+// codebase (see UnitField / DueDateField in MobileOrderCreationForm).
+// ---------------------------------------------------------------------------
+
+interface UserFieldProps {
+  value?: (number | null)[];
+  onChange?: (value: (number | null)[]) => void;
+  columns: { label: string; value: number }[];
+  visible: boolean;
+  onOpen: () => void;
+  onClose: () => void;
+}
+
+const UserField = ({ value, onChange, columns, visible, onOpen, onClose }: UserFieldProps) => {
+  const userId = value?.[0];
+  const selectedUser = columns.find(opt => opt.value === userId);
+  return (
+    <>
+      <Input
+        placeholder="Select user"
+        value={selectedUser?.label ?? ''}
+        readOnly
+        onClick={(e) => {
+          e.preventDefault();
+          onOpen();
+        }}
+      />
+      <Picker
+        visible={visible}
+        columns={[columns]}
+        value={value ?? []}
+        onClose={onClose}
+        onConfirm={(val) => {
+          onChange?.(val as (number | null)[]);
+          onClose();
+        }}
+      />
+    </>
   );
 };
