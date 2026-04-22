@@ -58,3 +58,4 @@ export type {
   AuditHistoryResponse,
 } from './types';
 export { MobileToolCheckout } from './MobileToolCheckout';
+export { MobileToolAuditHistory } from './components/mobile/MobileToolAuditHistory';
