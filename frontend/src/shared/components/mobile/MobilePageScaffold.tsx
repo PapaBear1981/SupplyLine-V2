@@ -12,6 +12,8 @@ interface MobilePageScaffoldProps {
   bottomSafe?: boolean;
   /** Optional className for the root element. */
   className?: string;
+  /** Optional data-testid for the root element. */
+  testId?: string;
 }
 
 /**
@@ -27,9 +29,13 @@ export const MobilePageScaffold = ({
   children,
   bottomSafe = true,
   className = '',
+  testId,
 }: MobilePageScaffoldProps) => {
   return (
-    <div className={`mobile-page-scaffold ${bottomSafe ? 'mobile-page-scaffold--bottom-safe' : ''} ${className}`}>
+    <div
+      className={`mobile-page-scaffold ${bottomSafe ? 'mobile-page-scaffold--bottom-safe' : ''} ${className}`}
+      data-testid={testId}
+    >
       {header && <div className="mobile-page-scaffold__header">{header}</div>}
       {sticky && <div className="mobile-page-scaffold__sticky">{sticky}</div>}
       <div className="mobile-page-scaffold__body">{children}</div>
