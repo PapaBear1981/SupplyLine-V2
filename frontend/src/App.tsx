@@ -14,7 +14,7 @@ import { LoginPage } from '@features/auth/pages/LoginPage';
 import { ForgotPasswordPage } from '@features/auth/pages/ForgotPasswordPage';
 import { DashboardPage } from '@features/dashboard/pages/DashboardPage';
 import { ToolsPage } from '@features/tools/pages/ToolsPage';
-import { ToolCheckoutPage } from '@features/tool-checkout';
+import { ToolCheckoutPage, ToolAuditHistoryPage } from '@features/tool-checkout';
 import { ChemicalsPage } from '@features/chemicals/pages/ChemicalsPage';
 import { ChemicalForecastPage } from '@features/chemicals/pages/ChemicalForecastPage';
 import { MobileChemicalForecast } from '@features/chemicals/components/mobile';
@@ -75,6 +75,7 @@ function AppContent() {
                   <Route path={ROUTES.HOME} element={<Navigate to={ROUTES.DASHBOARD} replace />} />
                   <Route path={ROUTES.DASHBOARD} element={<DashboardPage />} />
                   <Route path={ROUTES.TOOL_CHECKOUT} element={<ToolCheckoutPage />} />
+                  <Route path={ROUTES.TOOL_HISTORY} element={<ToolAuditHistoryPage />} />
                   <Route path={ROUTES.TOOLS} element={<ToolsPage />} />
                   <Route path={ROUTES.CHEMICALS} element={<ChemicalsPage />} />
                   <Route

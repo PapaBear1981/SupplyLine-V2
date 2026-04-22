@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Drawer,
   Tabs,
@@ -25,6 +25,9 @@ import {
   InfoCircleOutlined,
   PrinterOutlined,
   ToolOutlined,
+  CheckCircleOutlined,
+  CloseCircleOutlined,
+  MinusCircleOutlined,
 } from '@ant-design/icons';
 import dayjs from 'dayjs';
 import {
@@ -38,6 +41,7 @@ import { ToolForm } from './ToolForm';
 import type { ToolFormData, ToolStatus, CalibrationStatus } from '../types';
 import { LabelPrintModal } from '@/components/shared/LabelPrintModal';
 import { PermissionGuard } from '@features/auth/components/PermissionGuard';
+import { ToolHistoryTimeline } from '@features/tool-checkout';
 
 interface ToolDrawerProps {
   open: boolean;
@@ -241,24 +245,42 @@ export const ToolDrawer = ({ open, mode: initialMode, toolId, onClose, onSuccess
       return <Empty description="No calibration history" />;
     }
 
+    const statusConfig: Record<string, { color: string; icon: React.ReactNode; label: string }> = {
+      pass: { color: 'success', icon: <CheckCircleOutlined />, label: 'Pass' },
+      fail: { color: 'error', icon: <CloseCircleOutlined />, label: 'Fail' },
+      limited: { color: 'warning', icon: <MinusCircleOutlined />, label: 'Limited' },
+    };
+
     return (
       <Timeline
-        items={calibrations.map((cal) => ({
-          color: 'blue',
-          children: (
-            <div>
+        items={calibrations.map((cal) => {
+          const status = statusConfig[cal.calibration_status] ?? statusConfig.pass;
+          return {
+            color: cal.calibration_status === 'pass' ? 'green' : cal.calibration_status === 'fail' ? 'red' : 'orange',
+            children: (
               <div>
-                <strong>{dayjs(cal.calibration_date).format('MMM D, YYYY')}</strong>
+                <Space wrap>
+                  <strong>{dayjs(cal.calibration_date).format('MMM D, YYYY')}</strong>
+                  <Tag color={status.color} icon={status.icon}>{status.label}</Tag>
+                </Space>
+                {cal.performed_by_name && (
+                  <div>Calibrated by: {cal.performed_by_name}</div>
+                )}
+                {cal.calibration_certificate_file && (
+                  <div>Certificate file: {cal.calibration_certificate_file}</div>
+                )}
+                {cal.calibration_notes && (
+                  <div style={{ marginTop: 8, color: '#666' }}>{cal.calibration_notes}</div>
+                )}
+                {cal.next_calibration_date && (
+                  <div style={{ marginTop: 4, fontSize: 12, color: '#999' }}>
+                    Next due: {dayjs(cal.next_calibration_date).format('MMM D, YYYY')}
+                  </div>
+                )}
               </div>
-              <div>Calibrated by: {cal.calibrated_by}</div>
-              {cal.certificate_number && <div>Certificate: {cal.certificate_number}</div>}
-              {cal.notes && <div style={{ marginTop: 8, color: '#666' }}>{cal.notes}</div>}
-              <div style={{ marginTop: 4, fontSize: 12, color: '#999' }}>
-                Next due: {dayjs(cal.next_calibration_date).format('MMM D, YYYY')}
-              </div>
-            </div>
-          ),
-        }))}
+            ),
+          };
+        })}
       />
     );
   };
@@ -376,6 +398,15 @@ export const ToolDrawer = ({ open, mode: initialMode, toolId, onClose, onSuccess
                 </span>
               ),
               children: renderQRCodeTab(),
+            },
+            {
+              key: 'history',
+              label: (
+                <span>
+                  <HistoryOutlined /> History
+                </span>
+              ),
+              children: toolId ? <ToolHistoryTimeline toolId={toolId} /> : <Empty description="No tool selected" />,
             },
           ]}
         />

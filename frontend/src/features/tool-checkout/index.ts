@@ -1,5 +1,6 @@
 // Pages
 export { ToolCheckoutPage } from './pages/ToolCheckoutPage';
+export { ToolAuditHistoryPage } from './pages/ToolAuditHistoryPage';
 
 // Components
 export { QuickCheckoutModal } from './components/QuickCheckoutModal';
@@ -28,6 +29,7 @@ export {
   useLazySearchToolsForCheckoutQuery,
   useReportDamageMutation,
   useExtendCheckoutMutation,
+  useGetToolAuditHistoryQuery,
 } from './services/checkoutApi';
 
 // Types
@@ -52,4 +54,7 @@ export type {
   ToolTimelineResponse,
   CheckoutQueryParams,
   TimelineQueryParams,
+  AuditHistoryQueryParams,
+  AuditHistoryResponse,
 } from './types';
+export { MobileToolCheckout } from './MobileToolCheckout';

@@ -1302,4 +1302,56 @@ def register_tool_checkout_routes(app):
             logger.exception("Error extending checkout")
             return jsonify({"error": str(e)}), 500
 
+    # ============================================
+    # Cross-Tool Audit History
+    # ============================================
+    @app.route("/api/tool-history", methods=["GET"])
+    @jwt_required
+    def get_tool_audit_history():
+        """Cross-tool history for auditing — paginated, filterable."""
+        try:
+            page = max(1, int(request.args.get("page", 1)))
+            per_page = min(max(1, int(request.args.get("per_page", 50))), 100)
+            tool_id = request.args.get("tool_id", type=int)
+            user_id = request.args.get("user_id", type=int)
+            event_type = request.args.get("event_type")
+            start_date_str = request.args.get("start_date")
+            end_date_str = request.args.get("end_date")
+
+            query = ToolHistory.query
+
+            if tool_id:
+                query = query.filter(ToolHistory.tool_id == tool_id)
+            if user_id:
+                query = query.filter(ToolHistory.user_id == user_id)
+            if event_type:
+                query = query.filter(ToolHistory.event_type == event_type)
+            if start_date_str:
+                try:
+                    start_date = datetime.fromisoformat(start_date_str.replace("Z", ""))
+                    query = query.filter(ToolHistory.event_date >= start_date)
+                except (ValueError, TypeError):
+                    return jsonify({"error": "Invalid start_date format, use ISO 8601"}), 400
+            if end_date_str:
+                try:
+                    end_date = datetime.fromisoformat(end_date_str.replace("Z", ""))
+                    query = query.filter(ToolHistory.event_date <= end_date)
+                except (ValueError, TypeError):
+                    return jsonify({"error": "Invalid end_date format, use ISO 8601"}), 400
+
+            query = query.order_by(ToolHistory.event_date.desc())
+            paginated = query.paginate(page=page, per_page=per_page, error_out=False)
+
+            return jsonify({
+                "history": [event.to_dict() for event in paginated.items],
+                "total": paginated.total,
+                "page": page,
+                "per_page": per_page,
+                "pages": paginated.pages,
+            }), 200
+
+        except Exception as e:
+            logger.exception("Error fetching tool audit history")
+            return jsonify({"error": str(e)}), 500
+
     logger.info("Tool checkout routes registered")
