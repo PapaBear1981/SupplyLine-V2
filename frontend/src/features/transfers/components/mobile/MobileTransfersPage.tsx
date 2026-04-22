@@ -92,6 +92,7 @@ export const MobileTransfersPage = () => {
 
   return (
     <MobilePageScaffold
+      testId="transfers-page"
       header={
         <div style={{ padding: 16, display: 'flex', justifyContent: 'space-between' }}>
           <Title level={4} style={{ margin: 0 }}>
@@ -103,6 +104,7 @@ export const MobileTransfersPage = () => {
               size="small"
               icon={<PlusOutlined />}
               onClick={() => setInitiateOpen(true)}
+              data-testid="transfers-create-button"
             >
               New
             </Button>

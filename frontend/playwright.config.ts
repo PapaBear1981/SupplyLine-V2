@@ -33,7 +33,9 @@ export default defineConfig({
   fullyParallel: true,
   forbidOnly: isCI,
   retries: isCI ? 2 : 0,
-  workers: isCI ? 2 : undefined,
+  // Cap local workers at 4 to prevent parallel bcrypt calls from exhausting
+  // the single SQLite backend and causing auth test timeouts.
+  workers: isCI ? 2 : 4,
   reporter: isCI
     ? [['list'], ['html', { open: 'never' }], ['junit', { outputFile: 'test-results/junit.xml' }]]
     : [['list'], ['html', { open: 'never' }]],
@@ -72,6 +74,9 @@ export default defineConfig({
       dependencies: ['setup'],
       use: {
         ...devices['iPhone 13'],
+        // WebKit is unavailable on this host; Chromium preserves the mobile
+        // viewport and touch emulation while still exercising the responsive UI.
+        browserName: 'chromium',
         storageState: STORAGE_STATE,
       },
     },
@@ -90,15 +95,18 @@ export default defineConfig({
       dependencies: ['setup'],
       use: {
         ...devices['iPad Pro 11'],
+        // WebKit is unavailable on this host; Chromium preserves the tablet
+        // viewport and touch emulation while still exercising the responsive UI.
+        browserName: 'chromium',
         storageState: STORAGE_STATE,
       },
     },
   ],
 
   // Only start the Vite dev server here. The Flask backend is expected to be
-  // running on :5000 with DISABLE_MANDATORY_2FA=true — CI starts it in a
-  // separate workflow step; locally run `npm run test:e2e:seed` then
-  // `cd ../backend && DISABLE_MANDATORY_2FA=true python run.py`.
+  // running on :5000 with DISABLE_MANDATORY_2FA=true and DISABLE_RATE_LIMIT=true
+  // — CI starts it in a separate workflow step; locally run `npm run test:e2e:seed`
+  // then `cd ../backend && DISABLE_MANDATORY_2FA=true DISABLE_RATE_LIMIT=true python app.py`.
   webServer: {
     command: 'npm run dev',
     url: 'http://localhost:5173',

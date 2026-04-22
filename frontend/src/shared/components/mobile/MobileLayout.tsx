@@ -32,6 +32,7 @@ import {
   LogoutOutlined,
   BarChartOutlined,
   SettingOutlined,
+  RetweetOutlined,
 } from '@ant-design/icons';
 import { useAppDispatch, useAppSelector } from '@app/hooks';
 import { logout } from '@features/auth/slices/authSlice';
@@ -50,6 +51,7 @@ const routeNames: Record<string, string> = {
   [ROUTES.CHEMICALS]: 'Chemicals',
   [ROUTES.CHEMICAL_FORECAST]: 'Chemical Forecast',
   [ROUTES.KITS]: 'Kits',
+  [ROUTES.TRANSFERS]: 'Transfers',
   '/orders': 'Fulfillment',
   '/requests': 'Requests',
   [ROUTES.WAREHOUSES]: 'Warehouses',
@@ -67,6 +69,7 @@ const routeIcons: Record<string, React.ReactNode> = {
   [ROUTES.CHEMICALS]: <ExperimentOutlined />,
   [ROUTES.CHEMICAL_FORECAST]: <BarChartOutlined />,
   [ROUTES.KITS]: <InboxOutlined />,
+  [ROUTES.TRANSFERS]: <RetweetOutlined />,
   '/orders': <ShoppingCartOutlined />,
   '/requests': <FormOutlined />,
   [ROUTES.WAREHOUSES]: <HomeOutlined />,
@@ -99,6 +102,7 @@ export const MobileLayout = () => {
       ROUTES.CHEMICALS,
       ROUTES.CHEMICAL_FORECAST,
       ROUTES.KITS,
+      ROUTES.TRANSFERS,
       '/orders',
       '/requests',
       ROUTES.WAREHOUSES,

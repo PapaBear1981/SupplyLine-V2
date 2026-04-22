@@ -518,6 +518,20 @@ def main():
                     for line in result.stdout.splitlines():
                         logger.info(f"  {line}")
 
+                # Add transfer, kit, warehouse, order, request, and messaging
+                # permissions so E2E tests can exercise those features with the
+                # seeded admin account.
+                comprehensive_migration = os.path.join(migrations_dir, "add_comprehensive_permissions.py")
+                result = subprocess.run([sys.executable, comprehensive_migration], check=False, capture_output=True, text=True)
+                if result.returncode != 0:
+                    logger.error(f"Comprehensive permissions migration failed with exit code {result.returncode}")
+                    logger.error(f"STDOUT: {result.stdout}")
+                    logger.error(f"STDERR: {result.stderr}")
+                    raise subprocess.CalledProcessError(result.returncode, result.args, result.stdout, result.stderr)
+                if result.stdout:
+                    for line in result.stdout.splitlines():
+                        logger.info(f"  {line}")
+
                 logger.info("RBAC migration completed")
             except Exception as e:
                 logger.exception("Migration failed: %s", e)
