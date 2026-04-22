@@ -18,16 +18,20 @@ import {
   Dialog,
   SwipeAction,
   Empty,
+  Stepper,
+  NoticeBar,
 } from 'antd-mobile';
-import { AddOutline, FilterOutline, CloseOutline } from 'antd-mobile-icons';
+import { AddOutline, FilterOutline, CloseOutline, SendOutline } from 'antd-mobile-icons';
 import {
   ExperimentOutlined,
   ExclamationCircleOutlined,
   ClockCircleOutlined,
 } from '@ant-design/icons';
 import dayjs from 'dayjs';
-import { useGetChemicalsQuery, useCreateChemicalMutation, useUpdateChemicalMutation, useDeleteChemicalMutation } from '../../services/chemicalsApi';
+import { useGetChemicalsQuery, useCreateChemicalMutation, useUpdateChemicalMutation, useDeleteChemicalMutation, useIssueChemicalMutation } from '../../services/chemicalsApi';
 import { useGetWarehousesQuery } from '@features/warehouses/services/warehousesApi';
+import { useGetUsersQuery } from '@features/users/services/usersApi';
+import { useAppSelector } from '@app/hooks';
 import type { Chemical, ChemicalStatus, ChemicalFormData } from '../../types';
 import './MobileChemicalsList.css';
 
@@ -54,10 +58,12 @@ export const MobileChemicalsList = () => {
   const [showFilterPopup, setShowFilterPopup] = useState(false);
   const [showDetailPopup, setShowDetailPopup] = useState(false);
   const [showFormPopup, setShowFormPopup] = useState(false);
+  const [showIssuancePopup, setShowIssuancePopup] = useState(false);
   const [selectedChemical, setSelectedChemical] = useState<Chemical | null>(null);
   const [formMode, setFormMode] = useState<'create' | 'edit'>('create');
   const [page, setPage] = useState(1);
   const [form] = Form.useForm();
+  const [issuanceForm] = Form.useForm();
 
   // API queries
   const { data: chemicalsData, isLoading, isFetching, refetch } = useGetChemicalsQuery({
@@ -67,9 +73,12 @@ export const MobileChemicalsList = () => {
     status: statusFilter || undefined,
   });
   const { data: warehousesData } = useGetWarehousesQuery();
+  const { data: usersData } = useGetUsersQuery();
+  const currentUser = useAppSelector((state) => state.auth.user);
   const [createChemical, { isLoading: isCreating }] = useCreateChemicalMutation();
   const [updateChemical, { isLoading: isUpdating }] = useUpdateChemicalMutation();
   const [deleteChemical] = useDeleteChemicalMutation();
+  const [issueChemical, { isLoading: isIssuing }] = useIssueChemicalMutation();
 
   const chemicals = chemicalsData?.chemicals || [];
   const hasMore = chemicalsData ? page < chemicalsData.pagination.pages : false;
@@ -83,6 +92,13 @@ export const MobileChemicalsList = () => {
       })),
     ]];
   }, [warehousesData]);
+
+  const userOptions = useMemo(() => {
+    return [(usersData || []).map(u => ({
+      label: `${u.name} (${u.employee_number})`,
+      value: u.id,
+    }))];
+  }, [usersData]);
 
   const handleSearch = (value: string) => {
     setSearchQuery(value);
@@ -146,6 +162,45 @@ export const MobileChemicalsList = () => {
       } catch {
         Toast.show({ content: 'Failed to delete chemical', icon: 'fail' });
       }
+    }
+  };
+
+  const handleIssueOpen = (chemical: Chemical) => {
+    setSelectedChemical(chemical);
+    issuanceForm.resetFields();
+    issuanceForm.setFieldsValue({
+      quantity: 1,
+      hangar: '',
+      user_id: currentUser?.id ? [currentUser.id] : [],
+      work_order: '',
+      purpose: '',
+    });
+    setShowDetailPopup(false);
+    setShowIssuancePopup(true);
+  };
+
+  const handleIssuanceSubmit = async () => {
+    if (!selectedChemical) return;
+    try {
+      const values = await issuanceForm.validateFields();
+      const result = await issueChemical({
+        id: selectedChemical.id,
+        data: {
+          quantity: values.quantity,
+          hangar: values.hangar,
+          user_id: Array.isArray(values.user_id) ? values.user_id[0] : values.user_id,
+          work_order: values.work_order || undefined,
+          purpose: values.purpose || undefined,
+        },
+      }).unwrap();
+      Toast.show({ content: 'Chemical issued successfully', icon: 'success' });
+      if (result.message) {
+        Toast.show({ content: result.message, duration: 3000 });
+      }
+      setShowIssuancePopup(false);
+    } catch (error: unknown) {
+      const err = error as { data?: { error?: string } };
+      Toast.show({ content: err.data?.error || 'Failed to issue chemical', icon: 'fail' });
     }
   };
 
@@ -432,10 +487,154 @@ export const MobileChemicalsList = () => {
               )}
             </List>
             <div className="detail-actions">
-              <Button block color="primary" onClick={() => handleEdit(selectedChemical)}>
+              <Button
+                block
+                color="primary"
+                disabled={selectedChemical.status === 'expired' || selectedChemical.quantity <= 0}
+                onClick={() => handleIssueOpen(selectedChemical)}
+              >
+                <SendOutline style={{ marginRight: 6 }} />
+                Issue Chemical
+              </Button>
+              <Button block onClick={() => handleEdit(selectedChemical)}>
                 Edit Chemical
               </Button>
             </div>
+          </div>
+        )}
+      </Popup>
+
+      {/* Chemical Issuance Popup */}
+      <Popup
+        visible={showIssuancePopup}
+        onMaskClick={() => setShowIssuancePopup(false)}
+        position="bottom"
+        bodyStyle={{
+          borderTopLeftRadius: 16,
+          borderTopRightRadius: 16,
+          height: '90vh',
+          overflow: 'auto',
+        }}
+      >
+        {selectedChemical && (
+          <div className="form-popup">
+            <div className="form-header">
+              <span>Issue Chemical</span>
+              <CloseOutline onClick={() => setShowIssuancePopup(false)} />
+            </div>
+
+            {/* Chemical summary */}
+            <List style={{ marginBottom: 12 }}>
+              <List.Item extra={selectedChemical.part_number}>Part Number</List.Item>
+              <List.Item extra={selectedChemical.lot_number}>Lot Number</List.Item>
+              <List.Item extra={`${selectedChemical.quantity} ${selectedChemical.unit}`}>
+                Available Qty
+              </List.Item>
+            </List>
+
+            {selectedChemical.status === 'expired' && (
+              <NoticeBar
+                content="This chemical has expired and cannot be issued."
+                color="error"
+                style={{ marginBottom: 12 }}
+              />
+            )}
+            {selectedChemical.quantity <= 0 && selectedChemical.status !== 'expired' && (
+              <NoticeBar
+                content="This chemical is out of stock and cannot be issued."
+                color="error"
+                style={{ marginBottom: 12 }}
+              />
+            )}
+            {selectedChemical.minimum_stock_level !== null &&
+              selectedChemical.minimum_stock_level !== undefined &&
+              selectedChemical.quantity <= selectedChemical.minimum_stock_level &&
+              selectedChemical.status !== 'expired' &&
+              selectedChemical.quantity > 0 && (
+                <NoticeBar
+                  content={`Low stock — issuing will trigger an automatic reorder request.`}
+                  color="alert"
+                  style={{ marginBottom: 12 }}
+                />
+              )}
+
+            <Form
+              form={issuanceForm}
+              layout="vertical"
+              footer={
+                <Button
+                  block
+                  color="primary"
+                  loading={isIssuing}
+                  disabled={selectedChemical.status === 'expired' || selectedChemical.quantity <= 0}
+                  onClick={handleIssuanceSubmit}
+                >
+                  Confirm Issuance
+                </Button>
+              }
+            >
+              <Form.Item
+                name="quantity"
+                label="Quantity to Issue"
+                rules={[{ required: true, message: 'Quantity is required' }]}
+              >
+                <Stepper
+                  min={1}
+                  max={selectedChemical.quantity}
+                  disabled={selectedChemical.status === 'expired' || selectedChemical.quantity <= 0}
+                  style={{ width: '100%' }}
+                />
+              </Form.Item>
+
+              <Form.Item
+                name="hangar"
+                label="Hangar / Location"
+                rules={[
+                  { required: true, message: 'Hangar or location is required' },
+                  { max: 100, message: 'Max 100 characters' },
+                ]}
+              >
+                <Input
+                  placeholder="e.g. Hangar A, Bay 1"
+                  disabled={selectedChemical.status === 'expired' || selectedChemical.quantity <= 0}
+                />
+              </Form.Item>
+
+              <Form.Item
+                name="user_id"
+                label="Issue To"
+                rules={[{ required: true, message: 'Please select a user' }]}
+                trigger="onConfirm"
+                onClick={(_e, pickerRef) => pickerRef.current?.open()}
+              >
+                <Picker columns={userOptions}>
+                  {(items) => items[0]?.label || 'Select user'}
+                </Picker>
+              </Form.Item>
+
+              <Form.Item
+                name="work_order"
+                label="Work Order"
+                rules={[{ max: 100, message: 'Max 100 characters' }]}
+              >
+                <Input
+                  placeholder="Work order number (optional)"
+                  disabled={selectedChemical.status === 'expired' || selectedChemical.quantity <= 0}
+                />
+              </Form.Item>
+
+              <Form.Item
+                name="purpose"
+                label="Purpose"
+                rules={[{ max: 500, message: 'Max 500 characters' }]}
+              >
+                <TextArea
+                  rows={2}
+                  placeholder="Purpose of issuance (optional)"
+                  disabled={selectedChemical.status === 'expired' || selectedChemical.quantity <= 0}
+                />
+              </Form.Item>
+            </Form>
           </div>
         )}
       </Popup>
