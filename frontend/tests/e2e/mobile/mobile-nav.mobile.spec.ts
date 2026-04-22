@@ -36,6 +36,16 @@ test.describe('Mobile navigation', () => {
     await expect(page.getByTestId('mobile-tools-list')).toBeVisible({ timeout: 10_000 });
   });
 
+  test('menu sheet exposes the Transfers item and routes there on tap', async ({ page }) => {
+    await page.goto('/dashboard');
+    const nav = new MobileNavigation(page);
+    await nav.openMenu();
+    await expect(nav.menuItem('transfers')).toBeVisible();
+    await nav.menuItem('transfers').click();
+    await expect(page).toHaveURL(/\/transfers/);
+    await expect(page.getByTestId('transfers-page')).toBeVisible({ timeout: 10_000 });
+  });
+
   test('Settings tab routes to /settings', async ({ page }) => {
     await page.goto('/dashboard');
     const nav = new MobileNavigation(page);
