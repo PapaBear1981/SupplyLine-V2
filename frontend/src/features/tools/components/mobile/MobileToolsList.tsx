@@ -1,5 +1,5 @@
-import { useState, useMemo } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useState, useMemo, useEffect } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
   List,
   SearchBar,
@@ -28,7 +28,7 @@ import {
   ClockCircleOutlined,
 } from '@ant-design/icons';
 import dayjs from 'dayjs';
-import { useGetToolsQuery, useCreateToolMutation, useUpdateToolMutation, useDeleteToolMutation } from '../../services/toolsApi';
+import { useGetToolsQuery, useGetToolQuery, useCreateToolMutation, useUpdateToolMutation, useDeleteToolMutation } from '../../services/toolsApi';
 import { useGetWarehousesQuery } from '@features/warehouses/services/warehousesApi';
 import type { Tool, ToolStatus, CalibrationStatus, ToolFormData } from '../../types';
 import { MobileToolLabelSheet } from './MobileToolLabelSheet';
@@ -62,6 +62,7 @@ const statusOptions = [
 
 export const MobileToolsList = () => {
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<ToolStatus | ''>('');
   const [showFilterPopup, setShowFilterPopup] = useState(false);
@@ -72,6 +73,19 @@ export const MobileToolsList = () => {
   const [page, setPage] = useState(1);
   const [labelSheetOpen, setLabelSheetOpen] = useState(false);
   const [form] = Form.useForm();
+
+  const deepLinkId = searchParams.get('selected');
+  const { data: deepLinkedTool } = useGetToolQuery(Number(deepLinkId), {
+    skip: !deepLinkId,
+  });
+
+  useEffect(() => {
+    if (deepLinkedTool) {
+      setSelectedTool(deepLinkedTool);
+      setShowDetailPopup(true);
+      setSearchParams({}, { replace: true });
+    }
+  }, [deepLinkedTool, setSearchParams]);
 
   // API queries
   const { data: toolsData, isLoading, isFetching, refetch } = useGetToolsQuery({
