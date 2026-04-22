@@ -46,7 +46,7 @@ test.describe('Mobile tools list', () => {
     await expect(tools.detailPopup.getByText('T001')).toBeVisible();
     // The ?selected param should have been cleared from the URL so the popup
     // can be closed and re-opened independently.
-    await expect(page).toHaveURL(/\/tools(?!\?selected)/);
+    await expect(page).toHaveURL(url => !new URLSearchParams(url.search).has('selected'));
   });
 
   // Same WebKit + antd-mobile FloatingBubble flake as
