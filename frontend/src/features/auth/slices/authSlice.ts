@@ -23,6 +23,13 @@ const initialState: AuthState = {
   user: null,
   token: null,
   isAuthenticated: false,
+  // ProtectedRoute probes /api/auth/me on boot using the HttpOnly cookie.
+  // On 200, setCredentials flips isAuthenticated to true; on 401/error,
+  // bootstrapFinished drops it through to the login redirect. Gating the
+  // probe on this flag (instead of isAuthenticated) keeps LoginPage's
+  // "already logged in → go to dashboard" redirect from firing before we
+  // actually know whether the cookie is valid.
+  isBootstrapping: true,
 };
 
 const authSlice = createSlice({
@@ -37,6 +44,7 @@ const authSlice = createSlice({
       state.user = action.payload.user;
       state.token = token;
       state.isAuthenticated = true;
+      state.isBootstrapping = false;
 
       // Initialize the inactivity clock so the session timer starts from now,
       // not from a stale or zero value left over from a previous session.
@@ -46,6 +54,9 @@ const authSlice = createSlice({
       if (action.payload.expiresIn) {
         setTokenExpiration(action.payload.expiresIn);
       }
+    },
+    bootstrapFinished: (state) => {
+      state.isBootstrapping = false;
     },
     setSetupToken: (
       state,
@@ -68,6 +79,7 @@ const authSlice = createSlice({
       state.user = null;
       state.token = null;
       state.isAuthenticated = false;
+      state.isBootstrapping = false;
       localStorage.removeItem('token_expires_at');
       localStorage.removeItem('last_user_activity');
       sessionStorage.removeItem('setup_token');
@@ -75,5 +87,5 @@ const authSlice = createSlice({
   },
 });
 
-export const { setCredentials, setSetupToken, logout } = authSlice.actions;
+export const { setCredentials, setSetupToken, logout, bootstrapFinished } = authSlice.actions;
 export default authSlice.reducer;

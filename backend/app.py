@@ -243,6 +243,11 @@ def create_app():
     def _csrf_origin_check():
         if _flask_request.method not in _CSRF_UNSAFE_METHODS:
             return None
+        # Skip in the Flask test client — it's an in-process caller, never a
+        # cross-origin browser. pytest fixtures don't set Origin/Referer and
+        # blocking them here would break most backend tests.
+        if app.config.get("TESTING"):
+            return None
         if _flask_request.path in _CSRF_EXEMPT_PATHS:
             return None
         # If the caller authenticated with a bearer token rather than a

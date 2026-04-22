@@ -22,6 +22,11 @@ export interface AuthState {
   user: User | null;
   token: string | null;
   isAuthenticated: boolean;
+  // True on the very first render, before we've had a chance to probe
+  // /api/auth/me to see whether the HttpOnly session cookie is valid.
+  // ProtectedRoute renders a spinner while this is true so we don't
+  // flash the login page for already-logged-in users.
+  isBootstrapping: boolean;
 }
 
 export type User = ProfileUser;

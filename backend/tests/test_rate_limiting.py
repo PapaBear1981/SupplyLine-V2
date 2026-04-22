@@ -23,9 +23,14 @@ class TestLoginRateLimiting:
 
             response = client.post("/api/auth/login", json=login_data)
 
-            if response.status_code == 429:  # Rate limited
-                # Rate limiting is working
+            if response.status_code == 429:  # Rate limited by IP
                 assert attempt >= 3, "Rate limiting should kick in after a few attempts"
+                break
+            if response.status_code == 423:  # Account lockout kicked in
+                # Account-level lockout is the other valid protection signal.
+                # With MAX_FAILED_ATTEMPTS=5 the 5th failure (zero-indexed 4)
+                # locks the account.
+                assert attempt >= 4, "Account lockout should require at least 5 attempts"
                 break
             if response.status_code == 401:  # Unauthorized (normal failed login)
                 failed_attempts += 1
@@ -76,9 +81,10 @@ class TestLoginRateLimiting:
             }
             response = client.post("/api/auth/login", json=login_data)
 
-            # Check if account gets locked
+            # Check if account gets locked. With MAX_FAILED_ATTEMPTS=5 the
+            # 5th failure (zero-indexed 4) flips the account into lockout.
             if response.status_code == 423:  # Locked
-                assert attempt >= 5, "Account should lock after several failed attempts"
+                assert attempt >= 4, "Account should lock after 5 failed attempts"
                 break
             if response.status_code in [401, 429]:
                 continue
