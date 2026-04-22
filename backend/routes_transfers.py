@@ -1115,12 +1115,15 @@ def set_active_warehouse():
 
 
 @transfers_bp.route("/transfers", methods=["GET"])
-@jwt_required
+@permission_required("transfer.view")
 def get_transfers():
     """
-    Get transfer history with filters.
+    Get transfer history scoped to the user's active warehouse.
+
+    Non-admin users see only transfers where their active warehouse is the
+    source or destination.  Admins see all transfers across every warehouse.
+
     Query params:
-        - warehouse_id: Filter by warehouse (from or to)
         - kit_id: Filter by kit (from or to)
         - item_type: Filter by item type (tool/chemical)
         - item_id: Filter by specific item
@@ -1130,75 +1133,74 @@ def get_transfers():
         - page: Page number (default: 1)
         - per_page: Items per page (default: 50)
     """
-    try:
-        # Get query parameters
-        warehouse_id = request.args.get("warehouse_id", type=int)
-        kit_id = request.args.get("kit_id", type=int)
-        item_type = request.args.get("item_type")
-        item_id = request.args.get("item_id", type=int)
-        status = request.args.get("status")
-        start_date = request.args.get("start_date")
-        end_date = request.args.get("end_date")
-        page = int(request.args.get("page", 1))
-        per_page = int(request.args.get("per_page", 50))
+    payload = getattr(request, "current_user", None) or {}
+    is_admin = bool(payload.get("is_admin"))
 
-        # Build query
-        query = WarehouseTransfer.query
+    active = get_active_warehouse_id()
+    if not is_admin and active is None:
+        return jsonify({"transfers": [], "total": 0, "page": 1, "per_page": 0, "pages": 0}), 200
 
-        # Apply filters
-        if warehouse_id:
-            query = query.filter(
-                db.or_(
-                    WarehouseTransfer.from_warehouse_id == warehouse_id,
-                    WarehouseTransfer.to_warehouse_id == warehouse_id
-                )
+    kit_id = request.args.get("kit_id", type=int)
+    item_type = request.args.get("item_type")
+    item_id = request.args.get("item_id", type=int)
+    status = request.args.get("status")
+    start_date = request.args.get("start_date")
+    end_date = request.args.get("end_date")
+    page = int(request.args.get("page", 1))
+    per_page = int(request.args.get("per_page", 50))
+
+    query = WarehouseTransfer.query
+
+    # Non-admins see only transfers involving their active warehouse.
+    if not is_admin:
+        query = query.filter(
+            db.or_(
+                WarehouseTransfer.from_warehouse_id == active,
+                WarehouseTransfer.to_warehouse_id == active,
             )
-
-        if kit_id:
-            query = query.filter(
-                db.or_(
-                    WarehouseTransfer.from_kit_id == kit_id,
-                    WarehouseTransfer.to_kit_id == kit_id
-                )
-            )
-
-        if item_type:
-            query = query.filter_by(item_type=item_type)
-
-        if item_id:
-            query = query.filter_by(item_id=item_id)
-
-        if status:
-            query = query.filter_by(status=status)
-
-        if start_date:
-            try:
-                start_dt = datetime.fromisoformat(start_date)
-                query = query.filter(WarehouseTransfer.transfer_date >= start_dt)
-            except ValueError:
-                return jsonify({"error": "Invalid start_date format. Use ISO format."}), 400
-
-        if end_date:
-            try:
-                end_dt = datetime.fromisoformat(end_date)
-                query = query.filter(WarehouseTransfer.transfer_date <= end_dt)
-            except ValueError:
-                return jsonify({"error": "Invalid end_date format. Use ISO format."}), 400
-
-        # Paginate
-        pagination = query.order_by(WarehouseTransfer.transfer_date.desc()).paginate(
-            page=page,
-            per_page=per_page,
-            error_out=False
         )
 
-        return jsonify({
-            "transfers": [_transfer_dict_with_snapshot(transfer) for transfer in pagination.items],
-            "total": pagination.total,
-            "page": page,
-            "per_page": per_page,
-            "pages": pagination.pages
-        }), 200
+    if kit_id:
+        query = query.filter(
+            db.or_(
+                WarehouseTransfer.from_kit_id == kit_id,
+                WarehouseTransfer.to_kit_id == kit_id,
+            )
+        )
 
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
+    if item_type:
+        query = query.filter_by(item_type=item_type)
+
+    if item_id:
+        query = query.filter_by(item_id=item_id)
+
+    if status:
+        query = query.filter_by(status=status)
+
+    if start_date:
+        try:
+            start_dt = datetime.fromisoformat(start_date)
+            query = query.filter(WarehouseTransfer.transfer_date >= start_dt)
+        except ValueError:
+            return jsonify({"error": "Invalid start_date format. Use ISO format."}), 400
+
+    if end_date:
+        try:
+            end_dt = datetime.fromisoformat(end_date)
+            query = query.filter(WarehouseTransfer.transfer_date <= end_dt)
+        except ValueError:
+            return jsonify({"error": "Invalid end_date format. Use ISO format."}), 400
+
+    pagination = query.order_by(WarehouseTransfer.transfer_date.desc()).paginate(
+        page=page,
+        per_page=per_page,
+        error_out=False,
+    )
+
+    return jsonify({
+        "transfers": [_transfer_dict_with_snapshot(t) for t in pagination.items],
+        "total": pagination.total,
+        "page": page,
+        "per_page": per_page,
+        "pages": pagination.pages,
+    }), 200

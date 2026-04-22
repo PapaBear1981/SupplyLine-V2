@@ -508,58 +508,203 @@ class TestCreateTransfer:
 
 
 class TestGetTransfers:
-    """Test listing transfers"""
+    """Test listing transfer history (GET /api/transfers).
 
-    def test_get_all_transfers(self, client, auth_headers_user, pending_transfer):
-        """Test getting all transfers"""
-        response = client.get("/api/transfers", headers=auth_headers_user)
+    The endpoint now returns a paginated dict:
+        {"transfers": [...], "total": N, "page": N, "per_page": N, "pages": N}
 
-        assert response.status_code == 200
-        data = json.loads(response.data)
+    It requires transfer.view permission and scopes results to the user's
+    active warehouse for non-admins.  Admins see all warehouses.
+    """
 
-        assert isinstance(data, list)
-        assert len(data) >= 1
+    # ── helpers ─────────────────────────────────────────────────────────────
 
-    def test_get_transfers_filter_by_status(self, client, auth_headers_user, pending_transfer):
-        """Test filtering transfers by status"""
-        response = client.get("/api/transfers?status=pending", headers=auth_headers_user)
+    def _initiate_transfer(self, client, headers, src_wh, dst_wh, tool):
+        """Helper: initiate a warehouse-to-warehouse transfer via the API."""
+        resp = client.post(
+            "/api/transfers/initiate",
+            json={
+                "to_warehouse_id": dst_wh.id,
+                "item_type": "tool",
+                "item_id": tool.id,
+                "notes": "test history",
+            },
+            headers=headers,
+        )
+        assert resp.status_code == 201, resp.data
+        return json.loads(resp.data)["transfer"]
 
-        assert response.status_code == 200
-        data = json.loads(response.data)
+    # ── tests ────────────────────────────────────────────────────────────────
 
-        assert isinstance(data, list)
-        for transfer in data:
-            assert transfer["status"] == "pending"
+    def test_history_returns_paginated_dict(
+        self, client, admin_user, jwt_manager, db_session
+    ):
+        """GET /api/transfers returns a paginated dict, not a plain list."""
+        import uuid
+        from models import Tool, Warehouse
 
-    def test_get_transfers_filter_by_from_kit(self, client, auth_headers_user, pending_transfer, source_kit):
-        """Test filtering transfers by source kit"""
-        response = client.get(f"/api/transfers?from_kit_id={source_kit.id}", headers=auth_headers_user)
+        src = Warehouse(
+            name=f"Src {uuid.uuid4().hex[:6]}",
+            warehouse_type="satellite",
+            is_active=True,
+        )
+        dst = Warehouse(
+            name=f"Dst {uuid.uuid4().hex[:6]}",
+            warehouse_type="satellite",
+            is_active=True,
+        )
+        db_session.add_all([src, dst])
+        db_session.commit()
 
-        assert response.status_code == 200
-        data = json.loads(response.data)
+        tool = Tool(
+            tool_number=f"TN-{uuid.uuid4().hex[:6].upper()}",
+            serial_number=f"SN-{uuid.uuid4().hex[:6].upper()}",
+            description="Paginated dict test tool",
+            status="available",
+            warehouse_id=src.id,
+        )
+        db_session.add(tool)
+        db_session.commit()
 
-        assert isinstance(data, list)
-        for transfer in data:
-            assert transfer["from_location_type"] == "kit"
-            assert transfer["from_location_id"] == source_kit.id
+        admin_user.active_warehouse_id = src.id
+        db_session.commit()
+        with client.application.app_context():
+            tokens = jwt_manager.generate_tokens(admin_user)
+        headers = {"Authorization": f"Bearer {tokens['access_token']}"}
 
-    def test_get_transfers_filter_by_to_kit(self, client, auth_headers_user, pending_transfer, dest_kit):
-        """Test filtering transfers by destination kit"""
-        response = client.get(f"/api/transfers?to_kit_id={dest_kit.id}", headers=auth_headers_user)
+        self._initiate_transfer(client, headers, src, dst, tool)
 
-        assert response.status_code == 200
-        data = json.loads(response.data)
+        resp = client.get("/api/transfers", headers=headers)
+        assert resp.status_code == 200
+        data = json.loads(resp.data)
 
-        assert isinstance(data, list)
-        for transfer in data:
-            assert transfer["to_location_type"] == "kit"
-            assert transfer["to_location_id"] == dest_kit.id
+        assert isinstance(data, dict)
+        assert "transfers" in data
+        assert "total" in data
+        assert "page" in data
+        assert "per_page" in data
+        assert "pages" in data
+        assert isinstance(data["transfers"], list)
+        assert data["total"] >= 1
 
-    def test_get_transfers_unauthenticated(self, client):
-        """Test getting transfers without authentication"""
+    def test_history_status_filter(
+        self, client, admin_user, jwt_manager, db_session
+    ):
+        """Status query param filters results to the given status value."""
+        import uuid
+        from models import Tool, Warehouse
+
+        src = Warehouse(
+            name=f"Src {uuid.uuid4().hex[:6]}",
+            warehouse_type="satellite",
+            is_active=True,
+        )
+        dst = Warehouse(
+            name=f"Dst {uuid.uuid4().hex[:6]}",
+            warehouse_type="satellite",
+            is_active=True,
+        )
+        db_session.add_all([src, dst])
+        db_session.commit()
+
+        tool = Tool(
+            tool_number=f"TN-{uuid.uuid4().hex[:6].upper()}",
+            serial_number=f"SN-{uuid.uuid4().hex[:6].upper()}",
+            description="Status filter test tool",
+            status="available",
+            warehouse_id=src.id,
+        )
+        db_session.add(tool)
+        db_session.commit()
+
+        admin_user.active_warehouse_id = src.id
+        db_session.commit()
+        with client.application.app_context():
+            tokens = jwt_manager.generate_tokens(admin_user)
+        headers = {"Authorization": f"Bearer {tokens['access_token']}"}
+
+        self._initiate_transfer(client, headers, src, dst, tool)
+
+        resp = client.get(
+            "/api/transfers?status=pending_receipt", headers=headers
+        )
+        assert resp.status_code == 200
+        data = json.loads(resp.data)
+        for t in data["transfers"]:
+            assert t["status"] == "pending_receipt"
+
+    def test_history_unauthenticated(self, client):
+        """Unauthenticated requests are rejected with 401."""
         response = client.get("/api/transfers")
-
         assert response.status_code == 401
+
+    def test_history_requires_transfer_view_permission(
+        self, client, regular_user, jwt_manager, db_session
+    ):
+        """Regular user without transfer.view permission receives 403."""
+        import uuid
+        from models import Warehouse
+
+        wh = Warehouse(
+            name=f"Perm test WH {uuid.uuid4().hex[:6]}",
+            warehouse_type="satellite",
+            is_active=True,
+        )
+        db_session.add(wh)
+        db_session.commit()
+
+        regular_user.active_warehouse_id = wh.id
+        db_session.commit()
+        with client.application.app_context():
+            tokens = jwt_manager.generate_tokens(regular_user)
+        headers = {"Authorization": f"Bearer {tokens['access_token']}"}
+
+        resp = client.get("/api/transfers", headers=headers)
+        assert resp.status_code == 403
+
+    def test_history_empty_when_no_active_warehouse(
+        self, client, db_session, jwt_manager
+    ):
+        """Non-admin with no active warehouse receives an empty list, not an error."""
+        import uuid
+        from models import Permission, User, UserPermission
+
+        user = User(
+            name="History No WH",
+            employee_number=f"HNW{uuid.uuid4().hex[:6].upper()}",
+            department="Test",
+            is_admin=False,
+            is_active=True,
+        )
+        user.set_password("pass")
+        db_session.add(user)
+        db_session.flush()
+
+        perm = Permission.query.filter_by(name="transfer.view").first()
+        if perm is None:
+            perm = Permission(name="transfer.view", description="View transfers")
+            db_session.add(perm)
+            db_session.flush()
+        db_session.add(
+            UserPermission(
+                user_id=user.id,
+                permission_id=perm.id,
+                grant_type="grant",
+                granted_by=user.id,
+            )
+        )
+        db_session.commit()
+
+        # No active_warehouse_id set
+        with client.application.app_context():
+            tokens = jwt_manager.generate_tokens(user)
+        headers = {"Authorization": f"Bearer {tokens['access_token']}"}
+
+        resp = client.get("/api/transfers", headers=headers)
+        assert resp.status_code == 200
+        data = json.loads(resp.data)
+        assert data["transfers"] == []
+        assert data["total"] == 0
 
 
 class TestGetTransferById:
