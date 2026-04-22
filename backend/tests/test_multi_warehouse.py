@@ -488,7 +488,6 @@ class TestTransferHistory:
         assert "transfers" in data
         assert "total" in data
         # Should see only the wh_a transfer, not the wh_other one
-        ids = {t["from_warehouse_id"] for t in data["transfers"]}
         assert all(wh_other.id not in (t.get("from_warehouse_id"), t.get("to_warehouse_id"))
                    for t in data["transfers"]), \
             "Non-admin should not see transfers from other warehouses"

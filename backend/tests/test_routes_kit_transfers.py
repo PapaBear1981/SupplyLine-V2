@@ -1,21 +1,21 @@
 """
-Unit tests for Kit Transfer API endpoints
+Unit tests for Transfer API endpoints
 
-Tests all transfer-related API endpoints including:
-- Creating transfers (kit-to-kit, kit-to-warehouse, warehouse-to-kit)
-- Listing transfers with filters
-- Getting transfer details
-- Completing transfers
-- Cancelling transfers
-- Authentication and authorization
-- Validation and error handling
+Tests the following current endpoints:
+- GET /api/transfers       — paginated history (TestGetTransfers)
+- GET /api/transfers/<id>  — single transfer detail (TestGetTransferById)
+
+Note: legacy kit-transfer POST/PUT endpoints (TestCreateTransfer,
+TestCompleteTransfer, TestCancelTransfer) were removed because the
+underlying routes no longer exist.  The two-step warehouse-to-warehouse
+workflow is tested in test_multi_warehouse.py.
 """
 
 import json
 
 import pytest
 
-from models import InventoryTransaction, Tool, User, Warehouse
+from models import Tool, User, Warehouse
 from models_kits import AircraftType, Kit, KitBox, KitExpendable, KitTransfer
 
 
@@ -220,293 +220,6 @@ def auth_headers_materials(client, materials_user, jwt_manager):
     return {"Authorization": f"Bearer {access_token}"}
 
 
-@pytest.fixture
-def pending_transfer(db_session, materials_user, test_expendable, source_kit, dest_kit):
-    """Create a pending transfer"""
-    transfer = KitTransfer(
-        item_type="expendable",
-        item_id=test_expendable.id,
-        from_location_type="kit",
-        from_location_id=source_kit.id,
-        to_location_type="kit",
-        to_location_id=dest_kit.id,
-        quantity=10.0,
-        transferred_by=materials_user.id,
-        status="pending",
-        notes="Test transfer"
-    )
-    db_session.add(transfer)
-    db_session.commit()
-    return transfer
-
-
-class TestCreateTransfer:
-    """Test creating transfers"""
-
-    def test_create_transfer_kit_to_kit_materials_user(self, client, auth_headers_materials, test_expendable, source_kit, dest_kit):
-        """Test creating kit-to-kit transfer as Materials user"""
-        transfer_data = {
-            "item_type": "expendable",
-            "item_id": test_expendable.id,
-            "from_location_type": "kit",
-            "from_location_id": source_kit.id,
-            "to_location_type": "kit",
-            "to_location_id": dest_kit.id,
-            "quantity": 20.0,
-            "notes": "Transfer for remote operation"
-        }
-
-        response = client.post("/api/transfers",
-                             json=transfer_data,
-                             headers=auth_headers_materials)
-
-        assert response.status_code == 201
-        data = json.loads(response.data)
-
-        assert data["item_type"] == "expendable"
-        assert data["item_id"] == test_expendable.id
-        assert data["from_location_type"] == "kit"
-        assert data["from_location_id"] == source_kit.id
-        assert data["to_location_type"] == "kit"
-        assert data["to_location_id"] == dest_kit.id
-        assert data["quantity"] == 20.0
-        assert data["status"] == "pending"
-        assert data["notes"] == "Transfer for remote operation"
-
-    def test_create_transfer_kit_to_warehouse(self, client, auth_headers_materials, test_expendable, source_kit, dest_warehouse):
-        """Test creating kit-to-warehouse transfer"""
-        transfer_data = {
-            "item_type": "expendable",
-            "item_id": test_expendable.id,
-            "from_location_type": "kit",
-            "from_location_id": source_kit.id,
-            "to_location_type": "warehouse",
-            "to_location_id": dest_warehouse.id,
-            "quantity": 15.0,
-            "notes": "Return to warehouse"
-        }
-
-        response = client.post("/api/transfers",
-                             json=transfer_data,
-                             headers=auth_headers_materials)
-
-        assert response.status_code == 201
-        data = json.loads(response.data)
-
-        assert data["to_location_type"] == "warehouse"
-        assert data["to_location_id"] == dest_warehouse.id
-
-    def test_create_transfer_warehouse_to_kit(self, client, auth_headers_materials, warehouse_chemical_lot, dest_kit, source_warehouse):
-        """Test creating warehouse-to-kit transfer with a chemical"""
-        transfer_data = {
-            "item_type": "chemical",
-            "item_id": warehouse_chemical_lot.id,
-            "from_location_type": "warehouse",
-            "from_location_id": source_warehouse.id,
-            "to_location_type": "kit",
-            "to_location_id": dest_kit.id,
-            "quantity": 25.0,
-            "notes": "Stock kit from warehouse"
-        }
-
-        response = client.post("/api/transfers",
-                             json=transfer_data,
-                             headers=auth_headers_materials)
-
-        assert response.status_code == 201
-        data = json.loads(response.data)
-
-        assert data["from_location_type"] == "warehouse"
-        assert data["from_location_id"] == source_warehouse.id
-        assert data["item_type"] == "chemical"
-        # Warehouse-originated transfers auto-complete
-        assert data["status"] == "completed"
-
-    def test_create_transfer_warehouse_to_warehouse_tool_serial(self, client, auth_headers_materials, source_warehouse, dest_warehouse, warehouse_tool_serial):
-        """Transfer a serial-tracked tool between warehouses"""
-        initial_count = InventoryTransaction.query.filter_by(
-            item_type="tool",
-            item_id=warehouse_tool_serial.id
-        ).count()
-
-        transfer_data = {
-            "item_type": "tool",
-            "item_id": warehouse_tool_serial.id,
-            "from_location_type": "warehouse",
-            "from_location_id": source_warehouse.id,
-            "to_location_type": "warehouse",
-            "to_location_id": dest_warehouse.id,
-            "quantity": 1,
-            "notes": "Move serial tool between warehouses"
-        }
-
-        response = client.post("/api/transfers",
-                               json=transfer_data,
-                               headers=auth_headers_materials)
-
-        assert response.status_code == 201
-        data = json.loads(response.data)
-
-        assert data["item_type"] == "tool"
-        assert data["quantity"] == 1
-        assert data["from_location_type"] == "warehouse"
-        assert data["from_location_id"] == source_warehouse.id
-        assert data["to_location_type"] == "warehouse"
-        assert data["to_location_id"] == dest_warehouse.id
-
-        updated_tool = Tool.query.get(warehouse_tool_serial.id)
-        assert updated_tool.warehouse_id == dest_warehouse.id
-
-        transactions = InventoryTransaction.query.filter_by(
-            item_type="tool",
-            item_id=warehouse_tool_serial.id
-        ).order_by(InventoryTransaction.id.desc()).all()
-        assert len(transactions) == initial_count + 1
-        transaction = transactions[0]
-        assert transaction.transaction_type == "transfer"
-        assert transaction.location_from == source_warehouse.name
-        assert transaction.location_to == dest_warehouse.name
-        assert transaction.quantity_change == 0
-
-    def test_create_transfer_warehouse_to_warehouse_tool_lot(self, client, auth_headers_materials, source_warehouse, dest_warehouse, warehouse_tool_lot):
-        """Transfer a lot-tracked tool between warehouses"""
-        transfer_data = {
-            "item_type": "tool",
-            "item_id": warehouse_tool_lot.id,
-            "from_location_type": "warehouse",
-            "from_location_id": source_warehouse.id,
-            "to_location_type": "warehouse",
-            "to_location_id": dest_warehouse.id,
-            "quantity": 1,
-            "notes": "Move lot-tracked tool between warehouses"
-        }
-
-        response = client.post("/api/transfers",
-                               json=transfer_data,
-                               headers=auth_headers_materials)
-
-        assert response.status_code == 201
-        data = json.loads(response.data)
-
-        assert data["item_type"] == "tool"
-        assert data["quantity"] == 1
-
-        updated_tool = Tool.query.get(warehouse_tool_lot.id)
-        assert updated_tool.warehouse_id == dest_warehouse.id
-        assert updated_tool.lot_number == warehouse_tool_lot.lot_number
-        assert updated_tool.serial_number == warehouse_tool_lot.serial_number
-
-    def test_create_transfer_warehouse_to_warehouse_invalid_quantity(self, client, auth_headers_materials, source_warehouse, dest_warehouse, warehouse_tool_serial):
-        """Warehouse-to-warehouse tool transfer must enforce quantity of 1"""
-        transfer_data = {
-            "item_type": "tool",
-            "item_id": warehouse_tool_serial.id,
-            "from_location_type": "warehouse",
-            "from_location_id": source_warehouse.id,
-            "to_location_type": "warehouse",
-            "to_location_id": dest_warehouse.id,
-            "quantity": 2,
-            "notes": "Invalid quantity for tool transfer"
-        }
-
-        response = client.post("/api/transfers",
-                               json=transfer_data,
-                               headers=auth_headers_materials)
-
-        assert response.status_code == 400
-        data = json.loads(response.data)
-        assert "quantity of 1" in data["error"]
-
-    def test_create_transfer_regular_user_forbidden(self, client, auth_headers_user, test_expendable, source_kit, dest_kit):
-        """Test creating transfer as regular user (should fail)"""
-        transfer_data = {
-            "item_type": "expendable",
-            "item_id": test_expendable.id,
-            "from_location_type": "kit",
-            "from_location_id": source_kit.id,
-            "to_location_type": "kit",
-            "to_location_id": dest_kit.id,
-            "quantity": 10.0
-        }
-
-        response = client.post("/api/transfers",
-                             json=transfer_data,
-                             headers=auth_headers_user)
-
-        assert response.status_code == 403
-
-    def test_create_transfer_missing_required_fields(self, client, auth_headers_materials):
-        """Test creating transfer with missing required fields"""
-        transfer_data = {
-            "item_type": "expendable",
-            "quantity": 10.0
-        }
-
-        response = client.post("/api/transfers",
-                             json=transfer_data,
-                             headers=auth_headers_materials)
-
-        assert response.status_code == 400
-        data = json.loads(response.data)
-        assert "error" in data
-
-    def test_create_transfer_invalid_location_type(self, client, auth_headers_materials, test_expendable, source_kit):
-        """Test creating transfer with invalid location type"""
-        transfer_data = {
-            "item_type": "expendable",
-            "item_id": test_expendable.id,
-            "from_location_type": "invalid",
-            "from_location_id": source_kit.id,
-            "to_location_type": "kit",
-            "to_location_id": 1,
-            "quantity": 10.0
-        }
-
-        response = client.post("/api/transfers",
-                             json=transfer_data,
-                             headers=auth_headers_materials)
-
-        assert response.status_code == 400
-        data = json.loads(response.data)
-        assert "Invalid from_location_type" in data["error"]
-
-    def test_create_transfer_insufficient_quantity(self, client, auth_headers_materials, test_expendable, source_kit, dest_kit):
-        """Test creating transfer with insufficient quantity"""
-        transfer_data = {
-            "item_type": "expendable",
-            "item_id": test_expendable.id,
-            "from_location_type": "kit",
-            "from_location_id": source_kit.id,
-            "to_location_type": "kit",
-            "to_location_id": dest_kit.id,
-            "quantity": 200.0  # More than available (100)
-        }
-
-        response = client.post("/api/transfers",
-                             json=transfer_data,
-                             headers=auth_headers_materials)
-
-        assert response.status_code == 400
-        data = json.loads(response.data)
-        assert "Insufficient quantity" in data["error"]
-
-    def test_create_transfer_unauthenticated(self, client, test_expendable, source_kit, dest_kit):
-        """Test creating transfer without authentication"""
-        transfer_data = {
-            "item_type": "expendable",
-            "item_id": test_expendable.id,
-            "from_location_type": "kit",
-            "from_location_id": source_kit.id,
-            "to_location_type": "kit",
-            "to_location_id": dest_kit.id,
-            "quantity": 10.0
-        }
-
-        response = client.post("/api/transfers", json=transfer_data)
-
-        assert response.status_code == 401
-
-
 class TestGetTransfers:
     """Test listing transfer history (GET /api/transfers).
 
@@ -708,161 +421,83 @@ class TestGetTransfers:
 
 
 class TestGetTransferById:
-    """Test getting transfer details"""
+    """Test GET /api/transfers/<id> (single transfer detail).
 
-    def test_get_transfer_by_id(self, client, auth_headers_user, pending_transfer):
-        """Test getting specific transfer by ID"""
-        response = client.get(f"/api/transfers/{pending_transfer.id}", headers=auth_headers_user)
+    The endpoint requires transfer.view permission and returns
+    {"transfer": {...}} for valid IDs.  Non-admins are scoped to
+    transfers that involve their active warehouse.
+    """
 
-        assert response.status_code == 200
-        data = json.loads(response.data)
-
-        assert data["id"] == pending_transfer.id
-        assert data["status"] == "pending"
-        assert "item_type" in data
-        assert "quantity" in data
-
-    def test_get_transfer_not_found(self, client, auth_headers_user):
-        """Test getting non-existent transfer"""
-        response = client.get("/api/transfers/99999", headers=auth_headers_user)
-
-        assert response.status_code == 404
-
-    def test_get_transfer_unauthenticated(self, client, pending_transfer):
-        """Test getting transfer without authentication"""
-        response = client.get(f"/api/transfers/{pending_transfer.id}")
-
-        assert response.status_code == 401
-
-
-class TestCompleteTransfer:
-    """Test completing transfers"""
-
-    def test_complete_transfer_materials_user(self, client, auth_headers_materials, pending_transfer, test_expendable, db_session):
-        """Test completing transfer as Materials user"""
-        # Get the current quantity from the database (may differ from fixture due to test isolation)
-        from models_kits import KitExpendable
-        fresh_item = KitExpendable.query.get(test_expendable.id)
-        original_quantity = fresh_item.quantity
-
-        response = client.put(f"/api/transfers/{pending_transfer.id}/complete",
-                            headers=auth_headers_materials)
-
-        assert response.status_code == 200
-        data = json.loads(response.data)
-
-        assert data["status"] == "completed"
-        assert data["completed_date"] is not None
-
-        # Verify source item quantity was reduced
-        # Note: The transfer operation may reduce quantity at creation and/or completion
-        db_session.expire_all()  # Ensure we get fresh data from database
-        updated_item = KitExpendable.query.get(test_expendable.id)
-        assert updated_item.quantity <= original_quantity  # Quantity should be reduced
-
-    def test_complete_transfer_regular_user_forbidden(self, client, auth_headers_user, pending_transfer):
-        """Test completing transfer as regular user (should fail)"""
-        response = client.put(f"/api/transfers/{pending_transfer.id}/complete",
-                            headers=auth_headers_user)
-
-        assert response.status_code == 403
-
-    def test_complete_transfer_not_pending(self, client, auth_headers_materials, db_session, materials_user, test_expendable, source_kit, dest_kit):
-        """Test completing transfer that is not in pending status"""
-        # Create a completed transfer
-        transfer = KitTransfer(
-            item_type="expendable",
-            item_id=test_expendable.id,
-            from_location_type="kit",
-            from_location_id=source_kit.id,
-            to_location_type="kit",
-            to_location_id=dest_kit.id,
-            quantity=5.0,
-            transferred_by=materials_user.id,
-            status="completed"
+    def _create_transfer(self, client, headers, src_wh, dst_wh, tool):
+        resp = client.post(
+            "/api/transfers/initiate",
+            json={
+                "to_warehouse_id": dst_wh.id,
+                "item_type": "tool",
+                "item_id": tool.id,
+                "notes": "detail test",
+            },
+            headers=headers,
         )
-        db_session.add(transfer)
+        assert resp.status_code == 201, resp.data
+        return json.loads(resp.data)["transfer"]
+
+    def test_get_transfer_by_id(self, client, admin_user, jwt_manager, db_session):
+        """Admin can fetch a specific transfer by its ID."""
+        import uuid
+        from models import Tool, Warehouse
+
+        src = Warehouse(
+            name=f"Src {uuid.uuid4().hex[:6]}",
+            warehouse_type="satellite",
+            is_active=True,
+        )
+        dst = Warehouse(
+            name=f"Dst {uuid.uuid4().hex[:6]}",
+            warehouse_type="satellite",
+            is_active=True,
+        )
+        db_session.add_all([src, dst])
         db_session.commit()
 
-        response = client.put(f"/api/transfers/{transfer.id}/complete",
-                            headers=auth_headers_materials)
-
-        assert response.status_code == 400
-        data = json.loads(response.data)
-        assert "not in pending status" in data["error"]
-
-    def test_complete_transfer_not_found(self, client, auth_headers_materials):
-        """Test completing non-existent transfer"""
-        response = client.put("/api/transfers/99999/complete",
-                            headers=auth_headers_materials)
-
-        assert response.status_code == 404
-
-    def test_complete_transfer_unauthenticated(self, client, pending_transfer):
-        """Test completing transfer without authentication"""
-        response = client.put(f"/api/transfers/{pending_transfer.id}/complete")
-
-        assert response.status_code == 401
-
-
-class TestCancelTransfer:
-    """Test cancelling transfers"""
-
-    def test_cancel_transfer_materials_user(self, client, auth_headers_materials, pending_transfer):
-        """Test cancelling transfer as Materials user"""
-        response = client.put(f"/api/transfers/{pending_transfer.id}/cancel",
-                            headers=auth_headers_materials)
-
-        assert response.status_code == 200
-        data = json.loads(response.data)
-
-        assert data["status"] == "cancelled"
-
-        # Verify transfer is cancelled in database
-        from models_kits import KitTransfer
-        updated_transfer = KitTransfer.query.get(pending_transfer.id)
-        assert updated_transfer.status == "cancelled"
-
-    def test_cancel_transfer_regular_user_forbidden(self, client, auth_headers_user, pending_transfer):
-        """Test cancelling transfer as regular user (should fail)"""
-        response = client.put(f"/api/transfers/{pending_transfer.id}/cancel",
-                            headers=auth_headers_user)
-
-        assert response.status_code == 403
-
-    def test_cancel_transfer_not_pending(self, client, auth_headers_materials, db_session, materials_user, test_expendable, source_kit, dest_kit):
-        """Test cancelling transfer that is not in pending status"""
-        # Create a completed transfer
-        transfer = KitTransfer(
-            item_type="expendable",
-            item_id=test_expendable.id,
-            from_location_type="kit",
-            from_location_id=source_kit.id,
-            to_location_type="kit",
-            to_location_id=dest_kit.id,
-            quantity=5.0,
-            transferred_by=materials_user.id,
-            status="completed"
+        tool = Tool(
+            tool_number=f"TN-{uuid.uuid4().hex[:6].upper()}",
+            serial_number=f"SN-{uuid.uuid4().hex[:6].upper()}",
+            description="Detail test tool",
+            status="available",
+            warehouse_id=src.id,
         )
-        db_session.add(transfer)
+        db_session.add(tool)
         db_session.commit()
 
-        response = client.put(f"/api/transfers/{transfer.id}/cancel",
-                            headers=auth_headers_materials)
+        admin_user.active_warehouse_id = src.id
+        db_session.commit()
+        with client.application.app_context():
+            tokens = jwt_manager.generate_tokens(admin_user)
+        headers = {"Authorization": f"Bearer {tokens['access_token']}"}
 
-        assert response.status_code == 400
-        data = json.loads(response.data)
-        assert "Can only cancel pending transfers" in data["error"]
+        transfer_data = self._create_transfer(client, headers, src, dst, tool)
+        transfer_id = transfer_data["id"]
 
-    def test_cancel_transfer_not_found(self, client, auth_headers_materials):
-        """Test cancelling non-existent transfer"""
-        response = client.put("/api/transfers/99999/cancel",
-                            headers=auth_headers_materials)
+        resp = client.get(f"/api/transfers/{transfer_id}", headers=headers)
+        assert resp.status_code == 200
+        data = json.loads(resp.data)
 
-        assert response.status_code == 404
+        assert "transfer" in data
+        assert data["transfer"]["id"] == transfer_id
+        assert "status" in data["transfer"]
+        assert "item_type" in data["transfer"]
 
-    def test_cancel_transfer_unauthenticated(self, client, pending_transfer):
-        """Test cancelling transfer without authentication"""
-        response = client.put(f"/api/transfers/{pending_transfer.id}/cancel")
+    def test_get_transfer_not_found(self, client, admin_user, jwt_manager):
+        """Returns 404 for a non-existent transfer ID."""
+        with client.application.app_context():
+            tokens = jwt_manager.generate_tokens(admin_user)
+        headers = {"Authorization": f"Bearer {tokens['access_token']}"}
 
-        assert response.status_code == 401
+        resp = client.get("/api/transfers/99999", headers=headers)
+        assert resp.status_code == 404
+
+    def test_get_transfer_unauthenticated(self, client):
+        """Unauthenticated requests are rejected with 401."""
+        resp = client.get("/api/transfers/1")
+        assert resp.status_code == 401
