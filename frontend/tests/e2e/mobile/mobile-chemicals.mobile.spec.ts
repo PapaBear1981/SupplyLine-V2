@@ -56,8 +56,8 @@ test.describe('Mobile chemicals list', () => {
     // Typing in the search input filters the list
     await chemicals.userSearch.locator('input').fill('John');
     await expect(page.locator('text=John Engineer').first()).toBeVisible();
-    // Users that don't match should not appear
-    await expect(page.locator('text=Regular User').first()).not.toBeVisible();
+    // Users that don't match are removed from the DOM by React
+    await expect(page.getByTestId(/mobile-chemical-user-option-/).filter({ hasText: 'Regular User' })).not.toBeAttached();
   });
 
   test('selecting a user from the popup populates the Issue To field', async ({ page }) => {
@@ -76,7 +76,8 @@ test.describe('Mobile chemicals list', () => {
     // Popup should close after selection
     await expect(chemicals.userSearch).not.toBeVisible({ timeout: 3_000 });
 
-    // The trigger input should now show the selected user's name
-    await expect(chemicals.userTrigger).toContainText('John Engineer');
+    // The trigger input should now show the selected user's name.
+    // antd-mobile Input renders <input value="..."> — use toHaveValue, not toContainText.
+    await expect(chemicals.userTrigger.locator('input')).toHaveValue(/John Engineer/);
   });
 });
