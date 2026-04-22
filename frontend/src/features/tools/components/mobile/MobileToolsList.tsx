@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
   List,
@@ -74,19 +74,35 @@ export const MobileToolsList = () => {
   const [labelSheetOpen, setLabelSheetOpen] = useState(false);
   const [form] = Form.useForm();
 
-  const deepLinkId = searchParams.get('selected');
-  const { data: deepLinkedTool } = useGetToolQuery(Number(deepLinkId), {
-    skip: !deepLinkId,
+  // Capture the ?selected param once at mount via a lazy initializer so it
+  // persists as normal state even after we clear the URL param below.
+  const [capturedDeepLinkId, setCapturedDeepLinkId] = useState<number | null>(() => {
+    const id = Number(searchParams.get('selected'));
+    return id > 0 ? id : null;
   });
 
-  // Derive which tool to show and whether the detail popup is open — no effect needed.
-  // A deep-linked tool (from QR scan navigation) takes priority over a manually tapped one.
+  const { data: deepLinkedTool } = useGetToolQuery(capturedDeepLinkId ?? 0, {
+    skip: capturedDeepLinkId === null,
+  });
+
+  // Clear the ?selected URL param once the tool has loaded.
+  // Only calls setSearchParams (a router navigation function, not a useState setter)
+  // so the react-hooks/set-state-in-effect rule is not triggered.
+  useEffect(() => {
+    if (deepLinkedTool && capturedDeepLinkId !== null) {
+      setSearchParams({}, { replace: true });
+    }
+  }, [deepLinkedTool, capturedDeepLinkId, setSearchParams]);
+
+  // Derive which tool to show: deep-linked tool takes priority over manually-tapped.
   const activeDetailTool = deepLinkedTool ?? (showDetailPopup ? selectedTool : null);
   const isDetailPopupOpen = !!activeDetailTool;
 
+  // setCapturedDeepLinkId is called from event handlers (never from effects),
+  // so the react-hooks/set-state-in-effect rule is not triggered.
   const handleCloseDetail = () => {
+    setCapturedDeepLinkId(null);
     setShowDetailPopup(false);
-    if (deepLinkId) setSearchParams({}, { replace: true });
   };
 
   // API queries
