@@ -27,8 +27,9 @@ export type MenuItem = Required<MenuProps>['items'][number];
  */
 const NAV_TEST_IDS: Record<string, string> = {
   [ROUTES.DASHBOARD]: 'nav-dashboard',
+  'tools-group': 'nav-tools',
   [ROUTES.TOOL_CHECKOUT]: 'nav-tool-checkout',
-  [ROUTES.TOOLS]: 'nav-tools',
+  [ROUTES.TOOLS]: 'nav-tools-inventory',
   [ROUTES.TOOL_HISTORY]: 'nav-tool-history',
   [ROUTES.CHEMICALS]: 'nav-chemicals',
   [ROUTES.CHEMICAL_FORECAST]: 'nav-chemicals-forecast',
@@ -77,22 +78,29 @@ export const ALL_MENU_ITEMS: MenuItemWithPermission[] = [
     // Dashboard is accessible to all authenticated users
   },
   {
-    key: ROUTES.TOOL_CHECKOUT,
-    icon: <SwapOutlined />,
-    label: 'Tool Checkout',
-    permission: 'page.checkouts',
-  },
-  {
-    key: ROUTES.TOOLS,
+    key: 'tools-group',
     icon: <ToolOutlined />,
     label: 'Tools',
-    permission: 'page.tools',
-  },
-  {
-    key: ROUTES.TOOL_HISTORY,
-    icon: <AuditOutlined />,
-    label: 'Tool History',
-    permission: 'checkout.view',
+    children: [
+      {
+        key: ROUTES.TOOLS,
+        icon: <ToolOutlined />,
+        label: 'Inventory',
+        permission: 'page.tools',
+      },
+      {
+        key: ROUTES.TOOL_CHECKOUT,
+        icon: <SwapOutlined />,
+        label: 'Tool Checkout',
+        permission: 'page.checkouts',
+      },
+      {
+        key: ROUTES.TOOL_HISTORY,
+        icon: <AuditOutlined />,
+        label: 'Tool History',
+        permission: 'checkout.view',
+      },
+    ],
   },
   {
     key: ROUTES.CHEMICALS,
@@ -187,18 +195,17 @@ export const getMenuItems = (isAdmin: boolean = false, permissions: string[] = [
         return permissions.includes(item.permission);
       })
       .map((item) => {
-        // Remove permission-related fields and return as MenuItem
         // eslint-disable-next-line @typescript-eslint/no-unused-vars
         const { permission, adminOnly, children, ...menuItem } = item;
         const tagged = { ...menuItem, label: taggedLabel(item.key, item.label) };
         if (children) {
-          return {
-            ...tagged,
-            children: filterItems(children),
-          } as MenuItem;
+          const filteredChildren = filterItems(children);
+          if (filteredChildren.length === 0) return null;
+          return { ...tagged, children: filteredChildren } as MenuItem;
         }
         return tagged as MenuItem;
-      });
+      })
+      .filter((item): item is MenuItem => item !== null);
   };
 
   return filterItems(ALL_MENU_ITEMS);

@@ -36,9 +36,10 @@ test.describe('Dashboard (desktop)', () => {
     await expect(page.getByTestId('nav-chemicals')).toBeVisible();
   });
 
-  test('clicking nav-tools routes to the Tools page', async ({ page }) => {
+  test('clicking nav-tools opens the Tools submenu and Inventory routes to the Tools page', async ({ page }) => {
     await page.goto('/dashboard');
     await page.getByTestId('nav-tools').click();
+    await page.getByTestId('nav-tools-inventory').click();
     await expect(page).toHaveURL(/\/tools/);
     await expect(page.getByTestId('tools-page')).toBeVisible();
   });
