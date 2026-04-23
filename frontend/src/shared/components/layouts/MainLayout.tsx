@@ -71,7 +71,7 @@ export const MainLayout = () => {
   } = theme.useToken();
 
   const handleMenuClick = (e: { key: string }) => {
-    navigate(e.key);
+    if (e.key.startsWith('/')) navigate(e.key);
   };
 
   const handleLogout = async () => {
