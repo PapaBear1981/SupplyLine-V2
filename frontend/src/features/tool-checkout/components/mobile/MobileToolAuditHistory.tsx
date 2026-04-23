@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect } from 'react';
+import React, { useState, useCallback } from 'react';
 import {
   List,
   SearchBar,
@@ -84,14 +84,21 @@ export const MobileToolAuditHistory = () => {
   const hasMore = data ? page < data.pages : false;
 
   // Accumulate pages into allItems; deduplicate by id to guard against double-fetches.
-  useEffect(() => {
-    if (!data) return;
-    setAllItems((prev) => {
-      if (data.page === 1) return data.history;
-      const existingIds = new Set(prev.map(({ id }) => id));
-      return [...prev, ...data.history.filter(({ id }) => !existingIds.has(id))];
-    });
-  }, [data]);
+  // Uses the "storing information from previous renders" pattern to avoid setState in useEffect.
+  const [prevData, setPrevData] = useState(data);
+  if (data !== prevData) {
+    setPrevData(data);
+    if (data) {
+      if (data.page === 1) {
+        setAllItems(data.history);
+      } else {
+        setAllItems((prev) => {
+          const existingIds = new Set(prev.map(({ id }) => id));
+          return [...prev, ...data.history.filter(({ id }) => !existingIds.has(id))];
+        });
+      }
+    }
+  }
 
   const loadMore = useCallback(async () => {
     if (!isFetching && hasMore) setPage((p) => p + 1);
@@ -100,6 +107,7 @@ export const MobileToolAuditHistory = () => {
   const handleRefresh = async () => {
     setPage(1);
     setAllItems([]);
+    setPrevData(undefined);
     await refetch();
   };
 
@@ -108,6 +116,7 @@ export const MobileToolAuditHistory = () => {
     setEventType(selected);
     setPage(1);
     setAllItems([]);
+    setPrevData(undefined);
     setShowFilterPicker(false);
   };
 

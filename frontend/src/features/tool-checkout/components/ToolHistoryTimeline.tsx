@@ -13,6 +13,7 @@ import {
   Statistic,
   Row,
   Col,
+  theme,
 } from 'antd';
 import {
   SwapOutlined,
@@ -110,6 +111,7 @@ const formatEventType = (eventType: ToolHistoryEventType) => {
 };
 
 export const ToolHistoryTimeline = ({ toolId }: ToolHistoryTimelineProps) => {
+  const { token } = theme.useToken();
   const [page, setPage] = useState(1);
   const [eventType, setEventType] = useState<ToolHistoryEventType | ''>('');
 
@@ -230,7 +232,7 @@ export const ToolHistoryTimeline = ({ toolId }: ToolHistoryTimelineProps) => {
       {data?.tool && (
         <div
           style={{
-            background: '#f5f5f5',
+            background: token.colorFillAlter,
             padding: 16,
             borderRadius: 8,
             marginBottom: 24,
