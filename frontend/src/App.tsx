@@ -22,9 +22,7 @@ import { WarehousesPage } from '@features/warehouses/pages/WarehousesPage';
 import { TransfersPage } from '@features/transfers/pages/TransfersPage';
 import { SettingsPage } from '@features/settings/pages/SettingsPage';
 import { ProfilePage } from '@features/profile/pages/ProfilePage';
-import { UsersPage } from '@features/users/pages/UsersPage';
 import { AdminPageWrapper } from '@features/admin/components/AdminPageWrapper';
-import { MobileUsersList } from '@features/admin/components/mobile';
 import { KitsDashboard, KitDetailView, KitWizard, MobileKitWizard } from '@features/kits';
 import {
   OrdersDashboard,
@@ -153,15 +151,6 @@ function AppContent() {
                   <Route path={ROUTES.WAREHOUSES} element={<WarehousesPage />} />
                   <Route path={ROUTES.TRANSFERS} element={<TransfersPage />} />
                   <Route path={ROUTES.REPORTS} element={<ReportsPage />} />
-                  <Route
-                    path={ROUTES.USERS}
-                    element={
-                      <ResponsivePage
-                        desktop={<UsersPage />}
-                        mobile={<MobileUsersList />}
-                      />
-                    }
-                  />
                   <Route path={ROUTES.PROFILE} element={<ProfilePage />} />
                   <Route path={ROUTES.SETTINGS} element={<SettingsPage />} />
 

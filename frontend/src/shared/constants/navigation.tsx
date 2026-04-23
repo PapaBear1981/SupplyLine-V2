@@ -7,7 +7,6 @@ import {
   InboxOutlined,
   HomeOutlined,
   FileTextOutlined,
-  UserOutlined,
   SettingOutlined,
   SwapOutlined,
   RetweetOutlined,
@@ -39,7 +38,6 @@ const NAV_TEST_IDS: Record<string, string> = {
   [ROUTES.WAREHOUSES]: 'nav-warehouses',
   [ROUTES.TRANSFERS]: 'nav-transfers',
   [ROUTES.REPORTS]: 'nav-reports',
-  [ROUTES.USERS]: 'nav-users',
   [ROUTES.ADMIN]: 'nav-admin',
 };
 
@@ -156,12 +154,6 @@ export const ALL_MENU_ITEMS: MenuItemWithPermission[] = [
     icon: <FileTextOutlined />,
     label: 'Reports',
     permission: 'page.reports',
-  },
-  {
-    key: ROUTES.USERS,
-    icon: <UserOutlined />,
-    label: 'Users',
-    permission: 'page.users',
   },
   {
     key: ROUTES.ADMIN,

@@ -25,7 +25,6 @@ import {
   InboxOutlined,
   HomeOutlined,
   FileTextOutlined,
-  UserOutlined,
   SwapOutlined,
   ShoppingCartOutlined,
   FormOutlined,
@@ -58,7 +57,6 @@ const routeNames: Record<string, string> = {
   '/requests': 'Requests',
   [ROUTES.WAREHOUSES]: 'Warehouses',
   [ROUTES.REPORTS]: 'Reports',
-  [ROUTES.USERS]: 'Users',
   [ROUTES.ADMIN]: 'Admin',
   [ROUTES.PROFILE]: 'Profile',
   [ROUTES.SETTINGS]: 'Settings',
@@ -77,7 +75,6 @@ const routeIcons: Record<string, React.ReactNode> = {
   '/requests': <FormOutlined />,
   [ROUTES.WAREHOUSES]: <HomeOutlined />,
   [ROUTES.REPORTS]: <FileTextOutlined />,
-  [ROUTES.USERS]: <UserOutlined />,
   [ROUTES.ADMIN]: <SettingOutlined />,
 };
 
@@ -111,7 +108,6 @@ export const MobileLayout = () => {
       '/requests',
       ROUTES.WAREHOUSES,
       ROUTES.REPORTS,
-      ROUTES.USERS,
       ROUTES.ADMIN,
     ];
 
