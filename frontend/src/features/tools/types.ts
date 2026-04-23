@@ -78,12 +78,11 @@ export interface ToolCalibration {
   id: number;
   tool_id: number;
   calibration_date: string;
-  next_calibration_date: string;
-  calibrated_by: string;
-  calibration_standard?: string;
-  certificate_number?: string;
-  notes?: string;
-  certificate_path?: string;
+  next_calibration_date: string | null;
+  performed_by_name: string | null;
+  calibration_notes: string | null;
+  calibration_status: 'pass' | 'fail' | 'limited';
+  calibration_certificate_file: string | null;
   created_at: string;
 }
 

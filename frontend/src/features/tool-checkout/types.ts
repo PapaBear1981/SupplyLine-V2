@@ -91,6 +91,8 @@ export interface ToolAvailability {
 export interface ToolHistoryEvent {
   id: number;
   tool_id: number;
+  tool_number: string | null;
+  tool_description: string | null;
   event_type: ToolHistoryEventType;
   event_date: string;
   user_id: number;
@@ -247,4 +249,23 @@ export interface TimelineQueryParams {
   page?: number;
   per_page?: number;
   event_type?: ToolHistoryEventType;
+}
+
+export interface AuditHistoryQueryParams {
+  page?: number;
+  per_page?: number;
+  tool_id?: number;
+  user_id?: number;
+  event_type?: ToolHistoryEventType | '';
+  tool_search?: string;
+  start_date?: string;
+  end_date?: string;
+}
+
+export interface AuditHistoryResponse {
+  history: ToolHistoryEvent[];
+  total: number;
+  page: number;
+  per_page: number;
+  pages: number;
 }

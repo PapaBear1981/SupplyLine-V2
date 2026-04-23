@@ -731,6 +731,8 @@ class ToolHistory(db.Model):
         return {
             "id": self.id,
             "tool_id": self.tool_id,
+            "tool_number": self.tool.tool_number if self.tool else None,
+            "tool_description": self.tool.description if self.tool else None,
             "event_type": self.event_type,
             "event_date": self.event_date.isoformat() if self.event_date else None,
             "user_id": self.user_id,

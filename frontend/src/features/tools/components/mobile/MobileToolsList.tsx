@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
   List,
@@ -19,6 +19,7 @@ import {
   Dialog,
   SwipeAction,
   Empty,
+  Tabs,
 } from 'antd-mobile';
 import { AddOutline, FilterOutline, CloseOutline } from 'antd-mobile-icons';
 import {
@@ -28,8 +29,9 @@ import {
   ClockCircleOutlined,
 } from '@ant-design/icons';
 import dayjs from 'dayjs';
-import { useGetToolsQuery, useGetToolQuery, useCreateToolMutation, useUpdateToolMutation, useDeleteToolMutation } from '../../services/toolsApi';
+import { useGetToolsQuery, useGetToolQuery, useCreateToolMutation, useUpdateToolMutation, useDeleteToolMutation, useGetToolCalibrationsQuery } from '../../services/toolsApi';
 import { useGetWarehousesQuery } from '@features/warehouses/services/warehousesApi';
+import { useGetToolTimelineQuery } from '@features/tool-checkout';
 import type { Tool, ToolStatus, CalibrationStatus, ToolFormData } from '../../types';
 import { MobileToolLabelSheet } from './MobileToolLabelSheet';
 import './MobileToolsList.css';
@@ -59,6 +61,100 @@ const statusOptions = [
     { label: 'Retired', value: 'retired' },
   ],
 ];
+
+// ── Inline sub-components for the detail popup tabs ──────────────────────────
+
+const EVENT_TYPE_COLORS: Record<string, string> = {
+  checkout: '#1890ff',
+  return: '#52c41a',
+  damage_reported: '#ff4d4f',
+  damage_resolved: '#52c41a',
+  calibration: '#722ed1',
+  maintenance_start: '#fa8c16',
+  maintenance_end: '#52c41a',
+  repair: '#13c2c2',
+  status_change: '#faad14',
+  retired: '#8c8c8c',
+};
+
+const ToolHistoryTab = ({ toolId }: { toolId: number }) => {
+  const { data, isLoading, isError } = useGetToolTimelineQuery({ toolId, params: { page: 1, per_page: 20 } });
+
+  if (isLoading) return <Skeleton animated style={{ margin: 16 }} />;
+  if (isError) return <Empty description="Unable to load history" style={{ padding: 32 }} />;
+  if (!data?.timeline.length) return <Empty description="No history yet" style={{ padding: 32 }} />;
+
+  return (
+    <List style={{ '--padding-left': '12px', '--padding-right': '12px' }}>
+      {data.timeline.map((event) => (
+        <List.Item
+          key={event.id}
+          prefix={
+            <Tag
+              color={EVENT_TYPE_COLORS[event.event_type] ?? '#8c8c8c'}
+              style={{ fontSize: 11, padding: '1px 6px' }}
+            >
+              {event.event_type.replace(/_/g, ' ')}
+            </Tag>
+          }
+          description={
+            <span style={{ fontSize: 12, color: '#8c8c8c' }}>
+              {dayjs(event.event_date).format('MMM D, YYYY h:mm A')} · {event.user_name}
+            </span>
+          }
+          style={{ '--border-inner': 'none' } as React.CSSProperties}
+        >
+          <span style={{ fontSize: 13 }}>{event.description}</span>
+        </List.Item>
+      ))}
+    </List>
+  );
+};
+
+const ToolCalibrationTab = ({ toolId, requiresCalibration }: { toolId: number; requiresCalibration: boolean }) => {
+  const { data: calibrations, isLoading, isError } = useGetToolCalibrationsQuery(toolId, { skip: !requiresCalibration });
+
+  if (!requiresCalibration) {
+    return <Empty description="This tool does not require calibration" style={{ padding: 32 }} />;
+  }
+  if (isLoading) return <Skeleton animated style={{ margin: 16 }} />;
+  if (isError) return <Empty description="Unable to load calibration records" style={{ padding: 32 }} />;
+  if (!calibrations?.length) return <Empty description="No calibration records" style={{ padding: 32 }} />;
+
+  const statusColor: Record<string, string> = { pass: '#52c41a', fail: '#ff4d4f', limited: '#fa8c16' };
+
+  return (
+    <List style={{ '--padding-left': '12px', '--padding-right': '12px' }}>
+      {calibrations.map((cal) => (
+        <List.Item
+          key={cal.id}
+          prefix={
+            <Tag
+              color={statusColor[cal.calibration_status] ?? '#8c8c8c'}
+              style={{ fontSize: 11, padding: '1px 6px', textTransform: 'capitalize' }}
+            >
+              {cal.calibration_status}
+            </Tag>
+          }
+          description={
+            <span style={{ fontSize: 12, color: '#8c8c8c' }}>
+              {cal.performed_by_name && `By: ${cal.performed_by_name} · `}
+              {cal.next_calibration_date && `Next: ${dayjs(cal.next_calibration_date).format('MMM D, YYYY')}`}
+            </span>
+          }
+          style={{ '--border-inner': 'none' } as React.CSSProperties}
+        >
+          <span style={{ fontSize: 13 }}>{dayjs(cal.calibration_date).format('MMM D, YYYY')}</span>
+          {cal.calibration_notes && (
+            <div style={{ fontSize: 12, color: '#595959', marginTop: 2 }}>{cal.calibration_notes}</div>
+          )}
+        </List.Item>
+      ))}
+    </List>
+  );
+};
+
+// ─────────────────────────────────────────────────────────────────────────────
 
 export const MobileToolsList = () => {
   const navigate = useNavigate();
@@ -408,77 +504,99 @@ export const MobileToolsList = () => {
         bodyStyle={{
           borderTopLeftRadius: 16,
           borderTopRightRadius: 16,
-          maxHeight: '80vh',
+          height: '90vh',
           overflow: 'auto',
+          display: 'flex',
+          flexDirection: 'column',
         }}
       >
         {activeDetailTool && (
-          <div className="detail-popup" data-testid="mobile-tool-detail-popup">
+          <div className="detail-popup" data-testid="mobile-tool-detail-popup" style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
             <div className="detail-header">
               <div className="detail-title">{activeDetailTool.tool_number}</div>
               <Tag color={statusColors[activeDetailTool.status]}>
                 {activeDetailTool.status.replace('_', ' ')}
               </Tag>
             </div>
-            <List>
-              <List.Item extra={activeDetailTool.serial_number}>Serial Number</List.Item>
-              {activeDetailTool.lot_number && (
-                <List.Item extra={activeDetailTool.lot_number}>Lot Number</List.Item>
-              )}
-              <List.Item extra={activeDetailTool.description}>Description</List.Item>
-              <List.Item extra={activeDetailTool.condition}>Condition</List.Item>
-              <List.Item extra={activeDetailTool.location}>Location</List.Item>
-              <List.Item extra={activeDetailTool.category || 'N/A'}>Category</List.Item>
-              {activeDetailTool.warehouse_name && (
-                <List.Item extra={activeDetailTool.warehouse_name}>Warehouse</List.Item>
-              )}
-              {activeDetailTool.requires_calibration && (
-                <>
-                  <List.Item extra={
-                    <Tag color={calibrationColors[activeDetailTool.calibration_status]}>
-                      {activeDetailTool.calibration_status.replace('_', ' ')}
-                    </Tag>
-                  }>
-                    Calibration Status
-                  </List.Item>
-                  {activeDetailTool.last_calibration_date && (
-                    <List.Item extra={dayjs(activeDetailTool.last_calibration_date).format('MMM D, YYYY')}>
-                      Last Calibration
-                    </List.Item>
-                  )}
-                  {activeDetailTool.next_calibration_date && (
-                    <List.Item extra={dayjs(activeDetailTool.next_calibration_date).format('MMM D, YYYY')}>
-                      Next Calibration
-                    </List.Item>
-                  )}
-                </>
-              )}
-            </List>
-            <div className="detail-actions">
-              <Button block color="primary" onClick={() => handleEdit(activeDetailTool)}>
-                Edit Tool
-              </Button>
-              <Button
-                block
-                color="primary"
-                fill="outline"
-                onClick={() => {
-                  handleCloseDetail();
-                  navigate(`/tool-checkout?tool=${activeDetailTool.tool_number}`);
-                }}
-              >
-                Go to Checkout
-              </Button>
-              <Button
-                block
-                fill="outline"
-                onClick={() => {
-                  setLabelSheetOpen(true);
-                }}
-              >
-                Generate Label
-              </Button>
-            </div>
+
+            <Tabs defaultActiveKey="details" style={{ flex: 1, overflow: 'hidden' }}>
+              <Tabs.Tab title="Details" key="details">
+                <div style={{ overflow: 'auto', maxHeight: 'calc(90vh - 200px)' }}>
+                  <List>
+                    <List.Item extra={activeDetailTool.serial_number}>Serial Number</List.Item>
+                    {activeDetailTool.lot_number && (
+                      <List.Item extra={activeDetailTool.lot_number}>Lot Number</List.Item>
+                    )}
+                    <List.Item extra={activeDetailTool.description}>Description</List.Item>
+                    <List.Item extra={activeDetailTool.condition}>Condition</List.Item>
+                    <List.Item extra={activeDetailTool.location}>Location</List.Item>
+                    <List.Item extra={activeDetailTool.category || 'N/A'}>Category</List.Item>
+                    {activeDetailTool.warehouse_name && (
+                      <List.Item extra={activeDetailTool.warehouse_name}>Warehouse</List.Item>
+                    )}
+                    {activeDetailTool.requires_calibration && (
+                      <>
+                        <List.Item extra={
+                          <Tag color={calibrationColors[activeDetailTool.calibration_status]}>
+                            {activeDetailTool.calibration_status.replace('_', ' ')}
+                          </Tag>
+                        }>
+                          Calibration Status
+                        </List.Item>
+                        {activeDetailTool.last_calibration_date && (
+                          <List.Item extra={dayjs(activeDetailTool.last_calibration_date).format('MMM D, YYYY')}>
+                            Last Calibration
+                          </List.Item>
+                        )}
+                        {activeDetailTool.next_calibration_date && (
+                          <List.Item extra={dayjs(activeDetailTool.next_calibration_date).format('MMM D, YYYY')}>
+                            Next Calibration
+                          </List.Item>
+                        )}
+                      </>
+                    )}
+                  </List>
+                  <div className="detail-actions">
+                    <Button block color="primary" onClick={() => handleEdit(activeDetailTool)}>
+                      Edit Tool
+                    </Button>
+                    <Button
+                      block
+                      color="primary"
+                      fill="outline"
+                      onClick={() => {
+                        handleCloseDetail();
+                        navigate(`/tool-checkout?tool=${activeDetailTool.tool_number}`);
+                      }}
+                    >
+                      Go to Checkout
+                    </Button>
+                    <Button
+                      block
+                      fill="outline"
+                      onClick={() => setLabelSheetOpen(true)}
+                    >
+                      Generate Label
+                    </Button>
+                  </div>
+                </div>
+              </Tabs.Tab>
+
+              <Tabs.Tab title="History" key="history" data-testid="mobile-tool-history-tab">
+                <div style={{ overflow: 'auto', maxHeight: 'calc(90vh - 200px)' }}>
+                  <ToolHistoryTab toolId={activeDetailTool.id} />
+                </div>
+              </Tabs.Tab>
+
+              <Tabs.Tab title="Calibration" key="calibration">
+                <div style={{ overflow: 'auto', maxHeight: 'calc(90vh - 200px)' }}>
+                  <ToolCalibrationTab
+                    toolId={activeDetailTool.id}
+                    requiresCalibration={activeDetailTool.requires_calibration}
+                  />
+                </div>
+              </Tabs.Tab>
+            </Tabs>
           </div>
         )}
       </Popup>

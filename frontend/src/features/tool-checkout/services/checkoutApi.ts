@@ -1,5 +1,7 @@
 import { baseApi } from '@services/baseApi';
 import type {
+  AuditHistoryQueryParams,
+  AuditHistoryResponse,
   BatchCheckoutRequest,
   BatchCheckoutResponse,
   CheckinRequest,
@@ -45,6 +47,7 @@ export const checkoutApi = baseApi.injectEndpoints({
         { type: 'Checkout' as const, id: 'ACTIVE' },
         { type: 'Checkout' as const, id: 'MY' },
         { type: 'Checkout' as const, id: 'STATS' },
+        { type: 'Checkout' as const, id: 'HISTORY' },
       ],
     }),
 
@@ -61,6 +64,7 @@ export const checkoutApi = baseApi.injectEndpoints({
         { type: 'Checkout' as const, id: 'ACTIVE' },
         { type: 'Checkout' as const, id: 'MY' },
         { type: 'Checkout' as const, id: 'STATS' },
+        { type: 'Checkout' as const, id: 'HISTORY' },
       ],
     }),
 
@@ -84,6 +88,7 @@ export const checkoutApi = baseApi.injectEndpoints({
         { type: 'Checkout' as const, id: 'MY' },
         { type: 'Checkout' as const, id: 'OVERDUE' },
         { type: 'Checkout' as const, id: 'STATS' },
+        { type: 'Checkout' as const, id: 'HISTORY' },
       ],
     }),
 
@@ -304,6 +309,19 @@ export const checkoutApi = baseApi.injectEndpoints({
         { type: 'Checkout' as const, id: 'STATS' },
       ],
     }),
+
+    // ==========================================
+    // Cross-Tool Audit History
+    // ==========================================
+    getToolAuditHistory: builder.query<AuditHistoryResponse, AuditHistoryQueryParams>({
+      query: (params) => {
+        const filtered = Object.fromEntries(
+          Object.entries(params).filter(([, v]) => v !== undefined && v !== '')
+        );
+        return { url: '/api/tool-history', params: filtered };
+      },
+      providesTags: [{ type: 'Checkout' as const, id: 'HISTORY' }],
+    }),
   }),
 });
 
@@ -341,4 +359,7 @@ export const {
   // Actions
   useReportDamageMutation,
   useExtendCheckoutMutation,
+
+  // Audit History
+  useGetToolAuditHistoryQuery,
 } = checkoutApi;

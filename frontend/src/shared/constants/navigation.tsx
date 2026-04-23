@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react';
 import {
+  AuditOutlined,
   DashboardOutlined,
   ToolOutlined,
   ExperimentOutlined,
@@ -28,6 +29,7 @@ const NAV_TEST_IDS: Record<string, string> = {
   [ROUTES.DASHBOARD]: 'nav-dashboard',
   [ROUTES.TOOL_CHECKOUT]: 'nav-tool-checkout',
   [ROUTES.TOOLS]: 'nav-tools',
+  [ROUTES.TOOL_HISTORY]: 'nav-tool-history',
   [ROUTES.CHEMICALS]: 'nav-chemicals',
   [ROUTES.CHEMICAL_FORECAST]: 'nav-chemicals-forecast',
   [ROUTES.KITS]: 'nav-kits',
@@ -85,6 +87,12 @@ export const ALL_MENU_ITEMS: MenuItemWithPermission[] = [
     icon: <ToolOutlined />,
     label: 'Tools',
     permission: 'page.tools',
+  },
+  {
+    key: ROUTES.TOOL_HISTORY,
+    icon: <AuditOutlined />,
+    label: 'Tool History',
+    permission: 'checkout.view',
   },
   {
     key: ROUTES.CHEMICALS,
