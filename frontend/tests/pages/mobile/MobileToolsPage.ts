@@ -31,6 +31,14 @@ export class MobileToolsPage extends BasePage {
     return this.page.getByTestId('mobile-tool-detail-popup');
   }
 
+  get editButton(): Locator {
+    return this.page.getByTestId('mobile-tool-edit-button');
+  }
+
+  get formPopup(): Locator {
+    return this.page.getByTestId('mobile-tool-form-popup');
+  }
+
   toolItem(id: number | string): Locator {
     return this.page.getByTestId(`mobile-tool-item-${id}`);
   }

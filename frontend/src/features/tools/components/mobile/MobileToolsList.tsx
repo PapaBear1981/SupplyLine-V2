@@ -257,6 +257,8 @@ export const MobileToolsList = () => {
   const handleEdit = (tool: Tool) => {
     setFormMode('edit');
     setSelectedTool(tool);
+    // antd-mobile Picker expects value as an array (PickerValue[]); passing a
+    // scalar crashes the Picker at render and blanks the form popup.
     form.setFieldsValue({
       tool_number: tool.tool_number,
       serial_number: tool.serial_number,
@@ -265,8 +267,8 @@ export const MobileToolsList = () => {
       condition: tool.condition,
       location: tool.location,
       category: tool.category || '',
-      status: tool.status,
-      warehouse_id: tool.warehouse_id,
+      status: [tool.status],
+      warehouse_id: tool.warehouse_id != null ? [tool.warehouse_id] : [''],
       requires_calibration: tool.requires_calibration,
       calibration_frequency_days: tool.calibration_frequency_days,
     });
@@ -292,6 +294,12 @@ export const MobileToolsList = () => {
   const handleFormSubmit = async () => {
     try {
       const values = await form.validateFields();
+      // Picker fields are stored as arrays in form state (see handleEdit and
+      // antd-mobile's onConfirm payload); unwrap the first entry here.
+      const statusValue = Array.isArray(values.status) ? values.status[0] : values.status;
+      const warehouseValue = Array.isArray(values.warehouse_id)
+        ? values.warehouse_id[0]
+        : values.warehouse_id;
       const formData: ToolFormData = {
         tool_number: values.tool_number,
         serial_number: values.serial_number,
@@ -300,8 +308,8 @@ export const MobileToolsList = () => {
         condition: values.condition,
         location: values.location,
         category: values.category || undefined,
-        status: values.status || 'available',
-        warehouse_id: values.warehouse_id || undefined,
+        status: statusValue || 'available',
+        warehouse_id: warehouseValue || undefined,
         requires_calibration: values.requires_calibration || false,
         calibration_frequency_days: values.calibration_frequency_days || undefined,
       };
@@ -557,7 +565,12 @@ export const MobileToolsList = () => {
                     )}
                   </List>
                   <div className="detail-actions">
-                    <Button block color="primary" onClick={() => handleEdit(activeDetailTool)}>
+                    <Button
+                      block
+                      color="primary"
+                      onClick={() => handleEdit(activeDetailTool)}
+                      data-testid="mobile-tool-edit-button"
+                    >
                       Edit Tool
                     </Button>
                     <Button
@@ -623,7 +636,7 @@ export const MobileToolsList = () => {
           overflow: 'auto',
         }}
       >
-        <div className="form-popup">
+        <div className="form-popup" data-testid="mobile-tool-form-popup">
           <div className="form-header">
             <span>{formMode === 'create' ? 'Add New Tool' : 'Edit Tool'}</span>
             <CloseOutline onClick={() => setShowFormPopup(false)} />
