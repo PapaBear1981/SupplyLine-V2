@@ -35,6 +35,22 @@ test.describe('Mobile tools list', () => {
     await expect(page.locator('text=T001').first()).toBeVisible();
   });
 
+  test('edit form popup renders without blanking when opened from detail popup', async ({ page }) => {
+    // Regression: tapping "Edit Tool" used to crash the form because the
+    // antd-mobile Picker expects its value as an array, but the edit handler
+    // was seeding it with scalar strings (status / warehouse_id). The crash
+    // had no ErrorBoundary to catch it, so the whole screen went blank.
+    const tools = new MobileToolsPage(page);
+    await tools.openWithDeepLink(1);
+    await expect(tools.detailPopup).toBeVisible({ timeout: 10_000 });
+    await tools.editButton.click();
+    // Form popup must render (the Picker is not allowed to throw during render).
+    await expect(tools.formPopup).toBeVisible({ timeout: 5_000 });
+    // And the header content must be present — proves the form actually
+    // mounted rather than just the popup shell.
+    await expect(tools.formPopup.getByText('Edit Tool')).toBeVisible();
+  });
+
   test('QR deep-link opens the tool detail popup for the scanned tool', async ({ page }) => {
     const tools = new MobileToolsPage(page);
     // Simulate what the QR scanner does: navigate to /tools?selected={id}
