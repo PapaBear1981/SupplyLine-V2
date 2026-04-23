@@ -46,8 +46,10 @@ export const MainLayout = () => {
     const keys: string[] = [];
     const toolRoutes: string[] = [ROUTES.TOOLS, ROUTES.TOOL_CHECKOUT, ROUTES.TOOL_HISTORY];
     const chemRoutes: string[] = [ROUTES.CHEMICALS, ROUTES.CHEMICAL_FORECAST];
+    const operationsRoutes: string[] = ['/orders', '/requests', ROUTES.TRANSFERS];
     if (toolRoutes.includes(location.pathname)) keys.push('tools-group');
     if (chemRoutes.some((r) => location.pathname.startsWith(r))) keys.push(ROUTES.CHEMICALS);
+    if (operationsRoutes.includes(location.pathname)) keys.push('operations-group');
     return keys;
   });
   const dispatch = useAppDispatch();

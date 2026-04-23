@@ -14,6 +14,7 @@ import {
   ShoppingCartOutlined,
   FormOutlined,
   BarChartOutlined,
+  AppstoreOutlined,
 } from '@ant-design/icons';
 import type { MenuProps } from 'antd';
 import { ROUTES } from './routes';
@@ -34,6 +35,7 @@ const NAV_TEST_IDS: Record<string, string> = {
   [ROUTES.CHEMICALS]: 'nav-chemicals',
   [ROUTES.CHEMICAL_FORECAST]: 'nav-chemicals-forecast',
   [ROUTES.KITS]: 'nav-kits',
+  'operations-group': 'nav-operations',
   '/orders': 'nav-orders',
   '/requests': 'nav-requests',
   [ROUTES.WAREHOUSES]: 'nav-warehouses',
@@ -128,28 +130,35 @@ export const ALL_MENU_ITEMS: MenuItemWithPermission[] = [
     permission: 'page.kits',
   },
   {
-    key: '/orders',
-    icon: <ShoppingCartOutlined />,
-    label: 'Fulfillment',
-    permission: 'page.orders',
-  },
-  {
-    key: '/requests',
-    icon: <FormOutlined />,
-    label: 'Requests',
-    permission: 'page.requests',
+    key: 'operations-group',
+    icon: <AppstoreOutlined />,
+    label: 'Operations',
+    children: [
+      {
+        key: '/orders',
+        icon: <ShoppingCartOutlined />,
+        label: 'Fulfillment',
+        permission: 'page.orders',
+      },
+      {
+        key: '/requests',
+        icon: <FormOutlined />,
+        label: 'Requests',
+        permission: 'page.requests',
+      },
+      {
+        key: ROUTES.TRANSFERS,
+        icon: <RetweetOutlined />,
+        label: 'Transfers',
+        permission: 'transfer.view',
+      },
+    ],
   },
   {
     key: ROUTES.WAREHOUSES,
     icon: <HomeOutlined />,
     label: 'Warehouses',
     permission: 'page.warehouses',
-  },
-  {
-    key: ROUTES.TRANSFERS,
-    icon: <RetweetOutlined />,
-    label: 'Transfers',
-    permission: 'transfer.view',
   },
   {
     key: ROUTES.REPORTS,
