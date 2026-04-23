@@ -257,6 +257,7 @@ export interface AuditHistoryQueryParams {
   tool_id?: number;
   user_id?: number;
   event_type?: ToolHistoryEventType | '';
+  tool_search?: string;
   start_date?: string;
   end_date?: string;
 }

@@ -78,9 +78,10 @@ const EVENT_TYPE_COLORS: Record<string, string> = {
 };
 
 const ToolHistoryTab = ({ toolId }: { toolId: number }) => {
-  const { data, isLoading } = useGetToolTimelineQuery({ toolId, params: { page: 1, per_page: 20 } });
+  const { data, isLoading, isError } = useGetToolTimelineQuery({ toolId, params: { page: 1, per_page: 20 } });
 
   if (isLoading) return <Skeleton animated style={{ margin: 16 }} />;
+  if (isError) return <Empty description="Unable to load history" style={{ padding: 32 }} />;
   if (!data?.timeline.length) return <Empty description="No history yet" style={{ padding: 32 }} />;
 
   return (
@@ -111,12 +112,13 @@ const ToolHistoryTab = ({ toolId }: { toolId: number }) => {
 };
 
 const ToolCalibrationTab = ({ toolId, requiresCalibration }: { toolId: number; requiresCalibration: boolean }) => {
-  const { data: calibrations, isLoading } = useGetToolCalibrationsQuery(toolId, { skip: !requiresCalibration });
+  const { data: calibrations, isLoading, isError } = useGetToolCalibrationsQuery(toolId, { skip: !requiresCalibration });
 
   if (!requiresCalibration) {
     return <Empty description="This tool does not require calibration" style={{ padding: 32 }} />;
   }
   if (isLoading) return <Skeleton animated style={{ margin: 16 }} />;
+  if (isError) return <Empty description="Unable to load calibration records" style={{ padding: 32 }} />;
   if (!calibrations?.length) return <Empty description="No calibration records" style={{ padding: 32 }} />;
 
   const statusColor: Record<string, string> = { pass: '#52c41a', fail: '#ff4d4f', limited: '#fa8c16' };

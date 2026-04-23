@@ -45,6 +45,13 @@ class TestToolTimeline:
         self, client, auth_headers, auth_headers_user, regular_user, test_tool, db_session
     ):
         """A checkout operation creates a ToolHistory event visible in the timeline."""
+        # Ensure the tool is available — close any lingering active checkout first.
+        active = Checkout.query.filter_by(tool_id=test_tool.id, return_date=None).first()
+        if active:
+            active.return_date = datetime.utcnow()
+            test_tool.status = "available"
+            db_session.commit()
+
         checkout_data = {
             "tool_id": test_tool.id,
             "user_id": regular_user.id,
@@ -55,10 +62,7 @@ class TestToolTimeline:
             json=checkout_data,
             headers=auth_headers,
         )
-        # Accept either success or a 409 if already checked out from a previous test run
-        assert checkout_resp.status_code in (201, 409)
-        if checkout_resp.status_code != 201:
-            return  # Skip the rest if the tool was already checked out
+        assert checkout_resp.status_code == 201, checkout_resp.get_json()
 
         timeline_resp = client.get(
             f"/api/tools/{test_tool.id}/timeline",
@@ -222,7 +226,8 @@ class TestToolAuditHistory:
         assert response.status_code == 200
         history = response.get_json()["history"]
         assert len(history) >= 1
-        record = history[0]
+        record = next((item for item in history if item["id"] == history_entry.id), None)
+        assert record is not None, "Created history entry not found in response"
         assert record["tool_number"] == test_tool.tool_number
         assert record["tool_description"] == test_tool.description
 
@@ -351,6 +356,13 @@ class TestToolAuditHistory:
         self, client, auth_headers, test_tool, regular_user, db_session
     ):
         """Performing a checkout creates a ToolHistory event of type 'checkout'."""
+        # Ensure the tool is available — close any lingering active checkout first.
+        active = Checkout.query.filter_by(tool_id=test_tool.id, return_date=None).first()
+        if active:
+            active.return_date = datetime.utcnow()
+            test_tool.status = "available"
+            db_session.commit()
+
         before_count = ToolHistory.query.filter_by(
             tool_id=test_tool.id, event_type="checkout"
         ).count()
@@ -364,8 +376,7 @@ class TestToolAuditHistory:
             json=checkout_data,
             headers=auth_headers,
         )
-        if response.status_code != 201:
-            return  # Tool might already be checked out
+        assert response.status_code == 201, response.get_json()
 
         after_count = ToolHistory.query.filter_by(
             tool_id=test_tool.id, event_type="checkout"

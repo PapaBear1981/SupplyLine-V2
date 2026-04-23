@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import {
   List,
   SearchBar,
@@ -29,11 +29,15 @@ const EVENT_TYPE_OPTIONS = [
     { label: 'Maintenance End', value: 'maintenance_end' },
     { label: 'Repair', value: 'repair' },
     { label: 'Status Change', value: 'status_change' },
+    { label: 'Location Change', value: 'location_change' },
+    { label: 'Condition Change', value: 'condition_change' },
+    { label: 'Created', value: 'created' },
     { label: 'Retired', value: 'retired' },
+    { label: 'Checkout Extended', value: 'checkout_extended' },
   ],
 ];
 
-const EVENT_COLORS: Record<string, string> = {
+const EVENT_COLORS: Record<ToolHistoryEventType, string> = {
   checkout: '#1890ff',
   return: '#52c41a',
   damage_reported: '#ff4d4f',
@@ -43,7 +47,11 @@ const EVENT_COLORS: Record<string, string> = {
   maintenance_end: '#52c41a',
   repair: '#13c2c2',
   status_change: '#faad14',
+  location_change: '#2f54eb',
+  condition_change: '#faad14',
+  created: '#52c41a',
   retired: '#8c8c8c',
+  checkout_extended: '#1677ff',
 };
 
 const PAGE_SIZE = 30;
@@ -71,21 +79,28 @@ export const MobileToolAuditHistory = () => {
     ...(eventType && { event_type: eventType }),
   };
 
-  const { data, isLoading, isFetching } = useGetToolAuditHistoryQuery(queryParams);
+  const { data, isLoading, isFetching, refetch } = useGetToolAuditHistoryQuery(queryParams);
 
   const hasMore = data ? page < data.pages : false;
 
+  // Accumulate pages into allItems; deduplicate by id to guard against double-fetches.
+  useEffect(() => {
+    if (!data) return;
+    setAllItems((prev) => {
+      if (data.page === 1) return data.history;
+      const existingIds = new Set(prev.map(({ id }) => id));
+      return [...prev, ...data.history.filter(({ id }) => !existingIds.has(id))];
+    });
+  }, [data]);
+
   const loadMore = useCallback(async () => {
-    if (!isFetching && data) {
-      const nextItems = data.history;
-      setAllItems((prev) => (page === 1 ? nextItems : [...prev, ...nextItems]));
-      if (hasMore) setPage((p) => p + 1);
-    }
-  }, [isFetching, data, page, hasMore]);
+    if (!isFetching && hasMore) setPage((p) => p + 1);
+  }, [isFetching, hasMore]);
 
   const handleRefresh = async () => {
     setPage(1);
     setAllItems([]);
+    await refetch();
   };
 
   const handleEventTypeChange = (val: PickerValue[]) => {
@@ -100,8 +115,7 @@ export const MobileToolAuditHistory = () => {
     setToolSearch(v);
   };
 
-  // Use the freshest page of data for display; fall back to accumulated list
-  const displayItems = (data?.history ?? allItems).filter((event) => {
+  const displayItems = allItems.filter((event) => {
     if (!toolSearch) return true;
     const q = toolSearch.toLowerCase();
     return (

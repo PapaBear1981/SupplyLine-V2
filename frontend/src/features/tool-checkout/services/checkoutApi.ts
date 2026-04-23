@@ -47,6 +47,7 @@ export const checkoutApi = baseApi.injectEndpoints({
         { type: 'Checkout' as const, id: 'ACTIVE' },
         { type: 'Checkout' as const, id: 'MY' },
         { type: 'Checkout' as const, id: 'STATS' },
+        { type: 'Checkout' as const, id: 'HISTORY' },
       ],
     }),
 
@@ -63,6 +64,7 @@ export const checkoutApi = baseApi.injectEndpoints({
         { type: 'Checkout' as const, id: 'ACTIVE' },
         { type: 'Checkout' as const, id: 'MY' },
         { type: 'Checkout' as const, id: 'STATS' },
+        { type: 'Checkout' as const, id: 'HISTORY' },
       ],
     }),
 
@@ -86,6 +88,7 @@ export const checkoutApi = baseApi.injectEndpoints({
         { type: 'Checkout' as const, id: 'MY' },
         { type: 'Checkout' as const, id: 'OVERDUE' },
         { type: 'Checkout' as const, id: 'STATS' },
+        { type: 'Checkout' as const, id: 'HISTORY' },
       ],
     }),
 

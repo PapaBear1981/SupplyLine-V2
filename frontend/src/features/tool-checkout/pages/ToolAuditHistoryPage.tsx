@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, type ReactNode } from 'react';
 import {
   Card,
   Table,
@@ -61,7 +61,7 @@ const EVENT_COLOR: Record<string, string> = {
   retired: 'default',
 };
 
-const EVENT_ICON: Record<string, React.ReactNode> = {
+const EVENT_ICON: Record<string, ReactNode> = {
   checkout: <SwapOutlined />,
   return: <LoginOutlined />,
   damage_reported: <ExclamationCircleOutlined />,
@@ -102,20 +102,13 @@ export const ToolAuditHistoryPage = () => {
     page,
     per_page: PAGE_SIZE,
     ...(eventType && { event_type: eventType }),
+    ...(toolSearch && { tool_search: toolSearch }),
     ...(dateRange && { start_date: dateRange[0], end_date: dateRange[1] }),
   };
 
   const { data, isLoading, isFetching } = useGetToolAuditHistoryQuery(queryParams);
 
-  // Client-side tool number filter (server doesn't have a text search param for tool number)
-  const rows = (data?.history ?? []).filter((event) => {
-    if (!toolSearch) return true;
-    const search = toolSearch.toLowerCase();
-    return (
-      event.tool_number?.toLowerCase().includes(search) ||
-      event.tool_description?.toLowerCase().includes(search)
-    );
-  });
+  const rows = data?.history ?? [];
 
   const columns: ColumnsType<ToolHistoryEvent> = [
     {
