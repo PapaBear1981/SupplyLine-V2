@@ -8,7 +8,7 @@ import { useActivityTracker } from './useActivityTracker';
 const makeWrapper = () => {
   const store = createTestStore(createAuthenticatedState());
   return function Wrapper({ children }: { children: React.ReactNode }) {
-    return React.createElement(Provider, { store }, children);
+    return <Provider store={store}>{children}</Provider>;
   };
 };
 
@@ -104,7 +104,7 @@ describe('useActivityTracker', () => {
       auth: { isAuthenticated: false, user: null, token: null },
     });
     const Wrapper = ({ children }: { children: React.ReactNode }) =>
-      React.createElement(Provider, { store }, children);
+      <Provider store={store}>{children}</Provider>;
 
     renderHook(() => useActivityTracker(), { wrapper: Wrapper });
     act(() => { window.dispatchEvent(new MouseEvent('mousemove')); });
