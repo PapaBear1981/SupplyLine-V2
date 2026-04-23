@@ -16,7 +16,6 @@ export const PAGE_PERMISSIONS: Record<string, string> = {
   '/reports': 'page.reports',
   '/orders': 'page.orders',
   '/requests': 'page.requests',
-  '/users': 'page.users',
   '/profile': 'page.profile',
   '/settings': 'page.settings',
   '/admin': 'page.admin_dashboard',

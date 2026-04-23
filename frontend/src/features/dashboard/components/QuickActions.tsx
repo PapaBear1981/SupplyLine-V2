@@ -7,7 +7,6 @@ import {
   SearchOutlined,
   BarChartOutlined,
   SettingOutlined,
-  TeamOutlined,
 } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 import { ROUTES } from '@shared/constants/routes';
@@ -56,9 +55,9 @@ export const QuickActions = ({ isAdmin = false }: QuickActionsProps) => {
 
   const adminActions: QuickAction[] = [
     {
-      icon: <TeamOutlined />,
-      label: 'Manage Users',
-      path: ROUTES.USERS,
+      icon: <SettingOutlined />,
+      label: 'Admin Panel',
+      path: ROUTES.ADMIN,
       color: '#13c2c2',
     },
     {
@@ -72,12 +71,6 @@ export const QuickActions = ({ isAdmin = false }: QuickActionsProps) => {
       label: 'Warehouses',
       path: ROUTES.WAREHOUSES,
       color: '#faad14',
-    },
-    {
-      icon: <SettingOutlined />,
-      label: 'Admin Panel',
-      path: ROUTES.ADMIN,
-      color: '#595959',
     },
   ];
 

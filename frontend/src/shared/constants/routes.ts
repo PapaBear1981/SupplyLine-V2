@@ -10,7 +10,6 @@ export const ROUTES = {
   WAREHOUSES: '/warehouses',
   TRANSFERS: '/transfers',
   REPORTS: '/reports',
-  USERS: '/users',
   ADMIN: '/admin',
   PROFILE: '/profile',
   SETTINGS: '/settings',
