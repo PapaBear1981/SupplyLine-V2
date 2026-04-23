@@ -44,3 +44,16 @@ flask_session/
 *.swp
 *.swo
 *~
+
+# Test data, seed scripts, and dev artifacts — these MUST NOT ship in the
+# production image. seed_e2e_test_data.py calls db.drop_all() and would
+# wipe production data if executed in the Render container.
+seed_e2e_test_data.py
+seed_*.py
+tests/
+conftest.py
+pytest.ini
+.pytest_cache/
+pyright_results.json
+.ruff_cache/
+.mypy_cache/

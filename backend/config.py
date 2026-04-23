@@ -163,12 +163,43 @@ class Config:
     CORS_ALLOW_HEADERS = ["Content-Type", "Authorization", "X-CSRF-Token"]
     CORS_SUPPORTS_CREDENTIALS = True  # Required for HttpOnly cookies to work with CORS
 
-    # Additional security headers
+    # Additional security headers.
+    # These ship on every response via backend/security/middleware.py's
+    # security_after_request hook, which reads this dict from app.config.
+    # Keep all security-header config HERE — backend/security_config.py is
+    # deprecated (see repo history).
     SECURITY_HEADERS = {
-        "X-Content-Type-Options": "nosnif",
+        "X-Content-Type-Options": "nosniff",
         "X-Frame-Options": "DENY",
         "X-XSS-Protection": "1; mode=block",
-        "Strict-Transport-Security": "max-age=31536000; includeSubDomains"
+        "Strict-Transport-Security": "max-age=31536000; includeSubDomains; preload",
+        "Referrer-Policy": "strict-origin-when-cross-origin",
+        "Permissions-Policy": (
+            "geolocation=(), microphone=(), camera=(), payment=(), "
+            "usb=(), magnetometer=(), gyroscope=()"
+        ),
+        # Content-Security-Policy: locked down to self for a React SPA served
+        # from the same origin as the Flask API. 'unsafe-inline' on style-src
+        # is required by Ant Design's runtime style injection; script-src is
+        # strict ('self' only — no unsafe-inline, no unsafe-eval). connect-src
+        # covers the Socket.IO WebSocket upgrade (wss://). If a CSP violation
+        # appears in production, extend the allow-list here rather than
+        # re-introducing unsafe-* keywords.
+        "Content-Security-Policy": (
+            "default-src 'self'; "
+            "script-src 'self'; "
+            "style-src 'self' 'unsafe-inline'; "
+            "img-src 'self' data: https:; "
+            "font-src 'self' data:; "
+            "connect-src 'self' https: wss:; "
+            "frame-ancestors 'none'; "
+            "base-uri 'self'; "
+            "form-action 'self'; "
+            "object-src 'none'; "
+            "media-src 'self'; "
+            "worker-src 'self' blob:; "
+            "manifest-src 'self'"
+        ),
     }
 
     # Trusted device settings - let users skip 2FA on devices they've verified
@@ -241,3 +272,22 @@ class Config:
 
         _ensure_key("SECRET_KEY", "Flask SECRET_KEY")
         _ensure_key("JWT_SECRET_KEY", "JWT secret key")
+
+        # Refuse to start if a DISABLE_* test-mode flag leaked into production
+        # (e.g. someone set DISABLE_MANDATORY_2FA=true on the Render dashboard).
+        from utils.test_mode import validate_no_test_flags_in_production
+        validate_no_test_flags_in_production()
+
+        # Postgres over TLS is non-negotiable in production. Supabase,
+        # Neon, and Render all require sslmode=require; catch the case
+        # where the operator paste-fumbles an unqualified URL.
+        if not is_ci and not is_development:
+            db_uri = app_config.get("SQLALCHEMY_DATABASE_URI", "") or ""
+            if db_uri.startswith(("postgres://", "postgresql://")) and "sslmode=" not in db_uri:
+                raise RuntimeError(
+                    "DATABASE_URL must include sslmode=require in production. "
+                    "Append `?sslmode=require` (or `&sslmode=require`) to the "
+                    "connection string. Supabase/Neon/Render managed Postgres "
+                    "all enforce TLS; this check catches a misconfigured URL "
+                    "before the app handles any traffic."
+                )

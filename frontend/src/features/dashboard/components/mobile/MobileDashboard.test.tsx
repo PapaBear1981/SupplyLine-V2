@@ -30,7 +30,7 @@ const createMockStore = () => {
       auth: {
         user: mockUser,
         token: 'mock-token',
-        isAuthenticated: true,
+        isAuthenticated: true, isBootstrapping: false,
       },
     },
     middleware: (getDefaultMiddleware) =>

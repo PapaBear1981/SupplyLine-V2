@@ -170,3 +170,6 @@ pyotp==2.9.0
     # via -r requirements.in
 qrcode==8.0
     # via -r requirements.in
+sentry-sdk[flask]==2.20.0
+    # via -r requirements.in
+    # (deps certifi, urllib3 already listed above)

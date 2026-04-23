@@ -86,3 +86,6 @@ pyright==1.1.390
 cryptography==46.0.5
 pyotp==2.9.0  # Generate and verify TOTP codes
 qrcode[pil]==8.0  # Generate QR codes for authenticator apps
+
+# Error monitoring (optional — only activates if SENTRY_DSN is set)
+sentry-sdk[flask]==2.20.0

@@ -30,7 +30,7 @@ const createMockStore = (preloadedState = {}) => {
       auth: {
         user: mockUser,
         token: 'mock-token',
-        isAuthenticated: true,
+        isAuthenticated: true, isBootstrapping: false,
       },
       ...preloadedState,
     },
@@ -161,7 +161,7 @@ describe('MobileLayout', () => {
       auth: {
         user: { ...mockUser, permissions: ['page.chemicals'] },
         token: 'mock-token',
-        isAuthenticated: true,
+        isAuthenticated: true, isBootstrapping: false,
       },
     });
     renderWithProviders(<MobileLayout />, storeWithChemicals);
@@ -185,7 +185,7 @@ describe('MobileLayout', () => {
       auth: {
         user: { ...mockUser, is_admin: true },
         token: 'mock-token',
-        isAuthenticated: true,
+        isAuthenticated: true, isBootstrapping: false,
       },
     });
     renderWithProviders(<MobileLayout />, adminStore);
@@ -200,7 +200,7 @@ describe('MobileLayout', () => {
       auth: {
         user: { ...mockUser, is_admin: true },
         token: 'mock-token',
-        isAuthenticated: true,
+        isAuthenticated: true, isBootstrapping: false,
       },
     });
     renderWithProviders(<MobileLayout />, adminStore);

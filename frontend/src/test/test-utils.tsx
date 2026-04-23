@@ -82,7 +82,7 @@ export const createAuthenticatedState = (user = createMockUser()) => ({
   auth: {
     user,
     token: 'mock-token',
-    isAuthenticated: true,
+    isAuthenticated: true, isBootstrapping: false,
   },
 });
 

@@ -19,7 +19,7 @@
     "test:e2e:debug": "PWDEBUG=1 playwright test",
     "test:e2e:headed": "playwright test --headed",
     "test:e2e:report": "playwright show-report",
-    "test:e2e:seed": "cd ../backend && python seed_e2e_test_data.py"
+    "test:e2e:seed": "cd ../backend && FLASK_ENV=testing SUPPLYLINE_ALLOW_DESTRUCTIVE_SEED=1 python seed_e2e_test_data.py"
   },
   "dependencies": {
     "@ant-design/icons": "^6.0.0",

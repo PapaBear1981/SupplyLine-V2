@@ -8,6 +8,7 @@ from flask import Flask
 from flask_cors import CORS
 from sqlalchemy import inspect as sa_inspect
 from sqlalchemy import text as sa_text
+from werkzeug.middleware.proxy_fix import ProxyFix
 
 from config import Config
 from models import db
@@ -17,6 +18,49 @@ from utils.logging_utils import setup_request_logging
 from utils.resource_monitor import init_resource_monitoring
 from utils.scheduled_backup import init_scheduled_backup, shutdown_scheduled_backup
 from utils.scheduled_maintenance import init_scheduled_maintenance, shutdown_scheduled_maintenance
+
+
+def _init_sentry():
+    """
+    Optional Sentry integration. Activates only when SENTRY_DSN is set, so
+    dev environments and CI don't phone home. The before_send hook strips
+    cookie and Authorization headers so tokens never appear in crash reports.
+    """
+    dsn = os.environ.get("SENTRY_DSN")
+    if not dsn:
+        return
+    try:
+        import sentry_sdk
+        from sentry_sdk.integrations.flask import FlaskIntegration
+
+        from utils.logging_utils import sanitize_data
+    except ImportError:
+        # sentry-sdk not installed — skip silently. requirements.in pins it,
+        # but a minimal local dev env may omit it.
+        return
+
+    def _scrub(event, _hint):
+        # Remove cookies + Authorization headers from the crash report.
+        req = event.get("request") or {}
+        headers = req.get("headers") or {}
+        for sensitive in ("authorization", "Authorization", "cookie", "Cookie"):
+            headers.pop(sensitive, None)
+        req.pop("cookies", None)
+        # Recursively redact by-name inside any nested data structures.
+        if "data" in req:
+            req["data"] = sanitize_data(req["data"])
+        event["request"] = req
+        return event
+
+    sentry_sdk.init(
+        dsn=dsn,
+        integrations=[FlaskIntegration()],
+        traces_sample_rate=float(os.environ.get("SENTRY_TRACES_SAMPLE_RATE", "0.05")),
+        send_default_pii=False,
+        before_send=_scrub,
+        environment=os.environ.get("FLASK_ENV", "production"),
+        release=os.environ.get("RENDER_GIT_COMMIT") or os.environ.get("GIT_SHA"),
+    )
 
 
 def create_app():
@@ -29,6 +73,10 @@ def create_app():
         # Windows doesn't have time.tzset()
         print("Running on Windows, cannot set system timezone. Ensure system time is correct.")
 
+    # Sentry must init BEFORE Flask so it can hook app creation. No-op without
+    # SENTRY_DSN set, so dev/CI/test are unaffected.
+    _init_sentry()
+
     # serve frontend static files from backend/static
     app = Flask(
         __name__,
@@ -36,6 +84,14 @@ def create_app():
         static_folder="static",
         static_url_path="/static"
     )
+
+    # Render terminates TLS one hop upstream and forwards to the container.
+    # Without ProxyFix, request.remote_addr returns Render's internal proxy
+    # IP, which makes rate limiting bucket all traffic into one identifier
+    # and causes security logs to record the wrong client IP for every event.
+    # x_for=1 matches Render's single-proxy topology.
+    app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1, x_port=1)
+
     app.config.from_object(Config)
 
     # File upload safeguards
@@ -161,6 +217,65 @@ def create_app():
             resp.headers["Access-Control-Allow-Headers"] = requested_headers
             resp.headers["Access-Control-Max-Age"] = "3600"
         return resp
+
+    # CSRF defense via Origin/Referer validation.
+    #
+    # We use cookie-based JWT auth and SameSite=None (cross-origin cookies
+    # are sent on any request). The only reliable cross-site CSRF vector
+    # against JSON endpoints is a form POST, which doesn't trigger CORS
+    # preflight. OWASP's "Same-Origin verification" cheatsheet recommends
+    # rejecting state-changing cookie-authenticated requests whose Origin
+    # or Referer does not match the allow-list.
+    #
+    # This is an app-wide guard that doesn't require per-route decorators
+    # or a frontend change. A follow-up should add token-based double-
+    # submit CSRF (see SECURITY_AUDIT_2026-04.md) once the frontend wires
+    # up the /api/auth/csrf-token flow and X-CSRF-Token header.
+    _CSRF_EXEMPT_PATHS = {
+        "/api/auth/login",              # no session yet
+        "/api/auth/refresh",            # refresh cookie is the auth
+        "/api/auth/password-reset",     # unauthenticated
+        "/api/auth/password-reset/confirm",
+    }
+    _CSRF_UNSAFE_METHODS = {"POST", "PUT", "PATCH", "DELETE"}
+
+    @app.before_request
+    def _csrf_origin_check():
+        if _flask_request.method not in _CSRF_UNSAFE_METHODS:
+            return None
+        # Skip in the Flask test client — it's an in-process caller, never a
+        # cross-origin browser. pytest fixtures don't set Origin/Referer and
+        # blocking them here would break most backend tests.
+        if app.config.get("TESTING"):
+            return None
+        if _flask_request.path in _CSRF_EXEMPT_PATHS:
+            return None
+        # If the caller authenticated with a bearer token rather than a
+        # cookie, CSRF is not applicable (attacker can't set an Authorization
+        # header cross-site).
+        if not _flask_request.cookies.get("access_token"):
+            return None
+        allowed = app.config.get("CORS_ORIGINS", [])
+        origin = _flask_request.headers.get("Origin")
+        referer = _flask_request.headers.get("Referer")
+        # Origin is the stronger signal; check it first. If missing, fall
+        # back to Referer (older browsers, some proxies strip Origin).
+        if origin:
+            if origin in allowed:
+                return None
+        elif referer:
+            if any(referer.startswith(a.rstrip("/") + "/") or referer == a for a in allowed):
+                return None
+        else:
+            # Neither header present on a state-changing cookie-auth request
+            # is itself suspicious (every real browser sends at least one).
+            pass
+        from flask import jsonify
+        logging.getLogger(__name__).warning(
+            "CSRF block: method=%s path=%s origin=%s referer=%s",
+            _flask_request.method, _flask_request.path, origin, referer,
+        )
+        return jsonify({"error": "CSRF check failed", "code": "CSRF_ORIGIN_MISMATCH"}), 403
 
     # Belt-and-suspenders: ensure every response to an API request from
     # an allowed origin carries the CORS headers, even if the view raised

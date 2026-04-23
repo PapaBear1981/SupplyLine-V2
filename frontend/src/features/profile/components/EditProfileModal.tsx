@@ -36,11 +36,9 @@ export const EditProfileModal = ({ open, onClose, user }: EditProfileModalProps)
     try {
       const updatedUser = await updateProfile({ ...values, phone: values.phone?.trim() || undefined }).unwrap();
 
-      // Update the user in Redux state
-      const token = localStorage.getItem('access_token');
-      if (token) {
-        dispatch(setCredentials({ user: updatedUser, token }));
-      }
+      // Update the user in Redux state. The HttpOnly cookie remains the
+      // auth source of truth; we just refresh the user object.
+      dispatch(setCredentials({ user: updatedUser, token: null }));
 
       message.success('Profile updated successfully!');
       onClose();

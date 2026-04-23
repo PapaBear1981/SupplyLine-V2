@@ -7,6 +7,10 @@ on:
     branches: [ main, develop ]
   workflow_dispatch:  # Allow manual triggers
 
+# Least-privilege GITHUB_TOKEN. See note in ci.yml.
+permissions:
+  contents: read
+
 jobs:
   test:
     name: Run Tests

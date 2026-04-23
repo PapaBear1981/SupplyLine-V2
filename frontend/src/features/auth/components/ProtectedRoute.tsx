@@ -4,41 +4,52 @@ import { useAppSelector, useAppDispatch } from '@app/hooks';
 import { ROUTES } from '@shared/constants/routes';
 import { Spin } from 'antd';
 import { useGetCurrentUserQuery } from '../services/authApi';
-import { setCredentials } from '../slices/authSlice';
+import { setCredentials, bootstrapFinished } from '../slices/authSlice';
 import { socketService } from '@services/socket';
 
 export const ProtectedRoute = () => {
   const dispatch = useAppDispatch();
-  const { isAuthenticated, token, user } = useAppSelector((state) => state.auth);
+  const { isAuthenticated, isBootstrapping, token, user } = useAppSelector((state) => state.auth);
 
-  // Fetch current user if authenticated but user data is not loaded
-  const { data: currentUser, isLoading } = useGetCurrentUserQuery(undefined, {
-    skip: !isAuthenticated || !!user,
+  // Fire /api/auth/me on boot (to probe the HttpOnly cookie) and whenever
+  // we're authenticated but don't yet have a user object loaded. 401 is
+  // handled by baseApi.ts which dispatches logout.
+  const { data: currentUser, isLoading, isError } = useGetCurrentUserQuery(undefined, {
+    skip: !!user || (!isAuthenticated && !isBootstrapping),
   });
 
   // Update Redux state with fetched user data
   useEffect(() => {
-    if (currentUser && token && !user) {
+    if (currentUser && !user) {
       dispatch(setCredentials({ user: currentUser, token }));
     }
   }, [currentUser, token, user, dispatch]);
 
+  // Exit the bootstrap phase on probe failure so we can redirect to login
+  // instead of spinning forever. 401 already logs out via baseApi; this
+  // handles 500s and network errors too.
+  useEffect(() => {
+    if (isError && isBootstrapping) {
+      dispatch(bootstrapFinished());
+    }
+  }, [isError, isBootstrapping, dispatch]);
+
   // Establish WebSocket connection when authenticated (handles page refresh)
   useEffect(() => {
-    if (isAuthenticated && token && user && !socketService.isConnected()) {
+    if (isAuthenticated && user && !socketService.isConnected()) {
       try {
-        socketService.connect(token);
+        socketService.connect(token ?? undefined);
       } catch (err) {
         console.warn('Failed to establish WebSocket connection:', err);
       }
     }
   }, [isAuthenticated, token, user]);
 
-  // Note: 401/403 errors are now handled globally in baseApi.ts
-  // which will automatically logout and redirect to login
+  // Note: 401/403 errors are handled globally in baseApi.ts which dispatches
+  // logout (flipping isAuthenticated to false) and redirects.
 
-  // Show loading state while checking authentication or fetching user
-  if (token === undefined || (isAuthenticated && !user && isLoading)) {
+  // Show loading while we're bootstrapping the session or still waiting on /me.
+  if (isBootstrapping || (isAuthenticated && !user && isLoading)) {
     return (
       <div
         style={{

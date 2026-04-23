@@ -20,15 +20,49 @@ from socketio_config import socketio
 logger = logging.getLogger(__name__)
 
 
+def _extract_ws_token(auth=None):
+    """
+    Resolve the JWT for a WebSocket handler.
+
+    Precedence:
+      1. HttpOnly access_token cookie — set by the login flow and attached
+         automatically by the browser on the Socket.IO handshake.
+      2. Socket.IO `auth` payload — passed explicitly by the client in
+         `io(url, { auth: { token } })`. Preferred over query strings
+         because it doesn't end up in proxy access logs or browser history.
+      3. Legacy query string — kept only so in-flight sessions don't break
+         during the one-release deprecation window. Logged at WARNING level.
+    """
+    cookie_token = request.cookies.get("access_token")
+    if cookie_token:
+        return cookie_token
+    if auth and isinstance(auth, dict):
+        payload_token = auth.get("token")
+        if payload_token:
+            return payload_token
+    query_token = request.args.get("token")
+    if query_token:
+        logger.warning(
+            "WebSocket auth via query string is deprecated and will be "
+            "removed. Migrate client to HttpOnly cookie or io() auth payload."
+        )
+        return query_token
+    return None
+
+
 def authenticated_only(f):
     """
     Decorator to require JWT authentication for WebSocket events.
+
+    Reads the token from the cookie first (see _extract_ws_token). For events
+    emitted after `connect`, the auth payload is not re-sent, so we rely on
+    the cookie that Flask-SocketIO keeps in the per-connection request ctx.
     """
     @wraps(f)
     def wrapped(*args, **kwargs):
-        token = request.args.get("token")
+        token = _extract_ws_token()
         if not token:
-            logger.warning("WebSocket connection without token")
+            logger.warning("WebSocket event without token")
             emit("error", {"message": "Authentication required"})
             return None
 
@@ -59,12 +93,16 @@ def authenticated_only(f):
 # === Connection Management ===
 
 @socketio.on("connect")
-def handle_connect():
+def handle_connect(auth=None):
     """
     Handle client connection.
     Authenticate user and set them as online.
+
+    `auth` is the payload passed by the client as `io(url, { auth: ... })`.
+    We prefer the HttpOnly cookie; the auth payload is the secure fallback
+    before the legacy query-string path.
     """
-    token = request.args.get("token")
+    token = _extract_ws_token(auth)
     if not token:
         logger.warning("WebSocket connection attempt without token")
         return False  # Reject connection

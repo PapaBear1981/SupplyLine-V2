@@ -17,19 +17,20 @@ class SocketService {
       this.socket.disconnect();
     }
 
-    const accessToken = token || localStorage.getItem('access_token');
-    if (!accessToken) {
-      console.warn('No access token available for WebSocket connection');
-      throw new Error('No access token available');
-    }
+    // Auth flow: the HttpOnly access_token cookie is attached automatically
+    // on the Socket.IO handshake when withCredentials=true. Callers that
+    // already have an explicit token (LoginPage, ForcedTotpSetup) pass it
+    // in — we put it in the `auth` payload, never the query string (which
+    // gets captured by proxy access logs and browser history). localStorage
+    // is intentionally NOT consulted: see authSlice.ts.
+    const explicitToken = token || undefined;
 
     // Use the same origin for WebSocket (nginx will proxy it)
     const url = import.meta.env.VITE_SOCKET_URL || '';
 
     this.socket = io(url, {
-      query: {
-        token: accessToken,
-      },
+      withCredentials: true,
+      auth: explicitToken ? { token: explicitToken } : undefined,
       transports: ['websocket', 'polling'],
       autoConnect: true,
       reconnection: true,

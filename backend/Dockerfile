@@ -1,4 +1,7 @@
-FROM python:3.11-slim
+# Pinned to a specific patch version so a rebuild doesn't silently pick up a
+# new base layer. Upgrade this tag when you've reviewed the release notes;
+# consider digest-pinning (@sha256:...) for full supply-chain integrity.
+FROM python:3.11.11-slim
 
 # Set environment variables
 ENV PYTHONDONTWRITEBYTECODE=1 \

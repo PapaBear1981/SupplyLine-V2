@@ -6,6 +6,13 @@ on:
   pull_request:
     branches: [ master, main ]
 
+# Least-privilege GITHUB_TOKEN. Individual jobs that need more (e.g. writing
+# check-runs, posting PR comments) should override `permissions:` at the job
+# level rather than bumping this default. Supply-chain risk mitigation: if a
+# pinned action is ever compromised, it can't push code or release assets.
+permissions:
+  contents: read
+
 jobs:
   # Backend Linting Job
   backend-lint:
@@ -255,7 +262,9 @@ jobs:
           cd backend
           python seed_e2e_test_data.py
         env:
+          FLASK_ENV: testing
           DATABASE_URL: sqlite:///test.db
+          SUPPLYLINE_ALLOW_DESTRUCTIVE_SEED: '1'
 
       - name: Start backend server
         run: |
@@ -272,6 +281,14 @@ jobs:
           JWT_SECRET_KEY: test-jwt-secret-key-for-ci-do-not-use-in-production
           DISABLE_MANDATORY_2FA: 'true'
           DISABLE_RATE_LIMIT: 'true'
+          # CI backend runs over HTTP on localhost. Production cookie defaults
+          # to Secure=True (set via render.yaml). WebKit on HTTP drops Secure
+          # cookies (Chromium/Firefox give localhost a pass; WebKit-Linux as
+          # shipped with Playwright does not). Without this override the
+          # access_token cookie is silently discarded on the iPhone/iPad
+          # projects, breaking every spec that relies on the saved
+          # storageState. SameSite stays at the default Lax.
+          SESSION_COOKIE_SECURE: 'False'
 
       - name: Verify backend is running
         run: |
