@@ -157,7 +157,9 @@ export const MobileLayout = () => {
       })
       .map((item) => ({
         key: item.key,
-        label: item.label,
+        // The Tools page is labelled "Inventory" in the desktop submenu for
+        // context, but appears as a standalone flat item on mobile.
+        label: item.key === ROUTES.TOOLS ? 'Tools' : item.label,
         icon: routeIcons[item.key],
       }));
   }, [user?.is_admin, user?.permissions, mobileAdminEnabled]);
