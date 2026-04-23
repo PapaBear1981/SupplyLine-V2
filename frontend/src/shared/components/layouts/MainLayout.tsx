@@ -44,8 +44,8 @@ export const MainLayout = () => {
   // lazy initializer is the right tool — it captures the mount-time pathname.
   const [defaultOpenSubmenus] = useState<string[]>(() => {
     const keys: string[] = [];
-    const toolRoutes = [ROUTES.TOOLS, ROUTES.TOOL_CHECKOUT, ROUTES.TOOL_HISTORY];
-    const chemRoutes = [ROUTES.CHEMICALS, ROUTES.CHEMICAL_FORECAST];
+    const toolRoutes: string[] = [ROUTES.TOOLS, ROUTES.TOOL_CHECKOUT, ROUTES.TOOL_HISTORY];
+    const chemRoutes: string[] = [ROUTES.CHEMICALS, ROUTES.CHEMICAL_FORECAST];
     if (toolRoutes.includes(location.pathname)) keys.push('tools-group');
     if (chemRoutes.some((r) => location.pathname.startsWith(r))) keys.push(ROUTES.CHEMICALS);
     return keys;
