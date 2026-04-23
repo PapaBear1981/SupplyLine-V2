@@ -17,6 +17,17 @@ test.describe('Mobile tool history', () => {
     ).toBeVisible({ timeout: 10_000 });
   });
 
+  test('tool history is reachable from the mobile menu', async ({ page }) => {
+    await page.goto('/dashboard');
+    await page.getByTestId('mobile-tab-menu').click();
+    await expect(page.getByTestId('mobile-menu-popup')).toBeVisible();
+    await page.getByTestId('mobile-menu-item-tool-history').click();
+    await expect(page).toHaveURL(/\/tool-history$/);
+    await expect(
+      page.getByTestId('mobile-tool-audit-history-page')
+    ).toBeVisible({ timeout: 10_000 });
+  });
+
   test('mobile audit history page shows the search bar and filter button', async ({ page }) => {
     await page.goto('/tool-history');
     await page.getByTestId('mobile-tool-audit-history-page').waitFor({ state: 'visible' });
