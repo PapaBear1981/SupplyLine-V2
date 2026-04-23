@@ -10,6 +10,12 @@ test.describe('Requests (desktop)', () => {
     await expect(page.getByTestId('requests-create-button')).toBeVisible();
   });
 
+  test('sidebar auto-expands the Operations group when landing on the requests page', async ({ page }) => {
+    await page.goto('/requests');
+    await expect(page.getByTestId('nav-operations')).toBeVisible();
+    await expect(page.getByTestId('nav-requests')).toBeVisible();
+  });
+
   test('New Request navigates to the create form route', async ({ page }) => {
     await page.goto('/requests');
     await page.getByTestId('requests-create-button').click();

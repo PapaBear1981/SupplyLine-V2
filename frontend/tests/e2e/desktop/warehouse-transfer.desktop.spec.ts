@@ -16,6 +16,12 @@ test.describe('Warehouse transfers (desktop)', () => {
     await expect(page.getByTestId('transfers-create-button')).toBeVisible();
   });
 
+  test('sidebar auto-expands the Operations group when landing on the transfers page', async ({ page }) => {
+    await page.goto('/transfers');
+    await expect(page.getByTestId('nav-operations')).toBeVisible();
+    await expect(page.getByTestId('nav-transfers')).toBeVisible();
+  });
+
   test('Initiate transfer opens a modal', async ({ page }) => {
     await page.goto('/transfers');
     await page.getByTestId('transfers-create-button').click();

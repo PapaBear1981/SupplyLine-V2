@@ -19,6 +19,12 @@ test.describe('Orders / Fulfillment (desktop)', () => {
     await expect(page.locator('.ant-tabs').first()).toBeVisible();
   });
 
+  test('sidebar auto-expands the Operations group when landing on the orders page', async ({ page }) => {
+    await page.goto('/orders');
+    await expect(page.getByTestId('nav-operations')).toBeVisible();
+    await expect(page.getByTestId('nav-orders')).toBeVisible();
+  });
+
   test('New Fulfillment Action button is visible on the Orders tab', async ({ page }) => {
     await page.goto('/orders');
     // activeTab defaults to 'requests'; the create button is conditionally

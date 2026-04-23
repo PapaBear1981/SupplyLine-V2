@@ -43,4 +43,41 @@ test.describe('Dashboard (desktop)', () => {
     await expect(page).toHaveURL(/\/tools/);
     await expect(page.getByTestId('tools-page')).toBeVisible();
   });
+
+  test('sidebar exposes the Operations group', async ({ page }) => {
+    await page.goto('/dashboard');
+    await expect(page.getByTestId('nav-operations')).toBeVisible();
+  });
+
+  test('clicking nav-operations expands the submenu with Fulfillment, Requests, and Transfers', async ({ page }) => {
+    await page.goto('/dashboard');
+    await page.getByTestId('nav-operations').click();
+    await expect(page.getByTestId('nav-orders')).toBeVisible();
+    await expect(page.getByTestId('nav-requests')).toBeVisible();
+    await expect(page.getByTestId('nav-transfers')).toBeVisible();
+  });
+
+  test('Operations → Fulfillment routes to /orders', async ({ page }) => {
+    await page.goto('/dashboard');
+    await page.getByTestId('nav-operations').click();
+    await page.getByTestId('nav-orders').click();
+    await expect(page).toHaveURL(/\/orders/);
+    await expect(page.getByTestId('orders-page')).toBeVisible();
+  });
+
+  test('Operations → Requests routes to /requests', async ({ page }) => {
+    await page.goto('/dashboard');
+    await page.getByTestId('nav-operations').click();
+    await page.getByTestId('nav-requests').click();
+    await expect(page).toHaveURL(/\/requests/);
+    await expect(page.getByTestId('requests-page')).toBeVisible();
+  });
+
+  test('Operations → Transfers routes to /transfers', async ({ page }) => {
+    await page.goto('/dashboard');
+    await page.getByTestId('nav-operations').click();
+    await page.getByTestId('nav-transfers').click();
+    await expect(page).toHaveURL(/\/transfers/);
+    await expect(page.getByTestId('transfers-page')).toBeVisible();
+  });
 });
