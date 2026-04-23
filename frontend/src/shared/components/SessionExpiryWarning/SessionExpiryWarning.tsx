@@ -95,11 +95,6 @@ export const SessionExpiryWarning = () => {
       }
 
       setTimeRemaining(msLeft);
-
-      if (msLeft > WARNING_THRESHOLD_MS) {
-        // User became active again (activity tracker updated localStorage)
-        setShowWarning(false);
-      }
     }, 1_000);
 
     return () => clearInterval(interval);
