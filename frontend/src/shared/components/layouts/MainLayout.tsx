@@ -37,6 +37,19 @@ export const MainLayout = () => {
   const [collapsed, setCollapsed] = useState(false);
   const navigate = useNavigate();
   const location = useLocation();
+
+  // Compute which submenus should be open at initial render so that child
+  // nav items (e.g. nav-tool-history) are visible without a user click.
+  // `defaultOpenKeys` only affects the first render, so useState with a
+  // lazy initializer is the right tool — it captures the mount-time pathname.
+  const [defaultOpenSubmenus] = useState<string[]>(() => {
+    const keys: string[] = [];
+    const toolRoutes: string[] = [ROUTES.TOOLS, ROUTES.TOOL_CHECKOUT, ROUTES.TOOL_HISTORY];
+    const chemRoutes: string[] = [ROUTES.CHEMICALS, ROUTES.CHEMICAL_FORECAST];
+    if (toolRoutes.includes(location.pathname)) keys.push('tools-group');
+    if (chemRoutes.some((r) => location.pathname.startsWith(r))) keys.push(ROUTES.CHEMICALS);
+    return keys;
+  });
   const dispatch = useAppDispatch();
   const user = useAppSelector((state) => state.auth.user);
   const [logoutApi] = useLogoutMutation();
@@ -58,7 +71,7 @@ export const MainLayout = () => {
   } = theme.useToken();
 
   const handleMenuClick = (e: { key: string }) => {
-    navigate(e.key);
+    if (e.key.startsWith('/')) navigate(e.key);
   };
 
   const handleLogout = async () => {
@@ -140,6 +153,7 @@ export const MainLayout = () => {
           theme={isDark ? 'dark' : 'light'}
           mode="inline"
           selectedKeys={[location.pathname]}
+          defaultOpenKeys={defaultOpenSubmenus}
           items={menuItems}
           onClick={handleMenuClick}
           style={{ background: isDark ? undefined : '#dbeafe' }}
