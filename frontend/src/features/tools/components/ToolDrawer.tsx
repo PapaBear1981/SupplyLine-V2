@@ -22,6 +22,7 @@ import {
   EditOutlined,
   QrcodeOutlined,
   HistoryOutlined,
+  CalendarOutlined,
   InfoCircleOutlined,
   PrinterOutlined,
   ToolOutlined,
@@ -384,7 +385,7 @@ export const ToolDrawer = ({ open, mode: initialMode, toolId, onClose, onSuccess
               key: 'calibration',
               label: (
                 <span>
-                  <HistoryOutlined /> Calibration
+                  <CalendarOutlined /> Calibration
                 </span>
               ),
               children: renderCalibrationTab(),

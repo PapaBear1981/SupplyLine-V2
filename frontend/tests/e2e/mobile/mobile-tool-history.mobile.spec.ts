@@ -27,9 +27,14 @@ test.describe('Mobile tool history', () => {
   test('mobile audit history list renders', async ({ page }) => {
     await page.goto('/tool-history');
     await page.getByTestId('mobile-tool-audit-history-page').waitFor({ state: 'visible' });
-    // Either the list or an empty-state message should be visible
+    // Wait for the loading state to resolve: either the list or an empty-state appears.
+    // waitForSelector avoids the strict-mode issue with multiple .adm-skeleton elements.
+    await page.waitForSelector(
+      '[data-testid="mobile-audit-history-list"], .adm-empty',
+      { timeout: 12_000 }
+    );
     const hasList = await page.getByTestId('mobile-audit-history-list').isVisible().catch(() => false);
-    const hasEmpty = await page.locator('.adm-empty').isVisible().catch(() => false);
+    const hasEmpty = await page.locator('.adm-empty').first().isVisible().catch(() => false);
     expect(hasList || hasEmpty).toBe(true);
   });
 
@@ -56,11 +61,11 @@ test.describe('Mobile tool history', () => {
     await tools.detailPopup.waitFor({ state: 'visible' });
     // Tap the History tab
     await tools.detailPopup.getByText('History').click();
-    // After switching tabs the History content area should appear (list or empty state)
-    const hasHistoryContent =
-      await tools.detailPopup.locator('.adm-list').isVisible().catch(() => false) ||
-      await tools.detailPopup.locator('.adm-empty').isVisible().catch(() => false) ||
-      await tools.detailPopup.locator('.adm-skeleton').isVisible().catch(() => false);
-    expect(hasHistoryContent).toBe(true);
+    // Wait for the tab content to render — list, empty state, or loading skeleton.
+    // Use :visible to skip the Details tab's hidden list (inactive tab panels are
+    // kept in the DOM but hidden by antd-mobile).
+    await expect(
+      tools.detailPopup.locator('.adm-list:visible, .adm-empty:visible, .adm-skeleton:visible').first()
+    ).toBeVisible({ timeout: 8_000 });
   });
 });

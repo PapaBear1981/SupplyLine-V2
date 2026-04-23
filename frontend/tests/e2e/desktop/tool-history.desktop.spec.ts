@@ -47,10 +47,11 @@ test.describe('Tool History (desktop)', () => {
   test('tool drawer shows a History tab when a tool row is opened', async ({ page }) => {
     const tools = new ToolsPage(page);
     await tools.open();
-    // Wait for at least one tool row, then click it to open the drawer
-    const firstRow = tools.table.locator('tr[data-row-key]').first();
-    await firstRow.waitFor({ state: 'visible' });
-    await firstRow.click();
+    // Wait for at least one tool row to appear
+    await tools.table.locator('tr[data-row-key]').first().waitFor({ state: 'visible' });
+    // Click the "View Details" (eye) button. The actions column is fixed-right so the
+    // buttons live in the fixed column overlay, not the main tr. Use the icon aria-label.
+    await page.locator('[aria-label="eye"]').first().click();
 
     // The drawer should open
     const drawer = page.locator('.ant-drawer-open, .ant-drawer-content').first();
