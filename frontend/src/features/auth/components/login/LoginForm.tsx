@@ -1,5 +1,9 @@
 import { Form, Button, Typography, message } from 'antd';
-import { UserOutlined, LockOutlined } from '@ant-design/icons';
+import {
+  UserOutlined,
+  LockOutlined,
+  ThunderboltFilled,
+} from '@ant-design/icons';
 import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { useLoginMutation } from '../../services/authApi';
@@ -46,11 +50,14 @@ export const LoginForm = ({ onSuccess }: LoginFormProps) => {
       data-testid="login-form"
     >
       <div className="login-form-header">
-        <Title level={2} style={{ marginBottom: 8 }}>
+        <div className="login-form-mark" aria-hidden="true">
+          <ThunderboltFilled />
+        </div>
+        <Title level={2} className="login-form-title">
           Welcome back
         </Title>
-        <Text type="secondary">
-          Continue where you left off—dispatching drops, monitoring hangars, and coordinating crews.
+        <Text type="secondary" className="login-form-subtitle">
+          Sign in to resume dispatch, hangar ops, and crew coordination.
         </Text>
       </div>
 

@@ -2,48 +2,135 @@
   position: relative;
   min-height: 100vh;
   width: 100%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
   overflow: hidden;
   background: var(--login-bg-secondary);
+  color: var(--login-text-primary);
+  isolation: isolate;
 }
 
-.login-background {
+/* Drifting gradient orbs. Kept on a dedicated element so the animation can
+   be suppressed independently for prefers-reduced-motion. */
+.login-bg-orbs {
   position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
+  inset: -20% -20% -20% -20%;
   z-index: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(
+      38% 38% at 22% 28%,
+      rgba(0, 217, 255, 0.22) 0%,
+      transparent 70%
+    ),
+    radial-gradient(
+      42% 42% at 78% 72%,
+      rgba(100, 181, 246, 0.22) 0%,
+      transparent 70%
+    ),
+    radial-gradient(
+      30% 30% at 60% 20%,
+      rgba(147, 51, 234, 0.14) 0%,
+      transparent 70%
+    );
+  filter: blur(40px);
+  animation: login-orb-drift 38s ease-in-out infinite alternate;
 }
 
-.login-gradient {
+/* Radar-style grid overlay. Uses two stacked linear-gradients to create a
+   fine mesh that fades toward the edges. */
+.login-bg-grid {
   position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: var(--login-bg-secondary);
-  opacity: 1;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background-image:
+    linear-gradient(rgba(100, 181, 246, 0.08) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(100, 181, 246, 0.08) 1px, transparent 1px);
+  background-size: 44px 44px;
+  mask-image: radial-gradient(
+    ellipse at 50% 45%,
+    rgba(0, 0, 0, 0.9) 0%,
+    rgba(0, 0, 0, 0.35) 55%,
+    transparent 85%
+  );
+  -webkit-mask-image: radial-gradient(
+    ellipse at 50% 45%,
+    rgba(0, 0, 0, 0.9) 0%,
+    rgba(0, 0, 0, 0.35) 55%,
+    transparent 85%
+  );
+  opacity: 0.7;
 }
 
-.login-container {
+@keyframes login-orb-drift {
+  0% {
+    transform: translate3d(0, 0, 0) rotate(0deg);
+  }
+  50% {
+    transform: translate3d(2%, -1.5%, 0) rotate(8deg);
+  }
+  100% {
+    transform: translate3d(-1.5%, 2%, 0) rotate(-6deg);
+  }
+}
+
+/* ---------- Split-screen shell ------------------------------------------- */
+.login-shell {
   position: relative;
   z-index: 1;
+  display: grid;
+  grid-template-columns: 1.1fr 0.9fr;
+  min-height: 100vh;
   width: 100%;
-  max-width: 500px;
-  padding: 24px;
+}
+
+.login-hero {
+  position: relative;
+  display: flex;
+  border-right: 1px solid rgba(100, 181, 246, 0.08);
+}
+
+.login-hero::after {
+  /* Soft vertical seam glow between hero and panel */
+  content: '';
+  position: absolute;
+  top: 10%;
+  bottom: 10%;
+  right: -1px;
+  width: 1px;
+  background: linear-gradient(
+    180deg,
+    transparent 0%,
+    rgba(100, 181, 246, 0.35) 50%,
+    transparent 100%
+  );
+  pointer-events: none;
+}
+
+.login-panel {
+  position: relative;
   display: flex;
   align-items: center;
   justify-content: center;
+  padding: 48px 64px;
+}
+
+.login-panel-inner {
+  width: 100%;
+  max-width: 440px;
 }
 
 .login-card {
   width: 100%;
   padding: 48px 40px;
+  border-radius: 20px;
+  /* Intensify the cyan-tinted border glow on the dark panel */
+  box-shadow:
+    0 28px 80px rgba(0, 0, 0, 0.55),
+    0 0 0 1px rgba(100, 181, 246, 0.08),
+    inset 0 1px 0 rgba(255, 255, 255, 0.06);
 }
 
+/* ---------- TOTP full-screen state (unchanged behavior) ------------------ */
 .totp-setup-fullscreen {
   position: fixed;
   top: 0;
@@ -59,15 +146,30 @@
   padding: 24px 0;
 }
 
-/* Mobile responsive */
+/* ---------- Responsive --------------------------------------------------- */
+/* Collapse hero below 1024px — form centers on the animated dark backdrop. */
+@media (max-width: 1023px) {
+  .login-shell {
+    grid-template-columns: 1fr;
+  }
+
+  .login-hero {
+    display: none;
+  }
+
+  .login-panel {
+    min-height: 100vh;
+    padding: 40px 24px;
+  }
+}
+
 @media (max-width: 768px) {
-  .login-container {
-    max-width: 100%;
-    padding: 16px;
+  .login-panel {
+    padding: 32px 20px;
   }
 
   .login-card {
-    padding: 32px 24px;
+    padding: 36px 28px;
   }
 
   .totp-setup-fullscreen {
@@ -76,13 +178,13 @@
 }
 
 @media (max-width: 576px) {
-  .login-container {
-    padding: 12px;
+  .login-panel {
+    padding: 24px 16px;
   }
 
   .login-card {
-    padding: 24px 20px;
-    border-radius: 12px;
+    padding: 28px 22px;
+    border-radius: 16px;
   }
 
   .totp-setup-fullscreen {
@@ -90,21 +192,14 @@
   }
 }
 
-/* Tablet responsive */
-@media (min-width: 577px) and (max-width: 768px) {
-  .login-container {
+/* Large desktop: slightly roomier panel */
+@media (min-width: 1440px) {
+  .login-shell {
+    grid-template-columns: 1.15fr 0.85fr;
+  }
+
+  .login-panel-inner {
     max-width: 460px;
-  }
-
-  .login-card {
-    padding: 40px 32px;
-  }
-}
-
-/* Desktop large screens */
-@media (min-width: 1200px) {
-  .login-container {
-    max-width: 540px;
   }
 
   .login-card {
@@ -112,14 +207,10 @@
   }
 }
 
-/* Animation-related styles */
-.login-page .glass-card {
-  transform-origin: center;
-}
-
-/* Ensure smooth transitions */
+/* Animation perf hints */
 .login-card,
-.totp-setup-fullscreen {
+.totp-setup-fullscreen,
+.login-bg-orbs {
   will-change: opacity, transform;
 }
 
@@ -132,6 +223,10 @@
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
   }
+
+  .login-bg-orbs {
+    animation: none;
+  }
 }
 
 /* High contrast mode support */
@@ -140,7 +235,7 @@
     border-width: 2px;
   }
 
-  .login-gradient {
-    opacity: 0.8;
+  .login-bg-grid {
+    opacity: 0.9;
   }
 }

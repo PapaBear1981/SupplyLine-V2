@@ -26,21 +26,32 @@
 /* Dark theme colors */
 .adm-theme-dark,
 [data-theme='dark'] {
-  --login-bg-primary: #0f1a2c;
-  --login-bg-secondary: linear-gradient(135deg, #0f1a2c 0%, #0b2f3d 100%);
+  --login-bg-primary: #050b18;
+  --login-bg-secondary: radial-gradient(
+      ellipse at 20% 15%,
+      rgba(32, 86, 160, 0.35) 0%,
+      transparent 55%
+    ),
+    radial-gradient(
+      ellipse at 85% 90%,
+      rgba(0, 217, 255, 0.18) 0%,
+      transparent 50%
+    ),
+    linear-gradient(135deg, #050b18 0%, #0a1a2e 55%, #0f2847 100%);
   --login-text-primary: #f7fbff;
-  --login-text-secondary: rgba(247, 251, 255, 0.85);
-  --login-text-tertiary: rgba(247, 251, 255, 0.65);
-  --login-input-bg: rgba(15, 35, 55, 0.6);
-  --login-input-border: rgba(94, 165, 255, 0.25);
+  --login-text-secondary: rgba(247, 251, 255, 0.78);
+  --login-text-tertiary: rgba(247, 251, 255, 0.55);
+  --login-input-bg: rgba(15, 30, 55, 0.55);
+  --login-input-border: rgba(94, 165, 255, 0.28);
   --login-input-focus: #64b5f6;
   --login-accent-primary: #64b5f6;
   --login-accent-secondary: #5ea5ff;
-  --login-glass-bg: rgba(15, 35, 55, 0.4);
-  --login-glass-border: rgba(94, 165, 255, 0.25);
-  --login-shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.3);
-  --login-shadow-md: 0 4px 16px rgba(0, 0, 0, 0.4);
-  --login-shadow-lg: 0 8px 32px rgba(0, 0, 0, 0.5);
+  --login-accent-cyan: #00d9ff;
+  --login-glass-bg: rgba(13, 26, 46, 0.55);
+  --login-glass-border: rgba(94, 165, 255, 0.22);
+  --login-shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.35);
+  --login-shadow-md: 0 4px 16px rgba(0, 0, 0, 0.45);
+  --login-shadow-lg: 0 24px 60px rgba(0, 0, 0, 0.55);
 }
 
 /* Glassmorphism card effect */
@@ -93,7 +104,7 @@
 
 /* Glassmorphism button */
 .glass-button {
-  background: linear-gradient(135deg, var(--login-accent-blue) 0%, var(--login-accent-blue-hover) 100%);
+  background: linear-gradient(135deg, var(--login-accent-primary) 0%, var(--login-accent-secondary) 100%);
   border: none;
   border-radius: 8px;
   color: #ffffff;
