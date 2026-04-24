@@ -51,6 +51,7 @@ function updateCachedState(): void {
 }
 
 function getSnapshot(): MobileState {
+  updateCachedState();
   return cachedState;
 }
 
