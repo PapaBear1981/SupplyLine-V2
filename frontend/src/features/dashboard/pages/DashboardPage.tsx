@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import { Row, Col, Spin } from 'antd';
+import { Alert, Row, Col, Spin } from 'antd';
 import {
   ToolOutlined,
   SwapOutlined,
@@ -258,6 +258,16 @@ export const DashboardPage = () => {
           primaryColor={primaryColor}
         />
       </div>
+
+      {!activeWarehouseId && (
+        <Alert
+          data-testid="dashboard-no-warehouse-banner"
+          type="info"
+          showIcon
+          message="Select an active warehouse to populate the tools and chemicals stats."
+          style={{ marginBottom: 16 }}
+        />
+      )}
 
       {/* On-Call Personnel */}
       <Row gutter={[16, 16]} style={{ marginBottom: 24 }}>

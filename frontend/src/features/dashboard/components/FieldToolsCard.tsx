@@ -23,6 +23,7 @@ export const FieldToolsCard = () => {
     { skip: !activeWarehouseId }
   );
 
+  const noActiveWarehouse = !activeWarehouseId;
   const checkouts = data?.checkouts || [];
   const total = data?.total || 0;
 
@@ -130,7 +131,13 @@ export const FieldToolsCard = () => {
       }
       styles={{ body: { padding: '0 0 8px 0' } }}
     >
-      {isLoading ? (
+      {noActiveWarehouse ? (
+        <Empty
+          image={Empty.PRESENTED_IMAGE_SIMPLE}
+          description="Select an active warehouse to view field-deployed tools"
+          style={{ padding: '16px 0' }}
+        />
+      ) : isLoading ? (
         <div style={{ padding: 24, textAlign: 'center' }}>
           <Spin />
         </div>

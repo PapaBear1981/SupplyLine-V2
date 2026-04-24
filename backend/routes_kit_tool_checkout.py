@@ -23,6 +23,7 @@ from sqlalchemy.exc import IntegrityError
 from auth.jwt_manager import jwt_required, permission_required
 from models import AuditLog, Checkout, Tool, ToolHistory, UserActivity, db
 from models_kits import Kit, KitToolCheckout
+from utils.warehouse_scope import current_warehouse_scope
 
 
 logger = logging.getLogger(__name__)
@@ -349,14 +350,29 @@ def register_kit_tool_checkout_routes(app):
     def get_active_kit_tool_checkouts():
         """Return all tools currently deployed to any kit in the field.
 
-        Optionally scoped by ``warehouse_id`` (the source warehouse of the tool).
+        Non-admins are always scoped to their active warehouse (based on the
+        source warehouse of the tool). Admins see every warehouse by default
+        and may narrow the list via an optional ``warehouse_id`` query param.
         """
-        warehouse_id = request.args.get("warehouse_id", type=int)
+        is_admin, active_warehouse_id = current_warehouse_scope()
+        requested_warehouse_id = request.args.get("warehouse_id", type=int)
+
+        # Non-admins without an active warehouse get an empty list — same
+        # pattern as /api/tool-checkouts/active.
+        if not is_admin and active_warehouse_id is None:
+            return jsonify({"checkouts": [], "total": 0}), 200
+
+        if is_admin:
+            effective_warehouse_id = requested_warehouse_id
+        else:
+            # Non-admins are pinned to their active warehouse regardless of
+            # any warehouse_id hint from the client.
+            effective_warehouse_id = active_warehouse_id
 
         query = KitToolCheckout.query.filter_by(status="active")
-        if warehouse_id:
+        if effective_warehouse_id is not None:
             query = query.join(Tool, KitToolCheckout.tool_id == Tool.id).filter(
-                Tool.warehouse_id == warehouse_id
+                Tool.warehouse_id == effective_warehouse_id
             )
 
         checkouts = query.order_by(KitToolCheckout.checkout_date.desc()).all()

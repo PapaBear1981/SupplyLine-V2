@@ -246,6 +246,15 @@ export const MobileDashboard = () => {
         </div>
       )}
 
+      {!activeWarehouseId && (
+        <div style={{ marginBottom: 16 }}>
+          <NoticeBar
+            color="info"
+            content="Select an active warehouse to populate the tools and chemicals stats."
+          />
+        </div>
+      )}
+
       {/* On-Call Personnel */}
       <div className="section-title">On-Call Personnel</div>
       <Card className="activity-card" style={{ marginBottom: 16 }}>

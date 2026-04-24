@@ -3,14 +3,21 @@ import { render, screen } from '@testing-library/react';
 import { BrowserRouter } from 'react-router-dom';
 import { FieldToolsCard } from './FieldToolsCard';
 
-const activeKitToolCheckoutsSpy = vi.fn(() => ({
-  data: { checkouts: [], total: 0 },
-  isLoading: false,
-}));
+type QueryParams = { warehouse_id?: number };
+type QueryOptions = { skip?: boolean };
+
+const activeKitToolCheckoutsSpy = vi.fn(
+  (_params?: QueryParams, _options?: QueryOptions) => ({
+    data: { checkouts: [], total: 0 },
+    isLoading: false,
+  })
+);
 
 vi.mock('@features/kits/services/kitsApi', () => ({
-  useGetActiveKitToolCheckoutsQuery: (...args: unknown[]) =>
-    activeKitToolCheckoutsSpy(...args),
+  useGetActiveKitToolCheckoutsQuery: (
+    params?: QueryParams,
+    options?: QueryOptions,
+  ) => activeKitToolCheckoutsSpy(params, options),
 }));
 
 let mockActiveWarehouseId: number | null = 1;
@@ -42,24 +49,21 @@ describe('FieldToolsCard', () => {
     renderCard();
 
     expect(activeKitToolCheckoutsSpy).toHaveBeenCalled();
-    const [params, options] = activeKitToolCheckoutsSpy.mock.calls[0] as [
-      { warehouse_id?: number },
-      { skip?: boolean } | undefined,
-    ];
-    expect(params.warehouse_id).toBe(7);
+    const [params, options] = activeKitToolCheckoutsSpy.mock.calls[0];
+    expect(params?.warehouse_id).toBe(7);
     expect(options?.skip).toBe(false);
   });
 
-  it('skips the query when no warehouse is selected', () => {
+  it('skips the query when no warehouse is selected and shows the select-warehouse prompt', () => {
     mockActiveWarehouseId = null;
     renderCard();
 
-    const [params, options] = activeKitToolCheckoutsSpy.mock.calls[0] as [
-      { warehouse_id?: number },
-      { skip?: boolean } | undefined,
-    ];
-    expect(params.warehouse_id).toBeUndefined();
+    const [params, options] = activeKitToolCheckoutsSpy.mock.calls[0];
+    expect(params?.warehouse_id).toBeUndefined();
     expect(options?.skip).toBe(true);
+    expect(
+      screen.getByText(/select an active warehouse/i)
+    ).toBeInTheDocument();
   });
 
   it('renders the empty state when no checkouts are returned', () => {

@@ -41,21 +41,33 @@ const createMockStore = () => {
 };
 
 // Mock API hooks — use vi.fn() so tests can assert the args the components pass.
-const toolsQuerySpy = vi.fn(() => ({
-  data: { tools: [], total: 0 },
-  isLoading: false,
-}));
-const chemicalsQuerySpy = vi.fn(() => ({
-  data: { chemicals: [], pagination: { total: 0 } },
-  isLoading: false,
-}));
+type ToolsQueryParams = { per_page?: number; warehouse_id?: number };
+type ChemicalsQueryParams = { per_page?: number; warehouse_id?: number };
+type QueryOptions = { skip?: boolean };
+
+const toolsQuerySpy = vi.fn(
+  (_params?: ToolsQueryParams, _options?: QueryOptions) => ({
+    data: { tools: [], total: 0 },
+    isLoading: false,
+  })
+);
+const chemicalsQuerySpy = vi.fn(
+  (_params?: ChemicalsQueryParams, _options?: QueryOptions) => ({
+    data: { chemicals: [], pagination: { total: 0 } },
+    isLoading: false,
+  })
+);
 
 vi.mock('@features/tools/services/toolsApi', () => ({
-  useGetToolsQuery: (...args: unknown[]) => toolsQuerySpy(...args),
+  useGetToolsQuery: (params?: ToolsQueryParams, options?: QueryOptions) =>
+    toolsQuerySpy(params, options),
 }));
 
 vi.mock('@features/chemicals/services/chemicalsApi', () => ({
-  useGetChemicalsQuery: (...args: unknown[]) => chemicalsQuerySpy(...args),
+  useGetChemicalsQuery: (
+    params?: ChemicalsQueryParams,
+    options?: QueryOptions,
+  ) => chemicalsQuerySpy(params, options),
 }));
 
 vi.mock('@features/kits/services/kitsApi', () => ({
@@ -193,11 +205,8 @@ describe('MobileDashboard', () => {
       renderWithProviders(<MobileDashboard />);
 
       expect(toolsQuerySpy).toHaveBeenCalled();
-      const [params, options] = toolsQuerySpy.mock.calls[0] as [
-        { warehouse_id?: number; per_page?: number },
-        { skip?: boolean } | undefined,
-      ];
-      expect(params.warehouse_id).toBe(42);
+      const [params, options] = toolsQuerySpy.mock.calls[0];
+      expect(params?.warehouse_id).toBe(42);
       expect(options?.skip).toBe(false);
     });
 
@@ -206,11 +215,8 @@ describe('MobileDashboard', () => {
       renderWithProviders(<MobileDashboard />);
 
       expect(chemicalsQuerySpy).toHaveBeenCalled();
-      const [params, options] = chemicalsQuerySpy.mock.calls[0] as [
-        { warehouse_id?: number; per_page?: number },
-        { skip?: boolean } | undefined,
-      ];
-      expect(params.warehouse_id).toBe(42);
+      const [params, options] = chemicalsQuerySpy.mock.calls[0];
+      expect(params?.warehouse_id).toBe(42);
       expect(options?.skip).toBe(false);
     });
 
@@ -218,16 +224,19 @@ describe('MobileDashboard', () => {
       mockActiveWarehouseId = null;
       renderWithProviders(<MobileDashboard />);
 
-      const [, toolsOptions] = toolsQuerySpy.mock.calls[0] as [
-        unknown,
-        { skip?: boolean } | undefined,
-      ];
-      const [, chemicalsOptions] = chemicalsQuerySpy.mock.calls[0] as [
-        unknown,
-        { skip?: boolean } | undefined,
-      ];
+      const [, toolsOptions] = toolsQuerySpy.mock.calls[0];
+      const [, chemicalsOptions] = chemicalsQuerySpy.mock.calls[0];
       expect(toolsOptions?.skip).toBe(true);
       expect(chemicalsOptions?.skip).toBe(true);
+    });
+
+    it('shows a select-warehouse notice when no warehouse is selected', () => {
+      mockActiveWarehouseId = null;
+      renderWithProviders(<MobileDashboard />);
+
+      expect(
+        screen.getByText(/select an active warehouse/i)
+      ).toBeInTheDocument();
     });
   });
 });
