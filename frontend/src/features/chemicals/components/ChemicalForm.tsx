@@ -1,8 +1,9 @@
-import { useEffect, useCallback } from 'react';
+import { useEffect, useCallback, useMemo } from 'react';
 import { Form, Input, InputNumber, Select, DatePicker, Button, Space } from 'antd';
 import type { FormInstance } from 'antd';
 import dayjs from 'dayjs';
 import type { Chemical, ChemicalFormData } from '../types';
+import { useGetWarehousesQuery } from '@features/warehouses/services/warehousesApi';
 
 const { Option } = Select;
 const { TextArea } = Input;
@@ -17,6 +18,16 @@ interface ChemicalFormProps {
 
 export const ChemicalForm = ({ form, initialValues, onSubmit, onCancel, loading }: ChemicalFormProps) => {
   const isEditing = !!initialValues;
+  const { data: warehousesData, isLoading: warehousesLoading } = useGetWarehousesQuery();
+
+  const warehouseOptions = useMemo(
+    () =>
+      (warehousesData?.warehouses || []).map((w) => ({
+        label: w.name,
+        value: w.id,
+      })),
+    [warehousesData]
+  );
 
   const getInitialFormValues = useCallback(() => {
     if (!initialValues) return {};
@@ -164,11 +175,18 @@ export const ChemicalForm = ({ form, initialValues, onSubmit, onCancel, loading 
       </Form.Item>
 
       <Form.Item
-        label="Warehouse ID"
+        label="Warehouse"
         name="warehouse_id"
         rules={[{ required: true, message: 'Warehouse is required' }]}
       >
-        <InputNumber style={{ width: '100%' }} min={1} />
+        <Select
+          placeholder="Select warehouse"
+          loading={warehousesLoading}
+          options={warehouseOptions}
+          showSearch
+          optionFilterProp="label"
+          notFoundContent={warehousesLoading ? 'Loading...' : 'No warehouses available'}
+        />
       </Form.Item>
 
       <Form.Item
