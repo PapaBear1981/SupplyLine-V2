@@ -18,12 +18,17 @@ interface ChemicalFormProps {
 
 export const ChemicalForm = ({ form, initialValues, onSubmit, onCancel, loading }: ChemicalFormProps) => {
   const isEditing = !!initialValues;
-  const { data: warehousesData, isLoading: warehousesLoading } = useGetWarehousesQuery();
+  // Include inactive warehouses while editing so a chemical's existing
+  // warehouse_id still resolves to a label. per_page is the backend max (200).
+  const { data: warehousesData, isLoading: warehousesLoading } = useGetWarehousesQuery({
+    per_page: 200,
+    include_inactive: isEditing,
+  });
 
   const warehouseOptions = useMemo(
     () =>
-      (warehousesData?.warehouses || []).map((w) => ({
-        label: w.name,
+      (warehousesData?.warehouses ?? []).map((w) => ({
+        label: w.is_active ? w.name : `${w.name} (inactive)`,
         value: w.id,
       })),
     [warehousesData]
