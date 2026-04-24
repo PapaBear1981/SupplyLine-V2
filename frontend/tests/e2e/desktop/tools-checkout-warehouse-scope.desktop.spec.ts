@@ -77,10 +77,12 @@ test.describe('Tool checkout + history — warehouse scope (API, desktop)', () =
   });
 
   test('non-admin search only returns tools in the active warehouse', async () => {
-    // USER001 is pinned to Main by the seed, so the satellite tool T101
-    // must never appear — even though the query "T" matches both.
+    // USER001 is pinned to Main by the seed. The backend search endpoint
+    // ignores queries shorter than 2 chars, so use "SN" — a substring
+    // shared by every seeded tool's serial number (SN001-SN005, SN101) —
+    // to force a search that *would* include T101 if the filter failed.
     const token = await login(ctx, TEST_USERS.user);
-    const hits = await searchCheckoutTools(ctx, token, 'T');
+    const hits = await searchCheckoutTools(ctx, token, 'SN');
     const numbers = new Set(hits.map((t) => t.tool_number));
 
     expect(numbers.has(TEST_TOOLS.multimeter.number)).toBeTruthy();
@@ -93,7 +95,7 @@ test.describe('Tool checkout + history — warehouse scope (API, desktop)', () =
 
   test('admin search returns tools from every warehouse', async () => {
     const token = await login(ctx, TEST_USERS.admin);
-    const hits = await searchCheckoutTools(ctx, token, 'T');
+    const hits = await searchCheckoutTools(ctx, token, 'SN');
     const numbers = new Set(hits.map((t) => t.tool_number));
 
     expect(numbers.has(TEST_TOOLS.multimeter.number)).toBeTruthy();
