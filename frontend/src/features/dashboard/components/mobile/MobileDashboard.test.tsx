@@ -40,19 +40,43 @@ const createMockStore = () => {
   });
 };
 
-// Mock API hooks
+// Mock API hooks — use vi.fn() so tests can assert the args the components pass.
+type ToolsQueryParams = { per_page?: number; warehouse_id?: number };
+type ChemicalsQueryParams = { per_page?: number; warehouse_id?: number };
+type QueryOptions = { skip?: boolean };
+type UseGetToolsQueryFn = (
+  params?: ToolsQueryParams,
+  options?: QueryOptions,
+) => { data: { tools: unknown[]; total: number }; isLoading: boolean };
+type UseGetChemicalsQueryFn = (
+  params?: ChemicalsQueryParams,
+  options?: QueryOptions,
+) => {
+  data: { chemicals: unknown[]; pagination: { total: number } };
+  isLoading: boolean;
+};
+
+const toolsQuerySpy = vi.fn<UseGetToolsQueryFn>();
+toolsQuerySpy.mockReturnValue({
+  data: { tools: [], total: 0 },
+  isLoading: false,
+});
+const chemicalsQuerySpy = vi.fn<UseGetChemicalsQueryFn>();
+chemicalsQuerySpy.mockReturnValue({
+  data: { chemicals: [], pagination: { total: 0 } },
+  isLoading: false,
+});
+
 vi.mock('@features/tools/services/toolsApi', () => ({
-  useGetToolsQuery: () => ({
-    data: { tools: [], total: 0 },
-    isLoading: false,
-  }),
+  useGetToolsQuery: (params?: ToolsQueryParams, options?: QueryOptions) =>
+    toolsQuerySpy(params, options),
 }));
 
 vi.mock('@features/chemicals/services/chemicalsApi', () => ({
-  useGetChemicalsQuery: () => ({
-    data: { chemicals: [], pagination: { total: 0 } },
-    isLoading: false,
-  }),
+  useGetChemicalsQuery: (
+    params?: ChemicalsQueryParams,
+    options?: QueryOptions,
+  ) => chemicalsQuerySpy(params, options),
 }));
 
 vi.mock('@features/kits/services/kitsApi', () => ({
@@ -90,6 +114,18 @@ vi.mock('@features/kits/components/mobile', () => ({
   MobileKitLocationMap: () => <div data-testid="kit-location-map" />,
 }));
 
+// Mock useActiveWarehouse so tests can drive the active warehouse ID.
+let mockActiveWarehouseId: number | null = 1;
+vi.mock('@features/warehouses/hooks/useActiveWarehouse', () => ({
+  useActiveWarehouse: () => ({
+    activeWarehouseId: mockActiveWarehouseId,
+    activeWarehouseName: mockActiveWarehouseId ? 'Test Warehouse' : null,
+    setActiveWarehouse: vi.fn(),
+    isChanging: false,
+    error: undefined,
+  }),
+}));
+
 const renderWithProviders = (component: React.ReactNode) => {
   const store = createMockStore();
   return render(
@@ -104,6 +140,7 @@ const renderWithProviders = (component: React.ReactNode) => {
 describe('MobileDashboard', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockActiveWarehouseId = 1;
   });
 
   it('should render welcome message with user name', () => {
@@ -169,5 +206,46 @@ describe('MobileDashboard', () => {
     expect(screen.getByText('New Order')).toBeInTheDocument();
     expect(screen.getByText('New Kit')).toBeInTheDocument();
     expect(screen.getByText('Reports')).toBeInTheDocument();
+  });
+
+  describe('active warehouse scoping', () => {
+    it('passes the active warehouse id to the tools query', () => {
+      mockActiveWarehouseId = 42;
+      renderWithProviders(<MobileDashboard />);
+
+      expect(toolsQuerySpy).toHaveBeenCalled();
+      const [params, options] = toolsQuerySpy.mock.calls[0];
+      expect(params?.warehouse_id).toBe(42);
+      expect(options?.skip).toBe(false);
+    });
+
+    it('passes the active warehouse id to the chemicals query', () => {
+      mockActiveWarehouseId = 42;
+      renderWithProviders(<MobileDashboard />);
+
+      expect(chemicalsQuerySpy).toHaveBeenCalled();
+      const [params, options] = chemicalsQuerySpy.mock.calls[0];
+      expect(params?.warehouse_id).toBe(42);
+      expect(options?.skip).toBe(false);
+    });
+
+    it('skips the tools and chemicals queries when no warehouse is selected', () => {
+      mockActiveWarehouseId = null;
+      renderWithProviders(<MobileDashboard />);
+
+      const [, toolsOptions] = toolsQuerySpy.mock.calls[0];
+      const [, chemicalsOptions] = chemicalsQuerySpy.mock.calls[0];
+      expect(toolsOptions?.skip).toBe(true);
+      expect(chemicalsOptions?.skip).toBe(true);
+    });
+
+    it('shows a select-warehouse notice when no warehouse is selected', () => {
+      mockActiveWarehouseId = null;
+      renderWithProviders(<MobileDashboard />);
+
+      expect(
+        screen.getByText(/select an active warehouse/i)
+      ).toBeInTheDocument();
+    });
   });
 });

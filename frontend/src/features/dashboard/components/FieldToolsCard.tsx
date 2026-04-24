@@ -9,15 +9,21 @@ import { useNavigate } from 'react-router-dom';
 import type { ColumnsType } from 'antd/es/table';
 import dayjs from 'dayjs';
 import { useGetActiveKitToolCheckoutsQuery } from '@features/kits/services/kitsApi';
+import { useActiveWarehouse } from '@features/warehouses/hooks/useActiveWarehouse';
 import type { KitToolCheckout } from '@features/kits/types';
 
 const { Text, Title } = Typography;
 
 export const FieldToolsCard = () => {
   const navigate = useNavigate();
+  const { activeWarehouseId } = useActiveWarehouse();
 
-  const { data, isLoading } = useGetActiveKitToolCheckoutsQuery();
+  const { data, isLoading } = useGetActiveKitToolCheckoutsQuery(
+    { warehouse_id: activeWarehouseId ?? undefined },
+    { skip: !activeWarehouseId }
+  );
 
+  const noActiveWarehouse = !activeWarehouseId;
   const checkouts = data?.checkouts || [];
   const total = data?.total || 0;
 
@@ -125,7 +131,13 @@ export const FieldToolsCard = () => {
       }
       styles={{ body: { padding: '0 0 8px 0' } }}
     >
-      {isLoading ? (
+      {noActiveWarehouse ? (
+        <Empty
+          image={Empty.PRESENTED_IMAGE_SIMPLE}
+          description="Select an active warehouse to view field-deployed tools"
+          style={{ padding: '16px 0' }}
+        />
+      ) : isLoading ? (
         <div style={{ padding: 24, textAlign: 'center' }}>
           <Spin />
         </div>

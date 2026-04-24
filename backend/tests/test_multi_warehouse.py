@@ -966,3 +966,201 @@ class TestCheckoutReadScoping:
             f"/api/tool-checkouts/{checkout_id}", headers=user_hdrs
         )
         assert resp.status_code == 404
+
+
+# ─── Dashboard field-tools card (/api/kit-tool-checkouts/active) ─────────────
+
+
+def _kit_in(db_session, admin_user, name_prefix="DashKit"):
+    """Create a kit with a unique name + aircraft type for testing."""
+    from models_kits import AircraftType, Kit
+
+    ac_type = AircraftType.query.filter_by(name="Q400").first()
+    if ac_type is None:
+        ac_type = AircraftType(name="Q400", description="Test AC", is_active=True)
+        db_session.add(ac_type)
+        db_session.flush()
+
+    kit = Kit(
+        name=f"{name_prefix} {uuid.uuid4().hex[:6]}",
+        aircraft_type_id=ac_type.id,
+        description="Pytest kit",
+        status="active",
+        created_by=admin_user.id,
+    )
+    db_session.add(kit)
+    db_session.commit()
+    return kit
+
+
+def _active_field_checkout(db_session, tool, kit, user):
+    """Create an active KitToolCheckout deploying ``tool`` to ``kit``."""
+    from models_kits import KitToolCheckout
+
+    ktc = KitToolCheckout(
+        tool_id=tool.id,
+        kit_id=kit.id,
+        checked_out_by_id=user.id,
+        previous_location=tool.location,
+        previous_warehouse_id=tool.warehouse_id,
+        status="active",
+    )
+    db_session.add(ktc)
+    db_session.commit()
+    return ktc
+
+
+class TestActiveKitToolCheckoutsWarehouseFilter:
+    """
+    /api/kit-tool-checkouts/active powers the dashboard "Tools in Field" card.
+
+    Scoping rules (mirrors /api/tool-checkouts/active):
+    - Non-admins are always scoped to their active warehouse (by the *source*
+      warehouse of the tool, ``KitToolCheckout.tool.warehouse_id``). An
+      explicit ``warehouse_id`` query param from a non-admin is ignored.
+    - Admins see every warehouse and may narrow the list via ``warehouse_id``.
+    - Non-admins without any active warehouse get an empty list.
+    """
+
+    def test_admin_sees_every_warehouse_by_default(
+        self, client, admin_user, jwt_manager, db_session
+    ):
+        wh_a = _warehouse(db_session, "FieldAdminA")
+        wh_b = _warehouse(db_session, "FieldAdminB")
+        tool_a = _tool_in(db_session, wh_a)
+        tool_b = _tool_in(db_session, wh_b)
+        kit = _kit_in(db_session, admin_user)
+
+        _active_field_checkout(db_session, tool_a, kit, admin_user)
+        _active_field_checkout(db_session, tool_b, kit, admin_user)
+
+        hdrs = _headers_with_warehouse(
+            client, jwt_manager, admin_user, wh_a.id, db_session
+        )
+        resp = client.get("/api/kit-tool-checkouts/active", headers=hdrs)
+        assert resp.status_code == 200
+        tool_ids = {c["tool_id"] for c in resp.json["checkouts"]}
+        assert {tool_a.id, tool_b.id}.issubset(tool_ids)
+
+    def test_non_admin_is_scoped_to_active_warehouse(
+        self, client, admin_user, regular_user, jwt_manager, db_session
+    ):
+        """Non-admin without warehouse_id must only see tools from wh_a."""
+        _grant_checkout_view(regular_user, db_session)
+
+        wh_a = _warehouse(db_session, "FieldScopeA")
+        wh_b = _warehouse(db_session, "FieldScopeB")
+        tool_a = _tool_in(db_session, wh_a)
+        tool_b = _tool_in(db_session, wh_b)
+        kit = _kit_in(db_session, admin_user)
+
+        _active_field_checkout(db_session, tool_a, kit, admin_user)
+        _active_field_checkout(db_session, tool_b, kit, admin_user)
+
+        hdrs = _headers_with_warehouse(
+            client, jwt_manager, regular_user, wh_a.id, db_session
+        )
+        resp = client.get("/api/kit-tool-checkouts/active", headers=hdrs)
+        assert resp.status_code == 200
+        tool_ids = [c["tool_id"] for c in resp.json["checkouts"]]
+        assert tool_ids == [tool_a.id]
+        assert resp.json["total"] == 1
+
+    def test_non_admin_warehouse_id_param_is_ignored(
+        self, client, admin_user, regular_user, jwt_manager, db_session
+    ):
+        """Non-admin passing warehouse_id for a different warehouse still only sees their own."""
+        _grant_checkout_view(regular_user, db_session)
+
+        wh_a = _warehouse(db_session, "FieldIgnoreA")
+        wh_b = _warehouse(db_session, "FieldIgnoreB")
+        tool_a = _tool_in(db_session, wh_a)
+        tool_b = _tool_in(db_session, wh_b)
+        kit = _kit_in(db_session, admin_user)
+
+        _active_field_checkout(db_session, tool_a, kit, admin_user)
+        _active_field_checkout(db_session, tool_b, kit, admin_user)
+
+        hdrs = _headers_with_warehouse(
+            client, jwt_manager, regular_user, wh_a.id, db_session
+        )
+        resp = client.get(
+            f"/api/kit-tool-checkouts/active?warehouse_id={wh_b.id}",
+            headers=hdrs,
+        )
+        assert resp.status_code == 200
+        tool_ids = [c["tool_id"] for c in resp.json["checkouts"]]
+        assert tool_ids == [tool_a.id]
+        assert resp.json["total"] == 1
+
+    def test_admin_warehouse_id_param_narrows_results(
+        self, client, admin_user, jwt_manager, db_session
+    ):
+        """Admin can narrow the list by warehouse_id."""
+        wh_a = _warehouse(db_session, "FieldAdminNarrowA")
+        wh_b = _warehouse(db_session, "FieldAdminNarrowB")
+        tool_a = _tool_in(db_session, wh_a)
+        tool_b = _tool_in(db_session, wh_b)
+        kit = _kit_in(db_session, admin_user)
+
+        _active_field_checkout(db_session, tool_a, kit, admin_user)
+        _active_field_checkout(db_session, tool_b, kit, admin_user)
+
+        hdrs = _headers_with_warehouse(
+            client, jwt_manager, admin_user, wh_a.id, db_session
+        )
+        resp = client.get(
+            f"/api/kit-tool-checkouts/active?warehouse_id={wh_a.id}",
+            headers=hdrs,
+        )
+        assert resp.status_code == 200
+        tool_ids = [c["tool_id"] for c in resp.json["checkouts"]]
+        assert tool_ids == [tool_a.id]
+        assert resp.json["total"] == 1
+
+    def test_non_admin_with_no_active_warehouse_returns_empty(
+        self, client, regular_user, admin_user, jwt_manager, db_session
+    ):
+        """Non-admin without any active warehouse must see an empty list."""
+        _grant_checkout_view(regular_user, db_session)
+
+        wh = _warehouse(db_session, "FieldNoneSet")
+        tool = _tool_in(db_session, wh)
+        kit = _kit_in(db_session, admin_user)
+        _active_field_checkout(db_session, tool, kit, admin_user)
+
+        # No active warehouse on the user / token.
+        regular_user.active_warehouse_id = None
+        db_session.commit()
+        with client.application.app_context():
+            tokens = jwt_manager.generate_tokens(regular_user)
+        hdrs = {"Authorization": f"Bearer {tokens['access_token']}"}
+
+        resp = client.get("/api/kit-tool-checkouts/active", headers=hdrs)
+        assert resp.status_code == 200
+        assert resp.json == {"checkouts": [], "total": 0}
+
+    def test_warehouse_filter_excludes_returned_checkouts(
+        self, client, admin_user, regular_user, jwt_manager, db_session
+    ):
+        """A returned KitToolCheckout must not appear even when it matches the warehouse."""
+        _grant_checkout_view(regular_user, db_session)
+
+        wh = _warehouse(db_session, "FieldReturned")
+        tool_active = _tool_in(db_session, wh)
+        tool_returned = _tool_in(db_session, wh)
+        kit = _kit_in(db_session, admin_user)
+
+        _active_field_checkout(db_session, tool_active, kit, admin_user)
+        returned = _active_field_checkout(db_session, tool_returned, kit, admin_user)
+        returned.status = "returned"
+        db_session.commit()
+
+        hdrs = _headers_with_warehouse(
+            client, jwt_manager, regular_user, wh.id, db_session
+        )
+        resp = client.get("/api/kit-tool-checkouts/active", headers=hdrs)
+        assert resp.status_code == 200
+        tool_ids = [c["tool_id"] for c in resp.json["checkouts"]]
+        assert tool_ids == [tool_active.id]
+        assert resp.json["total"] == 1

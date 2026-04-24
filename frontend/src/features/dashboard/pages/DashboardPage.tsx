@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import { Row, Col, Spin } from 'antd';
+import { Alert, Row, Col, Spin } from 'antd';
 import {
   ToolOutlined,
   SwapOutlined,
@@ -54,9 +54,15 @@ export const DashboardPage = () => {
 
   const { activeWarehouseId } = useActiveWarehouse();
 
-  // Fetch data
-  const { data: toolsData, isLoading: toolsLoading, refetch: refetchTools } = useGetToolsQuery({ per_page: 1000 });
-  const { data: chemicalsData, isLoading: chemicalsLoading, refetch: refetchChemicals } = useGetChemicalsQuery({ per_page: 1000 });
+  // Fetch data — tools and chemicals are scoped to the active warehouse
+  const { data: toolsData, isLoading: toolsLoading, refetch: refetchTools } = useGetToolsQuery(
+    { per_page: 1000, warehouse_id: activeWarehouseId ?? undefined },
+    { skip: !activeWarehouseId }
+  );
+  const { data: chemicalsData, isLoading: chemicalsLoading, refetch: refetchChemicals } = useGetChemicalsQuery(
+    { per_page: 1000, warehouse_id: activeWarehouseId ?? undefined },
+    { skip: !activeWarehouseId }
+  );
 
   // Warehouse-scoped counts for the top stat cards
   const { data: inboundData, isLoading: inboundLoading } = useListInboundTransfersQuery(
@@ -252,6 +258,16 @@ export const DashboardPage = () => {
           primaryColor={primaryColor}
         />
       </div>
+
+      {!activeWarehouseId && (
+        <Alert
+          data-testid="dashboard-no-warehouse-banner"
+          type="info"
+          showIcon
+          message="Select an active warehouse to populate the tools and chemicals stats."
+          style={{ marginBottom: 16 }}
+        />
+      )}
 
       {/* On-Call Personnel */}
       <Row gutter={[16, 16]} style={{ marginBottom: 24 }}>
