@@ -5,13 +5,16 @@ import { FieldToolsCard } from './FieldToolsCard';
 
 type QueryParams = { warehouse_id?: number };
 type QueryOptions = { skip?: boolean };
+type UseActiveKitToolCheckoutsQueryFn = (
+  params?: QueryParams,
+  options?: QueryOptions,
+) => { data: { checkouts: unknown[]; total: number }; isLoading: boolean };
 
-const activeKitToolCheckoutsSpy = vi.fn(
-  (_params?: QueryParams, _options?: QueryOptions) => ({
-    data: { checkouts: [], total: 0 },
-    isLoading: false,
-  })
-);
+const activeKitToolCheckoutsSpy = vi.fn<UseActiveKitToolCheckoutsQueryFn>();
+activeKitToolCheckoutsSpy.mockReturnValue({
+  data: { checkouts: [], total: 0 },
+  isLoading: false,
+});
 
 vi.mock('@features/kits/services/kitsApi', () => ({
   useGetActiveKitToolCheckoutsQuery: (

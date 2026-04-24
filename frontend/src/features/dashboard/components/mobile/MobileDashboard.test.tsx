@@ -44,19 +44,28 @@ const createMockStore = () => {
 type ToolsQueryParams = { per_page?: number; warehouse_id?: number };
 type ChemicalsQueryParams = { per_page?: number; warehouse_id?: number };
 type QueryOptions = { skip?: boolean };
+type UseGetToolsQueryFn = (
+  params?: ToolsQueryParams,
+  options?: QueryOptions,
+) => { data: { tools: unknown[]; total: number }; isLoading: boolean };
+type UseGetChemicalsQueryFn = (
+  params?: ChemicalsQueryParams,
+  options?: QueryOptions,
+) => {
+  data: { chemicals: unknown[]; pagination: { total: number } };
+  isLoading: boolean;
+};
 
-const toolsQuerySpy = vi.fn(
-  (_params?: ToolsQueryParams, _options?: QueryOptions) => ({
-    data: { tools: [], total: 0 },
-    isLoading: false,
-  })
-);
-const chemicalsQuerySpy = vi.fn(
-  (_params?: ChemicalsQueryParams, _options?: QueryOptions) => ({
-    data: { chemicals: [], pagination: { total: 0 } },
-    isLoading: false,
-  })
-);
+const toolsQuerySpy = vi.fn<UseGetToolsQueryFn>();
+toolsQuerySpy.mockReturnValue({
+  data: { tools: [], total: 0 },
+  isLoading: false,
+});
+const chemicalsQuerySpy = vi.fn<UseGetChemicalsQueryFn>();
+chemicalsQuerySpy.mockReturnValue({
+  data: { chemicals: [], pagination: { total: 0 } },
+  isLoading: false,
+});
 
 vi.mock('@features/tools/services/toolsApi', () => ({
   useGetToolsQuery: (params?: ToolsQueryParams, options?: QueryOptions) =>
