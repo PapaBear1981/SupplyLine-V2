@@ -35,10 +35,10 @@
 .mobile-login-form {
   position: relative;
   z-index: 1;
-  padding: 28px 20px 24px;
+  padding: 24px 20px 22px;
   display: flex;
   flex-direction: column;
-  gap: 24px;
+  gap: 22px;
   animation: fadeInUp 0.4s ease-out;
 }
 
@@ -49,22 +49,85 @@
   -webkit-backdrop-filter: blur(12px);
 }
 
+/* --- Brand mark (top of card) ------------------------------------------- */
+.mobile-login-brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  font-weight: 700;
+  letter-spacing: 0.22em;
+  font-size: 12px;
+  color: var(--login-text-primary);
+}
+
+.mobile-login-brand-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  background: var(--login-accent-cyan, #00d9ff);
+  box-shadow:
+    0 0 0 3px rgba(0, 217, 255, 0.18),
+    0 0 14px rgba(0, 217, 255, 0.7);
+  animation: login-brand-pulse 2.6s ease-in-out infinite;
+}
+
+.mobile-login-brand-word {
+  font-family:
+    'Inter',
+    -apple-system,
+    BlinkMacSystemFont,
+    'Segoe UI',
+    sans-serif;
+}
+
+.mobile-login-brand-chip {
+  padding: 2px 7px;
+  border-radius: 4px;
+  font-size: 10px;
+  letter-spacing: 0.18em;
+  color: var(--login-accent-primary);
+  background: rgba(100, 181, 246, 0.12);
+  border: 1px solid rgba(100, 181, 246, 0.28);
+}
+
+/* --- Header ------------------------------------------------------------- */
 .mobile-login-header {
   text-align: left;
-  margin-bottom: 8px;
+  margin-bottom: 4px;
+}
+
+.mobile-login-mark {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  margin-bottom: 14px;
+  border-radius: 11px;
+  color: var(--login-accent-cyan, #00d9ff);
+  background: linear-gradient(
+    135deg,
+    rgba(0, 217, 255, 0.16) 0%,
+    rgba(100, 181, 246, 0.12) 100%
+  );
+  border: 1px solid rgba(100, 181, 246, 0.28);
+  box-shadow:
+    0 0 0 4px rgba(0, 217, 255, 0.05),
+    0 6px 20px rgba(0, 217, 255, 0.18);
+  font-size: 18px;
 }
 
 .mobile-login-title {
-  font-size: 28px;
+  font-size: 26px;
   font-weight: 700;
-  margin: 0 0 12px;
+  margin: 0 0 8px;
   color: var(--login-text-primary);
-  letter-spacing: -0.5px;
+  letter-spacing: -0.01em;
 }
 
 .mobile-login-subtitle {
   font-size: 14px;
-  line-height: 1.5;
+  line-height: 1.55;
   color: var(--login-text-secondary);
   margin: 0;
 }
@@ -131,11 +194,11 @@
 
 /* Submit Button */
 .mobile-login-form .adm-form-footer {
-  margin-top: 32px;
+  margin-top: 28px;
 }
 
 .mobile-login-form .adm-button {
-  --border-radius: 10px;
+  --border-radius: 12px;
   --background-color: var(--login-accent-primary);
   --border-color: var(--login-accent-primary);
 
@@ -159,7 +222,7 @@
 /* Footer */
 .mobile-login-footer {
   text-align: center;
-  padding-top: 8px;
+  padding-top: 4px;
 }
 
 .mobile-login-help {
@@ -168,31 +231,132 @@
   margin: 0;
 }
 
-/* Info Section — use glass-card tokens */
-.mobile-login-info {
-  margin-top: 16px;
-  padding: 18px;
-  background: var(--login-glass-bg);
-  border-radius: 14px;
-  border: 1px solid var(--login-glass-border);
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
+/* --- Hero section (bottom of card) -------------------------------------- */
+.mobile-login-hero {
+  margin-top: 6px;
+  padding-top: 20px;
+  border-top: 1px solid var(--login-glass-border);
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
 }
 
-.mobile-login-info-title {
-  font-size: 15px;
+.mobile-login-hero-headline {
+  margin: 0;
+  font-size: 17px;
+  line-height: 1.35;
+  letter-spacing: -0.01em;
   font-weight: 600;
   color: var(--login-text-primary);
-  margin-bottom: 8px;
-  text-align: center;
 }
 
-.mobile-login-info-text {
+.mobile-login-hero-accent {
+  background: linear-gradient(
+    135deg,
+    var(--login-accent-primary) 0%,
+    var(--login-accent-cyan, #00d9ff) 100%
+  );
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.mobile-login-ticker {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px 12px 18px;
+  border-radius: 12px;
+  background: rgba(13, 26, 46, 0.45);
+  border: 1px solid var(--login-glass-border);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  overflow: hidden;
+}
+
+.mobile-login-ticker-rail {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 3px;
+  background: linear-gradient(
+    180deg,
+    var(--login-accent-cyan, #00d9ff),
+    var(--login-accent-primary)
+  );
+}
+
+.mobile-login-ticker-row {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
   font-size: 13px;
-  line-height: 1.6;
   color: var(--login-text-secondary);
-  margin: 0;
-  text-align: center;
+  white-space: nowrap;
+}
+
+.mobile-login-ticker-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 999px;
+  flex-shrink: 0;
+}
+
+.mobile-login-ticker-dot.tone-good,
+.mobile-login-ticker-status.tone-good {
+  color: #62e3a3;
+}
+.mobile-login-ticker-dot.tone-good {
+  background: #62e3a3;
+  box-shadow: 0 0 10px rgba(98, 227, 163, 0.55);
+}
+
+.mobile-login-ticker-dot.tone-accent,
+.mobile-login-ticker-status.tone-accent {
+  color: var(--login-accent-cyan, #00d9ff);
+}
+.mobile-login-ticker-dot.tone-accent {
+  background: var(--login-accent-cyan, #00d9ff);
+  box-shadow: 0 0 10px rgba(0, 217, 255, 0.6);
+}
+
+.mobile-login-ticker-dot.tone-warn,
+.mobile-login-ticker-status.tone-warn {
+  color: #ffc970;
+}
+.mobile-login-ticker-dot.tone-warn {
+  background: #ffc970;
+  box-shadow: 0 0 10px rgba(255, 201, 112, 0.55);
+}
+
+.mobile-login-ticker-label {
+  color: var(--login-text-primary);
+  font-weight: 500;
+}
+
+.mobile-login-ticker-sep {
+  color: var(--login-text-tertiary);
+}
+
+.mobile-login-ticker-status {
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+
+.mobile-login-hero-foot {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--login-text-tertiary);
+}
+
+.mobile-login-hero-foot-sep {
+  opacity: 0.6;
 }
 
 /* Password visibility toggle */
@@ -225,9 +389,25 @@
   color: var(--login-accent-primary);
 }
 
-/* Reduce motion — kill the rotating backdrop */
+@keyframes login-brand-pulse {
+  0%,
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.7;
+    transform: scale(0.88);
+  }
+}
+
+/* Reduce motion — kill the rotating backdrop and brand pulse */
 @media (prefers-reduced-motion: reduce) {
   .mobile-login-bg::before {
+    animation: none;
+  }
+
+  .mobile-login-brand-dot {
     animation: none;
   }
 }
