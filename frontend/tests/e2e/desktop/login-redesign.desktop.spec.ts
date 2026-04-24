@@ -33,10 +33,14 @@ test.describe('Login page redesign (desktop)', () => {
     await expect(shell).toBeVisible();
     await expect(shell).toHaveAttribute('data-theme', 'dark');
 
-    // Branded hero is visible on full-width desktop viewports.
-    await expect(anonPage.getByTestId('login-hero')).toBeVisible();
-    await expect(anonPage.getByText('SUPPLYLINE')).toBeVisible();
-    await expect(anonPage.getByText(/Keep the line/i)).toBeVisible();
+    // Branded hero is visible on full-width desktop viewports. Scope all
+    // text lookups to the hero — the footer line inside it also contains
+    // the word "SupplyLine", so an unscoped substring match would hit two
+    // elements and trip strict mode.
+    const hero = anonPage.getByTestId('login-hero');
+    await expect(hero).toBeVisible();
+    await expect(hero.getByText('SUPPLYLINE', { exact: true })).toBeVisible();
+    await expect(hero.getByText(/Keep the line/i)).toBeVisible();
 
     // Form card is still there.
     await expect(anonPage.getByTestId('login-form')).toBeVisible();
