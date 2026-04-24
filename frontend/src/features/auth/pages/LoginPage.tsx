@@ -14,10 +14,10 @@ import {
   MobileBackupCodeForm,
 } from '../components/mobile';
 import { LoginForm } from '../components/login/LoginForm';
+import { LoginHero } from '../components/login/LoginHero';
 import { ForcedTotpSetup } from '../components/login/ForcedTotpSetup';
 import { TotpVerificationForm } from '../components/TotpVerificationForm';
 import { BackupCodeForm } from '../components/BackupCodeForm';
-import { ThemeToggle } from '../components/shared/ThemeToggle';
 import { pageVariants } from '../styles/animations';
 import type { LoginResponse } from '../types';
 import '../styles/glassmorphism.css';
@@ -160,78 +160,91 @@ export const LoginPage = () => {
   }
 
   // ---------- Desktop rendering ---------------------------------------------
-  return (
-    <div className="login-page">
-      <ThemeToggle />
-
-      <div className="login-background">
-        {/* Gradient background */}
-        <div className="login-gradient" />
+  // The login page is always dark-themed regardless of the user's global theme
+  // preference. `data-theme="dark"` scopes the dark CSS variables to this
+  // subtree only.
+  if (loginState === 'TOTP_SETUP' && loginResponse) {
+    return (
+      <div className="login-page" data-theme="dark">
+        <div className="login-bg-orbs" aria-hidden="true" />
+        <div className="login-bg-grid" aria-hidden="true" />
+        <motion.div
+          key="totp-setup"
+          variants={pageVariants}
+          initial="initial"
+          animate="animate"
+          exit="exit"
+          className="totp-setup-fullscreen"
+        >
+          <ForcedTotpSetup />
+        </motion.div>
       </div>
+    );
+  }
 
-      <div className="login-container">
-        <AnimatePresence mode="wait">
-          {loginState === 'PASSWORD_ENTRY' && (
-            <motion.div
-              key="password-entry"
-              variants={pageVariants}
-              initial="initial"
-              animate="animate"
-              exit="exit"
-              className="glass-card login-card"
-            >
-              <LoginForm onSuccess={handleLoginSuccess} />
-            </motion.div>
-          )}
+  return (
+    <div className="login-page" data-theme="dark" data-testid="login-page">
+      <div className="login-bg-orbs" aria-hidden="true" />
+      <div className="login-bg-grid" aria-hidden="true" />
 
-          {loginState === 'TOTP_SETUP' && loginResponse && (
-            <motion.div
-              key="totp-setup"
-              variants={pageVariants}
-              initial="initial"
-              animate="animate"
-              exit="exit"
-              className="totp-setup-fullscreen"
-            >
-              <ForcedTotpSetup />
-            </motion.div>
-          )}
+      <div className="login-shell">
+        <aside className="login-hero" data-testid="login-hero">
+          <LoginHero />
+        </aside>
 
-          {loginState === 'TOTP_VERIFICATION' && (
-            <motion.div
-              key="totp-verification"
-              variants={pageVariants}
-              initial="initial"
-              animate="animate"
-              exit="exit"
-              className="glass-card login-card"
-            >
-              <TotpVerificationForm
-                employeeNumber={employeeNumber}
-                onBack={handleBackToPassword}
-                onSuccess={handleTotpVerified}
-                onUseBackupCode={handleBackupCodeSwitch}
-              />
-            </motion.div>
-          )}
+        <section className="login-panel">
+          <div className="login-panel-inner">
+            <AnimatePresence mode="wait">
+              {loginState === 'PASSWORD_ENTRY' && (
+                <motion.div
+                  key="password-entry"
+                  variants={pageVariants}
+                  initial="initial"
+                  animate="animate"
+                  exit="exit"
+                  className="glass-card glass-card-elevated login-card"
+                >
+                  <LoginForm onSuccess={handleLoginSuccess} />
+                </motion.div>
+              )}
 
-          {loginState === 'BACKUP_CODE_ENTRY' && (
-            <motion.div
-              key="backup-code-entry"
-              variants={pageVariants}
-              initial="initial"
-              animate="animate"
-              exit="exit"
-              className="glass-card login-card"
-            >
-              <BackupCodeForm
-                employeeNumber={employeeNumber}
-                onSuccess={completeAuthentication}
-                onBack={handleBackToTotp}
-              />
-            </motion.div>
-          )}
-        </AnimatePresence>
+              {loginState === 'TOTP_VERIFICATION' && (
+                <motion.div
+                  key="totp-verification"
+                  variants={pageVariants}
+                  initial="initial"
+                  animate="animate"
+                  exit="exit"
+                  className="glass-card glass-card-elevated login-card"
+                >
+                  <TotpVerificationForm
+                    employeeNumber={employeeNumber}
+                    onBack={handleBackToPassword}
+                    onSuccess={handleTotpVerified}
+                    onUseBackupCode={handleBackupCodeSwitch}
+                  />
+                </motion.div>
+              )}
+
+              {loginState === 'BACKUP_CODE_ENTRY' && (
+                <motion.div
+                  key="backup-code-entry"
+                  variants={pageVariants}
+                  initial="initial"
+                  animate="animate"
+                  exit="exit"
+                  className="glass-card glass-card-elevated login-card"
+                >
+                  <BackupCodeForm
+                    employeeNumber={employeeNumber}
+                    onSuccess={completeAuthentication}
+                    onBack={handleBackToTotp}
+                  />
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </div>
+        </section>
       </div>
     </div>
   );
