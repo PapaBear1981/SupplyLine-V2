@@ -83,7 +83,7 @@ services:
     name: supplyline-frontend
     env: static
     rootDir: frontend
-    autoDeploy: false
+    autoDeploy: true
     buildCommand: npm install && npm run build
     staticPublishPath: dist
     # Rewrite all paths to index.html for React Router (SPA routing).
@@ -97,6 +97,14 @@ services:
       - path: /assets/*
         name: Cache-Control
         value: public, max-age=31536000, immutable
+      # Everything else (index.html and the SPA entry points that
+      # rewrite to it) must always revalidate; otherwise Render's
+      # edge CDN keeps serving a stale index.html that still points
+      # at the previous deploy's hashed asset filenames, so users see
+      # old code even after a successful rebuild.
+      - path: /*
+        name: Cache-Control
+        value: public, max-age=0, must-revalidate
     envVars:
       # Vite bakes these into the bundle at build time.
       # Update both values if you rename the backend service.
