@@ -41,8 +41,8 @@
   --login-text-primary: #f7fbff;
   --login-text-secondary: rgba(247, 251, 255, 0.78);
   --login-text-tertiary: rgba(247, 251, 255, 0.55);
-  --login-input-bg: rgba(15, 30, 55, 0.55);
-  --login-input-border: rgba(94, 165, 255, 0.28);
+  --login-input-bg: rgba(8, 18, 36, 0.92);
+  --login-input-border: rgba(94, 165, 255, 0.4);
   --login-input-focus: #64b5f6;
   --login-accent-primary: #64b5f6;
   --login-accent-secondary: #5ea5ff;
