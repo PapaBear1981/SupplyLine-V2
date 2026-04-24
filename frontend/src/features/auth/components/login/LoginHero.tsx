@@ -3,9 +3,9 @@ import { AnimatePresence, motion } from 'framer-motion';
 import './LoginHero.css';
 
 const TICKER_ITEMS = [
-  { label: 'Hangar 3', status: 'Online', tone: 'good' as const },
+  { label: 'Tool crib', status: 'Online', tone: 'good' as const },
   { label: 'Inventory sync', status: '99.2%', tone: 'good' as const },
-  { label: 'Line 12 · AOG kit', status: 'Dispatched', tone: 'accent' as const },
+  { label: 'Checkouts today', status: '47', tone: 'accent' as const },
   { label: 'Calibration due', status: '3 tools', tone: 'warn' as const },
 ];
 
@@ -46,7 +46,8 @@ export const LoginHero = () => {
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.6, ease: [0.22, 1, 0.36, 1], delay: 0.1 }}
         >
-          Keep the line <span className="login-headline-accent">moving.</span>
+          Keep the right tool in the right hand at the{' '}
+          <span className="login-headline-accent">right time.</span>
         </motion.h1>
         <motion.p
           className="login-subhead"
@@ -54,8 +55,7 @@ export const LoginHero = () => {
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.6, ease: [0.22, 1, 0.36, 1], delay: 0.22 }}
         >
-          Dispatch drops, monitor hangars, and coordinate crews from a single
-          flight deck. Built for the pace of MRO.
+          Inventory, checkouts, and accountability, built for MRO.
         </motion.p>
 
         <motion.div

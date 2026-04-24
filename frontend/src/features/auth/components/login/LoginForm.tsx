@@ -57,7 +57,7 @@ export const LoginForm = ({ onSuccess }: LoginFormProps) => {
           Welcome back
         </Title>
         <Text type="secondary" className="login-form-subtitle">
-          Sign in to resume dispatch, hangar ops, and crew coordination.
+          Sign in to pick up your tool checkouts, kits, and inventory.
         </Text>
       </div>
 
