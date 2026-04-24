@@ -680,3 +680,289 @@ class TestTransferHistory:
         data = resp.json
         assert data["transfers"] == []
         assert data["total"] == 0
+
+
+# ─── Warehouse-scope enforcement on read endpoints ───────────────────────────
+
+
+def _grant_checkout_view(user, db_session):
+    """Grant checkout.view so a non-admin can hit the listing endpoints."""
+    from models import Permission, UserPermission
+    perm = Permission.query.filter_by(name="checkout.view").first()
+    if perm is None:
+        perm = Permission(name="checkout.view", description="View checkouts")
+        db_session.add(perm)
+        db_session.flush()
+    db_session.add(
+        UserPermission(
+            user_id=user.id,
+            permission_id=perm.id,
+            grant_type="grant",
+            granted_by=user.id,
+        )
+    )
+    db_session.commit()
+
+
+def _grant_checkout_create(user, db_session):
+    """Grant checkout.create so we can seed active checkouts as a non-admin."""
+    from models import Permission, UserPermission
+    perm = Permission.query.filter_by(name="checkout.create").first()
+    if perm is None:
+        perm = Permission(name="checkout.create", description="Create checkouts")
+        db_session.add(perm)
+        db_session.flush()
+    db_session.add(
+        UserPermission(
+            user_id=user.id,
+            permission_id=perm.id,
+            grant_type="grant",
+            granted_by=user.id,
+        )
+    )
+    db_session.commit()
+
+
+class TestCheckoutReadScoping:
+    """
+    Non-admins must only see tools / checkouts / history tied to their active
+    warehouse. Admins bypass the scope.
+    """
+
+    def test_search_tools_only_returns_active_warehouse_tools(
+        self, client, regular_user, jwt_manager, db_session
+    ):
+        wh_a = _warehouse(db_session, "ScopeA")
+        wh_b = _warehouse(db_session, "ScopeB")
+        tool_a = _tool_in(db_session, wh_a)
+        tool_b = _tool_in(db_session, wh_b)
+
+        headers = _headers_with_warehouse(
+            client, jwt_manager, regular_user, wh_a.id, db_session
+        )
+
+        # Search on a substring shared by both tool numbers ("TN-")
+        resp = client.get("/api/tool-checkout/search?q=TN-", headers=headers)
+        assert resp.status_code == 200
+        ids = {t["id"] for t in resp.json["tools"]}
+        assert tool_a.id in ids
+        assert tool_b.id not in ids
+
+    def test_search_tools_admin_sees_all_warehouses(
+        self, client, admin_user, jwt_manager, db_session
+    ):
+        wh_a = _warehouse(db_session, "ScopeAdminA")
+        wh_b = _warehouse(db_session, "ScopeAdminB")
+        tool_a = _tool_in(db_session, wh_a)
+        tool_b = _tool_in(db_session, wh_b)
+
+        headers = _headers_with_warehouse(
+            client, jwt_manager, admin_user, wh_a.id, db_session
+        )
+        resp = client.get("/api/tool-checkout/search?q=TN-", headers=headers)
+        assert resp.status_code == 200
+        ids = {t["id"] for t in resp.json["tools"]}
+        assert tool_a.id in ids
+        assert tool_b.id in ids
+
+    def test_search_tools_no_active_warehouse_returns_empty(
+        self, client, regular_user, jwt_manager, db_session
+    ):
+        wh = _warehouse(db_session, "ScopeNone")
+        _tool_in(db_session, wh)
+
+        # No active warehouse set on the user / token
+        with client.application.app_context():
+            tokens = jwt_manager.generate_tokens(regular_user)
+        headers = {"Authorization": f"Bearer {tokens['access_token']}"}
+
+        resp = client.get("/api/tool-checkout/search?q=TN-", headers=headers)
+        assert resp.status_code == 200
+        assert resp.json["tools"] == []
+
+    def test_active_checkouts_scoped_to_warehouse(
+        self, client, regular_user, admin_user, jwt_manager, db_session
+    ):
+        """
+        A non-admin user in warehouse A must not see active checkouts for
+        tools in warehouse B.
+        """
+        _grant_checkout_view(regular_user, db_session)
+
+        wh_a = _warehouse(db_session, "ActiveA")
+        wh_b = _warehouse(db_session, "ActiveB")
+        tool_a = _tool_in(db_session, wh_a)
+        tool_b = _tool_in(db_session, wh_b)
+
+        # Admin creates a checkout in each warehouse by switching active scope.
+        hdrs_admin_a = _headers_with_warehouse(
+            client, jwt_manager, admin_user, wh_a.id, db_session
+        )
+        resp = client.post(
+            "/api/tool-checkout",
+            json={"tool_id": tool_a.id, "user_id": admin_user.id},
+            headers=hdrs_admin_a,
+        )
+        assert resp.status_code == 201, resp.data
+
+        hdrs_admin_b = _headers_with_warehouse(
+            client, jwt_manager, admin_user, wh_b.id, db_session
+        )
+        resp = client.post(
+            "/api/tool-checkout",
+            json={"tool_id": tool_b.id, "user_id": admin_user.id},
+            headers=hdrs_admin_b,
+        )
+        assert resp.status_code == 201, resp.data
+
+        # Non-admin viewing from wh_a
+        hdrs = _headers_with_warehouse(
+            client, jwt_manager, regular_user, wh_a.id, db_session
+        )
+        resp = client.get("/api/tool-checkouts/active", headers=hdrs)
+        assert resp.status_code == 200
+        tool_ids = {c["tool_id"] for c in resp.json["checkouts"]}
+        assert tool_a.id in tool_ids
+        assert tool_b.id not in tool_ids
+
+    def test_my_checkouts_scoped_to_warehouse(
+        self, client, regular_user, admin_user, jwt_manager, db_session
+    ):
+        """
+        /api/tool-checkouts/my only returns the user's checkouts in their
+        active warehouse, even if they have open checkouts elsewhere.
+        """
+        _grant_checkout_create(regular_user, db_session)
+
+        wh_a = _warehouse(db_session, "MyA")
+        wh_b = _warehouse(db_session, "MyB")
+        tool_a = _tool_in(db_session, wh_a)
+        tool_b = _tool_in(db_session, wh_b)
+
+        # Regular user checks out tool_a while active in wh_a
+        hdrs_a = _headers_with_warehouse(
+            client, jwt_manager, regular_user, wh_a.id, db_session
+        )
+        resp = client.post(
+            "/api/tool-checkout",
+            json={"tool_id": tool_a.id, "user_id": regular_user.id},
+            headers=hdrs_a,
+        )
+        assert resp.status_code == 201, resp.data
+
+        # Admin gives the same user a checkout in wh_b
+        admin_hdrs = _headers_with_warehouse(
+            client, jwt_manager, admin_user, wh_b.id, db_session
+        )
+        resp = client.post(
+            "/api/tool-checkout",
+            json={"tool_id": tool_b.id, "user_id": regular_user.id},
+            headers=admin_hdrs,
+        )
+        assert resp.status_code == 201, resp.data
+
+        # Still active in wh_a — /my should only show the wh_a checkout.
+        resp = client.get("/api/tool-checkouts/my", headers=hdrs_a)
+        assert resp.status_code == 200
+        tool_ids = {c["tool_id"] for c in resp.json["checkouts"]}
+        assert tool_a.id in tool_ids
+        assert tool_b.id not in tool_ids
+
+    def test_tool_checkout_history_blocked_for_foreign_warehouse(
+        self, client, regular_user, admin_user, jwt_manager, db_session
+    ):
+        """A non-admin cannot see history for tools outside their warehouse."""
+        wh_a = _warehouse(db_session, "HistScopeA")
+        wh_b = _warehouse(db_session, "HistScopeB")
+        tool_b = _tool_in(db_session, wh_b)
+
+        # Admin creates a checkout for tool_b so it has history.
+        admin_hdrs = _headers_with_warehouse(
+            client, jwt_manager, admin_user, wh_b.id, db_session
+        )
+        resp = client.post(
+            "/api/tool-checkout",
+            json={"tool_id": tool_b.id, "user_id": admin_user.id},
+            headers=admin_hdrs,
+        )
+        assert resp.status_code == 201, resp.data
+
+        # Regular user active in wh_a cannot see tool_b's history / timeline.
+        user_hdrs = _headers_with_warehouse(
+            client, jwt_manager, regular_user, wh_a.id, db_session
+        )
+        resp = client.get(
+            f"/api/tools/{tool_b.id}/checkout-history", headers=user_hdrs
+        )
+        assert resp.status_code == 404
+
+        resp = client.get(f"/api/tools/{tool_b.id}/timeline", headers=user_hdrs)
+        assert resp.status_code == 404
+
+    def test_tool_audit_history_scoped_to_warehouse(
+        self, client, regular_user, admin_user, jwt_manager, db_session
+    ):
+        """Cross-tool audit history only shows events for in-scope tools."""
+        _grant_checkout_view(regular_user, db_session)
+
+        wh_a = _warehouse(db_session, "AuditA")
+        wh_b = _warehouse(db_session, "AuditB")
+        tool_a = _tool_in(db_session, wh_a)
+        tool_b = _tool_in(db_session, wh_b)
+
+        # Create one checkout in each warehouse so history rows exist.
+        hdrs_a = _headers_with_warehouse(
+            client, jwt_manager, admin_user, wh_a.id, db_session
+        )
+        client.post(
+            "/api/tool-checkout",
+            json={"tool_id": tool_a.id, "user_id": admin_user.id},
+            headers=hdrs_a,
+        )
+
+        hdrs_b = _headers_with_warehouse(
+            client, jwt_manager, admin_user, wh_b.id, db_session
+        )
+        client.post(
+            "/api/tool-checkout",
+            json={"tool_id": tool_b.id, "user_id": admin_user.id},
+            headers=hdrs_b,
+        )
+
+        # Non-admin at wh_a only sees tool_a's history, never tool_b's.
+        user_hdrs = _headers_with_warehouse(
+            client, jwt_manager, regular_user, wh_a.id, db_session
+        )
+        resp = client.get("/api/tool-history", headers=user_hdrs)
+        assert resp.status_code == 200
+        tool_ids = {event.get("tool_id") for event in resp.json["history"]}
+        assert tool_b.id not in tool_ids, (
+            f"tool_b events leaked into non-admin audit history: {tool_ids}"
+        )
+
+    def test_checkout_details_scoped_to_warehouse(
+        self, client, regular_user, admin_user, jwt_manager, db_session
+    ):
+        """Non-admin cannot view details of a checkout for a tool in another warehouse."""
+        wh_a = _warehouse(db_session, "DetA")
+        wh_b = _warehouse(db_session, "DetB")
+        tool_b = _tool_in(db_session, wh_b)
+
+        admin_hdrs = _headers_with_warehouse(
+            client, jwt_manager, admin_user, wh_b.id, db_session
+        )
+        resp = client.post(
+            "/api/tool-checkout",
+            json={"tool_id": tool_b.id, "user_id": admin_user.id},
+            headers=admin_hdrs,
+        )
+        assert resp.status_code == 201, resp.data
+        checkout_id = resp.json["checkout"]["id"]
+
+        user_hdrs = _headers_with_warehouse(
+            client, jwt_manager, regular_user, wh_a.id, db_session
+        )
+        resp = client.get(
+            f"/api/tool-checkouts/{checkout_id}", headers=user_hdrs
+        )
+        assert resp.status_code == 404

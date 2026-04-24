@@ -50,11 +50,22 @@ export const TEST_USERS = {
 } as const;
 
 export const TEST_TOOLS = {
-  multimeter: { number: 'T001', description: 'Digital Multimeter' },
-  torqueWrench: { number: 'T002', description: 'Torque Wrench' },
-  oscilloscope: { number: 'T003', description: 'Oscilloscope', checkedOut: true },
-  impactWrench: { number: 'T004', description: 'Impact Wrench' },
-  micrometer: { number: 'T005', description: 'Micrometer' },
+  multimeter: { number: 'T001', description: 'Digital Multimeter', warehouse: 'main' },
+  torqueWrench: { number: 'T002', description: 'Torque Wrench', warehouse: 'main' },
+  oscilloscope: {
+    number: 'T003',
+    description: 'Oscilloscope',
+    checkedOut: true,
+    warehouse: 'main',
+  },
+  impactWrench: { number: 'T004', description: 'Impact Wrench', warehouse: 'main' },
+  micrometer: { number: 'T005', description: 'Micrometer', warehouse: 'main' },
+  // Seeded in Satellite Warehouse A — used by multi-warehouse scope tests.
+  satelliteCaliper: {
+    number: 'T101',
+    description: 'Satellite Caliper',
+    warehouse: 'satelliteA',
+  },
 } as const;
 
 export const TEST_CHEMICALS = {

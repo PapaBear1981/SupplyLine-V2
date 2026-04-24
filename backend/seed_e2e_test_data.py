@@ -237,6 +237,19 @@ def create_test_warehouses(users):
         logger.info(f"Created warehouse: {warehouse.name}")
 
     db.session.commit()
+
+    # Point every seeded user at the main warehouse so the UI has a
+    # deterministic active-warehouse context on first login. Non-admin E2E
+    # tests rely on this default to exercise the warehouse-scope filter.
+    main_warehouse = next(
+        (w for w in created_warehouses if w.warehouse_type == "main"),
+        created_warehouses[0],
+    )
+    for user in users:
+        user.active_warehouse_id = main_warehouse.id
+    db.session.commit()
+    logger.info(f"Pinned {len(users)} users to active warehouse: {main_warehouse.name}")
+
     return created_warehouses
 
 
@@ -244,8 +257,13 @@ def create_test_tools(warehouses):
     """Create test tools for E2E tests"""
     logger.info("Creating E2E test tools...")
 
-    # Use the main warehouse for tools
+    # Use the main warehouse for most tools, and seed at least one in a
+    # satellite so multi-warehouse scoping has observable coverage.
     main_warehouse = next((w for w in warehouses if w.warehouse_type == "main"), warehouses[0])
+    satellite_a = next(
+        (w for w in warehouses if w.name == "Satellite Warehouse A"),
+        None,
+    )
 
     tools_data = [
         {
@@ -255,7 +273,8 @@ def create_test_tools(warehouses):
             "condition": "Good",
             "location": "Tool Crib A-1",
             "category": "Testing",
-            "status": "available"
+            "status": "available",
+            "warehouse": main_warehouse,
         },
         {
             "tool_number": "T002",
@@ -264,7 +283,8 @@ def create_test_tools(warehouses):
             "condition": "Excellent",
             "location": "Tool Crib A-2",
             "category": "Hand Tools",
-            "status": "available"
+            "status": "available",
+            "warehouse": main_warehouse,
         },
         {
             "tool_number": "T003",
@@ -273,7 +293,8 @@ def create_test_tools(warehouses):
             "condition": "Good",
             "location": "Electronics Lab",
             "category": "Testing",
-            "status": "checked_out"
+            "status": "checked_out",
+            "warehouse": main_warehouse,
         },
         {
             "tool_number": "T004",
@@ -282,7 +303,8 @@ def create_test_tools(warehouses):
             "condition": "Good",
             "location": "Shop Floor",
             "category": "Power Tools",
-            "status": "available"
+            "status": "available",
+            "warehouse": main_warehouse,
         },
         {
             "tool_number": "T005",
@@ -291,8 +313,22 @@ def create_test_tools(warehouses):
             "condition": "Excellent",
             "location": "Quality Lab",
             "category": "Measuring Tools",
-            "status": "available"
-        }
+            "status": "available",
+            "warehouse": main_warehouse,
+        },
+        {
+            # Seeded in the satellite warehouse so E2E warehouse-scope tests
+            # can verify the checkout search only returns tools from the
+            # caller's active warehouse.
+            "tool_number": "T101",
+            "serial_number": "SN101",
+            "description": "Satellite Caliper",
+            "condition": "Good",
+            "location": "Satellite Tool Crib",
+            "category": "Measuring Tools",
+            "status": "available",
+            "warehouse": satellite_a or main_warehouse,
+        },
     ]
 
     created_tools = []
@@ -305,12 +341,15 @@ def create_test_tools(warehouses):
             location=tool_data["location"],
             category=tool_data["category"],
             status=tool_data["status"],
-            warehouse_id=main_warehouse.id,  # Assign to main warehouse
+            warehouse_id=tool_data["warehouse"].id,
             created_at=get_current_time()
         )
         db.session.add(tool)
         created_tools.append(tool)
-        logger.info(f"Created tool: {tool.tool_number} - {tool.description}")
+        logger.info(
+            f"Created tool: {tool.tool_number} - {tool.description} "
+            f"(warehouse: {tool_data['warehouse'].name})"
+        )
 
     db.session.commit()
     return created_tools
