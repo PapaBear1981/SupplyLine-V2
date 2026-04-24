@@ -347,12 +347,19 @@ def register_kit_tool_checkout_routes(app):
     @app.route("/api/kit-tool-checkouts/active", methods=["GET"])
     @permission_required("checkout.view")
     def get_active_kit_tool_checkouts():
-        """Return all tools currently deployed to any kit in the field."""
-        checkouts = (
-            KitToolCheckout.query.filter_by(status="active")
-            .order_by(KitToolCheckout.checkout_date.desc())
-            .all()
-        )
+        """Return all tools currently deployed to any kit in the field.
+
+        Optionally scoped by ``warehouse_id`` (the source warehouse of the tool).
+        """
+        warehouse_id = request.args.get("warehouse_id", type=int)
+
+        query = KitToolCheckout.query.filter_by(status="active")
+        if warehouse_id:
+            query = query.join(Tool, KitToolCheckout.tool_id == Tool.id).filter(
+                Tool.warehouse_id == warehouse_id
+            )
+
+        checkouts = query.order_by(KitToolCheckout.checkout_date.desc()).all()
 
         return jsonify(
             {

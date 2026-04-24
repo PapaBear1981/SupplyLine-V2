@@ -586,9 +586,12 @@ export const kitsApi = baseApi.injectEndpoints({
 
     getActiveKitToolCheckouts: builder.query<
       { checkouts: KitToolCheckout[]; total: number },
-      void
+      { warehouse_id?: number } | void
     >({
-      query: () => '/api/kit-tool-checkouts/active',
+      query: (params) => ({
+        url: '/api/kit-tool-checkouts/active',
+        params: params?.warehouse_id ? { warehouse_id: params.warehouse_id } : undefined,
+      }),
       providesTags: [{ type: 'Kit', id: 'FIELD_TOOLS' }],
     }),
 

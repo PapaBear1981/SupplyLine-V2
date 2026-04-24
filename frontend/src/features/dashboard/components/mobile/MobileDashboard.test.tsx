@@ -90,6 +90,16 @@ vi.mock('@features/kits/components/mobile', () => ({
   MobileKitLocationMap: () => <div data-testid="kit-location-map" />,
 }));
 
+vi.mock('@features/warehouses/hooks/useActiveWarehouse', () => ({
+  useActiveWarehouse: () => ({
+    activeWarehouseId: 1,
+    activeWarehouseName: 'Test Warehouse',
+    setActiveWarehouse: vi.fn(),
+    isChanging: false,
+    error: undefined,
+  }),
+}));
+
 const renderWithProviders = (component: React.ReactNode) => {
   const store = createMockStore();
   return render(

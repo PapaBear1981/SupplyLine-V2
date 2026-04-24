@@ -41,6 +41,7 @@ import { useGetKitsQuery, useGetRecentKitActivityQuery, useGetReorderReportQuery
 import { useGetWarehousesQuery } from '@features/warehouses/services/warehousesApi';
 import { useGetAnnouncementsQuery } from '@features/admin/services/adminApi';
 import { useGetOnCallPersonnelQuery } from '@features/admin/services/oncallApi';
+import { useActiveWarehouse } from '@features/warehouses/hooks/useActiveWarehouse';
 import { MobileKitLocationMap } from '@features/kits/components/mobile';
 
 import './MobileDashboard.css';
@@ -49,10 +50,17 @@ export const MobileDashboard = () => {
   const navigate = useNavigate();
   const user = useAppSelector((state) => state.auth.user);
   const [announcementsPopupOpen, setAnnouncementsPopupOpen] = useState(false);
+  const { activeWarehouseId } = useActiveWarehouse();
 
-  // Fetch data
-  const { data: toolsData, isLoading: toolsLoading } = useGetToolsQuery({ per_page: 1000 });
-  const { data: chemicalsData, isLoading: chemicalsLoading } = useGetChemicalsQuery({ per_page: 1000 });
+  // Fetch data — tools and chemicals are scoped to the active warehouse
+  const { data: toolsData, isLoading: toolsLoading } = useGetToolsQuery(
+    { per_page: 1000, warehouse_id: activeWarehouseId ?? undefined },
+    { skip: !activeWarehouseId }
+  );
+  const { data: chemicalsData, isLoading: chemicalsLoading } = useGetChemicalsQuery(
+    { per_page: 1000, warehouse_id: activeWarehouseId ?? undefined },
+    { skip: !activeWarehouseId }
+  );
   const { data: kitsData, isLoading: kitsLoading } = useGetKitsQuery();
   const { data: warehousesData, isLoading: warehousesLoading } = useGetWarehousesQuery();
   const { data: announcements } = useGetAnnouncementsQuery();
