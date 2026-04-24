@@ -24,7 +24,10 @@ from models import (
 )
 from utils.error_handler import ValidationError
 from utils.transaction_helper import record_tool_checkout, record_tool_return
-from utils.warehouse_scope import assert_active_warehouse_matches
+from utils.warehouse_scope import (
+    assert_active_warehouse_matches,
+    current_warehouse_scope,
+)
 
 
 logger = logging.getLogger(__name__)
@@ -127,8 +130,19 @@ def register_tool_checkout_routes(app):
         """
         Return the active (not-yet-returned) checkout record for a specific tool.
         Used by the mobile scan-to-return flow.
-        Returns 404 if the tool is not currently checked out.
+        Returns 404 if the tool is not currently checked out, or if the tool
+        isn't in the caller's active warehouse (non-admin).
         """
+        tool = db.session.get(Tool, tool_id)
+        if not tool:
+            return jsonify({"error": "Tool not found"}), 404
+
+        is_admin, active_warehouse_id = current_warehouse_scope()
+        if not is_admin and (
+            active_warehouse_id is None or tool.warehouse_id != active_warehouse_id
+        ):
+            return jsonify({"error": "Tool not found"}), 404
+
         checkout = Checkout.query.filter_by(tool_id=tool_id, return_date=None).first()
         if not checkout:
             return jsonify({"error": "This tool is not currently checked out"}), 404
@@ -714,7 +728,31 @@ def register_tool_checkout_routes(app):
             department = request.args.get("department")
             overdue_only = request.args.get("overdue_only", "false").lower() == "true"
 
+            is_admin, active_warehouse_id = current_warehouse_scope()
+
+            # Non-admins with no active warehouse see nothing.
+            if not is_admin and active_warehouse_id is None:
+                return jsonify({
+                    "checkouts": [],
+                    "total": 0,
+                    "page": page,
+                    "per_page": per_page,
+                    "pages": 0,
+                }), 200
+
             query = Checkout.query.filter(Checkout.return_date.is_(None))
+
+            # Track whether Tool / User have already been joined so we don't
+            # re-join them below (duplicate joins raise in SQLAlchemy).
+            tool_joined = False
+            user_joined = False
+
+            # Scope to the user's active warehouse (admins see everything).
+            if not is_admin:
+                query = query.join(Tool, Checkout.tool_id == Tool.id).filter(
+                    Tool.warehouse_id == active_warehouse_id
+                )
+                tool_joined = True
 
             # Filter by overdue
             if overdue_only:
@@ -725,9 +763,10 @@ def register_tool_checkout_routes(app):
 
             # Search by tool number, serial number, or user name
             if search:
-                query = query.join(Tool, Checkout.tool_id == Tool.id).join(
-                    User, Checkout.user_id == User.id
-                ).filter(
+                if not tool_joined:
+                    query = query.join(Tool, Checkout.tool_id == Tool.id)
+                    tool_joined = True
+                query = query.join(User, Checkout.user_id == User.id).filter(
                     db.or_(
                         Tool.tool_number.ilike(f"%{search}%"),
                         Tool.serial_number.ilike(f"%{search}%"),
@@ -736,11 +775,13 @@ def register_tool_checkout_routes(app):
                         User.employee_number.ilike(f"%{search}%"),
                     )
                 )
+                user_joined = True
 
             # Filter by department
             if department:
-                if not search:
+                if not user_joined:
                     query = query.join(User, Checkout.user_id == User.id)
+                    user_joined = True
                 query = query.filter(User.department == department)
 
             # Order by checkout date (most recent first)
@@ -768,14 +809,30 @@ def register_tool_checkout_routes(app):
     @app.route("/api/tool-checkouts/my", methods=["GET"])
     @jwt_required
     def get_my_checkouts():
-        """Get current user's checkouts"""
+        """Get current user's checkouts (scoped to active warehouse)."""
         try:
             user_id = request.current_user.get("user_id")
             include_returned = request.args.get("include_returned", "false").lower() == "true"
             page = request.args.get("page", 1, type=int)
             per_page = request.args.get("per_page", 50, type=int)
 
+            is_admin, active_warehouse_id = current_warehouse_scope()
+
+            if not is_admin and active_warehouse_id is None:
+                return jsonify({
+                    "checkouts": [],
+                    "total": 0,
+                    "page": page,
+                    "per_page": per_page,
+                    "pages": 0,
+                }), 200
+
             query = Checkout.query.filter(Checkout.user_id == user_id)
+
+            if not is_admin:
+                query = query.join(Tool, Checkout.tool_id == Tool.id).filter(
+                    Tool.warehouse_id == active_warehouse_id
+                )
 
             if not include_returned:
                 query = query.filter(Checkout.return_date.is_(None))
@@ -803,16 +860,34 @@ def register_tool_checkout_routes(app):
     @app.route("/api/tool-checkouts/overdue", methods=["GET"])
     @permission_required("checkout.view")
     def get_overdue_tool_checkouts():
-        """Get all overdue checkouts"""
+        """Get all overdue checkouts (scoped to the user's active warehouse)."""
         try:
             page = request.args.get("page", 1, type=int)
             per_page = request.args.get("per_page", 50, type=int)
+
+            is_admin, active_warehouse_id = current_warehouse_scope()
+
+            if not is_admin and active_warehouse_id is None:
+                return jsonify({
+                    "checkouts": [],
+                    "total": 0,
+                    "page": page,
+                    "per_page": per_page,
+                    "pages": 0,
+                }), 200
 
             now = datetime.now()
             query = Checkout.query.filter(
                 Checkout.return_date.is_(None),
                 Checkout.expected_return_date < now
-            ).order_by(Checkout.expected_return_date.asc())  # Most overdue first
+            )
+
+            if not is_admin:
+                query = query.join(Tool, Checkout.tool_id == Tool.id).filter(
+                    Tool.warehouse_id == active_warehouse_id
+                )
+
+            query = query.order_by(Checkout.expected_return_date.asc())  # Most overdue first
 
             total = query.count()
             checkouts = query.offset((page - 1) * per_page).limit(per_page).all()
@@ -835,10 +910,21 @@ def register_tool_checkout_routes(app):
     @app.route("/api/tool-checkouts/due-today", methods=["GET"])
     @permission_required("checkout.view")
     def get_due_today_checkouts():
-        """Get all active checkouts whose expected return date is today"""
+        """Get active checkouts due today (scoped to the user's active warehouse)."""
         try:
             page = request.args.get("page", 1, type=int)
             per_page = request.args.get("per_page", 50, type=int)
+
+            is_admin, active_warehouse_id = current_warehouse_scope()
+
+            if not is_admin and active_warehouse_id is None:
+                return jsonify({
+                    "checkouts": [],
+                    "total": 0,
+                    "page": page,
+                    "per_page": per_page,
+                    "pages": 0,
+                }), 200
 
             now = datetime.now()
             today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
@@ -848,7 +934,14 @@ def register_tool_checkout_routes(app):
                 Checkout.return_date.is_(None),
                 Checkout.expected_return_date >= today_start,
                 Checkout.expected_return_date <= today_end,
-            ).order_by(Checkout.expected_return_date.asc())
+            )
+
+            if not is_admin:
+                query = query.join(Tool, Checkout.tool_id == Tool.id).filter(
+                    Tool.warehouse_id == active_warehouse_id
+                )
+
+            query = query.order_by(Checkout.expected_return_date.asc())
 
             total = query.count()
             checkouts = query.offset((page - 1) * per_page).limit(per_page).all()
@@ -871,11 +964,24 @@ def register_tool_checkout_routes(app):
     @app.route("/api/tool-checkouts/<int:checkout_id>", methods=["GET"])
     @jwt_required
     def get_checkout_details(checkout_id):
-        """Get detailed information about a specific checkout"""
+        """Get detailed information about a specific checkout.
+
+        Non-admins can only view checkouts whose tool is in their active
+        warehouse.
+        """
         try:
             checkout = db.session.get(Checkout, checkout_id)
             if not checkout:
                 return jsonify({"error": "Checkout not found"}), 404
+
+            is_admin, active_warehouse_id = current_warehouse_scope()
+            if not is_admin:
+                tool_warehouse_id = checkout.tool.warehouse_id if checkout.tool else None
+                if (
+                    active_warehouse_id is None
+                    or tool_warehouse_id != active_warehouse_id
+                ):
+                    return jsonify({"error": "Checkout not found"}), 404
 
             result = checkout.to_dict()
 
@@ -905,10 +1011,17 @@ def register_tool_checkout_routes(app):
     @app.route("/api/tools/<int:tool_id>/checkout-history", methods=["GET"])
     @jwt_required
     def get_tool_checkout_history(tool_id):
-        """Get complete checkout history for a tool"""
+        """Get complete checkout history for a tool (scoped to active warehouse)."""
         try:
             tool = db.session.get(Tool, tool_id)
             if not tool:
+                return jsonify({"error": "Tool not found"}), 404
+
+            is_admin, active_warehouse_id = current_warehouse_scope()
+            # Non-admins can only view history for tools in their active warehouse.
+            if not is_admin and (
+                active_warehouse_id is None or tool.warehouse_id != active_warehouse_id
+            ):
                 return jsonify({"error": "Tool not found"}), 404
 
             page = request.args.get("page", 1, type=int)
@@ -943,10 +1056,18 @@ def register_tool_checkout_routes(app):
         """
         Get comprehensive timeline for a tool including all events:
         checkouts, returns, calibrations, maintenance, damage reports, etc.
+
+        Non-admins can only view timelines for tools in their active warehouse.
         """
         try:
             tool = db.session.get(Tool, tool_id)
             if not tool:
+                return jsonify({"error": "Tool not found"}), 404
+
+            is_admin, active_warehouse_id = current_warehouse_scope()
+            if not is_admin and (
+                active_warehouse_id is None or tool.warehouse_id != active_warehouse_id
+            ):
                 return jsonify({"error": "Tool not found"}), 404
 
             page = request.args.get("page", 1, type=int)
@@ -1002,53 +1123,78 @@ def register_tool_checkout_routes(app):
     @app.route("/api/tool-checkouts/stats", methods=["GET"])
     @jwt_required
     def get_checkout_stats():
-        """Get checkout statistics for dashboard"""
+        """Get checkout statistics for dashboard (scoped to active warehouse)."""
         try:
             now = datetime.now()
             thirty_days_ago = now - timedelta(days=30)
             seven_days_ago = now - timedelta(days=7)
 
+            is_admin, active_warehouse_id = current_warehouse_scope()
+
+            # Non-admins with no active warehouse get empty stats rather than
+            # an error, so the dashboard still renders.
+            if not is_admin and active_warehouse_id is None:
+                return jsonify({
+                    "active_checkouts": 0,
+                    "overdue_checkouts": 0,
+                    "checkouts_today": 0,
+                    "returns_today": 0,
+                    "checkouts_this_week": 0,
+                    "checkouts_this_month": 0,
+                    "damage_reports_this_month": 0,
+                    "popular_tools": [],
+                    "active_users": [],
+                }), 200
+
+            def scoped(query):
+                """Apply warehouse scope to a Checkout-based query."""
+                if is_admin:
+                    return query
+                return query.join(Tool, Checkout.tool_id == Tool.id).filter(
+                    Tool.warehouse_id == active_warehouse_id
+                )
+
             # Active checkouts count
-            active_checkouts = Checkout.query.filter(
+            active_checkouts = scoped(Checkout.query.filter(
                 Checkout.return_date.is_(None)
-            ).count()
+            )).count()
 
             # Overdue checkouts count
-            overdue_checkouts = Checkout.query.filter(
+            overdue_checkouts = scoped(Checkout.query.filter(
                 Checkout.return_date.is_(None),
                 Checkout.expected_return_date < now
-            ).count()
+            )).count()
 
             # Checkouts today
             today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
-            checkouts_today = Checkout.query.filter(
+            checkouts_today = scoped(Checkout.query.filter(
                 Checkout.checkout_date >= today_start
-            ).count()
+            )).count()
 
             # Returns today
-            returns_today = Checkout.query.filter(
+            returns_today = scoped(Checkout.query.filter(
                 Checkout.return_date >= today_start
-            ).count()
+            )).count()
 
             # Checkouts this week
-            checkouts_this_week = Checkout.query.filter(
+            checkouts_this_week = scoped(Checkout.query.filter(
                 Checkout.checkout_date >= seven_days_ago
-            ).count()
+            )).count()
 
             # Checkouts this month
-            checkouts_this_month = Checkout.query.filter(
+            checkouts_this_month = scoped(Checkout.query.filter(
                 Checkout.checkout_date >= thirty_days_ago
-            ).count()
+            )).count()
 
             # Damage reports this month
-            damage_reports = Checkout.query.filter(
+            damage_reports = scoped(Checkout.query.filter(
                 Checkout.damage_reported,
                 Checkout.damage_reported_date >= thirty_days_ago
-            ).count()
+            )).count()
 
             # Most frequently checked out tools
             from sqlalchemy import func
-            popular_tools = db.session.query(
+            popular_tools_q = db.session.query(
                 Tool.id,
                 Tool.tool_number,
                 Tool.description,
@@ -1057,14 +1203,19 @@ def register_tool_checkout_routes(app):
                 Checkout, Tool.id == Checkout.tool_id
             ).filter(
                 Checkout.checkout_date >= thirty_days_ago
-            ).group_by(
+            )
+            if not is_admin:
+                popular_tools_q = popular_tools_q.filter(
+                    Tool.warehouse_id == active_warehouse_id
+                )
+            popular_tools = popular_tools_q.group_by(
                 Tool.id
             ).order_by(
                 func.count(Checkout.id).desc()
             ).limit(10).all()
 
             # Most active users
-            active_users = db.session.query(
+            active_users_q = db.session.query(
                 User.id,
                 User.name,
                 User.department,
@@ -1073,7 +1224,12 @@ def register_tool_checkout_routes(app):
                 Checkout, User.id == Checkout.user_id
             ).filter(
                 Checkout.checkout_date >= thirty_days_ago
-            ).group_by(
+            )
+            if not is_admin:
+                active_users_q = active_users_q.join(
+                    Tool, Checkout.tool_id == Tool.id
+                ).filter(Tool.warehouse_id == active_warehouse_id)
+            active_users = active_users_q.group_by(
                 User.id
             ).order_by(
                 func.count(Checkout.id).desc()
@@ -1115,20 +1271,35 @@ def register_tool_checkout_routes(app):
     @app.route("/api/tool-checkout/search", methods=["GET"])
     @jwt_required
     def search_tools_for_checkout():
-        """Search for tools available for checkout"""
+        """Search for tools available for checkout.
+
+        Non-admins only see tools that live in their active warehouse, so the
+        checkout UI can never list a tool the user isn't allowed to check out.
+        Admins see all tools to support cross-warehouse troubleshooting.
+        """
         try:
             q = request.args.get("q", "")
             if len(q) < 2:
                 return jsonify({"tools": []}), 200
 
-            # Search tools
-            tools = Tool.query.filter(
+            is_admin, active_warehouse_id = current_warehouse_scope()
+
+            # Non-admins with no active warehouse have nothing to check out.
+            if not is_admin and active_warehouse_id is None:
+                return jsonify({"tools": []}), 200
+
+            query = Tool.query.filter(
                 db.or_(
                     Tool.tool_number.ilike(f"%{q}%"),
                     Tool.serial_number.ilike(f"%{q}%"),
                     Tool.description.ilike(f"%{q}%"),
                 )
-            ).limit(20).all()
+            )
+
+            if not is_admin:
+                query = query.filter(Tool.warehouse_id == active_warehouse_id)
+
+            tools = query.limit(20).all()
 
             results = []
             for tool in tools:
@@ -1181,6 +1352,17 @@ def register_tool_checkout_routes(app):
             checkout = db.session.get(Checkout, checkout_id)
             if not checkout:
                 return jsonify({"error": "Checkout not found"}), 404
+
+            # Warehouse scope: only allow damage reports on checkouts for
+            # tools in the caller's active warehouse (admins bypass).
+            is_admin, active_warehouse_id = current_warehouse_scope()
+            if not is_admin:
+                tool_warehouse_id = checkout.tool.warehouse_id if checkout.tool else None
+                if (
+                    active_warehouse_id is None
+                    or tool_warehouse_id != active_warehouse_id
+                ):
+                    return jsonify({"error": "Checkout not found"}), 404
 
             if checkout.return_date:
                 return jsonify({"error": "Cannot report damage on returned checkout"}), 400
@@ -1259,6 +1441,17 @@ def register_tool_checkout_routes(app):
             if not checkout:
                 return jsonify({"error": "Checkout not found"}), 404
 
+            # Warehouse scope: extending a checkout on a tool outside the
+            # user's active warehouse is disallowed (admins bypass).
+            is_admin, active_warehouse_id = current_warehouse_scope()
+            if not is_admin:
+                tool_warehouse_id = checkout.tool.warehouse_id if checkout.tool else None
+                if (
+                    active_warehouse_id is None
+                    or tool_warehouse_id != active_warehouse_id
+                ):
+                    return jsonify({"error": "Checkout not found"}), 404
+
             if checkout.return_date:
                 return jsonify({"error": "Cannot extend returned checkout"}), 400
 
@@ -1308,7 +1501,11 @@ def register_tool_checkout_routes(app):
     @app.route("/api/tool-history", methods=["GET"])
     @permission_required("checkout.view")
     def get_tool_audit_history():
-        """Cross-tool history for auditing — paginated, filterable."""
+        """Cross-tool history for auditing — paginated, filterable.
+
+        Non-admins only see history entries for tools in their active
+        warehouse. Admins see entries across all warehouses.
+        """
         try:
             page = request.args.get("page", 1, type=int)
             per_page = request.args.get("per_page", 50, type=int)
@@ -1323,7 +1520,28 @@ def register_tool_checkout_routes(app):
             start_date_str = request.args.get("start_date")
             end_date_str = request.args.get("end_date")
 
+            is_admin, active_warehouse_id = current_warehouse_scope()
+
+            # Non-admins with no active warehouse see no history.
+            if not is_admin and active_warehouse_id is None:
+                return jsonify({
+                    "history": [],
+                    "total": 0,
+                    "page": page,
+                    "per_page": per_page,
+                    "pages": 0,
+                }), 200
+
             query = ToolHistory.query
+            tool_joined = False
+
+            # Warehouse scope — constrain history to tools in the active
+            # warehouse for non-admins.
+            if not is_admin:
+                query = query.join(Tool, ToolHistory.tool_id == Tool.id).filter(
+                    Tool.warehouse_id == active_warehouse_id
+                )
+                tool_joined = True
 
             if tool_id:
                 query = query.filter(ToolHistory.tool_id == tool_id)
@@ -1332,7 +1550,10 @@ def register_tool_checkout_routes(app):
             if event_type:
                 query = query.filter(ToolHistory.event_type == event_type)
             if tool_search:
-                query = query.join(Tool, ToolHistory.tool_id == Tool.id).filter(
+                if not tool_joined:
+                    query = query.join(Tool, ToolHistory.tool_id == Tool.id)
+                    tool_joined = True
+                query = query.filter(
                     db.or_(
                         Tool.tool_number.ilike(f"%{tool_search}%"),
                         Tool.description.ilike(f"%{tool_search}%"),

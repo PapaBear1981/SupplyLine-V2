@@ -53,6 +53,20 @@ def get_active_warehouse_id():
     return None
 
 
+def current_warehouse_scope(allow_superadmin_override=True):
+    """
+    Return the (is_admin, active_warehouse_id) pair for the current request.
+
+    Use this in read-only list endpoints to filter results to the user's
+    active warehouse. Admins bypass (is_admin=True) when
+    ``allow_superadmin_override`` is True, and callers should treat that as
+    "no warehouse filter needed".
+    """
+    payload = _current_user_payload() or {}
+    is_admin = bool(payload.get("is_admin")) if allow_superadmin_override else False
+    return is_admin, get_active_warehouse_id()
+
+
 def assert_active_warehouse_matches(item, *, allow_superadmin_override=True):
     """
     Ensure the given item (Tool / Chemical / any model with `warehouse_id`)

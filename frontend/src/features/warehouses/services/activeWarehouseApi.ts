@@ -34,14 +34,22 @@ export const activeWarehouseApi = baseApi.injectEndpoints({
         method: 'POST',
         body,
       }),
-      // Invalidate all Transfer, Tool and Chemical cache entries so every
-      // warehouse-scoped list re-fetches with the new JWT after the switch.
+      // Invalidate every warehouse-scoped cache so each list re-fetches with
+      // the new JWT after the switch. Checkout tags cover the tool-checkout
+      // page (active / overdue / due-today / my / stats) and audit history.
       invalidatesTags: [
         { type: 'ActiveWarehouse', id: 'ME' },
         { type: 'Tool', id: 'LIST' },
         { type: 'Chemical', id: 'LIST' },
         { type: 'Transfer' as const },   // clears inbound, outbound, list (all warehouses)
         { type: 'User', id: 'ME' },
+        { type: 'Checkout', id: 'ACTIVE' },
+        { type: 'Checkout', id: 'OVERDUE' },
+        { type: 'Checkout', id: 'DUE_TODAY' },
+        { type: 'Checkout', id: 'MY' },
+        { type: 'Checkout', id: 'STATS' },
+        { type: 'Checkout', id: 'LIST' },
+        { type: 'Checkout', id: 'HISTORY' },
       ],
     }),
   }),
