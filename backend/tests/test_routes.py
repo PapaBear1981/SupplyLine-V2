@@ -106,6 +106,25 @@ class TestToolRoutes:
         data = json.loads(response.data)
         assert "required" in data["error"].lower()
 
+    def test_create_tool_missing_warehouse_id(self, client, auth_headers_admin):
+        """Creating a tool without warehouse_id should return 400 with a clear error"""
+        tool_data = {
+            "tool_number": "T004",
+            "serial_number": "S004",
+            "description": "Tool Without Warehouse",
+            "condition": "Good",
+            "location": "Lab A",
+            "category": "Testing",
+        }
+
+        response = client.post("/api/tools",
+                             json=tool_data,
+                             headers=auth_headers_admin)
+
+        assert response.status_code == 400
+        data = json.loads(response.data)
+        assert "warehouse_id" in data["error"]
+
     def test_update_tool_admin(self, client, auth_headers_admin, test_tool):
         """Test updating tool as admin"""
         update_data = {
