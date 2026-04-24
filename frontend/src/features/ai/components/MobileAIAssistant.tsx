@@ -107,10 +107,12 @@ export const MobileAIAssistant = () => {
         position="bottom"
         destroyOnClose={false}
         bodyStyle={{
-          height: '100vh',
+          height: '100dvh',
+          maxHeight: '100dvh',
           background: 'var(--adm-color-background)',
           display: 'flex',
           flexDirection: 'column',
+          overflow: 'hidden',
         }}
       >
         <div className="mobile-ai">
