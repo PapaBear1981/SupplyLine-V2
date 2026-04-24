@@ -16,11 +16,11 @@ describe('LoginHero', () => {
 
     expect(screen.getByText('SUPPLYLINE')).toBeInTheDocument();
     expect(screen.getByText('MRO')).toBeInTheDocument();
-    expect(screen.getByText(/Keep the line/i)).toBeInTheDocument();
-    expect(screen.getByText('moving.')).toBeInTheDocument();
+    expect(screen.getByText(/Keep the right tool in the right hand/i)).toBeInTheDocument();
+    expect(screen.getByText('right time.')).toBeInTheDocument();
     expect(
       screen.getByText(
-        /Dispatch drops, monitor hangars, and coordinate crews/i
+        /Inventory, checkouts, and accountability, built for MRO\./i
       )
     ).toBeInTheDocument();
   });
@@ -28,7 +28,7 @@ describe('LoginHero', () => {
   it('shows the first ticker entry on first render', () => {
     render(<LoginHero />);
 
-    expect(screen.getByText('Hangar 3')).toBeInTheDocument();
+    expect(screen.getByText('Tool crib')).toBeInTheDocument();
     expect(screen.getByText('Online')).toBeInTheDocument();
   });
 
@@ -59,14 +59,14 @@ describe('LoginHero', () => {
     try {
       render(<LoginHero />);
 
-      expect(screen.getByText('Hangar 3')).toBeInTheDocument();
+      expect(screen.getByText('Tool crib')).toBeInTheDocument();
 
       act(() => {
         vi.advanceTimersByTime(10_000);
       });
 
       // Still on the first entry — no interval was registered.
-      expect(screen.getByText('Hangar 3')).toBeInTheDocument();
+      expect(screen.getByText('Tool crib')).toBeInTheDocument();
       expect(screen.queryByText('Inventory sync')).not.toBeInTheDocument();
     } finally {
       window.matchMedia = originalMatchMedia;

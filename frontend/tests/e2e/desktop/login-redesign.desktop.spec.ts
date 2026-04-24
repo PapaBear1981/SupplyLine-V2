@@ -40,7 +40,9 @@ test.describe('Login page redesign (desktop)', () => {
     const hero = anonPage.getByTestId('login-hero');
     await expect(hero).toBeVisible();
     await expect(hero.getByText('SUPPLYLINE', { exact: true })).toBeVisible();
-    await expect(hero.getByText(/Keep the line/i)).toBeVisible();
+    await expect(
+      hero.getByText(/Keep the right tool in the right hand/i)
+    ).toBeVisible();
 
     // Form card is still there.
     await expect(anonPage.getByTestId('login-form')).toBeVisible();
