@@ -25,6 +25,7 @@ import {
   SyncOutlined,
   CloseCircleOutlined,
   ExclamationCircleOutlined,
+  GithubOutlined,
 } from '@ant-design/icons';
 import dayjs from 'dayjs';
 import {
@@ -189,6 +190,30 @@ export const BugReportManagement = () => {
       render: (date) => dayjs(date).format('MMM D, YYYY'),
       sorter: (a, b) => dayjs(a.created_at).unix() - dayjs(b.created_at).unix(),
       defaultSortOrder: 'descend',
+    },
+    {
+      title: 'GitHub',
+      dataIndex: 'github_issue_url',
+      width: 80,
+      render: (url: string | null, record) => {
+        const issueLabel = record.github_issue_number
+          ? `GitHub Issue #${record.github_issue_number}`
+          : 'GitHub issue';
+        return url ? (
+          <Tooltip title={issueLabel}>
+            <a
+              href={url}
+              target="_blank"
+              rel="noopener noreferrer"
+              aria-label={`Open ${issueLabel} in a new tab`}
+            >
+              <GithubOutlined style={{ fontSize: 16 }} />
+            </a>
+          </Tooltip>
+        ) : (
+          <Text type="secondary">—</Text>
+        );
+      },
     },
     {
       title: 'Actions',

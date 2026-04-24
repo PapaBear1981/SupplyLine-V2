@@ -2354,6 +2354,8 @@ class BugReport(db.Model):
     created_at = db.Column(db.DateTime, default=get_current_time)
     updated_at = db.Column(db.DateTime, default=get_current_time, onupdate=get_current_time)
     resolved_at = db.Column(db.DateTime, nullable=True)
+    github_issue_number = db.Column(db.Integer, nullable=True)
+    github_issue_url = db.Column(db.String(500), nullable=True)
 
     reported_by = db.relationship("User", foreign_keys=[reported_by_id])
 
@@ -2372,6 +2374,8 @@ class BugReport(db.Model):
             "created_at": self.created_at.isoformat() if self.created_at else None,
             "updated_at": self.updated_at.isoformat() if self.updated_at else None,
             "resolved_at": self.resolved_at.isoformat() if self.resolved_at else None,
+            "github_issue_number": self.github_issue_number,
+            "github_issue_url": self.github_issue_url,
         }
 
 # Import enhanced messaging models

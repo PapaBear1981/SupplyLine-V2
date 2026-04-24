@@ -353,6 +353,11 @@ def create_app():
                             ))
                             _conn.commit()
 
+                    if "bug_reports" in tables:
+                        bug_cols = {c["name"] for c in inspector.get_columns("bug_reports")}
+                        _auto_add_col("bug_reports", "github_issue_number INTEGER", "github_issue_number", bug_cols)
+                        _auto_add_col("bug_reports", "github_issue_url VARCHAR(500)", "github_issue_url", bug_cols)
+
                     # Widen users.totp_secret — PostgreSQL-only syntax; SQLite skips cleanly.
                     if "users" in tables:
                         try:

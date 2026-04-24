@@ -57,6 +57,7 @@ from routes_tool_checkout import register_tool_checkout_routes
 from routes_transfers import transfers_bp
 from routes_user_requests import register_user_request_routes
 from routes_bug_reports import register_bug_report_routes
+from routes_github import register_github_routes
 from routes_users import register_user_routes
 from routes_warehouses import warehouses_bp
 from utils.error_handler import ValidationError, handle_errors, log_security_event
@@ -249,6 +250,7 @@ def register_routes(app):
     register_order_routes(app)
     register_user_request_routes(app)
     register_bug_report_routes(app)
+    register_github_routes(app)
 
     # Register enhanced messaging routes (channels, real-time chat)
     register_channels_routes(app)
