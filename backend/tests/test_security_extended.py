@@ -289,31 +289,37 @@ class TestCryptographicSecurity:
     def test_password_timing_attack_resistance(self, client, db_session, test_user):
         """Test that password verification is timing-attack resistant"""
         import time
+        import statistics
 
-        # Test with correct vs incorrect password
-        # Timing should be similar to prevent timing attacks
+        # Measure several samples per case and compare medians. Single-sample
+        # wall-clock timings on CI runners are dominated by scheduler/I/O noise,
+        # so median-of-N smooths that out while still catching a real
+        # non-constant-time comparison (which would produce a consistent gap).
 
-        # Correct password
-        start = time.perf_counter()
-        client.post("/api/auth/login", json={
-            "employee_number": test_user.employee_number,
-            "password": "user123"
-        })
-        time1 = time.perf_counter() - start
+        def sample(password: str) -> float:
+            start = time.perf_counter()
+            client.post(
+                "/api/auth/login",
+                json={
+                    "employee_number": test_user.employee_number,
+                    "password": password,
+                },
+            )
+            return time.perf_counter() - start
 
-        # Wrong password (same length)
-        start = time.perf_counter()
-        client.post("/api/auth/login", json={
-            "employee_number": test_user.employee_number,
-            "password": "wrong23"
-        })
-        time2 = time.perf_counter() - start
+        # Warm-up call to prime lazy imports, connection pools, bcrypt/scrypt
+        # state, etc. so it doesn't skew the first real sample.
+        sample("warmup0")
 
-        # Times should be similar (within 150ms)
-        # Threshold is generous to account for CI runner load variance;
-        # bcrypt/scrypt inherently provides constant-time comparison.
-        time_diff = abs(time1 - time2)
-        assert time_diff < 0.15, f"Timing difference too large: {time_diff:.4f}s"
+        samples = 5
+        correct_times = [sample("user123") for _ in range(samples)]
+        wrong_times = [sample("wrong23") for _ in range(samples)]
+
+        time_diff = abs(statistics.median(correct_times) - statistics.median(wrong_times))
+        assert time_diff < 0.15, (
+            f"Timing difference too large: {time_diff:.4f}s "
+            f"(correct={correct_times}, wrong={wrong_times})"
+        )
 
 
 @pytest.mark.security
