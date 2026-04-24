@@ -24,6 +24,9 @@ services:
     runtime: docker
     dockerfilePath: ./backend/Dockerfile
     dockerContext: ./backend
+    # Deploys are triggered by .github/workflows/deploy.yml after CI passes
+    # on master, via Render's deploy-hook URL. Leaving autoDeploy disabled
+    # keeps GitHub Actions the single source of truth for production deploys.
     autoDeploy: false
     healthCheckPath: /api/health
     # Override the Dockerfile's CMD with Gunicorn pointing at
@@ -83,7 +86,9 @@ services:
     name: supplyline-frontend
     env: static
     rootDir: frontend
-    autoDeploy: true
+    # See note on the backend service above: deploys are CI-gated via
+    # .github/workflows/deploy.yml, not Render's push watcher.
+    autoDeploy: false
     buildCommand: npm install && npm run build
     staticPublishPath: dist
     # Rewrite all paths to index.html for React Router (SPA routing).

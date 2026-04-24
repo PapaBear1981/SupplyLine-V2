@@ -1,0 +1,70 @@
+name: Deploy to Render
+
+# Triggers Render deploys for the backend and frontend services after the main
+# CI pipeline succeeds on master. Gating on CI ensures that only code which has
+# passed lint, typecheck, tests, and build verification reaches production.
+#
+# Required repository secrets (Settings → Secrets and variables → Actions):
+#   RENDER_BACKEND_DEPLOY_HOOK_URL  – Deploy hook for the supplyline-backend service
+#   RENDER_FRONTEND_DEPLOY_HOOK_URL – Deploy hook for the supplyline-frontend service
+#
+# Grab each URL from Render → service → Settings → Deploy Hook.
+
+on:
+  workflow_run:
+    workflows: ["CI/CD Pipeline"]
+    types: [completed]
+    branches: [master]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: render-deploy-master
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Deploy backend + frontend to Render
+    runs-on: ubuntu-latest
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (github.event.workflow_run.conclusion == 'success' &&
+       github.event.workflow_run.head_branch == 'master')
+    steps:
+      - name: Verify deploy hook secrets are configured
+        env:
+          BACKEND_HOOK: ${{ secrets.RENDER_BACKEND_DEPLOY_HOOK_URL }}
+          FRONTEND_HOOK: ${{ secrets.RENDER_FRONTEND_DEPLOY_HOOK_URL }}
+        run: |
+          missing=0
+          if [ -z "$BACKEND_HOOK" ]; then
+            echo "::error::RENDER_BACKEND_DEPLOY_HOOK_URL secret is not set"
+            missing=1
+          fi
+          if [ -z "$FRONTEND_HOOK" ]; then
+            echo "::error::RENDER_FRONTEND_DEPLOY_HOOK_URL secret is not set"
+            missing=1
+          fi
+          exit $missing
+
+      - name: Trigger backend deploy
+        env:
+          HOOK_URL: ${{ secrets.RENDER_BACKEND_DEPLOY_HOOK_URL }}
+        run: |
+          curl --fail-with-body --silent --show-error \
+               --retry 3 --retry-delay 5 --retry-connrefused \
+               -X POST "$HOOK_URL"
+          echo
+          echo "Backend deploy triggered"
+
+      - name: Trigger frontend deploy
+        env:
+          HOOK_URL: ${{ secrets.RENDER_FRONTEND_DEPLOY_HOOK_URL }}
+        run: |
+          curl --fail-with-body --silent --show-error \
+               --retry 3 --retry-delay 5 --retry-connrefused \
+               -X POST "$HOOK_URL"
+          echo
+          echo "Frontend deploy triggered"
