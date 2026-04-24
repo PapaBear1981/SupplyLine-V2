@@ -966,3 +966,132 @@ class TestCheckoutReadScoping:
             f"/api/tool-checkouts/{checkout_id}", headers=user_hdrs
         )
         assert resp.status_code == 404
+
+
+# ─── Dashboard field-tools card (/api/kit-tool-checkouts/active) ─────────────
+
+
+def _kit_in(db_session, admin_user, name_prefix="DashKit"):
+    """Create a kit with a unique name + aircraft type for testing."""
+    from models_kits import AircraftType, Kit
+
+    ac_type = AircraftType.query.filter_by(name="Q400").first()
+    if ac_type is None:
+        ac_type = AircraftType(name="Q400", description="Test AC", is_active=True)
+        db_session.add(ac_type)
+        db_session.flush()
+
+    kit = Kit(
+        name=f"{name_prefix} {uuid.uuid4().hex[:6]}",
+        aircraft_type_id=ac_type.id,
+        description="Pytest kit",
+        status="active",
+        created_by=admin_user.id,
+    )
+    db_session.add(kit)
+    db_session.commit()
+    return kit
+
+
+def _active_field_checkout(db_session, tool, kit, user):
+    """Create an active KitToolCheckout deploying ``tool`` to ``kit``."""
+    from models_kits import KitToolCheckout
+
+    ktc = KitToolCheckout(
+        tool_id=tool.id,
+        kit_id=kit.id,
+        checked_out_by_id=user.id,
+        previous_location=tool.location,
+        previous_warehouse_id=tool.warehouse_id,
+        status="active",
+    )
+    db_session.add(ktc)
+    db_session.commit()
+    return ktc
+
+
+class TestActiveKitToolCheckoutsWarehouseFilter:
+    """
+    /api/kit-tool-checkouts/active powers the dashboard "Tools in Field" card.
+    The endpoint accepts an optional ``warehouse_id`` query param that filters
+    by the *source* warehouse of the tool (KitToolCheckout.tool.warehouse_id).
+    """
+
+    def test_no_filter_returns_all_active_checkouts(
+        self, client, admin_user, regular_user, jwt_manager, db_session
+    ):
+        _grant_checkout_view(regular_user, db_session)
+
+        wh_a = _warehouse(db_session, "FieldA")
+        wh_b = _warehouse(db_session, "FieldB")
+        tool_a = _tool_in(db_session, wh_a)
+        tool_b = _tool_in(db_session, wh_b)
+        kit = _kit_in(db_session, admin_user)
+
+        _active_field_checkout(db_session, tool_a, kit, admin_user)
+        _active_field_checkout(db_session, tool_b, kit, admin_user)
+
+        hdrs = _headers_with_warehouse(
+            client, jwt_manager, regular_user, wh_a.id, db_session
+        )
+        resp = client.get("/api/kit-tool-checkouts/active", headers=hdrs)
+        assert resp.status_code == 200
+        tool_ids = {c["tool_id"] for c in resp.json["checkouts"]}
+        assert tool_a.id in tool_ids
+        assert tool_b.id in tool_ids
+        assert resp.json["total"] == len(resp.json["checkouts"])
+
+    def test_warehouse_filter_scopes_to_source_warehouse(
+        self, client, admin_user, regular_user, jwt_manager, db_session
+    ):
+        _grant_checkout_view(regular_user, db_session)
+
+        wh_a = _warehouse(db_session, "FieldScopeA")
+        wh_b = _warehouse(db_session, "FieldScopeB")
+        tool_a = _tool_in(db_session, wh_a)
+        tool_b = _tool_in(db_session, wh_b)
+        kit = _kit_in(db_session, admin_user)
+
+        _active_field_checkout(db_session, tool_a, kit, admin_user)
+        _active_field_checkout(db_session, tool_b, kit, admin_user)
+
+        hdrs = _headers_with_warehouse(
+            client, jwt_manager, regular_user, wh_a.id, db_session
+        )
+        resp = client.get(
+            f"/api/kit-tool-checkouts/active?warehouse_id={wh_a.id}",
+            headers=hdrs,
+        )
+        assert resp.status_code == 200
+        tool_ids = {c["tool_id"] for c in resp.json["checkouts"]}
+        assert tool_a.id in tool_ids
+        assert tool_b.id not in tool_ids
+        assert resp.json["total"] == len(resp.json["checkouts"])
+
+    def test_warehouse_filter_excludes_returned_checkouts(
+        self, client, admin_user, regular_user, jwt_manager, db_session
+    ):
+        """A returned KitToolCheckout must not appear even when it matches the warehouse."""
+        _grant_checkout_view(regular_user, db_session)
+
+        wh = _warehouse(db_session, "FieldReturned")
+        tool_active = _tool_in(db_session, wh)
+        tool_returned = _tool_in(db_session, wh)
+        kit = _kit_in(db_session, admin_user)
+
+        _active_field_checkout(db_session, tool_active, kit, admin_user)
+        returned = _active_field_checkout(db_session, tool_returned, kit, admin_user)
+        returned.status = "returned"
+        db_session.commit()
+
+        hdrs = _headers_with_warehouse(
+            client, jwt_manager, regular_user, wh.id, db_session
+        )
+        resp = client.get(
+            f"/api/kit-tool-checkouts/active?warehouse_id={wh.id}",
+            headers=hdrs,
+        )
+        assert resp.status_code == 200
+        tool_ids = {c["tool_id"] for c in resp.json["checkouts"]}
+        assert tool_active.id in tool_ids
+        assert tool_returned.id not in tool_ids
