@@ -40,6 +40,7 @@ import {
 } from '../services/toolsApi';
 import { ToolForm } from './ToolForm';
 import type { ToolFormData, ToolStatus, CalibrationStatus } from '../types';
+import { getToolActionErrorMessage } from '../utils/getToolActionErrorMessage';
 import { LabelPrintModal } from '@/components/shared/LabelPrintModal';
 import { PermissionGuard } from '@features/auth/components/PermissionGuard';
 import { ToolHistoryTimeline } from '@features/tool-checkout';
@@ -110,8 +111,10 @@ export const ToolDrawer = ({ open, mode: initialMode, toolId, onClose, onSuccess
       }
       onSuccess?.();
       onClose();
-    } catch {
-      message.error(`Failed to ${mode === 'create' ? 'create' : 'update'} tool`);
+    } catch (err: unknown) {
+      message.error(
+        getToolActionErrorMessage(err, mode === 'create' ? 'create' : 'update')
+      );
     }
   };
 

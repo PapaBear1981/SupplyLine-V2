@@ -2,6 +2,7 @@ import { Form, Input, Select, InputNumber, Switch, DatePicker, Button, Space } f
 import type { FormInstance } from 'antd';
 import dayjs from 'dayjs';
 import type { Tool, ToolFormData } from '../types';
+import { useGetWarehousesQuery } from '@features/warehouses/services/warehousesApi';
 
 const { Option } = Select;
 const { TextArea } = Input;
@@ -16,6 +17,10 @@ interface ToolFormProps {
 
 export const ToolForm = ({ form, initialValues, onSubmit, onCancel, loading }: ToolFormProps) => {
   const isEditing = !!initialValues;
+  const { data: warehousesData, isLoading: warehousesLoading } = useGetWarehousesQuery({
+    per_page: 200,
+  });
+  const warehouses = warehousesData?.warehouses ?? [];
 
   // Convert Tool to ToolFormData for form initialization
   const getInitialFormValues = () => {
@@ -171,13 +176,19 @@ export const ToolForm = ({ form, initialValues, onSubmit, onCancel, loading }: T
       </Form.Item>
 
       <Form.Item
-        label="Warehouse ID"
+        label="Warehouse"
         name="warehouse_id"
+        rules={[{ required: true, message: 'Please select a warehouse' }]}
       >
-        <InputNumber
-          style={{ width: '100%' }}
-          placeholder="Optional - link to warehouse"
-          min={1}
+        <Select
+          placeholder="Select a warehouse"
+          loading={warehousesLoading}
+          showSearch
+          optionFilterProp="label"
+          options={warehouses.map((w) => ({
+            label: w.name,
+            value: w.id,
+          }))}
         />
       </Form.Item>
 

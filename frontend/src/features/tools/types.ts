@@ -45,7 +45,7 @@ export interface ToolFormData {
   status?: ToolStatus;
   status_reason?: string;
   maintenance_return_date?: string;
-  warehouse_id?: number;
+  warehouse_id: number;
 
   // Calibration fields
   requires_calibration?: boolean;
