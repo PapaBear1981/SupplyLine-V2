@@ -114,6 +114,17 @@ vi.mock('@features/kits/components/mobile', () => ({
   MobileKitLocationMap: () => <div data-testid="kit-location-map" />,
 }));
 
+// The active warehouse picker has its own RTK Query + popup logic that is
+// covered by its own tests. Stub it here so the dashboard tests stay focused.
+vi.mock('@features/warehouses/components/mobile', () => ({
+  MobileActiveWarehouseSelect: ({ variant }: { variant?: string }) => (
+    <div
+      data-testid="mobile-active-warehouse-stub"
+      data-variant={variant}
+    />
+  ),
+}));
+
 // Mock useActiveWarehouse so tests can drive the active warehouse ID.
 let mockActiveWarehouseId: number | null = 1;
 vi.mock('@features/warehouses/hooks/useActiveWarehouse', () => ({
@@ -239,13 +250,13 @@ describe('MobileDashboard', () => {
       expect(chemicalsOptions?.skip).toBe(true);
     });
 
-    it('shows a select-warehouse notice when no warehouse is selected', () => {
+    it('renders the active warehouse picker on the dashboard', () => {
       mockActiveWarehouseId = null;
       renderWithProviders(<MobileDashboard />);
 
-      expect(
-        screen.getByText(/select an active warehouse/i)
-      ).toBeInTheDocument();
+      const stub = screen.getByTestId('mobile-active-warehouse-stub');
+      expect(stub).toBeInTheDocument();
+      expect(stub).toHaveAttribute('data-variant', 'card');
     });
   });
 });

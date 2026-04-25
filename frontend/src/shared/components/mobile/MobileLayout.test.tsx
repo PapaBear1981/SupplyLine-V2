@@ -74,6 +74,14 @@ vi.mock('@features/scanner', () => ({
   }),
 }));
 
+// MobileActiveWarehouseSelect pulls in its own RTK Query and slice. The
+// MobileLayout tests don't exercise warehouse switching, so render a stub.
+vi.mock('@features/warehouses/components/mobile', () => ({
+  MobileActiveWarehouseSelect: () => (
+    <div data-testid="mobile-active-warehouse-stub" />
+  ),
+}));
+
 const renderWithProviders = (component: React.ReactNode, store = createMockStore()) => {
   return render(
     <Provider store={store}>
