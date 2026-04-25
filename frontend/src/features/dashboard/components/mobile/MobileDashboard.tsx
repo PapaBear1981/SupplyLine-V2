@@ -42,6 +42,7 @@ import { useGetWarehousesQuery } from '@features/warehouses/services/warehousesA
 import { useGetAnnouncementsQuery } from '@features/admin/services/adminApi';
 import { useGetOnCallPersonnelQuery } from '@features/admin/services/oncallApi';
 import { useActiveWarehouse } from '@features/warehouses/hooks/useActiveWarehouse';
+import { MobileActiveWarehouseSelect } from '@features/warehouses/components/mobile';
 import { MobileKitLocationMap } from '@features/kits/components/mobile';
 
 import './MobileDashboard.css';
@@ -246,14 +247,8 @@ export const MobileDashboard = () => {
         </div>
       )}
 
-      {!activeWarehouseId && (
-        <div style={{ marginBottom: 16 }}>
-          <NoticeBar
-            color="info"
-            content="Select an active warehouse to populate the tools and chemicals stats."
-          />
-        </div>
-      )}
+      {/* Active Warehouse picker — always visible so users can switch from the landing page */}
+      <MobileActiveWarehouseSelect variant="card" />
 
       {/* On-Call Personnel */}
       <div className="section-title">On-Call Personnel</div>

@@ -41,6 +41,7 @@ import { socketService } from '@services/socket';
 import { ROUTES } from '@shared/constants/routes';
 import { ALL_MENU_ITEMS } from '@shared/constants/navigation';
 import { useMobileAdminEnabled } from '@shared/hooks/useMobileAdminEnabled';
+import { MobileActiveWarehouseSelect } from '@features/warehouses/components/mobile';
 import './MobileLayout.css';
 
 // Map route keys to display names
@@ -334,6 +335,11 @@ export const MobileLayout = () => {
               <div className="mobile-menu-user-dept">{user?.department}</div>
             </div>
           </div>
+
+          {/* Active Warehouse */}
+          <List header="Active Warehouse" className="mobile-menu-list">
+            <MobileActiveWarehouseSelect variant="menu" />
+          </List>
 
           {/* Menu Items */}
           <List header="Navigation" className="mobile-menu-list">
