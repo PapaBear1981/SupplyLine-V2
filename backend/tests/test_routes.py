@@ -259,6 +259,63 @@ class TestChemicalRoutes:
         assert "chemicals" in data
         assert isinstance(data["chemicals"], list)
 
+    def test_get_chemicals_handles_legacy_bad_data(
+        self, client, auth_headers_user, db_session, test_warehouse, test_chemical
+    ):
+        """Inventory list must not 500 when a single row has legacy bad data.
+
+        Regression for the warehouse-specific 500: a chemical with a ``date``
+        (not ``datetime``) expiration_date triggers a TypeError when compared
+        to ``datetime.now()`` in ``Chemical.is_expired``, killing the whole list.
+        """
+        from datetime import date
+        import uuid as _uuid
+        from models import Chemical
+
+        bad = Chemical(
+            part_number=f"BAD{_uuid.uuid4().hex[:6].upper()}",
+            lot_number=f"LOT{_uuid.uuid4().hex[:6].upper()}",
+            description="Legacy chemical with date-typed expiration",
+            quantity=None,  # NULL quantity used to crash the status-update branch
+            unit="each",
+            status="available",
+            warehouse_id=test_warehouse.id,
+            expiration_date=date(2099, 1, 1),  # plain ``date``, not ``datetime``
+        )
+        # Already-expired row exercises the auto-archive bulk_insert path,
+        # which would IntegrityError if AuditLog.action were missing from the payload.
+        expired = Chemical(
+            part_number=f"EXP{_uuid.uuid4().hex[:6].upper()}",
+            lot_number=f"LOT{_uuid.uuid4().hex[:6].upper()}",
+            description="Already-expired chemical with date-typed expiration",
+            quantity=5,
+            unit="each",
+            status="available",
+            warehouse_id=test_warehouse.id,
+            expiration_date=date(2000, 1, 1),
+        )
+        db_session.add_all([bad, expired])
+        db_session.commit()
+
+        response = client.get(
+            f"/api/chemicals?warehouse_id={test_warehouse.id}&per_page=1000",
+            headers=auth_headers_user,
+        )
+
+        assert response.status_code == 200
+        data = json.loads(response.data)
+        part_numbers = {chem["part_number"] for chem in data["chemicals"]}
+        assert test_chemical.part_number in part_numbers
+        assert bad.part_number in part_numbers
+
+        # Expired row gets auto-archived (so it's filtered from the default list)
+        # but the bulk_insert_mappings call must have succeeded — i.e. the row's
+        # status must now be ``expired`` and it must be flagged archived.
+        db_session.expire_all()
+        expired_after = Chemical.query.get(expired.id)
+        assert expired_after.status == "expired"
+        assert expired_after.is_archived is True
+
     def test_create_chemical_materials_user(self, client, auth_headers_materials, db_session, test_warehouse):
         """Test creating chemical as materials user"""
         chemical_data = {
