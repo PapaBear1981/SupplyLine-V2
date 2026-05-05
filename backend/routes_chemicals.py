@@ -188,20 +188,26 @@ def register_chemical_routes(app):
         pagination = query.paginate(page=page, per_page=per_page, error_out=False)
         chemicals = pagination.items
 
-        # Batch update status based on expiration and stock level to avoid N+1 queries
+        # Batch update status based on expiration and stock level to avoid N+1 queries.
+        # Each chemical is processed in isolation so a single bad row (e.g. NULL
+        # quantity, date/datetime mismatch on expiration_date) can't 500 the whole
+        # inventory page.
         chemicals_to_update = []
         archive_logs = []
 
         for chemical in chemicals:
             try:
-                is_archived = chemical.is_archived
-            except AttributeError:
-                # If the column doesn't exist, assume not archived
-                logger.debug("is_archived attribute not found for chemical %s", chemical.id)
-                is_archived = False
+                try:
+                    is_archived = chemical.is_archived
+                except AttributeError:
+                    logger.debug("is_archived attribute not found for chemical %s", chemical.id)
+                    is_archived = False
 
-            if not is_archived:  # Only update status for non-archived chemicals
+                if is_archived:
+                    continue
+
                 status_changed = False
+                quantity = chemical.quantity if chemical.quantity is not None else 0
 
                 if chemical.is_expired():
                     chemical.status = "expired"
@@ -213,36 +219,34 @@ def register_chemical_routes(app):
                         chemical.archived_reason = "expired"
                         chemical.archived_date = datetime.utcnow()
 
-                        # Prepare log for archiving (batch insert later)
                         archive_logs.append({
                             "action_type": "chemical_archived",
                             "action_details": f"Chemical {chemical.part_number} - {chemical.lot_number} automatically archived: expired",
                             "timestamp": datetime.utcnow()
                         })
 
-                        # Update reorder status for expired chemicals
                         chemical.update_reorder_status()
                     except AttributeError as e:
-                        # If the columns don't exist, just update the status
                         logger.debug(f"Archive columns not found for chemical {chemical.id}: {e!s}")
-                elif chemical.quantity <= 0:
+                elif quantity <= 0:
                     chemical.status = "out_of_stock"
                     status_changed = True
-                    # Update reorder status for out-of-stock chemicals
                     chemical.update_reorder_status()
                 elif chemical.is_low_stock():
                     chemical.status = "low_stock"
                     status_changed = True
-                    # Update reorder status for low-stock chemicals
                     chemical.update_reorder_status()
 
-                # Check if chemical is expiring soon (within 30 days)
                 if chemical.is_expiring_soon(30):
-                    # Add a flag to the chemical data
                     chemical.expiring_soon = True
 
                 if status_changed:
                     chemicals_to_update.append(chemical)
+            except Exception:
+                logger.exception(
+                    "Failed to evaluate status for chemical id=%s; skipping mutation",
+                    getattr(chemical, "id", None),
+                )
 
         # Batch insert archive logs if any
         if archive_logs:
@@ -250,36 +254,58 @@ def register_chemical_routes(app):
 
         # Single commit for all changes
         if chemicals_to_update or archive_logs:
-            db.session.commit()
+            try:
+                db.session.commit()
+            except Exception:
+                db.session.rollback()
+                logger.exception("Failed to persist chemical status updates; continuing with read")
 
         # Get kit and box information for chemicals
-        from models_kits import KitItem
         chemical_kit_info = {}
-        kit_items = KitItem.query.filter(
-            KitItem.item_type == "chemical",
-            KitItem.item_id.in_([c.id for c in chemicals])
-        ).all()
+        try:
+            from models_kits import KitItem
+            chemical_ids = [c.id for c in chemicals]
+            if chemical_ids:
+                kit_items = KitItem.query.filter(
+                    KitItem.item_type == "chemical",
+                    KitItem.item_id.in_(chemical_ids)
+                ).all()
 
-        for kit_item in kit_items:
-            chemical_kit_info[kit_item.item_id] = {
-                "kit_id": kit_item.kit_id,
-                "kit_name": kit_item.kit.name if kit_item.kit else None,
-                "box_id": kit_item.box_id,
-                "box_number": kit_item.box.box_number if kit_item.box else None
-            }
+                for kit_item in kit_items:
+                    try:
+                        chemical_kit_info[kit_item.item_id] = {
+                            "kit_id": kit_item.kit_id,
+                            "kit_name": kit_item.kit.name if kit_item.kit else None,
+                            "box_id": kit_item.box_id,
+                            "box_number": kit_item.box.box_number if kit_item.box else None,
+                        }
+                    except Exception:
+                        logger.exception(
+                            "Failed to resolve kit/box for chemical id=%s",
+                            kit_item.item_id,
+                        )
+        except Exception:
+            logger.exception("Failed to load kit information for chemicals; continuing without it")
 
-        # Serialize after all mutations to ensure client gets updated data
-        chemicals_data = [
-            {
-                **c.to_dict(),
-                **({"expiring_soon": True} if getattr(c, "expiring_soon", False) else {}),
-                "kit_id": chemical_kit_info.get(c.id, {}).get("kit_id"),
-                "kit_name": chemical_kit_info.get(c.id, {}).get("kit_name"),
-                "box_id": chemical_kit_info.get(c.id, {}).get("box_id"),
-                "box_number": chemical_kit_info.get(c.id, {}).get("box_number")
-            }
-            for c in chemicals
-        ]
+        # Serialize after all mutations to ensure client gets updated data.
+        # Per-chemical try/except keeps a single corrupt row from failing the whole list.
+        chemicals_data = []
+        for c in chemicals:
+            try:
+                payload = {
+                    **c.to_dict(),
+                    **({"expiring_soon": True} if getattr(c, "expiring_soon", False) else {}),
+                    "kit_id": chemical_kit_info.get(c.id, {}).get("kit_id"),
+                    "kit_name": chemical_kit_info.get(c.id, {}).get("kit_name"),
+                    "box_id": chemical_kit_info.get(c.id, {}).get("box_id"),
+                    "box_number": chemical_kit_info.get(c.id, {}).get("box_number"),
+                }
+                chemicals_data.append(payload)
+            except Exception:
+                logger.exception(
+                    "Failed to serialize chemical id=%s; omitting from response",
+                    getattr(c, "id", None),
+                )
 
         # Return paginated response
         response = {

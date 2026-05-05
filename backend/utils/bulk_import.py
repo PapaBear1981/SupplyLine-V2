@@ -230,7 +230,7 @@ def validate_chemical_data(row_data: dict[str, Any]) -> dict[str, Any]:
             # Try multiple date formats
             for fmt in ["%Y-%m-%d", "%m/%d/%Y", "%d/%m/%Y"]:
                 try:
-                    chemical_data["expiration_date"] = datetime.strptime(exp_date_str, fmt).date()
+                    chemical_data["expiration_date"] = datetime.strptime(exp_date_str, fmt)
                     break
                 except ValueError:
                     continue

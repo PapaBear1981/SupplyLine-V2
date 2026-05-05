@@ -1,10 +1,24 @@
 import logging
-from datetime import datetime, timedelta
+from datetime import date, datetime, timedelta
 
 from flask_sqlalchemy import SQLAlchemy
 from sqlalchemy.ext.associationproxy import association_proxy
 from sqlalchemy.orm import object_session
 from werkzeug.security import check_password_hash, generate_password_hash
+
+
+def _coerce_to_datetime(value):
+    """Promote a date to a midnight datetime so comparisons with get_current_time() work.
+
+    Bulk-imported chemicals can land in the DB with a ``date`` rather than a
+    ``datetime`` for ``expiration_date``; comparing a ``date`` to a ``datetime``
+    raises ``TypeError`` and 500s the inventory list.
+    """
+    if isinstance(value, datetime):
+        return value
+    if isinstance(value, date):
+        return datetime(value.year, value.month, value.day)
+    return value
 
 
 # Import time utilities for consistent time handling
@@ -1571,7 +1585,7 @@ class Chemical(db.Model):
             "status": self.status,
             "warehouse_id": self.warehouse_id,
             "warehouse_name": self.warehouse.name if self.warehouse else None,
-            "date_added": self.date_added.isoformat(),
+            "date_added": self.date_added.isoformat() if self.date_added else None,
             "expiration_date": self.expiration_date.isoformat() if self.expiration_date else None,
             "minimum_stock_level": self.minimum_stock_level,
             "notes": self.notes,
@@ -1616,7 +1630,9 @@ class Chemical(db.Model):
     def is_expired(self):
         if not self.expiration_date:
             return False
-        return get_current_time() > self.expiration_date
+        now = get_current_time()
+        expiration = _coerce_to_datetime(self.expiration_date)
+        return now > expiration
 
     def is_expiring_soon(self, days=30):
         """Check if the chemical is expiring within the specified number of days"""
@@ -1626,9 +1642,10 @@ class Chemical(db.Model):
         # Calculate the date range
         now = get_current_time()
         expiration_threshold = now + timedelta(days=days)
+        expiration = _coerce_to_datetime(self.expiration_date)
 
         # Check if expiration date is in the future but within the threshold
-        return now < self.expiration_date <= expiration_threshold
+        return now < expiration <= expiration_threshold
 
     def update_reorder_status(self):
         """Update the reorder status based on expiration, quantity, and minimum stock level"""
@@ -1652,7 +1669,8 @@ class Chemical(db.Model):
     def is_low_stock(self):
         if not self.minimum_stock_level:
             return False
-        return self.quantity <= self.minimum_stock_level
+        quantity = self.quantity if self.quantity is not None else 0
+        return quantity <= self.minimum_stock_level
 
 
 class ChemicalIssuance(db.Model):
