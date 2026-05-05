@@ -220,6 +220,10 @@ def register_chemical_routes(app):
                         chemical.archived_date = datetime.utcnow()
 
                         archive_logs.append({
+                            # ``action`` is nullable=False on AuditLog;
+                            # bulk_insert_mappings bypasses __init__, so we must
+                            # provide it explicitly here.
+                            "action": "chemical_archived",
                             "action_type": "chemical_archived",
                             "action_details": f"Chemical {chemical.part_number} - {chemical.lot_number} automatically archived: expired",
                             "timestamp": datetime.utcnow()
@@ -248,13 +252,12 @@ def register_chemical_routes(app):
                     getattr(chemical, "id", None),
                 )
 
-        # Batch insert archive logs if any
-        if archive_logs:
-            db.session.bulk_insert_mappings(AuditLog, archive_logs)
-
-        # Single commit for all changes
+        # Single commit for status updates + archive log inserts. Wrapped so a
+        # bulk-insert failure rolls back instead of 500-ing the read response.
         if chemicals_to_update or archive_logs:
             try:
+                if archive_logs:
+                    db.session.bulk_insert_mappings(AuditLog, archive_logs)
                 db.session.commit()
             except Exception:
                 db.session.rollback()
