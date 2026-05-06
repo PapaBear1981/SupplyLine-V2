@@ -12,6 +12,7 @@ import {
   message,
 } from 'antd';
 import type { TableProps } from 'antd';
+import type { SorterResult } from 'antd/es/table/interface';
 import {
   EditOutlined,
   DeleteOutlined,
@@ -20,7 +21,13 @@ import {
   SearchOutlined,
 } from '@ant-design/icons';
 import { useGetToolsQuery, useDeleteToolMutation } from '../services/toolsApi';
-import type { Tool, ToolStatus, CalibrationStatus } from '../types';
+import type {
+  Tool,
+  ToolStatus,
+  CalibrationStatus,
+  ToolsSortField,
+  SortOrder,
+} from '../types';
 import { LabelPrintModal } from '@/components/shared/LabelPrintModal';
 import { PermissionGuard } from '@features/auth/components/PermissionGuard';
 import { useActiveWarehouse } from '@features/warehouses/hooks/useActiveWarehouse';
@@ -36,6 +43,8 @@ export const ToolsTable = ({ onView, onEdit }: ToolsTableProps) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [printModalTool, setPrintModalTool] = useState<{ id: number; description: string } | null>(null);
   const [showAllWarehouses, setShowAllWarehouses] = useState(false);
+  const [sortBy, setSortBy] = useState<ToolsSortField | undefined>(undefined);
+  const [sortOrder, setSortOrder] = useState<SortOrder | undefined>(undefined);
 
   const { activeWarehouseId, activeWarehouseName } = useActiveWarehouse();
 
@@ -45,7 +54,33 @@ export const ToolsTable = ({ onView, onEdit }: ToolsTableProps) => {
     q: searchQuery || undefined,
     warehouse_id:
       !showAllWarehouses && activeWarehouseId ? activeWarehouseId : undefined,
+    sort_by: sortBy,
+    order: sortOrder,
   });
+
+  const sortOrderFor = (key: ToolsSortField) => {
+    if (sortBy !== key || !sortOrder) return null;
+    return sortOrder === 'asc' ? ('ascend' as const) : ('descend' as const);
+  };
+
+  const handleTableChange: NonNullable<TableProps<Tool>['onChange']> = (
+    _pagination,
+    _filters,
+    sorter,
+  ) => {
+    const single = Array.isArray(sorter) ? sorter[0] : (sorter as SorterResult<Tool>);
+    const nextSortBy = single?.order
+      ? (single.columnKey as ToolsSortField)
+      : undefined;
+    const nextOrder: SortOrder | undefined = single?.order
+      ? single.order === 'ascend' ? 'asc' : 'desc'
+      : undefined;
+    if (nextSortBy !== sortBy || nextOrder !== sortOrder) {
+      setSortBy(nextSortBy);
+      setSortOrder(nextOrder);
+      setPage(1);
+    }
+  };
 
   const [deleteTool] = useDeleteToolMutation();
 
@@ -86,19 +121,24 @@ export const ToolsTable = ({ onView, onEdit }: ToolsTableProps) => {
       key: 'tool_number',
       fixed: 'left',
       width: 150,
-      sorter: (a, b) => a.tool_number.localeCompare(b.tool_number),
+      sorter: true,
+      sortOrder: sortOrderFor('tool_number'),
     },
     {
       title: 'Description',
       dataIndex: 'description',
       key: 'description',
       ellipsis: true,
+      sorter: true,
+      sortOrder: sortOrderFor('description'),
     },
     {
       title: 'Serial Number',
       dataIndex: 'serial_number',
       key: 'serial_number',
       width: 150,
+      sorter: true,
+      sortOrder: sortOrderFor('serial_number'),
     },
     {
       title: 'Category',
@@ -111,12 +151,16 @@ export const ToolsTable = ({ onView, onEdit }: ToolsTableProps) => {
         { text: 'Power Tools', value: 'Power Tools' },
       ],
       onFilter: (value, record) => record.category === value,
+      sorter: true,
+      sortOrder: sortOrderFor('category'),
     },
     {
       title: 'Location',
       dataIndex: 'location',
       key: 'location',
       width: 150,
+      sorter: true,
+      sortOrder: sortOrderFor('location'),
     },
     ...(showAllWarehouses
       ? [{
@@ -125,6 +169,8 @@ export const ToolsTable = ({ onView, onEdit }: ToolsTableProps) => {
           key: 'warehouse_name',
           width: 160,
           render: (_: unknown, record: Tool) => record.warehouse_name || '—',
+          sorter: true,
+          sortOrder: sortOrderFor('warehouse_name'),
         }]
       : []),
     {
@@ -147,12 +193,16 @@ export const ToolsTable = ({ onView, onEdit }: ToolsTableProps) => {
         { text: 'Retired', value: 'retired' },
       ],
       onFilter: (value, record) => record.status === value,
+      sorter: true,
+      sortOrder: sortOrderFor('status'),
     },
     {
       title: 'Calibration',
       dataIndex: 'calibration_status',
       key: 'calibration_status',
       width: 130,
+      sorter: true,
+      sortOrder: sortOrderFor('calibration_status'),
       render: (status: CalibrationStatus | null | undefined, record) => {
         if (!record.requires_calibration) {
           return <Tag color="default">N/A</Tag>;
@@ -275,6 +325,7 @@ export const ToolsTable = ({ onView, onEdit }: ToolsTableProps) => {
           rowKey="id"
           loading={isLoading || isFetching}
           scroll={{ x: 1200 }}
+          onChange={handleTableChange}
           pagination={{
             current: page,
             pageSize,

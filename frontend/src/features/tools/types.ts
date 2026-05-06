@@ -63,6 +63,19 @@ export interface ToolsListResponse {
   pages: number;
 }
 
+export type ToolsSortField =
+  | 'tool_number'
+  | 'serial_number'
+  | 'description'
+  | 'location'
+  | 'category'
+  | 'status'
+  | 'calibration_status'
+  | 'created_at'
+  | 'warehouse_name';
+
+export type SortOrder = 'asc' | 'desc';
+
 export interface ToolsQueryParams {
   page?: number;
   per_page?: number;
@@ -71,6 +84,8 @@ export interface ToolsQueryParams {
   category?: string;
   warehouse_id?: number;
   calibration_status?: CalibrationStatus;
+  sort_by?: ToolsSortField;
+  order?: SortOrder;
 }
 
 // Calibration history

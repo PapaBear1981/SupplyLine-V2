@@ -885,6 +885,28 @@ def register_routes(app):
 
             warehouse_id = request.args.get("warehouse_id", type=int)
             status_filter = request.args.get("status")
+            sort_by = request.args.get("sort_by")
+            order = (request.args.get("order") or "asc").lower()
+
+            # Whitelist of fields the client may sort by. Maps the API sort key
+            # to the SQLAlchemy column expression used in ORDER BY.
+            from models import Warehouse
+            sortable_columns = {
+                "tool_number": Tool.tool_number,
+                "serial_number": Tool.serial_number,
+                "description": Tool.description,
+                "location": Tool.location,
+                "category": Tool.category,
+                "status": Tool.status,
+                "calibration_status": Tool.calibration_status,
+                "created_at": Tool.created_at,
+                "warehouse_name": Warehouse.name,
+            }
+
+            if sort_by is not None and sort_by not in sortable_columns:
+                return jsonify({"error": f"Invalid sort_by: {sort_by}"}), 400
+            if order not in ("asc", "desc"):
+                return jsonify({"error": "order must be 'asc' or 'desc'"}), 400
 
             logger.debug("Tools list requested", extra={
                 "has_search_query": bool(search_query),
@@ -892,6 +914,8 @@ def register_routes(app):
                 "per_page": per_page,
                 "warehouse_id": warehouse_id,
                 "status_filter": status_filter,
+                "sort_by": sort_by,
+                "order": order,
             })
 
             # Build query
@@ -917,6 +941,18 @@ def register_routes(app):
                     logger.debug("Tools search filter applied")
                 except Exception:
                     logger.exception("Error during tools search filter")
+
+            # Apply sorting. Sorting by warehouse_name needs an outer join so
+            # tools without a warehouse still appear. Secondary sort by id
+            # gives a stable, deterministic order across pages.
+            if sort_by:
+                sort_column = sortable_columns[sort_by]
+                if sort_by == "warehouse_name":
+                    query = query.outerjoin(Warehouse, Tool.warehouse_id == Warehouse.id)
+                direction = sort_column.desc() if order == "desc" else sort_column.asc()
+                query = query.order_by(direction, Tool.id.asc())
+            else:
+                query = query.order_by(Tool.id.asc())
 
             # Apply pagination
             try:
