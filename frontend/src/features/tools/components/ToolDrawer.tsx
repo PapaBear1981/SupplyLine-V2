@@ -367,9 +367,13 @@ export const ToolDrawer = ({ open, mode: initialMode, toolId, onClose, onSuccess
             onClick={() => {
               calForm.resetFields();
               setCalCertFile(null);
+              const today = dayjs();
               calForm.setFieldsValue({
-                calibration_date: dayjs(),
+                calibration_date: today,
                 calibration_status: 'pass',
+                next_calibration_date: tool.calibration_frequency_days
+                  ? today.add(tool.calibration_frequency_days, 'day')
+                  : undefined,
               });
               setCalModalOpen(true);
             }}

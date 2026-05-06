@@ -1,5 +1,8 @@
-import { describe, it, expect } from 'vitest';
-import { unwrapToolCalibrations } from './toolsApi';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { configureStore } from '@reduxjs/toolkit';
+import { baseApi } from '@services/baseApi';
+import authReducer from '@features/auth/slices/authSlice';
+import { toolsApi, unwrapToolCalibrations } from './toolsApi';
 import type { ToolCalibration } from '../types';
 
 const cal = (id: number): ToolCalibration =>
@@ -36,5 +39,116 @@ describe('unwrapToolCalibrations', () => {
     expect(
       unwrapToolCalibrations({} as unknown as { calibrations: ToolCalibration[] })
     ).toEqual([]);
+  });
+});
+
+/**
+ * The "Record Calibration" workflow in the tool details drawer hits the
+ * backend `POST /api/tools/{id}/calibrations` route, which expects a JSON
+ * body (see `request.get_json()` in routes_calibration.py). An earlier
+ * version of this mutation sent a FormData body, which the route silently
+ * coerced to {} and rejected with a validation error. These tests pin the
+ * wire format so a future refactor doesn't regress that.
+ */
+describe('toolsApi mutations — record calibration workflow', () => {
+  const fetchSpy = vi.fn();
+
+  const makeStore = () =>
+    configureStore({
+      reducer: {
+        [baseApi.reducerPath]: baseApi.reducer,
+        auth: authReducer,
+      },
+      middleware: (getDefault) =>
+        getDefault({ serializableCheck: false }).concat(baseApi.middleware),
+    });
+
+  beforeEach(() => {
+    fetchSpy.mockReset();
+    vi.stubGlobal('fetch', fetchSpy);
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it('addToolCalibration POSTs JSON to /api/tools/:id/calibrations', async () => {
+    fetchSpy.mockResolvedValueOnce(
+      new Response(
+        JSON.stringify({ message: 'ok', calibration: { id: 42 } }),
+        { status: 201, headers: { 'Content-Type': 'application/json' } }
+      )
+    );
+
+    const store = makeStore();
+    const result = await store.dispatch(
+      toolsApi.endpoints.addToolCalibration.initiate({
+        toolId: 7,
+        data: {
+          calibration_date: '2026-05-01T00:00:00.000Z',
+          next_calibration_date: '2026-11-01T00:00:00.000Z',
+          calibration_status: 'pass',
+          notes: 'Annual',
+        },
+      })
+    );
+
+    expect('error' in result && result.error).toBeFalsy();
+    expect(fetchSpy).toHaveBeenCalledTimes(1);
+
+    const request = fetchSpy.mock.calls[0][0] as Request;
+    expect(request.url).toContain('/api/tools/7/calibrations');
+    expect(request.method).toBe('POST');
+    expect(request.headers.get('Content-Type')).toBe('application/json');
+
+    const body = await request.clone().json();
+    expect(body).toEqual({
+      calibration_date: '2026-05-01T00:00:00.000Z',
+      next_calibration_date: '2026-11-01T00:00:00.000Z',
+      calibration_status: 'pass',
+      notes: 'Annual',
+    });
+  });
+
+  it('uploadCalibrationCertificate POSTs multipart form-data to the cert endpoint', async () => {
+    fetchSpy.mockResolvedValueOnce(
+      new Response(
+        JSON.stringify({ message: 'ok', certificate: 'cert.pdf' }),
+        { status: 201, headers: { 'Content-Type': 'application/json' } }
+      )
+    );
+
+    const store = makeStore();
+    const file = new File([new Uint8Array([1, 2, 3])], 'cert.pdf', {
+      type: 'application/pdf',
+    });
+
+    const result = await store.dispatch(
+      toolsApi.endpoints.uploadCalibrationCertificate.initiate({
+        calibrationId: 99,
+        toolId: 7,
+        file,
+      })
+    );
+
+    expect('error' in result && result.error).toBeFalsy();
+    expect(fetchSpy).toHaveBeenCalledTimes(1);
+
+    const request = fetchSpy.mock.calls[0][0] as Request;
+    expect(request.url).toContain('/api/calibrations/99/certificate');
+    expect(request.method).toBe('POST');
+
+    // FormData is sent as multipart, not JSON. The browser sets the boundary
+    // automatically — Content-Type starts with multipart/form-data.
+    const ct = request.headers.get('Content-Type') ?? '';
+    expect(ct.startsWith('multipart/form-data')).toBe(true);
+
+    const form = await request.clone().formData();
+    const certField = form.get('certificate');
+    // The body is multipart with a "certificate" part carrying the file
+    // contents. (undici loses the filename when round-tripping in node, so
+    // we assert size rather than name — the browser preserves both.)
+    expect(certField).not.toBeNull();
+    expect((certField as Blob).size).toBe(3);
   });
 });

@@ -10,6 +10,7 @@ Tests calibration management including:
 - Out-of-calibration tool handling
 """
 
+import uuid
 from datetime import datetime, timedelta
 from io import BytesIO
 
@@ -655,3 +656,209 @@ class TestCalibrationApiContract:
         assert isinstance(data, dict)
         assert data["calibrations"] == []
         assert "pagination" in data
+
+
+@pytest.mark.calibration
+@pytest.mark.integration
+class TestRecordCalibrationWorkflow:
+    """
+    Cover the "Record Calibration" workflow used by the tool details drawer
+    Calibration tab. The frontend POSTs JSON (not multipart) to
+    `/api/tools/{id}/calibrations` and expects the server to:
+      1. Persist the ToolCalibration record.
+      2. Update tool.last_calibration_date / next_calibration_date.
+      3. Recompute tool.calibration_status.
+      4. Auto-derive next_calibration_date from frequency when omitted.
+    These tests pin that contract so the drawer can rely on it.
+    """
+
+    def _make_calibrated_tool(self, db_session, test_warehouse, frequency_days=365):
+        tool = Tool(
+            tool_number=f"CALWF{uuid.uuid4().hex[:6].upper()}",
+            serial_number=f"SN-{uuid.uuid4().hex[:8].upper()}",
+            description="Workflow Test Tool",
+            condition="Good",
+            location="Lab",
+            category="Measurement",
+            warehouse_id=test_warehouse.id,
+            status="available",
+            requires_calibration=True,
+            calibration_frequency_days=frequency_days,
+        )
+        db_session.add(tool)
+        db_session.commit()
+        return tool
+
+    def test_record_calibration_via_json_updates_tool_dates(
+        self, client, db_session, auth_headers, test_warehouse
+    ):
+        """JSON POST creates a record and propagates dates to the tool row."""
+        tool = self._make_calibrated_tool(db_session, test_warehouse)
+
+        cal_date = datetime.utcnow().replace(microsecond=0)
+        next_date = cal_date + timedelta(days=180)
+
+        response = client.post(
+            f"/api/tools/{tool.id}/calibrations",
+            headers=auth_headers,
+            json={
+                "calibration_date": cal_date.isoformat(),
+                "next_calibration_date": next_date.isoformat(),
+                "calibration_status": "pass",
+                "notes": "Drawer workflow test",
+            },
+        )
+
+        assert response.status_code == 201, response.get_json()
+        body = response.get_json()
+        assert "calibration" in body
+        record = body["calibration"]
+        assert record["calibration_status"] == "pass"
+        assert record["calibration_notes"] == "Drawer workflow test"
+
+        db_session.refresh(tool)
+        assert tool.last_calibration_date is not None
+        assert tool.next_calibration_date is not None
+        # The drawer's summary card depends on these being set so it can show
+        # "Last/Next/Time Until Next" without an extra calibration history call.
+        assert tool.last_calibration_date.date() == cal_date.date()
+        assert tool.next_calibration_date.date() == next_date.date()
+        assert tool.calibration_status in {"current", "due_soon"}
+
+    def test_record_calibration_auto_calculates_next_date_from_frequency(
+        self, client, db_session, auth_headers, test_warehouse
+    ):
+        """When the client omits next_calibration_date, server uses frequency."""
+        tool = self._make_calibrated_tool(db_session, test_warehouse, frequency_days=90)
+        cal_date = datetime.utcnow().replace(microsecond=0)
+
+        response = client.post(
+            f"/api/tools/{tool.id}/calibrations",
+            headers=auth_headers,
+            json={
+                "calibration_date": cal_date.isoformat(),
+                "calibration_status": "pass",
+            },
+        )
+
+        assert response.status_code == 201
+        record = response.get_json()["calibration"]
+        # Server should compute calibration_date + frequency_days.
+        assert record["next_calibration_date"] is not None
+        next_date = datetime.fromisoformat(record["next_calibration_date"])
+        expected = cal_date + timedelta(days=90)
+        # Allow 1 day tolerance for tz/clock skew between client and server.
+        assert abs((next_date - expected).total_seconds()) < 86400
+
+    def test_record_failed_calibration_marks_status(
+        self, client, db_session, auth_headers, test_warehouse
+    ):
+        """Failed calibration is persisted and visible to the drawer summary."""
+        tool = self._make_calibrated_tool(db_session, test_warehouse)
+        cal_date = datetime.utcnow().replace(microsecond=0)
+
+        response = client.post(
+            f"/api/tools/{tool.id}/calibrations",
+            headers=auth_headers,
+            json={
+                "calibration_date": cal_date.isoformat(),
+                "calibration_status": "fail",
+                "notes": "Out of tolerance",
+            },
+        )
+
+        assert response.status_code == 201
+        record = response.get_json()["calibration"]
+        assert record["calibration_status"] == "fail"
+
+        # The history endpoint must echo it back so the timeline renders red.
+        list_resp = client.get(
+            f"/api/tools/{tool.id}/calibrations", headers=auth_headers
+        )
+        assert list_resp.status_code == 200
+        history = list_resp.get_json()["calibrations"]
+        assert any(c["calibration_status"] == "fail" for c in history)
+
+    def test_record_calibration_rejects_invalid_status(
+        self, client, db_session, auth_headers, test_warehouse
+    ):
+        """Status must be pass/fail/limited — drawer Select enforces this."""
+        tool = self._make_calibrated_tool(db_session, test_warehouse)
+
+        response = client.post(
+            f"/api/tools/{tool.id}/calibrations",
+            headers=auth_headers,
+            json={
+                "calibration_date": datetime.utcnow().isoformat(),
+                "calibration_status": "bogus",
+            },
+        )
+
+        # Schema layer returns 400; constraint layer also 400.
+        assert response.status_code == 400
+
+    def test_record_calibration_requires_auth(
+        self, client, db_session, test_warehouse
+    ):
+        """Anonymous callers can't record calibrations from the drawer."""
+        tool = self._make_calibrated_tool(db_session, test_warehouse)
+
+        response = client.post(
+            f"/api/tools/{tool.id}/calibrations",
+            json={
+                "calibration_date": datetime.utcnow().isoformat(),
+                "calibration_status": "pass",
+            },
+        )
+
+        assert response.status_code == 401
+
+    def test_record_calibration_blocks_non_materials_user(
+        self, client, db_session, test_warehouse, user_auth_headers
+    ):
+        """tool_manager_required restricts to Materials/admin."""
+        tool = self._make_calibrated_tool(db_session, test_warehouse)
+
+        response = client.post(
+            f"/api/tools/{tool.id}/calibrations",
+            headers=user_auth_headers,
+            json={
+                "calibration_date": datetime.utcnow().isoformat(),
+                "calibration_status": "pass",
+            },
+        )
+
+        assert response.status_code == 403
+
+    def test_certificate_upload_after_record(
+        self, client, db_session, admin_user, auth_headers, test_warehouse
+    ):
+        """Drawer uploads cert file in a follow-up request to /certificate."""
+        from models import ToolCalibration
+
+        tool = self._make_calibrated_tool(db_session, test_warehouse)
+        calibration = ToolCalibration(
+            tool_id=tool.id,
+            calibration_date=datetime.utcnow(),
+            next_calibration_date=datetime.utcnow() + timedelta(days=365),
+            performed_by_user_id=admin_user.id,
+            calibration_status="pass",
+            calibration_notes="Cert upload test",
+        )
+        db_session.add(calibration)
+        db_session.commit()
+
+        pdf_bytes = b"%PDF-1.4\n%cert\n%%EOF\n"
+        response = client.post(
+            f"/api/calibrations/{calibration.id}/certificate",
+            headers=auth_headers,
+            data={"certificate": (BytesIO(pdf_bytes), "cert.pdf")},
+            content_type="multipart/form-data",
+        )
+
+        # 201 = uploaded; some environments may reject PDF magic but we still
+        # want to know if the route disappears (404) or auth breaks (401/403).
+        assert response.status_code in (201, 400)
+        if response.status_code == 201:
+            db_session.refresh(calibration)
+            assert calibration.calibration_certificate_file

@@ -81,4 +81,115 @@ test.describe('Tool details — calibration tab (desktop)', () => {
     // the Details table — `.first()` keeps strict-mode happy.
     await expect(drawer.getByText(TEST_TOOLS.calibratedWrench.number).first()).toBeVisible();
   });
+
+  /**
+   * The Calibration tab's job, restated by the user: "show me the last and
+   * next calibration date at minimum, plus how to record a new one." These
+   * tests pin down that contract. They use the seeded T200 wrench, which has
+   * `requires_calibration=true` plus one ToolCalibration record from the seed
+   * (last ~351 days ago, next ~14 days out).
+   */
+  test('summary card surfaces last/next calibration dates and frequency', async ({ page }) => {
+    const tools = new ToolsPage(page);
+    await tools.open();
+    await tools.search(TEST_TOOLS.calibratedWrench.number);
+
+    const row = tools.table
+      .locator('tr[data-row-key]')
+      .filter({ hasText: TEST_TOOLS.calibratedWrench.number })
+      .first();
+    await row.waitFor({ state: 'visible' });
+    await row.locator('[aria-label="eye"]').first().click();
+
+    const drawer = page.locator('.ant-drawer-open, .ant-drawer-content').first();
+    await expect(drawer).toBeVisible();
+    await drawer.getByRole('tab', { name: /calibration/i }).click();
+
+    // antd Statistic renders the field name in `.ant-statistic-title`. All
+    // five summary fields should appear regardless of history length.
+    for (const title of ['Status', 'Frequency', 'Last Calibration', 'Next Calibration', 'Time Until Next']) {
+      await expect(
+        drawer.locator('.ant-statistic-title', { hasText: new RegExp(`^${title}$`) }).first()
+      ).toBeVisible();
+    }
+
+    // Frequency for the seeded wrench is 365 days.
+    await expect(drawer.getByText('365 days').first()).toBeVisible();
+
+    // The "Time Until Next" stat shows a non-empty days countdown — content
+    // depends on the seed date but it must not be the placeholder em-dash.
+    const timeUntilCard = drawer.locator('.ant-statistic', {
+      has: drawer.locator('.ant-statistic-title', { hasText: /^Time Until Next$/ }),
+    });
+    await expect(timeUntilCard.locator('.ant-statistic-content-value')).not.toHaveText('—');
+  });
+
+  test('Record Calibration button opens a modal and persists a new record', async ({ page }) => {
+    const tools = new ToolsPage(page);
+    await tools.open();
+    await tools.search(TEST_TOOLS.calibratedWrench.number);
+
+    const row = tools.table
+      .locator('tr[data-row-key]')
+      .filter({ hasText: TEST_TOOLS.calibratedWrench.number })
+      .first();
+    await row.waitFor({ state: 'visible' });
+    await row.locator('[aria-label="eye"]').first().click();
+
+    const drawer = page.locator('.ant-drawer-open, .ant-drawer-content').first();
+    await drawer.getByRole('tab', { name: /calibration/i }).click();
+
+    // Snapshot how many timeline items render before we add a new record.
+    const timelineItems = drawer.locator('.ant-timeline-item');
+    const initialCount = await timelineItems.count();
+
+    await drawer.getByRole('button', { name: /record calibration/i }).click();
+
+    // The modal renders outside the drawer in the antd Portal — pick it up
+    // from the page rather than the drawer.
+    const modal = page.locator('.ant-modal').filter({ hasText: /Record Calibration/i }).first();
+    await expect(modal).toBeVisible();
+
+    // Date and result come pre-filled (today / pass). Add notes that we can
+    // assert against later to disambiguate from seeded records.
+    const stamp = `e2e-${Date.now()}`;
+    await modal.getByRole('textbox', { name: /Notes/i }).fill(stamp);
+
+    await Promise.all([
+      page.waitForResponse(
+        (resp) =>
+          /\/api\/tools\/\d+\/calibrations$/.test(resp.url()) &&
+          resp.request().method() === 'POST'
+      ),
+      modal.getByRole('button', { name: /save calibration/i }).click(),
+    ]);
+
+    // Modal closes and the new record shows up in the timeline.
+    await expect(modal).toBeHidden();
+    await expect(drawer.getByText(stamp)).toBeVisible({ timeout: 5_000 });
+    await expect(timelineItems).toHaveCount(initialCount + 1);
+  });
+
+  test('calibration tab shows enable-tracking empty state for non-calibrated tools', async ({ page }) => {
+    // T001 (Digital Multimeter) is seeded without requires_calibration —
+    // the tab should explain that and offer an Edit shortcut, not crash.
+    const tools = new ToolsPage(page);
+    await tools.open();
+    await tools.search(TEST_TOOLS.multimeter.number);
+
+    const row = tools.table
+      .locator('tr[data-row-key]')
+      .filter({ hasText: TEST_TOOLS.multimeter.number })
+      .first();
+    await row.waitFor({ state: 'visible' });
+    await row.locator('[aria-label="eye"]').first().click();
+
+    const drawer = page.locator('.ant-drawer-open, .ant-drawer-content').first();
+    const calibrationTab = drawer.getByRole('tab', { name: /calibration/i });
+    await expect(calibrationTab).not.toHaveAttribute('aria-disabled', 'true');
+    await calibrationTab.click();
+
+    await expect(drawer.getByText(/not currently tracked for calibration/i)).toBeVisible();
+    await expect(drawer.getByRole('button', { name: /edit tool/i })).toBeVisible();
+  });
 });
