@@ -39,6 +39,8 @@ export const toolsApi = baseApi.injectEndpoints({
             ...(queryParams.category && { category: queryParams.category }),
             ...(queryParams.warehouse_id && { warehouse_id: queryParams.warehouse_id }),
             ...(queryParams.calibration_status && { calibration_status: queryParams.calibration_status }),
+            ...(queryParams.sort_by && { sort_by: queryParams.sort_by }),
+            ...(queryParams.order && { order: queryParams.order }),
           },
         };
       },
