@@ -91,6 +91,8 @@ export const toolsApi = baseApi.injectEndpoints({
     // Get tool calibration history
     getToolCalibrations: builder.query<ToolCalibration[], number>({
       query: (toolId) => `/api/tools/${toolId}/calibrations`,
+      transformResponse: (response: ToolCalibration[] | { calibrations: ToolCalibration[] }) =>
+        Array.isArray(response) ? response : response?.calibrations ?? [],
       providesTags: (_result, _error, toolId) => [{ type: 'Tool', id: toolId }],
     }),
 
