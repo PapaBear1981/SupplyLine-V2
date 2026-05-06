@@ -392,6 +392,13 @@ def create_test_tools(warehouses):
         db.session.add(calibration)
         calibrated_wrench.next_calibration_date = calibration.next_calibration_date
         calibrated_wrench.last_calibration_date = calibration.calibration_date
+        # `Tool.calibration_status` is nullable; set it explicitly so the
+        # tools list can render a Tag. (Skipping `update_calibration_status`
+        # because it compares tz-naive `now` to the seeder's tz-aware
+        # `next_calibration_date`, which raises in Python.) The seeded due
+        # date is ~14 days out, so "due_soon" matches what the helper would
+        # compute.
+        calibrated_wrench.calibration_status = "due_soon"
         db.session.commit()
         logger.info(
             f"Seeded calibration record for {calibrated_wrench.tool_number} "

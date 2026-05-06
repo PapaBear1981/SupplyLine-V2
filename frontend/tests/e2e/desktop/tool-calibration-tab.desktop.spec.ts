@@ -77,6 +77,8 @@ test.describe('Tool details — calibration tab (desktop)', () => {
     await drawer.getByRole('tab', { name: /calibration/i }).click();
     await drawer.getByRole('tab', { name: /details/i }).click();
 
-    await expect(drawer.getByText(TEST_TOOLS.calibratedWrench.number)).toBeVisible();
+    // Tool number appears in the drawer header ("Tool: T200") and again in
+    // the Details table — `.first()` keeps strict-mode happy.
+    await expect(drawer.getByText(TEST_TOOLS.calibratedWrench.number).first()).toBeVisible();
   });
 });
