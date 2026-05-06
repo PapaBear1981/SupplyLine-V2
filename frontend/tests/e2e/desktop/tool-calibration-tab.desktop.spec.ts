@@ -105,32 +105,29 @@ test.describe('Tool details — calibration tab (desktop)', () => {
     await expect(drawer).toBeVisible();
     await drawer.getByRole('tab', { name: /calibration/i }).click();
 
-    // The Calibration tab's panel is the active one — the Details panel is
-    // still in the DOM (display:none) so locators must scope to the visible
-    // tabpanel to avoid matching hidden duplicate text.
-    const activePanel = drawer.locator('div[role="tabpanel"]:not([aria-hidden="true"])');
+    // The Calibration tab is the only tab that uses antd `Statistic`; the
+    // Details tab uses `Descriptions`. So `.ant-statistic` selectors are
+    // implicitly scoped to the Calibration tab — no need to filter the
+    // tabpanel by visibility (antd 5 hides inactive panes via class +
+    // display:none, not aria-hidden, so that filter is unreliable).
 
     // antd Statistic renders the field name in `.ant-statistic-title`. All
     // five summary fields should appear regardless of history length.
     for (const title of ['Status', 'Frequency', 'Last Calibration', 'Next Calibration', 'Time Until Next']) {
       await expect(
-        activePanel.locator('.ant-statistic-title', { hasText: new RegExp(`^${title}$`) }).first()
+        drawer.locator('.ant-statistic-title', { hasText: new RegExp(`^${title}$`) }).first()
       ).toBeVisible();
     }
 
-    // Frequency for the seeded wrench is 365 days. Scope to the Frequency
-    // statistic specifically so the Details tab's "Every 365 days" text
-    // (display:none in this tab) can't get picked up first.
-    const frequencyCard = activePanel.locator('.ant-statistic', {
-      has: activePanel.locator('.ant-statistic-title', { hasText: /^Frequency$/ }),
-    });
-    await expect(frequencyCard.locator('.ant-statistic-content')).toContainText('365');
+    // Frequency for the seeded wrench is 365 days. Match the whole
+    // Statistic block by its (unique) title text and assert its content
+    // contains 365 — this avoids splitting on antd's value formatting.
+    const frequencyCard = drawer.locator('.ant-statistic').filter({ hasText: 'Frequency' }).first();
+    await expect(frequencyCard).toContainText('365');
 
     // The "Time Until Next" stat shows a non-empty days countdown — content
     // depends on the seed date but it must not be the placeholder em-dash.
-    const timeUntilCard = activePanel.locator('.ant-statistic', {
-      has: activePanel.locator('.ant-statistic-title', { hasText: /^Time Until Next$/ }),
-    });
+    const timeUntilCard = drawer.locator('.ant-statistic').filter({ hasText: 'Time Until Next' }).first();
     await expect(timeUntilCard.locator('.ant-statistic-content-value')).not.toHaveText('—');
   });
 
@@ -212,8 +209,12 @@ test.describe('Tool details — calibration tab (desktop)', () => {
     await calibrationTab.click();
 
     await expect(drawer.getByText(/not currently tracked for calibration/i)).toBeVisible();
-    // The drawer header also has an "Edit tool details" button — use exact
-    // match on the empty-state CTA to avoid strict-mode collisions.
-    await expect(drawer.getByRole('button', { name: 'Edit Tool', exact: true })).toBeVisible();
+    // Scope to the antd Empty container — the drawer header also has an
+    // "Edit tool details" button, and the empty-state Edit button's
+    // accessible name comes out as "edit Edit Tool" because Playwright
+    // includes the EditOutlined icon's `data-icon="edit"`. Filtering inside
+    // `.ant-empty` avoids both collisions.
+    const emptyState = drawer.locator('.ant-empty').first();
+    await expect(emptyState.getByRole('button', { name: /edit tool/i })).toBeVisible();
   });
 });
