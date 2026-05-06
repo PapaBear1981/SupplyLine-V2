@@ -17,6 +17,11 @@ import {
   Input,
   DatePicker,
   Typography,
+  Card,
+  Statistic,
+  Row,
+  Col,
+  Upload,
 } from 'antd';
 import {
   EditOutlined,
@@ -29,6 +34,8 @@ import {
   CheckCircleOutlined,
   CloseCircleOutlined,
   MinusCircleOutlined,
+  PlusOutlined,
+  UploadOutlined,
 } from '@ant-design/icons';
 import dayjs from 'dayjs';
 import {
@@ -36,6 +43,8 @@ import {
   useUpdateToolMutation,
   useCreateToolMutation,
   useGetToolCalibrationsQuery,
+  useAddToolCalibrationMutation,
+  useUploadCalibrationCertificateMutation,
   useGetToolBarcodeQuery,
 } from '../services/toolsApi';
 import { ToolForm } from './ToolForm';
@@ -71,6 +80,9 @@ export const ToolDrawer = ({ open, mode: initialMode, toolId, onClose, onSuccess
   const [printModalOpen, setPrintModalOpen] = useState(false);
   const [maintModalOpen, setMaintModalOpen] = useState(false);
   const [maintForm] = Form.useForm();
+  const [calModalOpen, setCalModalOpen] = useState(false);
+  const [calForm] = Form.useForm();
+  const [calCertFile, setCalCertFile] = useState<File | null>(null);
 
   // Fetch tool data if viewing or editing
   const { data: tool, isLoading } = useGetToolQuery(toolId!, {
@@ -87,6 +99,8 @@ export const ToolDrawer = ({ open, mode: initialMode, toolId, onClose, onSuccess
 
   const [updateTool, { isLoading: isUpdating }] = useUpdateToolMutation();
   const [createTool, { isLoading: isCreating }] = useCreateToolMutation();
+  const [addCalibration, { isLoading: isAddingCalibration }] = useAddToolCalibrationMutation();
+  const [uploadCertificate] = useUploadCalibrationCertificateMutation();
 
   // Update mode when initialMode changes
   useEffect(() => {
@@ -216,21 +230,21 @@ export const ToolDrawer = ({ open, mode: initialMode, toolId, onClose, onSuccess
                 {tool.calibration_status.replace('_', ' ').toUpperCase()}
               </Tag>
             </Descriptions.Item>
-            {tool.calibration_frequency_days && (
-              <Descriptions.Item label="Calibration Frequency">
-                Every {tool.calibration_frequency_days} days
-              </Descriptions.Item>
-            )}
-            {tool.last_calibration_date && (
-              <Descriptions.Item label="Last Calibration">
-                {dayjs(tool.last_calibration_date).format('MMM D, YYYY')}
-              </Descriptions.Item>
-            )}
-            {tool.next_calibration_date && (
-              <Descriptions.Item label="Next Calibration">
-                {dayjs(tool.next_calibration_date).format('MMM D, YYYY')}
-              </Descriptions.Item>
-            )}
+            <Descriptions.Item label="Calibration Frequency">
+              {tool.calibration_frequency_days
+                ? `Every ${tool.calibration_frequency_days} days`
+                : 'Not set'}
+            </Descriptions.Item>
+            <Descriptions.Item label="Last Calibration">
+              {tool.last_calibration_date
+                ? dayjs(tool.last_calibration_date).format('MMM D, YYYY')
+                : <Text type="secondary">Not yet calibrated</Text>}
+            </Descriptions.Item>
+            <Descriptions.Item label="Next Calibration">
+              {tool.next_calibration_date
+                ? dayjs(tool.next_calibration_date).format('MMM D, YYYY')
+                : <Text type="secondary">—</Text>}
+            </Descriptions.Item>
           </>
         )}
         <Descriptions.Item label="Created">
@@ -241,12 +255,30 @@ export const ToolDrawer = ({ open, mode: initialMode, toolId, onClose, onSuccess
   };
 
   const renderCalibrationTab = () => {
-    if (!tool?.requires_calibration) {
-      return <Empty description="This tool does not require calibration" />;
-    }
+    if (!tool) return <Empty description="No tool data" />;
 
-    if (!calibrations || calibrations.length === 0) {
-      return <Empty description="No calibration history" />;
+    if (!tool.requires_calibration) {
+      return (
+        <Empty
+          description={
+            <span>
+              This tool is not currently tracked for calibration.
+              <br />
+              Enable "Requires Calibration" in tool details to start tracking.
+            </span>
+          }
+        >
+          <PermissionGuard permission="tool.edit">
+            <Button
+              type="primary"
+              icon={<EditOutlined />}
+              onClick={() => setMode('edit')}
+            >
+              Edit Tool
+            </Button>
+          </PermissionGuard>
+        </Empty>
+      );
     }
 
     const statusConfig: Record<string, { color: string; icon: React.ReactNode; label: string }> = {
@@ -255,38 +287,182 @@ export const ToolDrawer = ({ open, mode: initialMode, toolId, onClose, onSuccess
       limited: { color: 'warning', icon: <MinusCircleOutlined />, label: 'Limited' },
     };
 
+    // Compute days until next calibration
+    let daysUntilLabel = '—';
+    let daysValueStyle: React.CSSProperties = {};
+    if (tool.next_calibration_date) {
+      const days = dayjs(tool.next_calibration_date).startOf('day').diff(dayjs().startOf('day'), 'day');
+      if (days < 0) {
+        daysUntilLabel = `${Math.abs(days)} day${Math.abs(days) === 1 ? '' : 's'} overdue`;
+        daysValueStyle = { color: '#cf1322' };
+      } else if (days === 0) {
+        daysUntilLabel = 'Due today';
+        daysValueStyle = { color: '#d48806' };
+      } else {
+        daysUntilLabel = `${days} day${days === 1 ? '' : 's'}`;
+        daysValueStyle = days <= 30 ? { color: '#d48806' } : { color: '#3f8600' };
+      }
+    } else if (!tool.last_calibration_date) {
+      daysUntilLabel = 'Not yet calibrated';
+    }
+
     return (
-      <Timeline
-        items={calibrations.map((cal) => {
-          const status = statusConfig[cal.calibration_status] ?? statusConfig.pass;
-          return {
-            color: cal.calibration_status === 'pass' ? 'green' : cal.calibration_status === 'fail' ? 'red' : 'orange',
-            children: (
-              <div>
-                <Space wrap>
-                  <strong>{dayjs(cal.calibration_date).format('MMM D, YYYY')}</strong>
-                  <Tag color={status.color} icon={status.icon}>{status.label}</Tag>
-                </Space>
-                {cal.performed_by_name && (
-                  <div>Calibrated by: {cal.performed_by_name}</div>
+      <Space direction="vertical" style={{ width: '100%' }} size="middle">
+        <Card size="small">
+          <Row gutter={[16, 16]}>
+            <Col xs={12} sm={6}>
+              <Statistic
+                title="Status"
+                valueRender={() => (
+                  <Tag color={getCalibrationStatusColor(tool.calibration_status)}>
+                    {tool.calibration_status.replace('_', ' ').toUpperCase()}
+                  </Tag>
                 )}
-                {cal.calibration_certificate_file && (
-                  <div>Certificate file: {cal.calibration_certificate_file}</div>
-                )}
-                {cal.calibration_notes && (
-                  <div style={{ marginTop: 8, color: '#666' }}>{cal.calibration_notes}</div>
-                )}
-                {cal.next_calibration_date && (
-                  <div style={{ marginTop: 4, fontSize: 12, color: '#999' }}>
-                    Next due: {dayjs(cal.next_calibration_date).format('MMM D, YYYY')}
+                value={tool.calibration_status}
+              />
+            </Col>
+            <Col xs={12} sm={6}>
+              <Statistic
+                title="Frequency"
+                value={tool.calibration_frequency_days ? `${tool.calibration_frequency_days} days` : 'Not set'}
+                valueStyle={{ fontSize: 16 }}
+              />
+            </Col>
+            <Col xs={12} sm={6}>
+              <Statistic
+                title="Last Calibration"
+                value={
+                  tool.last_calibration_date
+                    ? dayjs(tool.last_calibration_date).format('MMM D, YYYY')
+                    : 'Never'
+                }
+                valueStyle={{ fontSize: 16 }}
+              />
+            </Col>
+            <Col xs={12} sm={6}>
+              <Statistic
+                title="Next Calibration"
+                value={
+                  tool.next_calibration_date
+                    ? dayjs(tool.next_calibration_date).format('MMM D, YYYY')
+                    : '—'
+                }
+                valueStyle={{ fontSize: 16 }}
+              />
+            </Col>
+            <Col xs={24}>
+              <Statistic
+                title="Time Until Next"
+                value={daysUntilLabel}
+                valueStyle={{ ...daysValueStyle, fontSize: 18 }}
+              />
+            </Col>
+          </Row>
+        </Card>
+
+        <PermissionGuard permission="tool.edit">
+          <Button
+            type="primary"
+            icon={<PlusOutlined />}
+            onClick={() => {
+              calForm.resetFields();
+              setCalCertFile(null);
+              const today = dayjs();
+              calForm.setFieldsValue({
+                calibration_date: today,
+                calibration_status: 'pass',
+                next_calibration_date: tool.calibration_frequency_days
+                  ? today.add(tool.calibration_frequency_days, 'day')
+                  : undefined,
+              });
+              setCalModalOpen(true);
+            }}
+          >
+            Record Calibration
+          </Button>
+        </PermissionGuard>
+
+        <Typography.Title level={5} style={{ marginTop: 8, marginBottom: 0 }}>
+          Calibration History
+        </Typography.Title>
+
+        {!calibrations || calibrations.length === 0 ? (
+          <Empty description="No calibration records yet" />
+        ) : (
+          <Timeline
+            items={calibrations.map((cal) => {
+              const status = statusConfig[cal.calibration_status] ?? statusConfig.pass;
+              return {
+                color: cal.calibration_status === 'pass' ? 'green' : cal.calibration_status === 'fail' ? 'red' : 'orange',
+                children: (
+                  <div>
+                    <Space wrap>
+                      <strong>{dayjs(cal.calibration_date).format('MMM D, YYYY')}</strong>
+                      <Tag color={status.color} icon={status.icon}>{status.label}</Tag>
+                    </Space>
+                    {cal.performed_by_name && (
+                      <div>Calibrated by: {cal.performed_by_name}</div>
+                    )}
+                    {cal.calibration_certificate_file && (
+                      <div>Certificate file: {cal.calibration_certificate_file}</div>
+                    )}
+                    {cal.calibration_notes && (
+                      <div style={{ marginTop: 8, color: '#666' }}>{cal.calibration_notes}</div>
+                    )}
+                    {cal.next_calibration_date && (
+                      <div style={{ marginTop: 4, fontSize: 12, color: '#999' }}>
+                        Next due: {dayjs(cal.next_calibration_date).format('MMM D, YYYY')}
+                      </div>
+                    )}
                   </div>
-                )}
-              </div>
-            ),
-          };
-        })}
-      />
+                ),
+              };
+            })}
+          />
+        )}
+      </Space>
     );
+  };
+
+  const handleCalibrationSubmit = async () => {
+    try {
+      const values = await calForm.validateFields();
+      const calDate = (values.calibration_date as ReturnType<typeof dayjs>);
+      const nextDate = values.next_calibration_date as ReturnType<typeof dayjs> | undefined;
+
+      const result = await addCalibration({
+        toolId: toolId!,
+        data: {
+          calibration_date: calDate.toISOString(),
+          next_calibration_date: nextDate ? nextDate.toISOString() : undefined,
+          calibration_status: values.calibration_status,
+          notes: values.notes || undefined,
+        },
+      }).unwrap();
+
+      if (calCertFile && result.calibration?.id) {
+        try {
+          await uploadCertificate({
+            calibrationId: result.calibration.id,
+            toolId: toolId!,
+            file: calCertFile,
+          }).unwrap();
+        } catch {
+          message.warning('Calibration saved, but certificate upload failed');
+        }
+      }
+
+      message.success('Calibration recorded');
+      setCalModalOpen(false);
+      calForm.resetFields();
+      setCalCertFile(null);
+      onSuccess?.();
+    } catch (err: unknown) {
+      const e = err as { errorFields?: unknown; data?: { error?: string } };
+      if (!e.errorFields) {
+        message.error(e.data?.error || 'Failed to record calibration');
+      }
+    }
   };
 
   const renderQRCodeTab = () => {
@@ -392,7 +568,6 @@ export const ToolDrawer = ({ open, mode: initialMode, toolId, onClose, onSuccess
                 </span>
               ),
               children: renderCalibrationTab(),
-              disabled: !tool.requires_calibration,
             },
             {
               key: 'qrcode',
@@ -479,6 +654,110 @@ export const ToolDrawer = ({ open, mode: initialMode, toolId, onClose, onSuccess
               disabledDate={(d) => d.isBefore(dayjs(), 'day')}
               placeholder="Select date…"
             />
+          </Form.Item>
+        </Form>
+      </Modal>
+
+      {/* Record Calibration modal */}
+      <Modal
+        open={calModalOpen}
+        title={
+          <Space>
+            <CalendarOutlined />
+            <span>Record Calibration</span>
+          </Space>
+        }
+        onCancel={() => {
+          setCalModalOpen(false);
+          calForm.resetFields();
+          setCalCertFile(null);
+        }}
+        onOk={handleCalibrationSubmit}
+        okText="Save Calibration"
+        okButtonProps={{ loading: isAddingCalibration }}
+        destroyOnClose
+      >
+        {tool && (
+          <Text type="secondary" style={{ display: 'block', marginBottom: 16 }}>
+            {tool.tool_number} — S/N {tool.serial_number}
+            {tool.calibration_frequency_days
+              ? ` — Frequency: every ${tool.calibration_frequency_days} days`
+              : ''}
+          </Text>
+        )}
+        <Form
+          form={calForm}
+          layout="vertical"
+          onValuesChange={(changed) => {
+            // Auto-compute next calibration date when calibration_date changes
+            if ('calibration_date' in changed && tool?.calibration_frequency_days) {
+              const calDate = changed.calibration_date as ReturnType<typeof dayjs> | null;
+              if (calDate) {
+                calForm.setFieldsValue({
+                  next_calibration_date: calDate.add(tool.calibration_frequency_days, 'day'),
+                });
+              }
+            }
+          }}
+        >
+          <Form.Item
+            label="Calibration date"
+            name="calibration_date"
+            rules={[{ required: true, message: 'Select the calibration date' }]}
+          >
+            <DatePicker
+              style={{ width: '100%' }}
+              disabledDate={(d) => d.isAfter(dayjs(), 'day')}
+            />
+          </Form.Item>
+          <Form.Item
+            label="Result"
+            name="calibration_status"
+            rules={[{ required: true, message: 'Select calibration result' }]}
+          >
+            <Select
+              options={[
+                { label: 'Pass', value: 'pass' },
+                { label: 'Limited', value: 'limited' },
+                { label: 'Fail', value: 'fail' },
+              ]}
+            />
+          </Form.Item>
+          <Form.Item
+            label="Next calibration date"
+            name="next_calibration_date"
+            extra={
+              tool?.calibration_frequency_days
+                ? `Auto-calculated from frequency (${tool.calibration_frequency_days} days). Override as needed.`
+                : 'Set the next calibration due date'
+            }
+          >
+            <DatePicker style={{ width: '100%' }} />
+          </Form.Item>
+          <Form.Item label="Notes (optional)" name="notes">
+            <Input.TextArea
+              rows={3}
+              maxLength={1000}
+              showCount
+              placeholder="Equipment used, deviations, observations…"
+            />
+          </Form.Item>
+          <Form.Item label="Certificate file (optional)">
+            <Upload
+              beforeUpload={(file) => {
+                setCalCertFile(file);
+                return false;
+              }}
+              onRemove={() => setCalCertFile(null)}
+              fileList={calCertFile ? [{
+                uid: '-1',
+                name: calCertFile.name,
+                status: 'done' as const,
+              }] : []}
+              maxCount={1}
+            >
+              <Button icon={<UploadOutlined />}>Attach certificate</Button>
+            </Upload>
           </Form.Item>
         </Form>
       </Modal>

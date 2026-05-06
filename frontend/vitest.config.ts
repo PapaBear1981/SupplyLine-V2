@@ -9,6 +9,13 @@ export default defineConfig({
     globals: true,
     setupFiles: ['./src/test/setup.ts'],
     include: ['src/**/*.{test,spec}.{ts,tsx}'],
+    env: {
+      // RTK Query's baseQuery reads VITE_API_BASE_URL ?? ''. With an empty
+      // string, relative URLs like /api/... can't be parsed as Request URLs
+      // in node's undici, breaking mutation/endpoint tests. Provide an
+      // absolute origin for tests so request construction succeeds.
+      VITE_API_BASE_URL: 'http://localhost',
+    },
     coverage: {
       reporter: ['text', 'json', 'html'],
       exclude: [
