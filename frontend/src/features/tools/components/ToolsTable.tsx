@@ -93,12 +93,14 @@ export const ToolsTable = ({ onView, onEdit }: ToolsTableProps) => {
       dataIndex: 'description',
       key: 'description',
       ellipsis: true,
+      sorter: (a, b) => (a.description || '').localeCompare(b.description || ''),
     },
     {
       title: 'Serial Number',
       dataIndex: 'serial_number',
       key: 'serial_number',
       width: 150,
+      sorter: (a, b) => (a.serial_number || '').localeCompare(b.serial_number || ''),
     },
     {
       title: 'Category',
@@ -111,12 +113,14 @@ export const ToolsTable = ({ onView, onEdit }: ToolsTableProps) => {
         { text: 'Power Tools', value: 'Power Tools' },
       ],
       onFilter: (value, record) => record.category === value,
+      sorter: (a, b) => (a.category || '').localeCompare(b.category || ''),
     },
     {
       title: 'Location',
       dataIndex: 'location',
       key: 'location',
       width: 150,
+      sorter: (a, b) => (a.location || '').localeCompare(b.location || ''),
     },
     ...(showAllWarehouses
       ? [{
@@ -125,6 +129,8 @@ export const ToolsTable = ({ onView, onEdit }: ToolsTableProps) => {
           key: 'warehouse_name',
           width: 160,
           render: (_: unknown, record: Tool) => record.warehouse_name || '—',
+          sorter: (a: Tool, b: Tool) =>
+            (a.warehouse_name || '').localeCompare(b.warehouse_name || ''),
         }]
       : []),
     {
@@ -147,12 +153,18 @@ export const ToolsTable = ({ onView, onEdit }: ToolsTableProps) => {
         { text: 'Retired', value: 'retired' },
       ],
       onFilter: (value, record) => record.status === value,
+      sorter: (a, b) => a.status.localeCompare(b.status),
     },
     {
       title: 'Calibration',
       dataIndex: 'calibration_status',
       key: 'calibration_status',
       width: 130,
+      sorter: (a, b) => {
+        const av = a.requires_calibration ? a.calibration_status || 'unknown' : 'n/a';
+        const bv = b.requires_calibration ? b.calibration_status || 'unknown' : 'n/a';
+        return av.localeCompare(bv);
+      },
       render: (status: CalibrationStatus | null | undefined, record) => {
         if (!record.requires_calibration) {
           return <Tag color="default">N/A</Tag>;
