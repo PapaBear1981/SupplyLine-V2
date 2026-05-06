@@ -692,18 +692,30 @@ class TestRecordCalibrationWorkflow:
     def test_record_calibration_via_json_updates_tool_dates(
         self, client, db_session, auth_headers, test_warehouse
     ):
-        """JSON POST creates a record and propagates dates to the tool row."""
+        """JSON POST creates a record and propagates dates to the tool row.
+
+        Uses the exact ISO 8601 format with 'Z' suffix that the frontend
+        sends via `dayjs.toISOString()`. An earlier version of
+        `validate_dates` parsed that into a tz-aware datetime, which then
+        crashed `Tool.update_calibration_status` with
+        "can't compare offset-naive and offset-aware datetimes" — the
+        drawer Save button would silently 500 in CI. This test pins that
+        path so it can't regress.
+        """
         tool = self._make_calibrated_tool(db_session, test_warehouse)
 
         cal_date = datetime.utcnow().replace(microsecond=0)
         next_date = cal_date + timedelta(days=180)
+        # Mirror dayjs's wire format exactly: "...Z" rather than "...+00:00".
+        cal_date_iso = cal_date.isoformat() + "Z"
+        next_date_iso = next_date.isoformat() + "Z"
 
         response = client.post(
             f"/api/tools/{tool.id}/calibrations",
             headers=auth_headers,
             json={
-                "calibration_date": cal_date.isoformat(),
-                "next_calibration_date": next_date.isoformat(),
+                "calibration_date": cal_date_iso,
+                "next_calibration_date": next_date_iso,
                 "calibration_status": "pass",
                 "notes": "Drawer workflow test",
             },

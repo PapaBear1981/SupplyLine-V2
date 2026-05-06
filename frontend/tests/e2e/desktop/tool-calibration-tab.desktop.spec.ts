@@ -105,21 +105,31 @@ test.describe('Tool details — calibration tab (desktop)', () => {
     await expect(drawer).toBeVisible();
     await drawer.getByRole('tab', { name: /calibration/i }).click();
 
+    // The Calibration tab's panel is the active one — the Details panel is
+    // still in the DOM (display:none) so locators must scope to the visible
+    // tabpanel to avoid matching hidden duplicate text.
+    const activePanel = drawer.locator('div[role="tabpanel"]:not([aria-hidden="true"])');
+
     // antd Statistic renders the field name in `.ant-statistic-title`. All
     // five summary fields should appear regardless of history length.
     for (const title of ['Status', 'Frequency', 'Last Calibration', 'Next Calibration', 'Time Until Next']) {
       await expect(
-        drawer.locator('.ant-statistic-title', { hasText: new RegExp(`^${title}$`) }).first()
+        activePanel.locator('.ant-statistic-title', { hasText: new RegExp(`^${title}$`) }).first()
       ).toBeVisible();
     }
 
-    // Frequency for the seeded wrench is 365 days.
-    await expect(drawer.getByText('365 days').first()).toBeVisible();
+    // Frequency for the seeded wrench is 365 days. Scope to the Frequency
+    // statistic specifically so the Details tab's "Every 365 days" text
+    // (display:none in this tab) can't get picked up first.
+    const frequencyCard = activePanel.locator('.ant-statistic', {
+      has: activePanel.locator('.ant-statistic-title', { hasText: /^Frequency$/ }),
+    });
+    await expect(frequencyCard.locator('.ant-statistic-content')).toContainText('365');
 
     // The "Time Until Next" stat shows a non-empty days countdown — content
     // depends on the seed date but it must not be the placeholder em-dash.
-    const timeUntilCard = drawer.locator('.ant-statistic', {
-      has: drawer.locator('.ant-statistic-title', { hasText: /^Time Until Next$/ }),
+    const timeUntilCard = activePanel.locator('.ant-statistic', {
+      has: activePanel.locator('.ant-statistic-title', { hasText: /^Time Until Next$/ }),
     });
     await expect(timeUntilCard.locator('.ant-statistic-content-value')).not.toHaveText('—');
   });
@@ -151,11 +161,14 @@ test.describe('Tool details — calibration tab (desktop)', () => {
     await expect(modal).toBeVisible();
 
     // Date and result come pre-filled (today / pass). Add notes that we can
-    // assert against later to disambiguate from seeded records.
+    // assert against later to disambiguate from seeded records. The Notes
+    // textarea is the only TextArea inside the modal — locate it directly
+    // rather than rely on accessible-name resolution, which has bitten us
+    // when antd label wiring changes between versions.
     const stamp = `e2e-${Date.now()}`;
-    await modal.getByRole('textbox', { name: /Notes/i }).fill(stamp);
+    await modal.locator('textarea').fill(stamp);
 
-    await Promise.all([
+    const [response] = await Promise.all([
       page.waitForResponse(
         (resp) =>
           /\/api\/tools\/\d+\/calibrations$/.test(resp.url()) &&
@@ -163,6 +176,15 @@ test.describe('Tool details — calibration tab (desktop)', () => {
       ),
       modal.getByRole('button', { name: /save calibration/i }).click(),
     ]);
+
+    // If the backend returns a non-2xx, the drawer keeps the modal open and
+    // shows a toast. Surface that as a clear failure rather than a generic
+    // toBeHidden timeout — past regressions (e.g. tz-aware/naive datetime
+    // comparison in `Tool.update_calibration_status`) silently 500'd here.
+    expect(
+      response.status(),
+      `POST /api/tools/.../calibrations returned ${response.status()}: ${await response.text().catch(() => '<no body>')}`
+    ).toBeLessThan(300);
 
     // Modal closes and the new record shows up in the timeline.
     await expect(modal).toBeHidden();
@@ -190,6 +212,8 @@ test.describe('Tool details — calibration tab (desktop)', () => {
     await calibrationTab.click();
 
     await expect(drawer.getByText(/not currently tracked for calibration/i)).toBeVisible();
-    await expect(drawer.getByRole('button', { name: /edit tool/i })).toBeVisible();
+    // The drawer header also has an "Edit tool details" button — use exact
+    // match on the empty-state CTA to avoid strict-mode collisions.
+    await expect(drawer.getByRole('button', { name: 'Edit Tool', exact: true })).toBeVisible();
   });
 });

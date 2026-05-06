@@ -7,7 +7,7 @@ used in the SupplyLine MRO Suite application.
 
 import html
 import re
-from datetime import datetime
+from datetime import UTC, datetime
 
 from utils.error_handler import ValidationError, validate_input
 
@@ -108,7 +108,17 @@ def validate_dates(data, date_fields):
                     date_str = data[field]
                     if date_str.endswith("Z"):
                         date_str = date_str.replace("Z", "+00:00")
-                    data[field] = datetime.fromisoformat(date_str)
+                    parsed = datetime.fromisoformat(date_str)
+                    # DB columns are tz-naive (db.DateTime without
+                    # timezone=True). Mixing tz-aware datetimes from the
+                    # client with tz-naive `datetime.now()` in helpers like
+                    # `Tool.update_calibration_status` raises
+                    # `TypeError: can't compare offset-naive and
+                    # offset-aware datetimes`. Normalize to naive UTC so
+                    # downstream comparisons are sound.
+                    if parsed.tzinfo is not None:
+                        parsed = parsed.astimezone(UTC).replace(tzinfo=None)
+                    data[field] = parsed
             except ValueError as err:
                 raise ValidationError(
                     f"{field} must be a valid ISO format date"
