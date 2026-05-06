@@ -9,6 +9,20 @@ import type {
 } from '../types';
 import type { LabelSize, CodeType, LabelSizesResponse } from '@/types/label';
 
+/**
+ * Backend `/api/tools/{id}/calibrations` returns `{ calibrations, pagination }`,
+ * but every consumer wants the bare array. Tolerate either shape so a future
+ * backend change to a bare array doesn't break the UI.
+ */
+export type ToolCalibrationsResponse =
+  | ToolCalibration[]
+  | { calibrations: ToolCalibration[]; pagination?: unknown };
+
+export const unwrapToolCalibrations = (
+  response: ToolCalibrationsResponse
+): ToolCalibration[] =>
+  Array.isArray(response) ? response : response?.calibrations ?? [];
+
 export const toolsApi = baseApi.injectEndpoints({
   endpoints: (builder) => ({
     // Get paginated list of tools with optional filters
@@ -91,8 +105,7 @@ export const toolsApi = baseApi.injectEndpoints({
     // Get tool calibration history
     getToolCalibrations: builder.query<ToolCalibration[], number>({
       query: (toolId) => `/api/tools/${toolId}/calibrations`,
-      transformResponse: (response: ToolCalibration[] | { calibrations: ToolCalibration[] }) =>
-        Array.isArray(response) ? response : response?.calibrations ?? [],
+      transformResponse: unwrapToolCalibrations,
       providesTags: (_result, _error, toolId) => [{ type: 'Tool', id: toolId }],
     }),
 
