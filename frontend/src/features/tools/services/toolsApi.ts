@@ -111,8 +111,16 @@ export const toolsApi = baseApi.injectEndpoints({
 
     // Add calibration record
     addToolCalibration: builder.mutation<
-      ToolCalibration,
-      { toolId: number; data: FormData }
+      { message: string; calibration: ToolCalibration },
+      {
+        toolId: number;
+        data: {
+          calibration_date: string;
+          next_calibration_date?: string;
+          calibration_status: 'pass' | 'fail' | 'limited';
+          notes?: string;
+        };
+      }
     >({
       query: ({ toolId, data }) => ({
         url: `/api/tools/${toolId}/calibrations`,
@@ -122,6 +130,25 @@ export const toolsApi = baseApi.injectEndpoints({
       invalidatesTags: (_result, _error, { toolId }) => [
         { type: 'Tool', id: toolId },
         { type: 'Tool', id: 'LIST' },
+      ],
+    }),
+
+    // Upload calibration certificate file (separate endpoint)
+    uploadCalibrationCertificate: builder.mutation<
+      { message: string; certificate: string },
+      { calibrationId: number; toolId: number; file: File }
+    >({
+      query: ({ calibrationId, file }) => {
+        const formData = new FormData();
+        formData.append('certificate', file);
+        return {
+          url: `/api/calibrations/${calibrationId}/certificate`,
+          method: 'POST',
+          body: formData,
+        };
+      },
+      invalidatesTags: (_result, _error, { toolId }) => [
+        { type: 'Tool', id: toolId },
       ],
     }),
 
@@ -198,6 +225,7 @@ export const {
   useRetireToolMutation,
   useGetToolCalibrationsQuery,
   useAddToolCalibrationMutation,
+  useUploadCalibrationCertificateMutation,
   useGetToolCheckoutsQuery,
   useSearchToolsQuery,
   useLazySearchToolsQuery,
