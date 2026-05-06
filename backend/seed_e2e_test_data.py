@@ -329,6 +329,21 @@ def create_test_tools(warehouses):
             "status": "available",
             "warehouse": satellite_a or main_warehouse,
         },
+        {
+            # Calibrated wrench near its calibration due date — exercises the
+            # ToolDrawer Calibration tab in E2E so a regression in the
+            # `/api/tools/{id}/calibrations` envelope (or its frontend
+            # transform) blanks the drawer in CI instead of in production.
+            "tool_number": "T200",
+            "serial_number": "SN200",
+            "description": "Torque Wrench (Calibrated)",
+            "condition": "Excellent",
+            "location": "Tool Crib A-3",
+            "category": "Hand Tools",
+            "status": "available",
+            "warehouse": main_warehouse,
+            "requires_calibration": True,
+        },
     ]
 
     created_tools = []
@@ -342,6 +357,10 @@ def create_test_tools(warehouses):
             category=tool_data["category"],
             status=tool_data["status"],
             warehouse_id=tool_data["warehouse"].id,
+            requires_calibration=tool_data.get("requires_calibration", False),
+            calibration_frequency_days=(
+                365 if tool_data.get("requires_calibration") else None
+            ),
             created_at=get_current_time()
         )
         db.session.add(tool)
@@ -352,6 +371,40 @@ def create_test_tools(warehouses):
         )
 
     db.session.commit()
+
+    # Seed a calibration record for the calibrated wrench so the Calibration
+    # tab in the ToolDrawer renders a non-empty Timeline. The next due date
+    # is set ~14 days out so the tool also surfaces in "due soon" UIs.
+    from models import ToolCalibration  # local import — avoids extending the top-of-file imports
+    admin_user = User.query.filter_by(employee_number="ADMIN001").first()
+    calibrated_wrench = next(
+        (t for t in created_tools if t.tool_number == "T200"), None
+    )
+    if calibrated_wrench is not None and admin_user is not None:
+        calibration = ToolCalibration(
+            tool_id=calibrated_wrench.id,
+            calibration_date=get_current_time() - timedelta(days=351),
+            next_calibration_date=get_current_time() + timedelta(days=14),
+            performed_by_user_id=admin_user.id,
+            calibration_status="pass",
+            calibration_notes="Annual calibration — within tolerance",
+        )
+        db.session.add(calibration)
+        calibrated_wrench.next_calibration_date = calibration.next_calibration_date
+        calibrated_wrench.last_calibration_date = calibration.calibration_date
+        # `Tool.calibration_status` is nullable; set it explicitly so the
+        # tools list can render a Tag. (Skipping `update_calibration_status`
+        # because it compares tz-naive `now` to the seeder's tz-aware
+        # `next_calibration_date`, which raises in Python.) The seeded due
+        # date is ~14 days out, so "due_soon" matches what the helper would
+        # compute.
+        calibrated_wrench.calibration_status = "due_soon"
+        db.session.commit()
+        logger.info(
+            f"Seeded calibration record for {calibrated_wrench.tool_number} "
+            f"(next due: {calibration.next_calibration_date.date()})"
+        )
+
     return created_tools
 
 

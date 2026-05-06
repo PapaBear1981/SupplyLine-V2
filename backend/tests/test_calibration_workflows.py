@@ -555,3 +555,103 @@ class TestCalibrationModels:
 
         if hasattr(calibration, "is_overdue"):
             assert calibration.is_overdue() is False
+
+
+@pytest.mark.calibration
+@pytest.mark.integration
+class TestCalibrationApiContract:
+    """
+    Pin the wire format of `GET /api/tools/{id}/calibrations`.
+
+    The frontend ToolDrawer feeds this response straight into a
+    `Timeline.items={calibrations.map(...)}`. If the backend ever drops the
+    `{calibrations, pagination}` envelope (or wraps it differently), the
+    drawer renders blank with `w.map is not a function`. This test fails
+    loudly so the change is intentional and the frontend transform is
+    updated in the same PR.
+    """
+
+    def test_endpoint_returns_calibrations_and_pagination_envelope(
+        self, client, db_session, admin_user, auth_headers, test_warehouse
+    ):
+        from models import ToolCalibration
+
+        tool = Tool(
+            tool_number="CONTRACT001",
+            serial_number="SN-CONTRACT001",
+            description="Calibration Contract Tool",
+            condition="Good",
+            location="Lab",
+            category="Measurement",
+            warehouse_id=test_warehouse.id,
+            status="available",
+            requires_calibration=True,
+        )
+        db_session.add(tool)
+        db_session.flush()
+
+        db_session.add(
+            ToolCalibration(
+                tool_id=tool.id,
+                calibration_date=datetime.utcnow() - timedelta(days=10),
+                next_calibration_date=datetime.utcnow() + timedelta(days=20),
+                performed_by_user_id=admin_user.id,
+                calibration_status="pass",
+                calibration_notes="Contract test calibration",
+            )
+        )
+        db_session.commit()
+
+        response = client.get(
+            f"/api/tools/{tool.id}/calibrations", headers=auth_headers
+        )
+
+        assert response.status_code == 200
+        data = response.get_json()
+
+        # Envelope shape — frontend's transformResponse depends on this.
+        assert isinstance(data, dict), (
+            "Expected envelope object; if this becomes a bare list, update "
+            "frontend `unwrapToolCalibrations` in toolsApi.ts."
+        )
+        assert "calibrations" in data
+        assert "pagination" in data
+        assert isinstance(data["calibrations"], list)
+        assert len(data["calibrations"]) == 1
+
+        record = data["calibrations"][0]
+        # Fields the ToolDrawer Calibration tab reads directly.
+        for field in (
+            "calibration_date",
+            "calibration_status",
+            "next_calibration_date",
+        ):
+            assert field in record, f"Missing field consumed by UI: {field}"
+
+    def test_endpoint_returns_empty_calibrations_for_tool_with_no_history(
+        self, client, db_session, auth_headers, test_warehouse
+    ):
+        """Tool with no calibration records still returns the envelope."""
+        tool = Tool(
+            tool_number="CONTRACT002",
+            serial_number="SN-CONTRACT002",
+            description="No Calibration History",
+            condition="Good",
+            location="Lab",
+            category="Measurement",
+            warehouse_id=test_warehouse.id,
+            status="available",
+            requires_calibration=True,
+        )
+        db_session.add(tool)
+        db_session.commit()
+
+        response = client.get(
+            f"/api/tools/{tool.id}/calibrations", headers=auth_headers
+        )
+
+        assert response.status_code == 200
+        data = response.get_json()
+        assert isinstance(data, dict)
+        assert data["calibrations"] == []
+        assert "pagination" in data

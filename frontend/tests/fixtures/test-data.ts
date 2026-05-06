@@ -66,6 +66,15 @@ export const TEST_TOOLS = {
     description: 'Satellite Caliper',
     warehouse: 'satelliteA',
   },
+  // `requires_calibration=true` with one seeded ToolCalibration record
+  // (next_calibration_date ~14 days out). Used by the wrench-details
+  // calibration tab regression test.
+  calibratedWrench: {
+    number: 'T200',
+    description: 'Torque Wrench (Calibrated)',
+    warehouse: 'main',
+    requiresCalibration: true,
+  },
 } as const;
 
 export const TEST_CHEMICALS = {

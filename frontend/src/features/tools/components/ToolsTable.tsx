@@ -153,9 +153,14 @@ export const ToolsTable = ({ onView, onEdit }: ToolsTableProps) => {
       dataIndex: 'calibration_status',
       key: 'calibration_status',
       width: 130,
-      render: (status: CalibrationStatus, record) => {
+      render: (status: CalibrationStatus | null | undefined, record) => {
         if (!record.requires_calibration) {
           return <Tag color="default">N/A</Tag>;
+        }
+        if (!status) {
+          // Tool requires calibration but no status has been computed yet
+          // (e.g., never calibrated). Don't crash the row.
+          return <Tag color="default">UNKNOWN</Tag>;
         }
         return (
           <Tag color={getCalibrationStatusColor(status)}>
