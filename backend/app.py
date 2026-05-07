@@ -353,6 +353,55 @@ def create_app():
                             ))
                             _conn.commit()
 
+                    if "chemicals" in tables:
+                        chem_cols = {c["name"] for c in inspector.get_columns("chemicals")}
+                        _auto_add_col(
+                            "chemicals",
+                            "chemical_part_id INTEGER REFERENCES chemical_parts(id)",
+                            "chemical_part_id",
+                            chem_cols,
+                        )
+                        if "chemical_part_id" not in chem_cols:
+                            _conn.execute(sa_text(
+                                "CREATE INDEX IF NOT EXISTS ix_chemicals_chemical_part_id "
+                                "ON chemicals(chemical_part_id)"
+                            ))
+                            _conn.commit()
+
+                        # Backfill chemical_parts master rows from existing
+                        # chemicals and link any unlinked lots to their part.
+                        # Idempotent and runs on every startup so seed scripts
+                        # or bulk imports that insert chemicals without a
+                        # chemical_part_id still get their parts created.
+                        if "chemical_parts" in inspector.get_table_names():
+                            _conn.execute(sa_text("""
+                                INSERT INTO chemical_parts (
+                                    part_number, description, manufacturer, category,
+                                    default_unit, minimum_stock_level
+                                )
+                                SELECT
+                                    c.part_number,
+                                    MAX(c.description),
+                                    MAX(c.manufacturer),
+                                    COALESCE(MAX(c.category), 'General'),
+                                    COALESCE(MAX(c.unit), 'each'),
+                                    MAX(c.minimum_stock_level)
+                                FROM chemicals c
+                                WHERE c.part_number IS NOT NULL
+                                  AND c.part_number NOT IN (SELECT part_number FROM chemical_parts)
+                                GROUP BY c.part_number
+                            """))
+                            _conn.execute(sa_text("""
+                                UPDATE chemicals
+                                SET chemical_part_id = (
+                                    SELECT cp.id FROM chemical_parts cp
+                                    WHERE cp.part_number = chemicals.part_number
+                                )
+                                WHERE chemical_part_id IS NULL
+                                  AND part_number IS NOT NULL
+                            """))
+                            _conn.commit()
+
                     # Widen users.totp_secret — PostgreSQL-only syntax; SQLite skips cleanly.
                     if "users" in tables:
                         try:

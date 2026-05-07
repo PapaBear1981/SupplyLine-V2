@@ -113,6 +113,7 @@ def create_child_chemical(parent_chemical, quantity, destination_warehouse_id=No
     # Create the child chemical
     child_chemical = Chemical(
         part_number=parent_chemical.part_number,
+        chemical_part_id=parent_chemical.chemical_part_id,
         lot_number=child_lot_number,
         description=parent_chemical.description,
         manufacturer=parent_chemical.manufacturer,

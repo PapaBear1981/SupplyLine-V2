@@ -7,6 +7,7 @@ export type ChemicalStatus =
 export interface Chemical {
   id: number;
   part_number: string;
+  chemical_part_id?: number | null;
   lot_number: string;
   description?: string | null;
   manufacturer?: string | null;
@@ -157,4 +158,43 @@ export interface ChemicalForecastResponse {
     safety_stock_days: number;
   };
   generated_at: string;
+}
+
+export type ChemicalPartStatus = 'available' | 'low_stock' | 'out_of_stock';
+
+export interface ChemicalPart {
+  id: number;
+  part_number: string;
+  description?: string | null;
+  manufacturer?: string | null;
+  category?: string | null;
+  default_unit: string;
+  minimum_stock_level?: number | null;
+  total_active_quantity: number;
+  lot_count: number;
+  status: ChemicalPartStatus;
+  earliest_expiration_date?: string | null;
+  has_open_reorder_request: boolean;
+  lots: Chemical[];
+}
+
+export interface ChemicalPartsListResponse {
+  parts: ChemicalPart[];
+  pagination: {
+    page: number;
+    per_page: number;
+    total: number;
+    pages: number;
+    has_next: boolean;
+    has_prev: boolean;
+  };
+}
+
+export interface ChemicalPartsQueryParams {
+  page?: number;
+  per_page?: number;
+  q?: string;
+  status?: ChemicalPartStatus;
+  category?: string;
+  warehouse_id?: number;
 }

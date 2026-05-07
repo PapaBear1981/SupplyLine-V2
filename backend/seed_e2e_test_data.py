@@ -440,10 +440,24 @@ def create_test_chemicals(warehouses):
         }
     ]
 
+    from models import ChemicalPart
+
     created_chemicals = []
     for chem_data in chemicals_data:
+        # Ensure a ChemicalPart master record exists so the part-number
+        # rollup view shows seeded lots even when the startup backfill
+        # runs after the seed.
+        part = ChemicalPart.get_or_create(
+            chem_data["part_number"],
+            description=chem_data.get("description"),
+            manufacturer=chem_data.get("manufacturer"),
+            category=chem_data.get("category"),
+            default_unit=chem_data.get("unit"),
+        )
+
         chemical = Chemical(
             part_number=chem_data["part_number"],
+            chemical_part_id=part.id if part else None,
             lot_number=chem_data["lot_number"],
             description=chem_data["description"],
             manufacturer=chem_data["manufacturer"],

@@ -1523,10 +1523,134 @@ class Expendable(db.Model):
         return self.quantity <= self.minimum_stock_level
 
 
+class ChemicalPart(db.Model):
+    """Master record for a chemical part number.
+
+    Lots (Chemical rows) reference a single ChemicalPart so that stock status,
+    minimum-stock thresholds, and reorder triggers can be evaluated across
+    *all* lots of the same part number rather than per-lot.
+    """
+    __tablename__ = "chemical_parts"
+
+    id = db.Column(db.Integer, primary_key=True)
+    part_number = db.Column(db.String, nullable=False, unique=True, index=True)
+    description = db.Column(db.String)
+    manufacturer = db.Column(db.String)
+    category = db.Column(db.String, nullable=True, default="General")
+    default_unit = db.Column(db.String, nullable=False, default="each")
+    minimum_stock_level = db.Column(db.Integer, nullable=True)
+    notes = db.Column(db.String)
+    created_at = db.Column(db.DateTime, default=get_current_time)
+    updated_at = db.Column(db.DateTime, default=get_current_time, onupdate=get_current_time)
+
+    lots = db.relationship(
+        "Chemical",
+        back_populates="part",
+        foreign_keys="Chemical.chemical_part_id",
+        lazy="select",
+    )
+
+    @classmethod
+    def get_or_create(cls, part_number, *, description=None, manufacturer=None,
+                      category=None, default_unit=None, minimum_stock_level=None):
+        """Find an existing ChemicalPart by part_number or create a new one.
+
+        The caller is responsible for committing. Fields supplied here only fill
+        in NULL values on an existing record so that the part master grows
+        richer over time without overwriting curated metadata.
+        """
+        if not part_number:
+            return None
+        part = cls.query.filter_by(part_number=part_number).first()
+        if part is None:
+            part = cls(
+                part_number=part_number,
+                description=description,
+                manufacturer=manufacturer,
+                category=category or "General",
+                default_unit=default_unit or "each",
+                minimum_stock_level=minimum_stock_level,
+            )
+            db.session.add(part)
+            db.session.flush()
+            return part
+        # Fill in any missing fields opportunistically
+        if not part.description and description:
+            part.description = description
+        if not part.manufacturer and manufacturer:
+            part.manufacturer = manufacturer
+        if not part.category and category:
+            part.category = category
+        if part.minimum_stock_level is None and minimum_stock_level is not None:
+            part.minimum_stock_level = minimum_stock_level
+        return part
+
+    def active_lots_query(self):
+        """Query of non-archived lots that count toward on-hand stock."""
+        return Chemical.query.filter(
+            Chemical.chemical_part_id == self.id,
+            Chemical.is_archived.is_(False),
+            # Issued child placeholders shouldn't count as active stock.
+            db.or_(Chemical.status.is_(None), Chemical.status != "issued"),
+        )
+
+    def total_active_quantity(self):
+        """Sum of quantity across non-archived, non-issued lots."""
+        total = (
+            db.session.query(db.func.coalesce(db.func.sum(Chemical.quantity), 0))
+            .filter(
+                Chemical.chemical_part_id == self.id,
+                Chemical.is_archived.is_(False),
+                db.or_(Chemical.status.is_(None), Chemical.status != "issued"),
+            )
+            .scalar()
+        )
+        return int(total or 0)
+
+    def is_below_min_stock(self):
+        if self.minimum_stock_level is None:
+            return False
+        return self.total_active_quantity() <= self.minimum_stock_level
+
+    def is_out_of_stock(self):
+        return self.total_active_quantity() <= 0
+
+    def part_status(self):
+        """Aggregate stock status for the part across all active lots."""
+        qty = self.total_active_quantity()
+        if qty <= 0:
+            return "out_of_stock"
+        if self.minimum_stock_level is not None and qty <= self.minimum_stock_level:
+            return "low_stock"
+        return "available"
+
+    def to_dict(self, include_lots=False):
+        result = {
+            "id": self.id,
+            "part_number": self.part_number,
+            "description": self.description,
+            "manufacturer": self.manufacturer,
+            "category": self.category,
+            "default_unit": self.default_unit,
+            "minimum_stock_level": self.minimum_stock_level,
+            "notes": self.notes,
+            "created_at": self.created_at.isoformat() if self.created_at else None,
+            "updated_at": self.updated_at.isoformat() if self.updated_at else None,
+            "total_active_quantity": self.total_active_quantity(),
+            "status": self.part_status(),
+        }
+        if include_lots:
+            active_lots = self.active_lots_query().all()
+            result["lots"] = [lot.to_dict() for lot in active_lots]
+            result["lot_count"] = len(active_lots)
+        return result
+
+
 class Chemical(db.Model):
     __tablename__ = "chemicals"
     id = db.Column(db.Integer, primary_key=True)
     part_number = db.Column(db.String, nullable=False)
+    chemical_part_id = db.Column(db.Integer, db.ForeignKey("chemical_parts.id"), nullable=True, index=True)
     lot_number = db.Column(db.String, nullable=False)
     description = db.Column(db.String)
     manufacturer = db.Column(db.String)
@@ -1566,6 +1690,7 @@ class Chemical(db.Model):
 
     # Relationships
     warehouse = db.relationship("Warehouse", back_populates="chemicals")
+    part = db.relationship("ChemicalPart", back_populates="lots", foreign_keys=[chemical_part_id])
     procurement_order = db.relationship("ProcurementOrder", foreign_keys=[procurement_order_id], backref="chemicals")
     # Relationship to issuance (for issued child lots) - one-to-one
     issuance = db.relationship("ChemicalIssuance", foreign_keys="ChemicalIssuance.chemical_id",
@@ -1575,6 +1700,7 @@ class Chemical(db.Model):
         result = {
             "id": self.id,
             "part_number": self.part_number,
+            "chemical_part_id": self.chemical_part_id,
             "lot_number": self.lot_number,
             "description": self.description,
             "manufacturer": self.manufacturer,
@@ -1648,7 +1774,17 @@ class Chemical(db.Model):
         return now < expiration <= expiration_threshold
 
     def update_reorder_status(self):
-        """Update the reorder status based on expiration, quantity, and minimum stock level"""
+        """Update the reorder status based on expiration and *part-level* stock.
+
+        Reorder is triggered when the total active quantity across all
+        non-archived lots of this part number falls at or below the part-level
+        minimum stock threshold — not when this single lot is depleted. This
+        prevents false reorder alarms when one lot runs out while other lots
+        of the same part number still have plenty in stock.
+
+        Falls back to lot-level evaluation if no ChemicalPart is linked
+        (e.g. legacy rows that haven't been backfilled yet).
+        """
         try:
             # If already marked for reorder, don't change
             if self.needs_reorder and self.reorder_status == "needed":
@@ -1658,8 +1794,21 @@ class Chemical(db.Model):
             if self.reorder_status == "ordered":
                 return
 
-            # Mark for reorder if expired, out of stock, or at/below minimum stock level
-            if self.is_expired() or self.quantity <= 0 or self.is_low_stock():
+            should_reorder = False
+
+            if self.is_expired():
+                should_reorder = True
+            else:
+                part = getattr(self, "part", None)
+                if part is not None:
+                    # Part-level aggregate evaluation
+                    if part.is_out_of_stock() or part.is_below_min_stock():
+                        should_reorder = True
+                elif self.quantity <= 0 or self.is_low_stock():
+                    # Legacy fallback: lot-level evaluation
+                    should_reorder = True
+
+            if should_reorder:
                 self.needs_reorder = True
                 self.reorder_status = "needed"
         except Exception:
@@ -1671,6 +1820,23 @@ class Chemical(db.Model):
             return False
         quantity = self.quantity if self.quantity is not None else 0
         return quantity <= self.minimum_stock_level
+
+    def archive_as_depleted(self):
+        """Mark this lot as depleted and archive it from the active inventory list.
+
+        Idempotent: safe to call repeatedly. Returns True if the row was
+        actually archived by this call (so callers can audit-log it once).
+        """
+        try:
+            if getattr(self, "is_archived", False):
+                return False
+            self.is_archived = True
+            self.archived_reason = "depleted"
+            self.archived_date = get_current_time()
+            self.status = "out_of_stock"
+            return True
+        except Exception:
+            return False
 
 
 class ChemicalIssuance(db.Model):

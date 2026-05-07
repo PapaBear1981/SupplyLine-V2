@@ -271,3 +271,168 @@ class TestChemicalIssuanceEndpoint:
         }, headers)
 
         assert resp.status_code == 404
+
+    def test_depleted_lot_is_auto_archived(
+        self, client, admin_user, jwt_manager, db_session
+    ):
+        """Fully consuming a lot archives it so it drops out of the active list."""
+        from models import Chemical, ChemicalPart
+        wh = _warehouse(db_session)
+
+        # Pre-create the part so the new lot links to it
+        part = ChemicalPart(part_number=f"P-DEPL-{uuid.uuid4().hex[:6]}",
+                            description="Depleted-test", default_unit="oz")
+        db_session.add(part)
+        db_session.commit()
+
+        chem = _chemical(
+            db_session, wh,
+            part_number=part.part_number,
+            chemical_part_id=part.id,
+            quantity=5,
+        )
+        headers = _issue_headers(client, jwt_manager, admin_user, wh, db_session)
+
+        resp = _issue(client, chem.id, {
+            "quantity": 5,
+            "hangar": "Hangar J",
+            "user_id": admin_user.id,
+        }, headers)
+        assert resp.status_code == 200, resp.data
+
+        db_session.expire_all()
+        depleted = db_session.get(Chemical, chem.id)
+        assert depleted.quantity == 0
+        assert depleted.is_archived is True
+        assert depleted.archived_reason == "depleted"
+
+    def test_reorder_not_triggered_when_other_lots_have_stock(
+        self, client, admin_user, jwt_manager, db_session
+    ):
+        """Depleting one lot must NOT trigger reorder if other lots have stock."""
+        from models import Chemical, ChemicalPart, RequestItem
+        wh = _warehouse(db_session)
+
+        # One part number, two lots. min_stock=10. Lot A=5, Lot B=100.
+        # Issuing all of A leaves 100 across the part — no reorder.
+        part = ChemicalPart(
+            part_number=f"P-AGG-{uuid.uuid4().hex[:6]}",
+            description="Aggregate-test",
+            default_unit="oz",
+            minimum_stock_level=10,
+        )
+        db_session.add(part)
+        db_session.commit()
+
+        lot_a = _chemical(
+            db_session, wh,
+            part_number=part.part_number,
+            chemical_part_id=part.id,
+            quantity=5,
+            minimum_stock_level=10,
+        )
+        _chemical(
+            db_session, wh,
+            part_number=part.part_number,
+            chemical_part_id=part.id,
+            quantity=100,
+            minimum_stock_level=10,
+        )
+
+        headers = _issue_headers(client, jwt_manager, admin_user, wh, db_session)
+        resp = _issue(client, lot_a.id, {
+            "quantity": 5,
+            "hangar": "Hangar K",
+            "user_id": admin_user.id,
+        }, headers)
+        assert resp.status_code == 200, resp.data
+        body = json.loads(resp.data)
+
+        # Lot A is gone but the part still has plenty of stock — no auto reorder
+        assert body.get("auto_reorder_request") is None
+        assert body["chemical"]["needs_reorder"] is False
+
+        # And no chemical RequestItem was created for this part number
+        open_items = (
+            db_session.query(RequestItem)
+            .filter(
+                RequestItem.item_type == "chemical",
+                RequestItem.part_number == part.part_number,
+            )
+            .all()
+        )
+        assert open_items == []
+
+    def test_reorder_triggered_when_all_lots_of_part_drop_below_min(
+        self, client, admin_user, jwt_manager, db_session
+    ):
+        """When the part-level total drops to/below min, auto-reorder fires once."""
+        from models import ChemicalPart, RequestItem
+        wh = _warehouse(db_session)
+
+        part = ChemicalPart(
+            part_number=f"P-MIN-{uuid.uuid4().hex[:6]}",
+            description="Min-trip-test",
+            default_unit="oz",
+            minimum_stock_level=10,
+        )
+        db_session.add(part)
+        db_session.commit()
+
+        # Only one lot, total = 12. After issuing 5 we're at 7, which is <= 10.
+        only_lot = _chemical(
+            db_session, wh,
+            part_number=part.part_number,
+            chemical_part_id=part.id,
+            quantity=12,
+            minimum_stock_level=10,
+        )
+
+        headers = _issue_headers(client, jwt_manager, admin_user, wh, db_session)
+        resp = _issue(client, only_lot.id, {
+            "quantity": 5,
+            "hangar": "Hangar L",
+            "user_id": admin_user.id,
+        }, headers)
+        assert resp.status_code == 200, resp.data
+
+        items = (
+            db_session.query(RequestItem)
+            .filter(
+                RequestItem.item_type == "chemical",
+                RequestItem.part_number == part.part_number,
+            )
+            .all()
+        )
+        assert len(items) >= 1
+
+    def test_parts_endpoint_aggregates_lots(self, client, admin_user, db_session):
+        """/api/chemicals/parts returns one row per part with embedded lots."""
+        from models import ChemicalPart
+        wh = _warehouse(db_session)
+
+        part = ChemicalPart(
+            part_number=f"P-API-{uuid.uuid4().hex[:6]}",
+            description="Parts-endpoint-test",
+            default_unit="oz",
+            minimum_stock_level=5,
+        )
+        db_session.add(part)
+        db_session.commit()
+
+        _chemical(db_session, wh, part_number=part.part_number,
+                  chemical_part_id=part.id, quantity=3)
+        _chemical(db_session, wh, part_number=part.part_number,
+                  chemical_part_id=part.id, quantity=4)
+
+        resp = client.get(f"/api/chemicals/parts?q={part.part_number}")
+        assert resp.status_code == 200
+        body = json.loads(resp.data)
+        rows = [r for r in body["parts"] if r["part_number"] == part.part_number]
+        assert len(rows) == 1
+        row = rows[0]
+        assert row["lot_count"] == 2
+        assert row["total_active_quantity"] == 7
+        # Two lots above the rolled-up min of 5 → status "available"
+        assert row["status"] == "available"
+        assert len(row["lots"]) == 2

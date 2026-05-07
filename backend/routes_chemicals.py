@@ -9,6 +9,7 @@ from models import (
     AuditLog,
     Chemical,
     ChemicalIssuance,
+    ChemicalPart,
     ChemicalReturn,
     ProcurementOrder,
     RequestItem,
@@ -34,6 +35,12 @@ from utils.warehouse_scope import assert_active_warehouse_matches
 
 logger = logging.getLogger(__name__)
 
+# Sentinel datetime used to sort lots without an expiration date to the end
+# of "earliest expiry first" ordering. Naive on purpose — the chemical
+# expiration_date column is naive too, so mixing tz-aware sentinels would
+# raise TypeError on comparison.
+_FAR_FUTURE = datetime(9999, 12, 31)
+
 # Decorator to check if user is admin or in Materials department
 materials_manager_required = department_required("Materials")
 
@@ -56,9 +63,55 @@ def _generate_order_number():
     return f"ORD-{next_number:05d}"
 
 
+def _resolve_part_aggregate(chemical):
+    """Return (part_total_qty, part_min_stock) for the chemical's part number.
+
+    Falls back to the lot's own values if no ChemicalPart is linked or the
+    part record is unavailable.
+    """
+    part = getattr(chemical, "part", None)
+    if part is not None:
+        return part.total_active_quantity(), part.minimum_stock_level
+
+    # Fallback for legacy rows without a linked part: aggregate by part_number
+    total = (
+        db.session.query(db.func.coalesce(db.func.sum(Chemical.quantity), 0))
+        .filter(
+            Chemical.part_number == chemical.part_number,
+            Chemical.is_archived.is_(False),
+            db.or_(Chemical.status.is_(None), Chemical.status != "issued"),
+        )
+        .scalar()
+    )
+    return int(total or 0), chemical.minimum_stock_level
+
+
+def _part_needs_reorder(chemical):
+    """True when the part's aggregate active stock is at/below minimum (or zero)."""
+    total_qty, min_stock = _resolve_part_aggregate(chemical)
+    if total_qty <= 0:
+        return True, "out_of_stock"
+    if min_stock is not None and total_qty <= min_stock:
+        return True, "low_stock"
+    return False, "available"
+
+
 def _create_auto_reorder_request(chemical, user_id):
-    """Create an automatic reorder request for a chemical that is low stock or out of stock."""
-    # Check if there's already an open request for this chemical
+    """Create an automatic reorder request for a chemical part number.
+
+    Reorder is decided based on the part-level aggregate quantity (sum across
+    all non-archived lots), not on the single lot that just got depleted.
+    Also dedupes against any open request for the same part number.
+    """
+    # Don't auto-reorder unless the part as a whole is below threshold
+    needs_reorder, part_status = _part_needs_reorder(chemical)
+    if not needs_reorder:
+        logger.info(
+            f"Skipping auto-reorder for {chemical.part_number}: part-level stock is sufficient"
+        )
+        return None
+
+    # Check if there's already an open request for this part number
     existing_request = (
         db.session.query(UserRequest)
         .join(RequestItem, UserRequest.id == RequestItem.request_id)
@@ -74,17 +127,20 @@ def _create_auto_reorder_request(chemical, user_id):
         logger.info(f"Auto-reorder request already exists for chemical {chemical.part_number}: Request #{existing_request.request_number}")
         return None
 
-    # Determine priority based on status
-    if chemical.status == "out_of_stock":
+    # Determine priority based on aggregated part status
+    if part_status == "out_of_stock":
         priority = "critical"
         title = f"URGENT: Restock {chemical.part_number} - Out of Stock"
     else:  # low_stock
         priority = "high"
         title = f"Restock {chemical.part_number} - Low Stock"
 
-    # Calculate quantity to order (bring back to minimum stock level + buffer)
-    if chemical.minimum_stock_level:
-        quantity_to_order = max(chemical.minimum_stock_level * 2, 1)
+    # Calculate quantity to order (bring back to minimum stock level + buffer).
+    # Prefer the part-level threshold; fall back to the lot's threshold.
+    _, part_min_stock = _resolve_part_aggregate(chemical)
+    effective_min = part_min_stock if part_min_stock is not None else chemical.minimum_stock_level
+    if effective_min:
+        quantity_to_order = max(effective_min * 2, 1)
     else:
         quantity_to_order = 1
 
@@ -233,7 +289,26 @@ def register_chemical_routes(app):
                     except AttributeError as e:
                         logger.debug(f"Archive columns not found for chemical {chemical.id}: {e!s}")
                 elif quantity <= 0:
-                    chemical.status = "out_of_stock"
+                    # Auto-archive depleted lots so they drop out of the active
+                    # inventory list. They remain queryable for forecasting and
+                    # history. Other lots of the same part number are unaffected.
+                    if chemical.status != "issued" and chemical.archive_as_depleted():
+                        archive_logs.append({
+                            "action": "chemical_archived",
+                            "action_type": "chemical_archived",
+                            "action_details": (
+                                f"Chemical {chemical.part_number} - {chemical.lot_number} "
+                                "automatically archived: depleted"
+                            ),
+                            "timestamp": datetime.utcnow(),
+                        })
+                    else:
+                        # Either the lot is an issued child placeholder, or
+                        # archive failed (e.g. legacy schema missing the
+                        # is_archived column). Either way we still want the
+                        # lot's status to reflect that it's empty so the UI
+                        # and reorder evaluator are consistent.
+                        chemical.status = "out_of_stock"
                     status_changed = True
                     chemical.update_reorder_status()
                 elif chemical.is_low_stock():
@@ -357,9 +432,22 @@ def register_chemical_routes(app):
         except SerialLotValidationError as e:
             raise ValidationError(str(e))
 
+        # Find or create the master ChemicalPart record so this lot can be
+        # aggregated with other lots of the same part number for stock,
+        # reorder, and forecasting purposes.
+        part = ChemicalPart.get_or_create(
+            validated_data["part_number"],
+            description=validated_data.get("description"),
+            manufacturer=validated_data.get("manufacturer"),
+            category=validated_data.get("category"),
+            default_unit=validated_data.get("unit"),
+            minimum_stock_level=validated_data.get("minimum_stock_level"),
+        )
+
         # Create new chemical - warehouse_id is required
         chemical = Chemical(
             part_number=validated_data["part_number"],
+            chemical_part_id=part.id if part else None,
             lot_number=validated_data["lot_number"],
             description=validated_data.get("description", ""),
             manufacturer=validated_data.get("manufacturer", ""),
@@ -579,10 +667,30 @@ def register_chemical_routes(app):
             reorder_was_needed = chemical.needs_reorder
             auto_request = None
 
-            # Update chemical status based on new quantity
+            # Update chemical status based on new quantity. When this lot is
+            # fully depleted, archive it so it drops out of the active list —
+            # other lots of the same part number remain visible.
             if chemical.quantity <= 0:
-                chemical.status = "out_of_stock"
-                # Update reorder status
+                if chemical.archive_as_depleted():
+                    AuditLog.log(
+                        user_id=current_user_id,
+                        action="chemical_archived",
+                        resource_type="chemical",
+                        resource_id=chemical.id,
+                        details={
+                            "part_number": chemical.part_number,
+                            "lot_number": chemical.lot_number,
+                            "reason": "depleted",
+                            "auto_archived": True,
+                        },
+                        ip_address=request.remote_addr,
+                    )
+                else:
+                    # Archive failed (legacy schema with no is_archived
+                    # column). Reflect depletion in the status so the UI and
+                    # reorder evaluator stay consistent.
+                    chemical.status = "out_of_stock"
+                # Reorder decision uses part-level aggregate (other lots may still have stock)
                 chemical.update_reorder_status()
             elif chemical.is_low_stock():
                 chemical.status = "low_stock"
@@ -1242,8 +1350,25 @@ def register_chemical_routes(app):
                     # If the columns don't exist, just update the status
                     pass
             elif chemical.quantity <= 0:
-                chemical.status = "out_of_stock"
-                # Update reorder status for out-of-stock chemicals
+                if chemical.status != "issued" and chemical.archive_as_depleted():
+                    AuditLog.log(
+                        user_id=None,
+                        action="chemical_archived",
+                        resource_type="chemical",
+                        resource_id=chemical.id,
+                        details={
+                            "part_number": chemical.part_number,
+                            "lot_number": chemical.lot_number,
+                            "reason": "depleted",
+                            "auto_archived": True,
+                        },
+                        ip_address=request.remote_addr if hasattr(request, "remote_addr") else None,
+                    )
+                else:
+                    # Issued child placeholder, or archive failed (legacy
+                    # schema). Keep the status consistent either way.
+                    chemical.status = "out_of_stock"
+                # Update reorder status (uses part-level aggregate)
                 chemical.update_reorder_status()
             elif chemical.is_low_stock():
                 chemical.status = "low_stock"
@@ -1383,6 +1508,162 @@ def register_chemical_routes(app):
             logger.info(f"Chemical {id} deleted successfully")
             return jsonify({"message": "Chemical deleted successfully"}), 200
         return None
+
+    @app.route("/api/chemicals/parts", methods=["GET"])
+    @handle_errors
+    def chemicals_parts_route():
+        """List chemicals grouped by part number with their active lots embedded.
+
+        This is the canonical inventory view: one row per part number with a
+        rolled-up quantity and stock status, plus expandable lot detail. A lot
+        being depleted does not remove the part from the list — only fully
+        depleted parts (zero stock across every active lot) report as
+        out_of_stock here, which is what drives reorder decisions.
+
+        Query params:
+        - q: search across part_number / description / manufacturer
+        - category: filter by category
+        - status: filter by aggregated part status (available/low_stock/out_of_stock)
+        - warehouse_id: only count lots in this warehouse toward the rollup
+        - page, per_page: pagination over part numbers
+        """
+        page = request.args.get("page", 1, type=int)
+        per_page = request.args.get("per_page", 50, type=int)
+        search = request.args.get("q")
+        category = request.args.get("category")
+        status_filter = request.args.get("status")
+        warehouse_id = request.args.get("warehouse_id", type=int)
+
+        if page < 1:
+            return jsonify({"error": "Page must be >= 1"}), 400
+        if per_page < 1 or per_page > 500:
+            return jsonify({"error": "Per page must be between 1 and 500"}), 400
+
+        parts_query = ChemicalPart.query
+        if search:
+            like = f"%{search}%"
+            parts_query = parts_query.filter(
+                db.or_(
+                    ChemicalPart.part_number.ilike(like),
+                    ChemicalPart.description.ilike(like),
+                    ChemicalPart.manufacturer.ilike(like),
+                )
+            )
+        if category:
+            parts_query = parts_query.filter(ChemicalPart.category == category)
+
+        parts_query = parts_query.order_by(ChemicalPart.part_number.asc())
+        all_parts = parts_query.all()
+        part_numbers = [p.part_number for p in all_parts]
+
+        # Bulk load active lots for these parts in one query.
+        part_ids = [p.id for p in all_parts]
+        lots_by_part: dict[int, list[Chemical]] = {pid: [] for pid in part_ids}
+        if part_ids:
+            lot_q = Chemical.query.filter(
+                Chemical.chemical_part_id.in_(part_ids),
+                Chemical.is_archived.is_(False),
+                db.or_(Chemical.status.is_(None), Chemical.status != "issued"),
+            )
+            if warehouse_id:
+                lot_q = lot_q.filter(Chemical.warehouse_id == warehouse_id)
+            for lot in lot_q.all():
+                lots_by_part.setdefault(lot.chemical_part_id, []).append(lot)
+
+        # Bulk-load every part_number with an open reorder request in one
+        # query so the per-part `has_open_reorder` lookup is O(1) instead of
+        # O(N) round trips.
+        open_reorder_part_numbers: set[str] = set()
+        if part_numbers:
+            open_rows = (
+                db.session.query(RequestItem.part_number)
+                .join(UserRequest, UserRequest.id == RequestItem.request_id)
+                .filter(
+                    RequestItem.item_type == "chemical",
+                    RequestItem.part_number.in_(part_numbers),
+                    UserRequest.status.in_(UserRequest.OPEN_STATUSES),
+                )
+                .distinct()
+                .all()
+            )
+            open_reorder_part_numbers = {pn for (pn,) in open_rows}
+
+        # Build the aggregated rows in Python so warehouse scoping affects the
+        # rollup totals (a part with no stock in the active warehouse should
+        # show as out_of_stock from that warehouse's perspective).
+        rows = []
+        for part in all_parts:
+            lots = lots_by_part.get(part.id, [])
+            total_qty = sum((lot.quantity or 0) for lot in lots)
+            if part.minimum_stock_level is None:
+                agg_status = "available" if total_qty > 0 else "out_of_stock"
+            elif total_qty <= 0:
+                agg_status = "out_of_stock"
+            elif total_qty <= part.minimum_stock_level:
+                agg_status = "low_stock"
+            else:
+                agg_status = "available"
+
+            if status_filter and agg_status != status_filter:
+                continue
+
+            # Earliest expiration across active lots — surfaces upcoming risk
+            # at the part level without needing to drill into each lot.
+            expiry_dates = [lot.expiration_date for lot in lots if lot.expiration_date]
+            earliest_expiry = min(expiry_dates) if expiry_dates else None
+
+            # Lots come from Chemical.to_dict() which doesn't compute
+            # is_expiring_soon — overlay the flag here so the UI can render
+            # an "Expiring Soon" badge without an extra API call.
+            sorted_lots = sorted(
+                lots,
+                key=lambda lot: (
+                    lot.expiration_date or _FAR_FUTURE,
+                    lot.lot_number or "",
+                ),
+            )
+            lot_dicts = []
+            for lot in sorted_lots:
+                payload = lot.to_dict()
+                if lot.is_expiring_soon(30):
+                    payload["expiring_soon"] = True
+                lot_dicts.append(payload)
+
+            rows.append({
+                "id": part.id,
+                "part_number": part.part_number,
+                "description": part.description,
+                "manufacturer": part.manufacturer,
+                "category": part.category,
+                "default_unit": part.default_unit,
+                "minimum_stock_level": part.minimum_stock_level,
+                "total_active_quantity": total_qty,
+                "lot_count": len(lots),
+                "status": agg_status,
+                "earliest_expiration_date": (
+                    earliest_expiry.isoformat() if earliest_expiry else None
+                ),
+                "has_open_reorder_request": part.part_number in open_reorder_part_numbers,
+                "lots": lot_dicts,
+            })
+
+        # Manual pagination after the in-memory status filter.
+        total = len(rows)
+        start = (page - 1) * per_page
+        end = start + per_page
+        page_rows = rows[start:end]
+
+        return jsonify({
+            "parts": page_rows,
+            "pagination": {
+                "page": page,
+                "per_page": per_page,
+                "total": total,
+                "pages": (total + per_page - 1) // per_page if per_page else 1,
+                "has_next": end < total,
+                "has_prev": page > 1,
+            },
+        })
 
     @app.route("/api/chemicals/forecast", methods=["GET"])
     @jwt_required
