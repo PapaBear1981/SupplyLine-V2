@@ -8,6 +8,8 @@ import type {
   ChemicalsQueryParams,
   ChemicalForecastParams,
   ChemicalForecastResponse,
+  ChemicalPartsListResponse,
+  ChemicalPartsQueryParams,
 } from '../types';
 import type { LabelSize, CodeType } from '@/types/label';
 
@@ -56,7 +58,11 @@ export const chemicalsApi = baseApi.injectEndpoints({
         method: 'POST',
         body,
       }),
-      invalidatesTags: [{ type: 'Chemical', id: 'LIST' }, { type: 'Chemical', id: 'FORECAST' }],
+      invalidatesTags: [
+        { type: 'Chemical', id: 'LIST' },
+        { type: 'Chemical', id: 'PARTS_LIST' },
+        { type: 'Chemical', id: 'FORECAST' },
+      ],
     }),
 
     updateChemical: builder.mutation<Chemical, { id: number; data: Partial<ChemicalFormData> }>(
@@ -69,6 +75,7 @@ export const chemicalsApi = baseApi.injectEndpoints({
         invalidatesTags: (_result, _error, { id }) => [
           { type: 'Chemical', id },
           { type: 'Chemical', id: 'LIST' },
+          { type: 'Chemical', id: 'PARTS_LIST' },
           { type: 'Chemical', id: 'FORECAST' },
         ],
       }
@@ -79,7 +86,11 @@ export const chemicalsApi = baseApi.injectEndpoints({
         url: `/api/chemicals/${id}`,
         method: 'DELETE',
       }),
-      invalidatesTags: [{ type: 'Chemical', id: 'LIST' }, { type: 'Chemical', id: 'FORECAST' }],
+      invalidatesTags: [
+        { type: 'Chemical', id: 'LIST' },
+        { type: 'Chemical', id: 'PARTS_LIST' },
+        { type: 'Chemical', id: 'FORECAST' },
+      ],
     }),
 
     issueChemical: builder.mutation<
@@ -96,6 +107,36 @@ export const chemicalsApi = baseApi.injectEndpoints({
         { type: 'Chemical', id: 'LIST' },
         { type: 'Chemical', id: 'FORECAST' },
       ],
+    }),
+
+    getChemicalParts: builder.query<ChemicalPartsListResponse, ChemicalPartsQueryParams | void>({
+      query: (params) => {
+        const queryParams = params || {};
+        return {
+          url: '/api/chemicals/parts',
+          params: {
+            page: queryParams.page || 1,
+            per_page: queryParams.per_page || 50,
+            ...(queryParams.q && { q: queryParams.q }),
+            ...(queryParams.status && { status: queryParams.status }),
+            ...(queryParams.category && { category: queryParams.category }),
+            ...(queryParams.warehouse_id && {
+              warehouse_id: queryParams.warehouse_id,
+            }),
+          },
+        };
+      },
+      providesTags: (result) =>
+        result
+          ? [
+              ...result.parts.flatMap((p) => [
+                { type: 'Chemical' as const, id: `PART-${p.id}` },
+                ...p.lots.map((l) => ({ type: 'Chemical' as const, id: l.id })),
+              ]),
+              { type: 'Chemical', id: 'PARTS_LIST' },
+              { type: 'Chemical', id: 'LIST' },
+            ]
+          : [{ type: 'Chemical', id: 'PARTS_LIST' }],
     }),
 
     getChemicalForecast: builder.query<ChemicalForecastResponse, ChemicalForecastParams | void>({
@@ -141,5 +182,6 @@ export const {
   useDeleteChemicalMutation,
   useIssueChemicalMutation,
   useGetChemicalForecastQuery,
+  useGetChemicalPartsQuery,
   usePrintChemicalLabelMutation,
 } = chemicalsApi;
