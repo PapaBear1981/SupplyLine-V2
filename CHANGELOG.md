@@ -1,6 +1,8 @@
 # Changelog
 
-All notable changes to this project will be documented in this file.
+All notable changes to this project will be documented in this file. For
+user-facing highlights of major releases, see
+[RELEASE_NOTES.md](RELEASE_NOTES.md).
 
 ## [Unreleased]
 

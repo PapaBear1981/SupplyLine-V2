@@ -170,14 +170,31 @@ docker-compose up -d
 docker-compose up -d --build
 ```
 
-## Additional Scripts
+## Other Scripts
 
-More scripts may be added to this directory in the future for:
-- Database migrations
-- Data seeding
-- Performance testing
-- Backup management
-- Log rotation
+### `set_admin_password.py`
+
+Reset the admin user's password from the command line.
+
+```bash
+python scripts/set_admin_password.py <new_password>
+# or
+ADMIN_PASSWORD=<new_password> python scripts/set_admin_password.py
+```
+
+### `verify_e2e_endpoints.py`
+
+Smoke-test all backend endpoints used by the E2E test suite. Useful when
+diagnosing E2E failures without running the full Playwright run.
+
+```bash
+python scripts/verify_e2e_endpoints.py
+```
+
+### `migrate_expendables_to_warehouse.py`
+
+One-off migration to move existing expendable inventory into the
+warehouse-scoped tables. Already run on production; kept for reference.
 
 ## See Also
 

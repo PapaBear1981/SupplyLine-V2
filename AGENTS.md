@@ -28,6 +28,6 @@
 - Pull requests should summarize motivation, list the commands/tests executed, link tickets, and include screenshots or API samples for user-facing updates.
 
 ## Security & Configuration Tips
-- Never hardcode sensitive values; load secrets through environment variables defined in `SECURITY_SETUP.md` and `DEPLOYMENT.md`.
+- Never hardcode sensitive values; load secrets through environment variables defined in `SECURITY.md` and `DOCKER_DEPLOYMENT.md`.
 - When adding new configuration keys, document defaults in `backend/config.py` and update deployment artifacts (`docker-compose.yml`, ECS task defs) together.
 - Logs default to sanitized payloads—double-check new handlers and ensure personally identifiable information stays redacted.

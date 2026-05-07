@@ -57,7 +57,7 @@ Product and delivery teams reference the baseline specification to scope future 
 
 ## Security & Compliance Impact *(mandatory)*
 
-- No new secrets or credentials are introduced; the document must reiterate that all configuration changes remain governed by `SECURITY_SETUP.md` and `DEPLOYMENT.md`.
+- No new secrets or credentials are introduced; the document must reiterate that all configuration changes remain governed by `SECURITY.md` and `DEPLOYMENT.md`.
 - The baseline must catalogue current security controls, audit intervals, and rate-limiting policies so reviews can trace them without scanning code.
 - Document updates must highlight any observability or logging commitments that teams are expected to maintain in runtime scripts and deployment guides.
 

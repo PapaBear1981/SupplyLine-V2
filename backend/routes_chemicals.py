@@ -456,7 +456,7 @@ def register_chemical_routes(app):
                 "qr_url": qr_url
             })
         except Exception as e:
-            print(f"Error in chemical barcode route: {e!s}")
+            logger.exception("Error in chemical barcode route")
             return jsonify({"error": "An error occurred while generating barcode data"}), 500
 
     # Issue a chemical
@@ -1056,7 +1056,7 @@ def register_chemical_routes(app):
             })
         except Exception as e:
             db.session.rollback()
-            print(f"Error in request chemical reorder route: {e!s}")
+            logger.exception("Error in request chemical reorder route")
             return jsonify({"error": "An error occurred while requesting reorder"}), 500
 
     # Mark a chemical as ordered
@@ -1144,7 +1144,7 @@ def register_chemical_routes(app):
                 chemical.expected_delivery_date = expected_delivery_date
                 chemical.procurement_order_id = procurement_order.id
             except Exception as e:
-                print(f"Error updating reorder status: {e!s}")
+                logger.exception("Error updating reorder status")
                 return jsonify({"error": "Failed to update reorder status"}), 500
 
             # Update the unified request system if a request item exists for this chemical
@@ -1195,7 +1195,7 @@ def register_chemical_routes(app):
             })
         except Exception as e:
             db.session.rollback()
-            print(f"Error in mark chemical as ordered route: {e!s}")
+            logger.exception("Error in mark chemical as ordered route")
             return jsonify({"error": "An error occurred while marking the chemical as ordered"}), 500
 
     # Get a specific chemical — any authenticated user (including Inventory Viewers)
@@ -1623,7 +1623,7 @@ def register_chemical_routes(app):
                 chemical.archived_reason = data.get("reason")
                 chemical.archived_date = datetime.utcnow()
             except Exception as e:
-                print(f"Error updating archive status: {e!s}")
+                logger.exception("Error updating archive status")
                 return jsonify({"error": "Failed to update archive status"}), 500
 
             # Log the action
@@ -1660,7 +1660,7 @@ def register_chemical_routes(app):
             })
         except Exception as e:
             db.session.rollback()
-            print(f"Error in archive chemical route: {e!s}")
+            logger.exception("Error in archive chemical route")
             return jsonify({"error": "An error occurred while archiving the chemical"}), 500
 
     # Unarchive a chemical
@@ -1685,7 +1685,7 @@ def register_chemical_routes(app):
                 chemical.archived_reason = None
                 chemical.archived_date = None
             except Exception as e:
-                print(f"Error updating archive status: {e!s}")
+                logger.exception("Error updating archive status")
                 return jsonify({"error": "Failed to update archive status"}), 500
 
             # Log the action
@@ -1721,7 +1721,7 @@ def register_chemical_routes(app):
             })
         except Exception as e:
             db.session.rollback()
-            print(f"Error in unarchive chemical route: {e!s}")
+            logger.exception("Error in unarchive chemical route")
             return jsonify({"error": "An error occurred while unarchiving the chemical"}), 500
 
     # Mark a chemical as delivered
@@ -1800,7 +1800,7 @@ def register_chemical_routes(app):
                     received_quantity=received_qty
                 )
             except Exception as e:
-                print(f"Error updating chemical status: {e!s}")
+                logger.exception("Error updating chemical status")
                 return jsonify({"error": "Failed to update chemical status"}), 500
 
             # Log the action
@@ -1838,5 +1838,5 @@ def register_chemical_routes(app):
             })
         except Exception as e:
             db.session.rollback()
-            print(f"Error in mark chemical as delivered route: {e!s}")
+            logger.exception("Error in mark chemical as delivered route")
             return jsonify({"error": "An error occurred while marking the chemical as delivered"}), 500

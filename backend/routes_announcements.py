@@ -83,7 +83,7 @@ def register_announcement_routes(app):
             }), 200
 
         except Exception as e:
-            print(f"Error getting announcements: {e!s}")
+            logger.exception("Error getting announcements")
             return jsonify({"error": f"An error occurred: {e!s}"}), 500
 
     # Get a specific announcement
@@ -117,7 +117,7 @@ def register_announcement_routes(app):
             return jsonify(announcement_dict), 200
 
         except Exception as e:
-            print(f"Error getting announcement: {e!s}")
+            logger.exception("Error getting announcement")
             return jsonify({"error": f"An error occurred: {e!s}"}), 500
 
     # Create a new announcement (admin only)
@@ -183,7 +183,7 @@ def register_announcement_routes(app):
 
         except Exception as e:
             db.session.rollback()
-            print(f"Error creating announcement: {e!s}")
+            logger.exception("Error creating announcement")
             return jsonify({"error": f"An error occurred: {e!s}"}), 500
 
     # Update an announcement (admin only)
@@ -248,7 +248,7 @@ def register_announcement_routes(app):
 
         except Exception as e:
             db.session.rollback()
-            print(f"Error updating announcement: {e!s}")
+            logger.exception("Error updating announcement")
             return jsonify({"error": f"An error occurred: {e!s}"}), 500
 
     # Delete an announcement (admin only)
@@ -295,7 +295,7 @@ def register_announcement_routes(app):
 
         except Exception as e:
             db.session.rollback()
-            print(f"Error deleting announcement: {e!s}")
+            logger.exception("Error deleting announcement")
             return jsonify({"error": f"An error occurred: {e!s}"}), 500
 
     # Mark an announcement as read
@@ -330,5 +330,5 @@ def register_announcement_routes(app):
 
         except Exception as e:
             db.session.rollback()
-            print(f"Error marking announcement as read: {e!s}")
+            logger.exception("Error marking announcement as read")
             return jsonify({"error": f"An error occurred: {e!s}"}), 500

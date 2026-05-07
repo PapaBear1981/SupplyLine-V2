@@ -16,7 +16,7 @@ A security program lead drafts a comprehensive review blueprint detailing scope,
 
 **Acceptance Scenarios**:
 
-1. **Given** the latest security artefacts (`SECURITY_SETUP.md`, `SECURITY_AUDIT_REPORT.md`, `SECURITY_IMPROVEMENTS.md`), **When** the security lead drafts the blueprint, **Then** it enumerates all mandatory controls (authentication, authorization, logging, data protection, dependency hygiene) with evaluation criteria and evidence locations.
+1. **Given** the latest security artefacts (`SECURITY.md`), **When** the security lead drafts the blueprint, **Then** it enumerates all mandatory controls (authentication, authorization, logging, data protection, dependency hygiene) with evaluation criteria and evidence locations.
 2. **Given** the review calendar, **When** the blueprint is completed, **Then** it assigns accountable owners and due dates for each control assessment and references required tooling or logs.
 
 ---
@@ -58,7 +58,7 @@ Security leadership compiles the review results, communicates risk ratings to st
 
 ## Security & Compliance Impact *(mandatory)*
 
-- No new secrets are introduced; review artifacts must reference existing credential management documented in `SECURITY_SETUP.md` and confirm adherence during assessment.
+- No new secrets are introduced; review artifacts must reference existing credential management documented in `SECURITY.md` and confirm adherence during assessment.
 - The review must verify rate limiting, password lifecycle, session handling, and data sanitization controls mandated by the constitution and `SECURITY_IMPROVEMENTS.md`.
 - Observability requirements include capturing log redaction proofs, alert coverage, and exception handling alignment as described in `ENHANCED_ERROR_HANDLING_IMPLEMENTATION.md`.
 - Deliverables must meet audit readiness expectations for internal governance and any external certifications targeted by the program.

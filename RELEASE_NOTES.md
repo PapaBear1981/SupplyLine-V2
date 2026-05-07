@@ -1,5 +1,9 @@
 # SupplyLine MRO Suite Release Notes
 
+> User-facing highlights of major releases. For the comprehensive
+> version-by-version technical record (including unreleased changes,
+> bug fixes, and migration scripts), see [CHANGELOG.md](CHANGELOG.md).
+
 ## Version 5.1.0 - Barcode System Refactoring & Inventory Enhancements (2025-11-06)
 
 ### 🚀 MAJOR IMPROVEMENTS RELEASE

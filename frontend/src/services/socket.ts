@@ -8,7 +8,7 @@ class SocketService {
   connect(token?: string): Socket {
     // Don't create multiple connections
     if (this.socket?.connected) {
-      console.log('Socket.IO already connected');
+      console.debug('Socket.IO already connected');
       return this.socket;
     }
 
@@ -39,12 +39,12 @@ class SocketService {
     });
 
     this.socket.on('connect', () => {
-      console.log('Socket.IO connected - user is now online');
+      console.debug('Socket.IO connected - user is now online');
       this.reconnectAttempts = 0;
     });
 
     this.socket.on('disconnect', (reason) => {
-      console.log('Socket.IO disconnected:', reason);
+      console.debug('Socket.IO disconnected:', reason);
     });
 
     this.socket.on('connect_error', (error) => {
@@ -53,7 +53,7 @@ class SocketService {
 
       // If token expired, don't keep trying
       if (error.message.includes('Token expired') || error.message.includes('Invalid token')) {
-        console.log('Token issue detected, stopping reconnection');
+        console.debug('Token issue detected, stopping reconnection');
         this.socket?.disconnect();
       }
     });
@@ -64,11 +64,11 @@ class SocketService {
 
     // Listen for online/offline events
     this.socket.on('user_online', (data) => {
-      console.log('User came online:', data);
+      console.debug('User came online:', data);
     });
 
     this.socket.on('user_offline', (data) => {
-      console.log('User went offline:', data);
+      console.debug('User went offline:', data);
     });
 
     return this.socket;
@@ -76,7 +76,7 @@ class SocketService {
 
   disconnect(): void {
     if (this.socket) {
-      console.log('Disconnecting Socket.IO');
+      console.debug('Disconnecting Socket.IO');
       this.socket.disconnect();
       this.socket = null;
     }

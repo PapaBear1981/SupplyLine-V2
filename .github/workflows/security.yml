@@ -55,6 +55,6 @@ jobs:
       - name: Run npm audit
         working-directory: frontend
         # Only fail on critical vulnerabilities
-        # High severity xlsx vulnerability is documented in SECURITY_NOTES.md
+        # High severity xlsx vulnerability is documented in SECURITY.md
         # and is not exploitable in our use case (export only, no import)
         run: npm audit --audit-level=critical

@@ -1,73 +1,86 @@
-# React + TypeScript + Vite
+# SupplyLine Frontend
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+React 19 + TypeScript + Vite single-page app for the SupplyLine MRO Suite.
+The backend is a Flask API; see the [root README](../README.md) and
+[`BACKEND_API.md`](../BACKEND_API.md) for the full stack overview.
 
-Currently, two official plugins are available:
+## Stack
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+- **Build:** Vite, TypeScript
+- **UI:** Ant Design (`antd`) on desktop, `antd-mobile` on mobile, Framer
+  Motion for transitions, Recharts for analytics
+- **State / data:** Redux Toolkit + RTK Query (`baseApi.ts`)
+- **Realtime:** `socket.io-client` (see `services/socket.ts`)
+- **Routing:** React Router v7
+- **Maps / scanning:** `react-leaflet`, `html5-qrcode`
+- **Testing:** Vitest + React Testing Library (unit/integration),
+  Playwright (E2E across desktop, tablet, and mobile projects)
 
-## React Compiler
+## Project structure
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
-
-## Expanding the ESLint configuration
-
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
-
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
-
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+```
+src/
+  app/         Redux store, router, providers
+  features/    Feature modules (one folder per domain — auth, tools,
+               chemicals, kits, orders, scanner, etc.)
+  shared/      Cross-feature components, hooks, constants, styles
+  services/    API client (RTK Query base), socket client
+  components/  Legacy shared components (being migrated to shared/)
+  types/       Shared TypeScript types
+  test/        Test setup and helpers
+tests/         Playwright E2E specs and fixtures
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+Each feature folder follows the same shape: `pages/` for routed views,
+`components/` for feature-local UI, `hooks/` for feature-specific hooks,
+and `api.ts` for RTK Query endpoints.
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
+## Local development
 
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+```bash
+npm install
+npm run dev          # Vite dev server on http://localhost:5173
 ```
+
+The dev server proxies API calls to the Flask backend; start it with
+`python backend/run.py` or `docker-compose up` from the repo root.
+
+## Scripts
+
+| Command | What it does |
+| --- | --- |
+| `npm run dev` | Vite dev server with HMR |
+| `npm run build` | Type-check (`tsc -b`) then production build |
+| `npm run preview` | Preview the production build locally |
+| `npm run lint` | ESLint across the project |
+| `npm test` | Vitest in watch mode |
+| `npm run test:run` | Vitest single run (CI) |
+| `npm run test:coverage` | Vitest with coverage |
+| `npm run test:e2e` | Playwright E2E (all projects) |
+| `npm run test:e2e:desktop` | Desktop Chromium only |
+| `npm run test:e2e:mobile` | Mobile iPhone + Pixel projects |
+| `npm run test:e2e:tablet` | Tablet iPad project |
+| `npm run test:e2e:ui` | Playwright UI mode for debugging |
+| `npm run test:e2e:seed` | Seed the backend with E2E fixtures |
+
+## Environment
+
+Vite reads `.env.development` and `.env.production`. Common keys:
+
+- `VITE_API_URL` — Flask backend base URL (defaults to relative `/api` so
+  nginx can proxy).
+- `VITE_SOCKET_URL` — Socket.IO origin (defaults to same origin).
+
+Do not commit real `.env` files; use `.env.example` for documented
+defaults.
+
+## Conventions
+
+- Logging: keep `console.error` / `console.warn` for genuine error
+  paths. Prefer `console.debug` over `console.log` for status-style
+  output so it stays out of production users' devtools by default.
+- Tests: colocate Vitest specs next to the unit under test
+  (`Foo.test.tsx` beside `Foo.tsx`). Playwright specs live under
+  `tests/`.
+- Imports: feature code imports from `shared/` and `services/`; nothing
+  in `shared/` should import from a feature module.

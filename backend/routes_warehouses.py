@@ -3,6 +3,7 @@ Warehouse management routes.
 Handles CRUD operations for warehouses and warehouse inventory.
 """
 
+import logging
 from datetime import datetime
 
 from flask import Blueprint, jsonify, request
@@ -10,6 +11,8 @@ from sqlalchemy import or_
 
 from auth.jwt_manager import permission_required
 from models import Chemical, Tool, User, Warehouse, db
+
+logger = logging.getLogger(__name__)
 
 
 warehouses_bp = Blueprint("warehouses", __name__)
@@ -85,9 +88,7 @@ def get_warehouses():
         return jsonify(response), 200
 
     except Exception as e:
-        import traceback
-        print(f"ERROR in get_warehouses: {e!s}")
-        print(traceback.format_exc())
+        logger.exception("Error in get_warehouses")
         return jsonify({"error": str(e)}), 500
 
 
@@ -140,9 +141,7 @@ def create_warehouse():
         }), 201
 
     except Exception as e:
-        import traceback
-        print(f"ERROR in create_warehouse: {e!s}")
-        print(traceback.format_exc())
+        logger.exception("Error in create_warehouse")
         db.session.rollback()
         return jsonify({"error": str(e)}), 500
 
@@ -272,10 +271,13 @@ def get_warehouse_stats(warehouse_id):
         if not warehouse:
             return jsonify({"error": "Warehouse not found"}), 404
 
-        # Debug: Check direct query
         tools_count_direct = Tool.query.filter_by(warehouse_id=warehouse_id).count()
-        print(f"DEBUG: Warehouse {warehouse_id} - Direct query tools count: {tools_count_direct}")
-        print(f"DEBUG: Warehouse {warehouse_id} - Relationship tools count: {warehouse.tools.count()}")
+        logger.debug(
+            "Warehouse %s tools count - direct: %s, relationship: %s",
+            warehouse_id,
+            tools_count_direct,
+            warehouse.tools.count(),
+        )
 
         # Get counts by category
         tools_by_category = db.session.query(

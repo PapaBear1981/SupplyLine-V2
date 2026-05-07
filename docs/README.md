@@ -73,9 +73,8 @@ This directory contains comprehensive documentation for the SupplyLine MRO Suite
 
 ### Security & Deployment
 
-- **[SECURITY_SETUP.md](../SECURITY_SETUP.md)** - Security configuration and best practices
-- **[SECURITY_COMPLIANCE.md](../SECURITY_COMPLIANCE.md)** - Compliance and audit requirements
-- **[DEPLOYMENT.md](../DEPLOYMENT.md)** - Deployment guide for production environments
+- **[SECURITY.md](../SECURITY.md)** - Security configuration and best practices
+- **[DOCKER_DEPLOYMENT.md](../DOCKER_DEPLOYMENT.md)** - Deployment guide for production environments
 
 ## What's New in v5.1.0
 
@@ -125,8 +124,8 @@ This directory contains comprehensive documentation for the SupplyLine MRO Suite
 
 ### For Administrators
 1. Review [WAREHOUSE_MANAGEMENT.md](WAREHOUSE_MANAGEMENT.md) for warehouse setup
-2. Check [SECURITY_SETUP.md](../SECURITY_SETUP.md) for security configuration
-3. See [DEPLOYMENT.md](../DEPLOYMENT.md) for production deployment
+2. Check [SECURITY.md](../SECURITY.md) for security configuration
+3. See [DOCKER_DEPLOYMENT.md](../DOCKER_DEPLOYMENT.md) for production deployment
 
 ### For Developers
 1. Start with [API_DOCUMENTATION.md](API_DOCUMENTATION.md) for API reference
