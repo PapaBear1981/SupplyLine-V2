@@ -27,6 +27,7 @@ import {
   EditOutlined,
   ToolOutlined,
   ApartmentOutlined,
+  MessageOutlined,
 } from '@ant-design/icons';
 import dayjs from 'dayjs';
 import type { ColumnsType } from 'antd/es/table';
@@ -34,10 +35,14 @@ import {
   useGetRequestQuery,
   useUpdateRequestMutation,
   useCancelRequestMutation,
+  useGetRequestMessagesQuery,
+  useCreateRequestMessageMutation,
+  useMarkRequestMessageAsReadMutation,
 } from '../services/requestsApi';
 import { useGetOrdersByRequestQuery } from '../services/ordersApi';
 import type { RequestItem, ProcurementOrder } from '../types';
 import { StatusBadge, PriorityBadge, ItemTypeBadge } from './';
+import { MessageThread } from './MessageThread';
 
 const { Title, Text } = Typography;
 const { TextArea } = Input;
@@ -99,8 +104,29 @@ export const RequestDetailModal = ({ open, requestId, onClose }: RequestDetailMo
     { skip: !open || !requestId }
   );
 
+  const { data: messages = [], isLoading: messagesLoading } = useGetRequestMessagesQuery(
+    requestId,
+    { skip: !open || !requestId }
+  );
+
   const [updateRequest, { isLoading: isUpdating }] = useUpdateRequestMutation();
   const [cancelRequest, { isLoading: isCancelling }] = useCancelRequestMutation();
+  const [createMessage] = useCreateRequestMessageMutation();
+  const [markMessageAsRead] = useMarkRequestMessageAsReadMutation();
+
+  const unreadMessageCount = messages.filter((m) => !m.is_read).length;
+
+  const handleSendMessage = async (data: {
+    subject: string;
+    message: string;
+    parent_message_id?: number;
+  }) => {
+    await createMessage({ requestId, message: data }).unwrap();
+  };
+
+  const handleMarkMessageRead = async (messageId: number) => {
+    await markMessageAsRead(messageId).unwrap();
+  };
 
   const handleEdit = () => {
     if (request) {
@@ -405,6 +431,13 @@ export const RequestDetailModal = ({ open, requestId, onClose }: RequestDetailMo
             <Title level={4} style={{ margin: 0 }}>
               Request Details
             </Title>
+            {unreadMessageCount > 0 && (
+              <Tooltip title={`${unreadMessageCount} unread message${unreadMessageCount === 1 ? '' : 's'}`}>
+                <Badge count={unreadMessageCount} offset={[0, 0]}>
+                  <MessageOutlined style={{ fontSize: 18, color: '#faad14' }} />
+                </Badge>
+              </Tooltip>
+            )}
           </Space>
         }
         open={open}
@@ -649,6 +682,14 @@ export const RequestDetailModal = ({ open, requestId, onClose }: RequestDetailMo
             </Card>
 
             <Divider style={{ margin: '0 0 4px' }} />
+
+            {/* Messages */}
+            <MessageThread
+              messages={messages}
+              loading={messagesLoading}
+              onSendMessage={handleSendMessage}
+              onMarkAsRead={handleMarkMessageRead}
+            />
 
             {/* Timeline */}
             <Card title="Request Timeline">{renderTimeline()}</Card>
