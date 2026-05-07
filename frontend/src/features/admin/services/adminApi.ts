@@ -35,6 +35,15 @@ export const adminApi = baseApi.injectEndpoints({
       query: () => '/api/admin/announcements',
       providesTags: ['Announcement'],
     }),
+    getActiveAnnouncements: builder.query<Announcement[], void>({
+      query: () => ({
+        url: '/api/announcements',
+        params: { active_only: true, limit: 50 },
+      }),
+      transformResponse: (response: { announcements: Announcement[] } | Announcement[]) =>
+        Array.isArray(response) ? response : (response?.announcements ?? []),
+      providesTags: ['Announcement'],
+    }),
     createAnnouncement: builder.mutation<Announcement, CreateAnnouncementRequest>({
       query: (body) => ({
         url: '/api/admin/announcements',
@@ -186,6 +195,7 @@ export const {
   useGetAdminStatsQuery,
   useGetOnlineUsersQuery,
   useGetAnnouncementsQuery,
+  useGetActiveAnnouncementsQuery,
   useCreateAnnouncementMutation,
   useUpdateAnnouncementMutation,
   useDeleteAnnouncementMutation,

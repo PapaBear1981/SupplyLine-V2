@@ -1,0 +1,486 @@
+// TV-optimized full-screen kit tracking display.
+// Designed for 1920x1080 wall displays viewed from across the room.
+
+$bg: #0b1220;
+$bgPanel: #131b2e;
+$bgPanelAlt: #1a2540;
+$border: #233153;
+$text: #e8eef9;
+$textMuted: #8c9bb8;
+$accent: #4ea1ff;
+$accentMaterials: #1ea7ff;
+$accentMaintenance: #fa8c16;
+$danger: #ff5562;
+$warning: #ffb648;
+$success: #6dd47e;
+
+.display {
+  position: fixed;
+  inset: 0;
+  display: grid;
+  grid-template-rows: auto 1fr auto;
+  gap: 1.25rem;
+  padding: 1.25rem;
+  background: radial-gradient(circle at top left, #142042 0%, $bg 60%);
+  color: $text;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Inter, Roboto, sans-serif;
+  font-size: clamp(1rem, 1.1vw, 1.4rem);
+  overflow: hidden;
+  cursor: none;
+}
+
+.topBar {
+  display: grid;
+  grid-template-columns: minmax(18rem, 1fr) minmax(0, 2fr) minmax(18rem, 1fr);
+  align-items: stretch;
+  gap: 1.25rem;
+}
+
+.brand {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  padding: 1rem 1.5rem;
+  background: $bgPanel;
+  border: 1px solid $border;
+  border-radius: 14px;
+}
+
+.brandTitle {
+  font-size: clamp(1.5rem, 1.8vw, 2.25rem);
+  font-weight: 700;
+  letter-spacing: 0.5px;
+}
+
+.brandSubtitle {
+  font-size: clamp(1rem, 1.1vw, 1.4rem);
+  color: $textMuted;
+  margin-top: 0.25rem;
+}
+
+.clock {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  justify-content: center;
+  padding: 1rem 1.5rem;
+  background: $bgPanel;
+  border: 1px solid $border;
+  border-radius: 14px;
+  font-variant-numeric: tabular-nums;
+}
+
+.clockTime {
+  font-size: clamp(2.5rem, 3.5vw, 4.25rem);
+  font-weight: 700;
+  line-height: 1;
+}
+
+.clockSeconds {
+  font-size: 0.55em;
+  color: $textMuted;
+  font-weight: 500;
+}
+
+.clockAmPm {
+  font-size: 0.45em;
+  color: $textMuted;
+  font-weight: 600;
+  margin-left: 0.25rem;
+}
+
+.clockDate {
+  font-size: clamp(1rem, 1.2vw, 1.4rem);
+  color: $textMuted;
+  margin-top: 0.5rem;
+}
+
+.kitsGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(22rem, 1fr));
+  grid-auto-rows: minmax(0, 1fr);
+  gap: 1.25rem;
+  overflow: hidden;
+  min-height: 0;
+}
+
+.emptyState {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: clamp(1.5rem, 2vw, 2.25rem);
+  color: $textMuted;
+  background: $bgPanel;
+  border: 1px solid $border;
+  border-radius: 14px;
+  padding: 4rem;
+}
+
+.kitCard {
+  display: flex;
+  flex-direction: column;
+  background: $bgPanel;
+  border: 1px solid $border;
+  border-radius: 14px;
+  padding: 1.25rem 1.5rem;
+  overflow: hidden;
+  min-height: 0;
+}
+
+.kitCardHeader {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding-bottom: 0.75rem;
+  border-bottom: 1px solid $border;
+}
+
+.kitCardTitleRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.kitName {
+  margin: 0;
+  font-size: clamp(1.5rem, 1.8vw, 2.25rem);
+  font-weight: 700;
+  line-height: 1.1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.kitStatus {
+  text-transform: uppercase;
+  font-size: clamp(0.7rem, 0.8vw, 0.95rem);
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  padding: 0.25rem 0.65rem;
+  border-radius: 999px;
+  white-space: nowrap;
+}
+
+.statusActive {
+  background: rgba($success, 0.18);
+  color: $success;
+}
+
+.statusDeployed {
+  background: rgba($accent, 0.18);
+  color: $accent;
+}
+
+.statusMaintenance {
+  background: rgba($warning, 0.18);
+  color: $warning;
+}
+
+.statusArchived {
+  background: rgba($textMuted, 0.18);
+  color: $textMuted;
+}
+
+.kitMeta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem 1rem;
+  font-size: clamp(0.95rem, 1.05vw, 1.25rem);
+  color: $textMuted;
+}
+
+.aircraftType {
+  color: $accent;
+  font-weight: 600;
+}
+
+.kitLocation {
+  color: $text;
+  font-weight: 500;
+}
+
+.kitCheckouts {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin-top: 0.75rem;
+  flex: 1;
+  min-height: 0;
+}
+
+.kitCheckoutsHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: clamp(0.85rem, 1vw, 1.1rem);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: $textMuted;
+}
+
+.kitCheckoutsCount {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  color: $text;
+  font-weight: 700;
+}
+
+.overdueChip {
+  background: rgba($danger, 0.2);
+  color: $danger;
+  font-size: 0.85em;
+  padding: 0.1rem 0.55rem;
+  border-radius: 999px;
+  font-weight: 700;
+}
+
+.kitCheckoutsEmpty {
+  color: $textMuted;
+  font-style: italic;
+  padding: 0.5rem 0;
+}
+
+.checkoutList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  overflow: hidden;
+}
+
+.checkoutRow {
+  display: grid;
+  grid-template-columns: minmax(5rem, auto) 1fr auto;
+  gap: 0.75rem;
+  align-items: baseline;
+  padding: 0.4rem 0.6rem;
+  border-radius: 8px;
+  background: $bgPanelAlt;
+  font-size: clamp(0.95rem, 1.05vw, 1.2rem);
+}
+
+.checkoutOverdue {
+  background: rgba($danger, 0.18);
+  border-left: 3px solid $danger;
+}
+
+.toolNumber {
+  font-weight: 700;
+  color: $accent;
+  font-variant-numeric: tabular-nums;
+}
+
+.toolDescription {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.checkoutSince {
+  color: $textMuted;
+  font-variant-numeric: tabular-nums;
+  font-size: 0.95em;
+}
+
+.checkoutMore {
+  color: $textMuted;
+  font-style: italic;
+  padding-left: 0.5rem;
+}
+
+.footer {
+  display: flex;
+  gap: 1.25rem;
+}
+
+.onCallPanel {
+  flex: 1;
+  background: $bgPanel;
+  border: 1px solid $border;
+  border-radius: 14px;
+  padding: 1rem 1.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.panelHeading {
+  margin: 0;
+  font-size: clamp(1rem, 1.1vw, 1.3rem);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: $textMuted;
+}
+
+.onCallGrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+}
+
+.onCallTile {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  padding: 1rem 1.25rem;
+  background: $bgPanelAlt;
+  border-radius: 12px;
+  border-left: 4px solid transparent;
+}
+
+.onCallMaterials {
+  border-left-color: $accentMaterials;
+}
+
+.onCallMaintenance {
+  border-left-color: $accentMaintenance;
+}
+
+.onCallLabel {
+  font-size: clamp(0.95rem, 1.05vw, 1.2rem);
+  font-weight: 700;
+  color: $textMuted;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.onCallBody {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.onCallAvatar {
+  width: clamp(3rem, 4vw, 4.5rem);
+  height: clamp(3rem, 4vw, 4.5rem);
+  border-radius: 50%;
+  background: $bg;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: clamp(1rem, 1.4vw, 1.7rem);
+  font-weight: 700;
+  overflow: hidden;
+  flex-shrink: 0;
+
+  img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+}
+
+.onCallInfo {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.onCallName {
+  font-size: clamp(1.25rem, 1.5vw, 1.85rem);
+  font-weight: 700;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.onCallDept {
+  color: $textMuted;
+  font-size: clamp(0.9rem, 1vw, 1.1rem);
+}
+
+.onCallPhone {
+  margin-top: 0.25rem;
+  font-size: clamp(1rem, 1.2vw, 1.4rem);
+  font-weight: 600;
+  color: $accent;
+  font-variant-numeric: tabular-nums;
+}
+
+.onCallEmpty {
+  color: $textMuted;
+  font-style: italic;
+  font-size: clamp(1rem, 1.2vw, 1.4rem);
+  padding: 0.5rem 0;
+}
+
+.announcementsPanel {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 0.4rem;
+  padding: 1rem 1.5rem;
+  background: $bgPanel;
+  border: 1px solid $border;
+  border-left-width: 6px;
+  border-left-color: $accent;
+  border-radius: 14px;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.priorityUrgent {
+  border-left-color: $danger;
+  background: linear-gradient(90deg, rgba($danger, 0.18), $bgPanel 40%);
+}
+
+.priorityHigh {
+  border-left-color: $warning;
+  background: linear-gradient(90deg, rgba($warning, 0.14), $bgPanel 40%);
+}
+
+.priorityMedium {
+  border-left-color: $accent;
+}
+
+.priorityLow {
+  border-left-color: $textMuted;
+}
+
+.announcementMeta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: clamp(0.8rem, 0.9vw, 1rem);
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: $textMuted;
+}
+
+.announcementPriorityTag {
+  font-weight: 700;
+}
+
+.announcementCounter {
+  font-variant-numeric: tabular-nums;
+}
+
+.announcementTitle {
+  font-size: clamp(1.4rem, 1.7vw, 2rem);
+  font-weight: 700;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.announcementMessage {
+  font-size: clamp(1rem, 1.15vw, 1.4rem);
+  color: $textMuted;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.announcementEmpty {
+  color: $textMuted;
+  font-style: italic;
+  font-size: clamp(1rem, 1.2vw, 1.4rem);
+  text-align: center;
+}
