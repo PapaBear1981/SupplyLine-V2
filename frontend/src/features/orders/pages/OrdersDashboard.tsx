@@ -27,6 +27,7 @@ import {
   InboxOutlined,
   FileTextOutlined,
   ToolOutlined,
+  MessageOutlined,
 } from '@ant-design/icons';
 import dayjs from 'dayjs';
 import relativeTime from 'dayjs/plugin/relativeTime';
@@ -143,18 +144,41 @@ export const OrdersDashboard: React.FC = () => {
       title: 'Title',
       dataIndex: 'title',
       key: 'title',
-      width: 220,
+      width: 240,
       ellipsis: true,
-      render: (title: string, record: UserRequest) => (
-        <Space direction="vertical" size={0}>
-          <span style={{ fontWeight: 500 }}>{title}</span>
-          {record.repairable && (
-            <Tag color="purple" icon={<ToolOutlined />} style={{ fontSize: 11 }}>
-              Repairable
-            </Tag>
-          )}
-        </Space>
-      ),
+      render: (title: string, record: UserRequest) => {
+        const messageCount = record.message_count || 0;
+        const unreadCount = record.unread_message_count || 0;
+        return (
+          <Space direction="vertical" size={2}>
+            <span style={{ fontWeight: 500 }}>{title}</span>
+            <Space size={4} wrap>
+              {record.repairable && (
+                <Tag color="purple" icon={<ToolOutlined />} style={{ fontSize: 11 }}>
+                  Repairable
+                </Tag>
+              )}
+              {messageCount > 0 && (
+                <Tooltip
+                  title={
+                    unreadCount > 0
+                      ? `${unreadCount} unread message${unreadCount === 1 ? '' : 's'} (${messageCount} total)`
+                      : `${messageCount} message${messageCount === 1 ? '' : 's'}`
+                  }
+                >
+                  <Tag
+                    color={unreadCount > 0 ? 'red' : 'blue'}
+                    icon={<MessageOutlined />}
+                    style={{ fontSize: 11 }}
+                  >
+                    {unreadCount > 0 ? `${unreadCount} unread` : `${messageCount}`}
+                  </Tag>
+                </Tooltip>
+              )}
+            </Space>
+          </Space>
+        );
+      },
     },
     {
       title: 'Type',
@@ -249,12 +273,35 @@ export const OrdersDashboard: React.FC = () => {
       title: 'Actions',
       key: 'actions',
       fixed: 'right',
-      width: 90,
-      render: (_, record: UserRequest) => (
-        <Button type="primary" size="small" onClick={() => handleViewRequest(record.id)}>
-          Process
-        </Button>
-      ),
+      width: 110,
+      render: (_, record: UserRequest) => {
+        const unreadCount = record.unread_message_count || 0;
+        const messageCount = record.message_count || 0;
+        const button = (
+          <Button type="primary" size="small" onClick={() => handleViewRequest(record.id)}>
+            Process
+          </Button>
+        );
+        if (unreadCount > 0) {
+          return (
+            <Tooltip title={`${unreadCount} unread message${unreadCount === 1 ? '' : 's'} — review before processing`}>
+              <Badge count={unreadCount} offset={[-4, 4]} size="small">
+                {button}
+              </Badge>
+            </Tooltip>
+          );
+        }
+        if (messageCount > 0) {
+          return (
+            <Tooltip title={`${messageCount} message${messageCount === 1 ? '' : 's'} on this request`}>
+              <Badge dot offset={[-4, 4]} color="blue">
+                {button}
+              </Badge>
+            </Tooltip>
+          );
+        }
+        return button;
+      },
     },
   ];
 
@@ -280,16 +327,39 @@ export const OrdersDashboard: React.FC = () => {
       title: 'Title',
       dataIndex: 'title',
       key: 'title',
-      width: 220,
+      width: 240,
       ellipsis: true,
-      render: (title: string, record: ProcurementOrder) => (
-        <Space direction="vertical" size={0}>
-          <span style={{ fontWeight: 500 }}>{title}</span>
-          {record.part_number && (
-            <span style={{ fontSize: 12, color: '#8c8c8c' }}>PN: {record.part_number}</span>
-          )}
-        </Space>
-      ),
+      render: (title: string, record: ProcurementOrder) => {
+        const messageCount = record.message_count || 0;
+        const unreadCount = record.unread_message_count || 0;
+        return (
+          <Space direction="vertical" size={2}>
+            <span style={{ fontWeight: 500 }}>{title}</span>
+            <Space size={4} wrap>
+              {record.part_number && (
+                <span style={{ fontSize: 12, color: '#8c8c8c' }}>PN: {record.part_number}</span>
+              )}
+              {messageCount > 0 && (
+                <Tooltip
+                  title={
+                    unreadCount > 0
+                      ? `${unreadCount} unread message${unreadCount === 1 ? '' : 's'} (${messageCount} total)`
+                      : `${messageCount} message${messageCount === 1 ? '' : 's'}`
+                  }
+                >
+                  <Tag
+                    color={unreadCount > 0 ? 'red' : 'blue'}
+                    icon={<MessageOutlined />}
+                    style={{ fontSize: 11 }}
+                  >
+                    {unreadCount > 0 ? `${unreadCount} unread` : `${messageCount}`}
+                  </Tag>
+                </Tooltip>
+              )}
+            </Space>
+          </Space>
+        );
+      },
     },
     {
       title: 'Linked Request',
@@ -402,12 +472,35 @@ export const OrdersDashboard: React.FC = () => {
       title: 'Actions',
       key: 'actions',
       fixed: 'right',
-      width: 80,
-      render: (_, record: ProcurementOrder) => (
-        <Button size="small" onClick={() => handleViewOrder(record.id)}>
-          View
-        </Button>
-      ),
+      width: 100,
+      render: (_, record: ProcurementOrder) => {
+        const unreadCount = record.unread_message_count || 0;
+        const messageCount = record.message_count || 0;
+        const button = (
+          <Button size="small" onClick={() => handleViewOrder(record.id)}>
+            View
+          </Button>
+        );
+        if (unreadCount > 0) {
+          return (
+            <Tooltip title={`${unreadCount} unread message${unreadCount === 1 ? '' : 's'} — review before processing`}>
+              <Badge count={unreadCount} offset={[-4, 4]} size="small">
+                {button}
+              </Badge>
+            </Tooltip>
+          );
+        }
+        if (messageCount > 0) {
+          return (
+            <Tooltip title={`${messageCount} message${messageCount === 1 ? '' : 's'} on this order`}>
+              <Badge dot offset={[-4, 4]} color="blue">
+                {button}
+              </Badge>
+            </Tooltip>
+          );
+        }
+        return button;
+      },
     },
   ];
 

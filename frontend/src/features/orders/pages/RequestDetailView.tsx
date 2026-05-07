@@ -1041,7 +1041,16 @@ export const RequestDetailView: React.FC = () => {
     },
     {
       key: 'messages',
-      label: 'Messages',
+      label: (
+        <Space size={6}>
+          <span>Messages</span>
+          {(request.unread_message_count ?? 0) > 0 ? (
+            <Badge count={request.unread_message_count} size="small" />
+          ) : (request.message_count ?? 0) > 0 ? (
+            <Badge count={request.message_count} size="small" style={{ backgroundColor: '#1890ff' }} />
+          ) : null}
+        </Space>
+      ),
       children: (
         <MessageThread
           messages={messages}
@@ -1081,6 +1090,23 @@ export const RequestDetailView: React.FC = () => {
           </Col>
         </Row>
       </div>
+
+      {/* Unread message alert — surfaced when processing a request that has open messages */}
+      {(request.unread_message_count ?? 0) > 0 && (
+        <Alert
+          message={`This request has ${request.unread_message_count} unread message${request.unread_message_count === 1 ? '' : 's'}`}
+          description="Review the conversation before processing — there may be clarifications, blockers, or context relevant to fulfillment."
+          type="warning"
+          showIcon
+          closable
+          action={
+            <Button size="small" type="primary" onClick={() => setActiveTab('messages')}>
+              View Messages
+            </Button>
+          }
+          style={{ marginBottom: 16 }}
+        />
+      )}
 
       {/* Tabs */}
       <Tabs activeKey={activeTab} onChange={setActiveTab} items={tabItems} />

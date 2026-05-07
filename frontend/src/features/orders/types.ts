@@ -149,6 +149,9 @@ export interface ProcurementOrder {
   is_late?: boolean;
   days_overdue?: number;
   due_soon?: boolean;
+  message_count?: number;
+  unread_message_count?: number;
+  latest_message_at?: string;
 
   // Phase 2: fulfillment-action fields
   request_id?: number;
@@ -360,6 +363,9 @@ export interface UserRequest {
   due_soon?: boolean;
   item_count?: number;
   fulfillment_action_count?: number;
+  message_count?: number;
+  unread_message_count?: number;
+  latest_message_at?: string;
 
   // Phase 2 operational context fields
   request_type?: RequestType;
