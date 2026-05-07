@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import {
   Card,
   List,
@@ -12,6 +12,7 @@ import {
   Badge,
   message as antdMessage,
 } from 'antd';
+import type { TextAreaRef } from 'antd/es/input/TextArea';
 import {
   MessageOutlined,
   SendOutlined,
@@ -43,6 +44,16 @@ export const MessageThread: React.FC<MessageThreadProps> = ({
   const [form] = Form.useForm();
   const [replyToId, setReplyToId] = useState<number | null>(null);
   const [sending, setSending] = useState(false);
+  const composerRef = useRef<HTMLDivElement>(null);
+  const messageRef = useRef<TextAreaRef>(null);
+
+  const startReply = (msg: ProcurementOrderMessage | UserRequestMessage) => {
+    setReplyToId(msg.id);
+    form.setFieldsValue({ subject: `Re: ${msg.subject}` });
+    composerRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    // Focus the message textarea so the user can start typing immediately.
+    setTimeout(() => messageRef.current?.focus(), 250);
+  };
 
   // Group messages by thread (parent and replies)
   const topLevelMessages = messages.filter((msg) => !msg.parent_message_id);
@@ -103,10 +114,7 @@ export const MessageThread: React.FC<MessageThreadProps> = ({
               type="link"
               size="small"
               icon={<MessageOutlined />}
-              onClick={() => {
-                setReplyToId(msg.id);
-                form.setFieldsValue({ subject: `Re: ${msg.subject}` });
-              }}
+              onClick={() => startReply(msg)}
             >
               Reply ({replies.length})
             </Button>
@@ -169,6 +177,7 @@ export const MessageThread: React.FC<MessageThreadProps> = ({
     <Card title="Messages" extra={<MessageOutlined />}>
       <Space direction="vertical" size="large" style={{ width: '100%' }}>
         {/* Message Composer */}
+        <div ref={composerRef}>
         <Form form={form} onFinish={handleSendMessage} layout="vertical">
           {replyToId && (
             <Space style={{ marginBottom: 8 }}>
@@ -193,7 +202,7 @@ export const MessageThread: React.FC<MessageThreadProps> = ({
             label="Message"
             rules={[{ required: true, message: 'Please enter a message' }]}
           >
-            <TextArea rows={4} placeholder="Type your message here..." />
+            <TextArea ref={messageRef} rows={4} placeholder="Type your message here..." />
           </Form.Item>
           <Form.Item>
             <Button
@@ -206,6 +215,7 @@ export const MessageThread: React.FC<MessageThreadProps> = ({
             </Button>
           </Form.Item>
         </Form>
+        </div>
 
         {/* Message List */}
         <List
