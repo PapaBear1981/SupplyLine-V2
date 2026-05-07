@@ -42,6 +42,7 @@ export interface Chemical {
 
 export interface ChemicalFormData {
   part_number: string;
+  chemical_part_id?: number | null;
   lot_number: string;
   description?: string;
   manufacturer?: string;
