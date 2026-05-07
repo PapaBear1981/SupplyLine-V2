@@ -35,6 +35,12 @@ from utils.warehouse_scope import assert_active_warehouse_matches
 
 logger = logging.getLogger(__name__)
 
+# Sentinel datetime used to sort lots without an expiration date to the end
+# of "earliest expiry first" ordering. Naive on purpose — the chemical
+# expiration_date column is naive too, so mixing tz-aware sentinels would
+# raise TypeError on comparison.
+_FAR_FUTURE = datetime(9999, 12, 31)
+
 # Decorator to check if user is admin or in Materials department
 materials_manager_required = department_required("Materials")
 
@@ -1609,9 +1615,9 @@ def register_chemical_routes(app):
                 "has_open_reorder_request": has_open_reorder,
                 "lots": [lot.to_dict() for lot in sorted(
                     lots,
-                    key=lambda l: (
-                        l.expiration_date or datetime.max,
-                        l.lot_number or "",
+                    key=lambda lot: (
+                        lot.expiration_date or _FAR_FUTURE,
+                        lot.lot_number or "",
                     ),
                 )],
             })

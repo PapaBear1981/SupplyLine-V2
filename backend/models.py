@@ -1804,10 +1804,9 @@ class Chemical(db.Model):
                     # Part-level aggregate evaluation
                     if part.is_out_of_stock() or part.is_below_min_stock():
                         should_reorder = True
-                else:
+                elif self.quantity <= 0 or self.is_low_stock():
                     # Legacy fallback: lot-level evaluation
-                    if self.quantity <= 0 or self.is_low_stock():
-                        should_reorder = True
+                    should_reorder = True
 
             if should_reorder:
                 self.needs_reorder = True
