@@ -35,7 +35,7 @@ const KitIssuanceForm = ({ visible, kitId, item, onClose }: KitIssuanceFormProps
     try {
       const values = await form.validateFields();
 
-      await issueFromKit({
+      const result = await issueFromKit({
         kitId,
         data: {
           item_type: item.item_type,
@@ -49,9 +49,9 @@ const KitIssuanceForm = ({ visible, kitId, item, onClose }: KitIssuanceFormProps
 
       message.success('Item issued successfully');
 
-      // Show auto-reorder notice if applicable
-      if (item.minimum_stock_level &&
-          (item.quantity - values.quantity) <= item.minimum_stock_level) {
+      // Backend echoes the auto-reorder it created (if any) so we only show
+      // the notice when one actually exists.
+      if ((result as { auto_reorder_request?: unknown })?.auto_reorder_request) {
         message.info('Automatic reorder request created due to low stock level');
       }
 

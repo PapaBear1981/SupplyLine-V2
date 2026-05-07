@@ -288,7 +288,14 @@ export const kitsApi = baseApi.injectEndpoints({
         method: 'POST',
         body: data,
       }),
-      invalidatesTags: (_result, _error, { kitId }) => [{ type: 'Kit', id: kitId }],
+      // Issuing can auto-create a kit reorder request and a unified user request
+      // when stock drops to/below the threshold, so invalidate those lists too.
+      invalidatesTags: (_result, _error, { kitId }) => [
+        { type: 'Kit', id: kitId },
+        { type: 'Kit', id: `reorders-${kitId}` },
+        { type: 'KitReorder', id: 'LIST' },
+        { type: 'Request', id: 'LIST' },
+      ],
     }),
 
     getAllKitIssuances: builder.query<

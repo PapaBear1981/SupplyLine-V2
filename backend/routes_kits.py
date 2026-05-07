@@ -1411,10 +1411,12 @@ def register_kit_routes(app):
     def issue_from_kit(kit_id):
         """Issue items from a kit"""
         from models_kits import KitIssuance, KitReorderRequest
+        from utils.unified_requests import create_kit_reorder_request
 
         kit = Kit.query.get_or_404(kit_id)
         data = request.get_json() or {}
         current_user_id = request.current_user.get("user_id")
+        auto_reorder = None  # Track auto-created reorder for unified request creation
 
         # Validate required fields
         if not data.get("item_type"):
@@ -1478,6 +1480,7 @@ def register_kit_routes(app):
                             is_automatic=True
                         )
                         db.session.add(reorder)
+                        auto_reorder = reorder
             else:
                 # Fall back to old KitExpendable table for backward compatibility
                 item = KitExpendable.query.filter_by(id=data["item_id"], kit_id=kit_id).first()
@@ -1521,6 +1524,7 @@ def register_kit_routes(app):
                             is_automatic=True
                         )
                         db.session.add(reorder)
+                        auto_reorder = reorder
 
         else:  # tool or chemical from kit_items
             item = KitItem.query.filter_by(id=data["item_id"], kit_id=kit_id).first()
@@ -1556,6 +1560,24 @@ def register_kit_routes(app):
         )
 
         db.session.add(issuance)
+
+        # If an automatic reorder was created, mirror it as a UserRequest in the
+        # unified requests system so it appears alongside manually-created reorders.
+        if auto_reorder is not None:
+            db.session.flush()  # Assign auto_reorder.id before linking the unified request
+            try:
+                create_kit_reorder_request(
+                    kit=kit,
+                    reorder_request=auto_reorder,
+                    requester_id=current_user_id,
+                )
+            except Exception:
+                logger.exception(
+                    "Failed to create unified UserRequest for auto kit reorder",
+                    extra={"kit_id": kit.id, "reorder_id": auto_reorder.id},
+                )
+                raise
+
         db.session.commit()
 
         # Log action
@@ -1568,7 +1590,10 @@ def register_kit_routes(app):
             ip_address=request.remote_addr
         )
 
-        return jsonify(issuance.to_dict()), 201
+        response_data = issuance.to_dict()
+        if auto_reorder is not None:
+            response_data["auto_reorder_request"] = auto_reorder.to_dict()
+        return jsonify(response_data), 201
 
     @app.route("/api/kits/issuances", methods=["GET"])
     @jwt_required
