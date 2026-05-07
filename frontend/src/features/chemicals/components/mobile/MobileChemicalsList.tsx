@@ -72,7 +72,7 @@ export const MobileChemicalsList = () => {
     q: searchQuery || undefined,
     status: statusFilter || undefined,
   });
-  const { data: warehousesData } = useGetWarehousesQuery();
+  const { data: warehousesData } = useGetWarehousesQuery({ per_page: 200 });
   const { data: usersData } = useGetUsersQuery();
   const currentUser = useAppSelector((state) => state.auth.user);
   const [createChemical, { isLoading: isCreating }] = useCreateChemicalMutation();
