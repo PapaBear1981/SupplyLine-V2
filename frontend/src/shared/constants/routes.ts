@@ -14,4 +14,5 @@ export const ROUTES = {
   PROFILE: '/profile',
   SETTINGS: '/settings',
   CHEMICAL_FORECAST: '/chemicals/forecast',
+  DISPLAY: '/display',
 } as const;

@@ -24,6 +24,7 @@ import { SettingsPage } from '@features/settings/pages/SettingsPage';
 import { ProfilePage } from '@features/profile/pages/ProfilePage';
 import { AdminPageWrapper } from '@features/admin/components/AdminPageWrapper';
 import { KitsDashboard, KitDetailView, KitWizard, MobileKitWizard } from '@features/kits';
+import { DisplayPage } from '@features/display/pages/DisplayPage';
 import {
   OrdersDashboard,
   OrderDetailView,
@@ -69,6 +70,8 @@ function AppContent() {
 
               {/* Protected Routes */}
               <Route element={<ProtectedRoute />}>
+                {/* Full-screen kiosk display: no sidebar/topbar */}
+                <Route path={ROUTES.DISPLAY} element={<DisplayPage />} />
                 <Route element={<ResponsiveLayout />}>
                   <Route path={ROUTES.HOME} element={<Navigate to={ROUTES.DASHBOARD} replace />} />
                   <Route path={ROUTES.DASHBOARD} element={<DashboardPage />} />
