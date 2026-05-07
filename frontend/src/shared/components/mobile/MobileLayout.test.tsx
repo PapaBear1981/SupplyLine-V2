@@ -41,9 +41,14 @@ const createMockStore = (preloadedState = {}) => {
   });
 };
 
-// Mock logout mutation
+// Mock logout + refresh mutations. useTokenAutoRefresh calls useRefreshTokenMutation;
+// the test environment has no real auth backend, so return a no-op mutation.
 vi.mock('@features/auth/services/authApi', () => ({
   useLogoutMutation: () => [vi.fn().mockResolvedValue({}), { isLoading: false }],
+  useRefreshTokenMutation: () => [
+    vi.fn(() => ({ unwrap: () => Promise.resolve({ expires_in: 1800 }) })),
+    { isLoading: false },
+  ],
 }));
 
 // Mock socket service
