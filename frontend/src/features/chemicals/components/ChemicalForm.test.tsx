@@ -4,15 +4,39 @@ import { Form } from 'antd';
 import { ChemicalForm } from './ChemicalForm';
 
 const mockUseGetWarehousesQuery = vi.fn();
+const mockUseGetChemicalPartsQuery = vi.fn();
 
 vi.mock('@features/warehouses/services/warehousesApi', () => ({
   useGetWarehousesQuery: (...args: unknown[]) => mockUseGetWarehousesQuery(...args),
+}));
+
+vi.mock('../services/chemicalsApi', () => ({
+  useGetChemicalPartsQuery: (...args: unknown[]) =>
+    mockUseGetChemicalPartsQuery(...args),
 }));
 
 const warehouses = [
   { id: 1, name: 'Main Warehouse' },
   { id: 2, name: 'East Hangar' },
   { id: 3, name: 'Overflow Storage' },
+];
+
+const parts = [
+  {
+    id: 11,
+    part_number: 'CH-EXISTING',
+    description: 'Already in stock',
+    manufacturer: 'ACME',
+    category: 'General',
+    default_unit: 'oz',
+    minimum_stock_level: 5,
+    total_active_quantity: 10,
+    lot_count: 2,
+    status: 'available' as const,
+    earliest_expiration_date: null,
+    has_open_reorder_request: false,
+    lots: [],
+  },
 ];
 
 const Harness = ({
@@ -30,6 +54,10 @@ const renderForm = () => {
   const onSubmit = vi.fn();
   const onCancel = vi.fn();
   const utils = render(<Harness onSubmit={onSubmit} onCancel={onCancel} />);
+  // Default mode is "Add Lot to Existing Part". Most legacy tests below
+  // exercise the new-part create flow, so flip into "Create New Part
+  // Number" mode unless the test explicitly stays in existing mode.
+  fireEvent.click(screen.getByRole('radio', { name: /create new part number/i }));
   return { ...utils, onSubmit, onCancel };
 };
 
@@ -38,6 +66,10 @@ describe('ChemicalForm warehouse field', () => {
     vi.clearAllMocks();
     mockUseGetWarehousesQuery.mockReturnValue({
       data: { warehouses },
+      isLoading: false,
+    });
+    mockUseGetChemicalPartsQuery.mockReturnValue({
+      data: { parts },
       isLoading: false,
     });
   });
@@ -86,7 +118,7 @@ describe('ChemicalForm warehouse field', () => {
     const warehouseOption = await screen.findByText('East Hangar');
     fireEvent.click(warehouseOption);
 
-    fireEvent.click(screen.getByRole('button', { name: /create chemical/i }));
+    fireEvent.click(screen.getByRole('button', { name: /create part & lot/i }));
 
     await waitFor(() => {
       expect(onSubmit).toHaveBeenCalledTimes(1);
@@ -115,7 +147,7 @@ describe('ChemicalForm warehouse field', () => {
     fireEvent.mouseDown(screen.getByLabelText('Unit'));
     fireEvent.click(await screen.findByText('Each'));
 
-    fireEvent.click(screen.getByRole('button', { name: /create chemical/i }));
+    fireEvent.click(screen.getByRole('button', { name: /create part & lot/i }));
 
     expect(await screen.findByText('Warehouse is required')).toBeInTheDocument();
     expect(onSubmit).not.toHaveBeenCalled();
@@ -141,6 +173,85 @@ describe('ChemicalForm warehouse field', () => {
 
     const dropdown = await screen.findByText('No warehouses found');
     expect(dropdown).toBeInTheDocument();
+  });
+
+  it('defaults to "Add Lot to Existing Part" mode when creating', () => {
+    const onSubmit = vi.fn();
+    const onCancel = vi.fn();
+    render(<Harness onSubmit={onSubmit} onCancel={onCancel} />);
+
+    const existingRadio = screen.getByRole('radio', {
+      name: /add lot to existing part/i,
+    }) as HTMLInputElement;
+    expect(existingRadio.checked).toBe(true);
+
+    // Part-master fields are hidden in this mode
+    expect(screen.queryByLabelText('Manufacturer')).not.toBeInTheDocument();
+    // Submit button reflects the mode
+    expect(screen.getByRole('button', { name: /add lot$/i })).toBeInTheDocument();
+  });
+
+  it('submits chemical_part_id when adding a lot to an existing part', async () => {
+    const onSubmit = vi.fn();
+    const onCancel = vi.fn();
+    render(<Harness onSubmit={onSubmit} onCancel={onCancel} />);
+
+    // Pick the seeded existing part
+    fireEvent.mouseDown(screen.getByLabelText('Existing Part Number'));
+    const partOption = await screen.findByText(/CH-EXISTING/);
+    fireEvent.click(partOption);
+
+    fireEvent.change(screen.getByLabelText('Lot Number'), {
+      target: { value: 'LOT-NEW-9' },
+    });
+    fireEvent.change(screen.getByLabelText('Quantity'), {
+      target: { value: '7' },
+    });
+
+    fireEvent.mouseDown(screen.getByLabelText('Warehouse'));
+    fireEvent.click(await screen.findByText('East Hangar'));
+
+    fireEvent.click(screen.getByRole('button', { name: /add lot$/i }));
+
+    await waitFor(() => {
+      expect(onSubmit).toHaveBeenCalledTimes(1);
+    });
+    expect(onSubmit).toHaveBeenCalledWith(
+      expect.objectContaining({
+        chemical_part_id: 11,
+        part_number: 'CH-EXISTING',
+        lot_number: 'LOT-NEW-9',
+        warehouse_id: 2,
+        unit: 'oz',
+      }),
+    );
+  });
+
+  it('does NOT send chemical_part_id when creating a new part', async () => {
+    const { onSubmit } = renderForm();
+
+    fireEvent.change(screen.getByLabelText('Part Number'), {
+      target: { value: 'CH-BRAND-NEW' },
+    });
+    fireEvent.change(screen.getByLabelText('Lot Number'), {
+      target: { value: 'LOT-1' },
+    });
+    fireEvent.change(screen.getByLabelText('Quantity'), {
+      target: { value: '1' },
+    });
+    fireEvent.mouseDown(screen.getByLabelText('Unit'));
+    fireEvent.click(await screen.findByText('Each'));
+    fireEvent.mouseDown(screen.getByLabelText('Warehouse'));
+    fireEvent.click(await screen.findByText('Main Warehouse'));
+
+    fireEvent.click(screen.getByRole('button', { name: /create part & lot/i }));
+
+    await waitFor(() => {
+      expect(onSubmit).toHaveBeenCalledTimes(1);
+    });
+    const submitted = onSubmit.mock.calls[0][0] as Record<string, unknown>;
+    expect(submitted.chemical_part_id).toBeUndefined();
+    expect(submitted.part_number).toBe('CH-BRAND-NEW');
   });
 
   it('preselects the warehouse id when editing an existing chemical', async () => {
