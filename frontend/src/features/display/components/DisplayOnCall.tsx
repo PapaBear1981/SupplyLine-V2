@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import {
   useGetOnCallPersonnelQuery,
   type OnCallEntry,
@@ -20,6 +21,7 @@ const initials = (name: string): string =>
 
 const OnCallTile = ({ label, accentClass, entry }: OnCallTileProps) => {
   const user = entry?.user ?? null;
+  const [imageError, setImageError] = useState(false);
 
   return (
     <div className={`${styles.onCallTile} ${accentClass}`}>
@@ -27,8 +29,12 @@ const OnCallTile = ({ label, accentClass, entry }: OnCallTileProps) => {
       {user ? (
         <div className={styles.onCallBody}>
           <div className={styles.onCallAvatar}>
-            {user.avatar ? (
-              <img src={user.avatar} alt={user.name} />
+            {user.avatar && !imageError ? (
+              <img
+                src={user.avatar}
+                alt={user.name}
+                onError={() => setImageError(true)}
+              />
             ) : (
               <span>{initials(user.name)}</span>
             )}

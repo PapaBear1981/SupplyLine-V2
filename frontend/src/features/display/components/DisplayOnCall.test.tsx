@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { render, screen, fireEvent } from '@testing-library/react';
 import { DisplayOnCall } from './DisplayOnCall';
 import type { OnCallPersonnel } from '@features/admin/services/oncallApi';
 
@@ -97,6 +97,42 @@ describe('DisplayOnCall', () => {
     render(<DisplayOnCall />);
 
     expect(screen.getAllByText('No one assigned')).toHaveLength(2);
+  });
+
+  it('falls back to initials when the avatar image fails to load', () => {
+    onCallSpy.mockReturnValue({
+      data: {
+        materials: {
+          user: {
+            id: 10,
+            name: 'Avery Brown',
+            employee_number: 'EMP010',
+            department: null,
+            email: null,
+            phone: null,
+            avatar: 'https://example.com/missing.png',
+          },
+          updated_at: null,
+          updated_by: null,
+        },
+        maintenance: {
+          user: null,
+          updated_at: null,
+          updated_by: null,
+        },
+      },
+    });
+
+    render(<DisplayOnCall />);
+
+    const img = screen.getByAltText('Avery Brown') as HTMLImageElement;
+    expect(img).toBeInTheDocument();
+    expect(screen.queryByText('AB')).not.toBeInTheDocument();
+
+    fireEvent.error(img);
+
+    expect(screen.queryByAltText('Avery Brown')).not.toBeInTheDocument();
+    expect(screen.getByText('AB')).toBeInTheDocument();
   });
 
   it('renders both labels even before any data is loaded', () => {

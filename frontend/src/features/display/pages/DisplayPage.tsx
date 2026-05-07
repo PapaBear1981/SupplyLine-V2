@@ -22,7 +22,7 @@ export const DisplayPage = () => {
 
   const { data: checkoutData } = useGetActiveKitToolCheckoutsQuery(
     { warehouse_id: activeWarehouseId ?? undefined },
-    { skip: !activeWarehouseId, pollingInterval: POLL_INTERVAL }
+    { skip: activeWarehouseId == null, pollingInterval: POLL_INTERVAL }
   );
 
   const checkoutsByKit = useMemo(() => {
@@ -61,7 +61,7 @@ export const DisplayPage = () => {
       </header>
 
       <main className={styles.kitsGrid}>
-        {!activeWarehouseId ? (
+        {activeWarehouseId == null ? (
           <div className={styles.emptyState}>
             No active warehouse selected. Sign in as the kiosk user and choose a warehouse.
           </div>

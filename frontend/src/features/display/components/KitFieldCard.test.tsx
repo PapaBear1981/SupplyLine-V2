@@ -23,7 +23,7 @@ const checkout = (over: Partial<KitToolCheckout> = {}): KitToolCheckout => ({
   tool_description: over.tool_description ?? 'Torque wrench',
   kit_id: 1,
   checked_out_by_id: 1,
-  checkout_date: over.checkout_date ?? '2026-05-01T00:00:00Z',
+  checkout_date: over.checkout_date ?? '2026-05-01T12:00:00Z',
   expected_return_date: over.expected_return_date ?? null,
   status: 'active',
   ...over,
@@ -69,8 +69,8 @@ describe('KitFieldCard', () => {
 
   it('renders each checkout with tool number, description, and checkout date', () => {
     const checkouts = [
-      checkout({ id: 1, tool_number: 'T-100', tool_description: 'Torque wrench', checkout_date: '2026-05-01T00:00:00Z' }),
-      checkout({ id: 2, tool_number: 'T-200', tool_description: 'Multimeter', checkout_date: '2026-05-03T00:00:00Z' }),
+      checkout({ id: 1, tool_number: 'T-100', tool_description: 'Torque wrench', checkout_date: '2026-05-01T12:00:00Z' }),
+      checkout({ id: 2, tool_number: 'T-200', tool_description: 'Multimeter', checkout_date: '2026-05-03T12:00:00Z' }),
     ];
 
     render(<KitFieldCard kit={baseKit} checkouts={checkouts} />);
@@ -85,8 +85,8 @@ describe('KitFieldCard', () => {
 
   it('flags overdue checkouts and shows the overdue chip', () => {
     const checkouts = [
-      checkout({ id: 1, expected_return_date: '2026-05-01T00:00:00Z' }), // before "today"
-      checkout({ id: 2, expected_return_date: '2026-06-01T00:00:00Z' }), // future
+      checkout({ id: 1, expected_return_date: '2026-05-01T12:00:00Z' }), // before "today"
+      checkout({ id: 2, expected_return_date: '2026-06-01T12:00:00Z' }), // future
     ];
 
     const { container } = render(<KitFieldCard kit={baseKit} checkouts={checkouts} />);
