@@ -292,23 +292,25 @@ def register_chemical_routes(app):
                     # Auto-archive depleted lots so they drop out of the active
                     # inventory list. They remain queryable for forecasting and
                     # history. Other lots of the same part number are unaffected.
-                    if chemical.status != "issued":
-                        if chemical.archive_as_depleted():
-                            archive_logs.append({
-                                "action": "chemical_archived",
-                                "action_type": "chemical_archived",
-                                "action_details": (
-                                    f"Chemical {chemical.part_number} - {chemical.lot_number} "
-                                    "automatically archived: depleted"
-                                ),
-                                "timestamp": datetime.utcnow(),
-                            })
-                            status_changed = True
-                            chemical.update_reorder_status()
+                    if chemical.status != "issued" and chemical.archive_as_depleted():
+                        archive_logs.append({
+                            "action": "chemical_archived",
+                            "action_type": "chemical_archived",
+                            "action_details": (
+                                f"Chemical {chemical.part_number} - {chemical.lot_number} "
+                                "automatically archived: depleted"
+                            ),
+                            "timestamp": datetime.utcnow(),
+                        })
                     else:
+                        # Either the lot is an issued child placeholder, or
+                        # archive failed (e.g. legacy schema missing the
+                        # is_archived column). Either way we still want the
+                        # lot's status to reflect that it's empty so the UI
+                        # and reorder evaluator are consistent.
                         chemical.status = "out_of_stock"
-                        status_changed = True
-                        chemical.update_reorder_status()
+                    status_changed = True
+                    chemical.update_reorder_status()
                 elif chemical.is_low_stock():
                     chemical.status = "low_stock"
                     status_changed = True
@@ -683,6 +685,11 @@ def register_chemical_routes(app):
                         },
                         ip_address=request.remote_addr,
                     )
+                else:
+                    # Archive failed (legacy schema with no is_archived
+                    # column). Reflect depletion in the status so the UI and
+                    # reorder evaluator stay consistent.
+                    chemical.status = "out_of_stock"
                 # Reorder decision uses part-level aggregate (other lots may still have stock)
                 chemical.update_reorder_status()
             elif chemical.is_low_stock():
@@ -1343,22 +1350,23 @@ def register_chemical_routes(app):
                     # If the columns don't exist, just update the status
                     pass
             elif chemical.quantity <= 0:
-                if chemical.status != "issued":
-                    if chemical.archive_as_depleted():
-                        AuditLog.log(
-                            user_id=None,
-                            action="chemical_archived",
-                            resource_type="chemical",
-                            resource_id=chemical.id,
-                            details={
-                                "part_number": chemical.part_number,
-                                "lot_number": chemical.lot_number,
-                                "reason": "depleted",
-                                "auto_archived": True,
-                            },
-                            ip_address=request.remote_addr if hasattr(request, "remote_addr") else None,
-                        )
+                if chemical.status != "issued" and chemical.archive_as_depleted():
+                    AuditLog.log(
+                        user_id=None,
+                        action="chemical_archived",
+                        resource_type="chemical",
+                        resource_id=chemical.id,
+                        details={
+                            "part_number": chemical.part_number,
+                            "lot_number": chemical.lot_number,
+                            "reason": "depleted",
+                            "auto_archived": True,
+                        },
+                        ip_address=request.remote_addr if hasattr(request, "remote_addr") else None,
+                    )
                 else:
+                    # Issued child placeholder, or archive failed (legacy
+                    # schema). Keep the status consistent either way.
                     chemical.status = "out_of_stock"
                 # Update reorder status (uses part-level aggregate)
                 chemical.update_reorder_status()
@@ -1546,6 +1554,7 @@ def register_chemical_routes(app):
 
         parts_query = parts_query.order_by(ChemicalPart.part_number.asc())
         all_parts = parts_query.all()
+        part_numbers = [p.part_number for p in all_parts]
 
         # Bulk load active lots for these parts in one query.
         part_ids = [p.id for p in all_parts]
@@ -1560,6 +1569,24 @@ def register_chemical_routes(app):
                 lot_q = lot_q.filter(Chemical.warehouse_id == warehouse_id)
             for lot in lot_q.all():
                 lots_by_part.setdefault(lot.chemical_part_id, []).append(lot)
+
+        # Bulk-load every part_number with an open reorder request in one
+        # query so the per-part `has_open_reorder` lookup is O(1) instead of
+        # O(N) round trips.
+        open_reorder_part_numbers: set[str] = set()
+        if part_numbers:
+            open_rows = (
+                db.session.query(RequestItem.part_number)
+                .join(UserRequest, UserRequest.id == RequestItem.request_id)
+                .filter(
+                    RequestItem.item_type == "chemical",
+                    RequestItem.part_number.in_(part_numbers),
+                    UserRequest.status.in_(UserRequest.OPEN_STATUSES),
+                )
+                .distinct()
+                .all()
+            )
+            open_reorder_part_numbers = {pn for (pn,) in open_rows}
 
         # Build the aggregated rows in Python so warehouse scoping affects the
         # rollup totals (a part with no stock in the active warehouse should
@@ -1585,18 +1612,22 @@ def register_chemical_routes(app):
             expiry_dates = [lot.expiration_date for lot in lots if lot.expiration_date]
             earliest_expiry = min(expiry_dates) if expiry_dates else None
 
-            # Open reorder request status (any open request for this part_number)
-            has_open_reorder = (
-                db.session.query(UserRequest.id)
-                .join(RequestItem, UserRequest.id == RequestItem.request_id)
-                .filter(
-                    RequestItem.item_type == "chemical",
-                    RequestItem.part_number == part.part_number,
-                    UserRequest.status.in_(UserRequest.OPEN_STATUSES),
-                )
-                .first()
-                is not None
+            # Lots come from Chemical.to_dict() which doesn't compute
+            # is_expiring_soon — overlay the flag here so the UI can render
+            # an "Expiring Soon" badge without an extra API call.
+            sorted_lots = sorted(
+                lots,
+                key=lambda lot: (
+                    lot.expiration_date or _FAR_FUTURE,
+                    lot.lot_number or "",
+                ),
             )
+            lot_dicts = []
+            for lot in sorted_lots:
+                payload = lot.to_dict()
+                if lot.is_expiring_soon(30):
+                    payload["expiring_soon"] = True
+                lot_dicts.append(payload)
 
             rows.append({
                 "id": part.id,
@@ -1612,14 +1643,8 @@ def register_chemical_routes(app):
                 "earliest_expiration_date": (
                     earliest_expiry.isoformat() if earliest_expiry else None
                 ),
-                "has_open_reorder_request": has_open_reorder,
-                "lots": [lot.to_dict() for lot in sorted(
-                    lots,
-                    key=lambda lot: (
-                        lot.expiration_date or _FAR_FUTURE,
-                        lot.lot_number or "",
-                    ),
-                )],
+                "has_open_reorder_request": part.part_number in open_reorder_part_numbers,
+                "lots": lot_dicts,
             })
 
         # Manual pagination after the in-memory status filter.

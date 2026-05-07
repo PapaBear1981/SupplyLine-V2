@@ -368,10 +368,11 @@ def create_app():
                             ))
                             _conn.commit()
 
-                        # Backfill chemical_parts master rows from existing chemicals,
-                        # then link any unlinked lots to their part. Idempotent: only
-                        # inserts part numbers that don't already exist and only
-                        # updates lots whose chemical_part_id is still NULL.
+                        # Backfill chemical_parts master rows from existing
+                        # chemicals and link any unlinked lots to their part.
+                        # Idempotent and runs on every startup so seed scripts
+                        # or bulk imports that insert chemicals without a
+                        # chemical_part_id still get their parts created.
                         if "chemical_parts" in inspector.get_table_names():
                             _conn.execute(sa_text("""
                                 INSERT INTO chemical_parts (
@@ -400,10 +401,6 @@ def create_app():
                                   AND part_number IS NOT NULL
                             """))
                             _conn.commit()
-                            logger.info(
-                                "Phase 2 auto-migration: backfilled chemical_parts master "
-                                "and linked existing lots"
-                            )
 
                     # Widen users.totp_secret — PostgreSQL-only syntax; SQLite skips cleanly.
                     if "users" in tables:
