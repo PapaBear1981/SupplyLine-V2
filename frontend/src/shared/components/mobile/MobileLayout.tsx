@@ -41,6 +41,9 @@ import { socketService } from '@services/socket';
 import { ROUTES } from '@shared/constants/routes';
 import { ALL_MENU_ITEMS } from '@shared/constants/navigation';
 import { useMobileAdminEnabled } from '@shared/hooks/useMobileAdminEnabled';
+import { useActivityTracker } from '@shared/hooks/useActivityTracker';
+import { useTokenAutoRefresh } from '@shared/hooks/useTokenAutoRefresh';
+import { SessionExpiryWarning } from '@shared/components/SessionExpiryWarning';
 import { MobileActiveWarehouseSelect } from '@features/warehouses/components/mobile';
 import './MobileLayout.css';
 
@@ -88,6 +91,11 @@ export const MobileLayout = () => {
   const [menuVisible, setMenuVisible] = useState(false);
   const { isEnabled: mobileAdminEnabled } = useMobileAdminEnabled();
   const { openScanner } = useScanner();
+
+  // Track activity and proactively refresh the JWT so users aren't kicked
+  // out at the 30-minute mark.
+  useActivityTracker();
+  useTokenAutoRefresh();
 
   // Memoize filtered menu items based on user permissions and mobile admin toggle
   const menuItems = useMemo(() => {
@@ -259,6 +267,7 @@ export const MobileLayout = () => {
 
   return (
     <div className="mobile-layout" data-testid="app-shell" data-shell-ready="true">
+      <SessionExpiryWarning />
       <div className="mobile-layout-header">
         <SafeArea position="top" />
         <NavBar

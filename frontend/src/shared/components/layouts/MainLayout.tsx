@@ -25,6 +25,7 @@ import { socketService } from '@services/socket';
 import { getMenuItems } from '@shared/constants/navigation';
 import { ROUTES } from '@shared/constants/routes';
 import { useActivityTracker } from '@shared/hooks/useActivityTracker';
+import { useTokenAutoRefresh } from '@shared/hooks/useTokenAutoRefresh';
 import { SessionExpiryWarning } from '@shared/components/SessionExpiryWarning';
 import { AIAssistant } from '@features/ai/components/AIAssistant';
 import { ActiveWarehouseSelect } from '@features/warehouses/components/activeWarehouse/ActiveWarehouseSelect';
@@ -60,6 +61,8 @@ export const MainLayout = () => {
 
   // Track user activity to prevent premature logout
   useActivityTracker();
+  // Refresh the JWT before it expires, even if no API calls are in flight.
+  useTokenAutoRefresh();
 
   // Memoize menu items based on user permissions
   const menuItems = useMemo(() => {

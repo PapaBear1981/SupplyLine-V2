@@ -4,9 +4,18 @@ import type { RootState } from '@app/store';
 import { logout, setCredentials } from '@features/auth/slices/authSlice';
 import type { User } from '@features/auth/types';
 
-// Track token expiration
-let tokenExpiresAt: number | null = null;
+// Track token expiration. Bootstrapped from localStorage so the value
+// survives a page reload — otherwise the proactive refresh check below
+// short-circuits and the JWT silently expires after ~30 minutes.
+let tokenExpiresAt: number | null = (() => {
+  if (typeof localStorage === 'undefined') return null;
+  const stored = localStorage.getItem('token_expires_at');
+  const parsed = stored ? parseInt(stored, 10) : NaN;
+  return Number.isFinite(parsed) ? parsed : null;
+})();
 let isRefreshing = false;
+
+export const getTokenExpiresAt = (): number | null => tokenExpiresAt;
 
 const FALLBACK_SESSION_TIMEOUT_MS = 30 * 60 * 1000; // 30 minutes
 
