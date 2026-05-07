@@ -56,8 +56,10 @@ vi.mock('../../services/chemicalsApi', () => ({
   useIssueChemicalMutation: () => [mockIssueChemical, { isLoading: false }],
 }));
 
+const mockUseGetWarehousesQuery = vi.fn();
+
 vi.mock('@features/warehouses/services/warehousesApi', () => ({
-  useGetWarehousesQuery: () => ({ data: { warehouses: [] } }),
+  useGetWarehousesQuery: (...args: unknown[]) => mockUseGetWarehousesQuery(...args),
 }));
 
 vi.mock('@features/users/services/usersApi', () => ({
@@ -101,6 +103,14 @@ const renderComponent = () => {
 describe('MobileChemicalsList', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockUseGetWarehousesQuery.mockReturnValue({
+      data: {
+        warehouses: [
+          { id: 1, name: 'Main Warehouse' },
+          { id: 2, name: 'East Hangar' },
+        ],
+      },
+    });
     mockGetChemicals.mockReturnValue(makePaginatedResult(makeChemical()));
     mockIssueChemical.mockReturnValue({
       unwrap: vi.fn().mockResolvedValue({
@@ -108,6 +118,13 @@ describe('MobileChemicalsList', () => {
         issuance: { id: 1, quantity: 10, hangar: 'Hangar A', user_id: 1, issue_date: '2025-01-01' },
       }),
     });
+  });
+
+  // ── Warehouse picker ────────────────────────────────────────────────────────
+
+  it('fetches warehouses with a generous page size so all options load', () => {
+    renderComponent();
+    expect(mockUseGetWarehousesQuery).toHaveBeenCalledWith({ per_page: 200 });
   });
 
   // ── List rendering ──────────────────────────────────────────────────────────
