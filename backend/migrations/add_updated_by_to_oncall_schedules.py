@@ -8,10 +8,17 @@ existing rows so the dashboard label is at least correct as of now.
 """
 
 import logging
+import os
 import sys
 
 from sqlalchemy import inspect
 from sqlalchemy.exc import SQLAlchemyError
+
+# Make backend/ importable when this script is invoked as
+# `python migrations/add_updated_by_to_oncall_schedules.py` from /app — the
+# parent dir isn't on sys.path by default, so `from app import create_app`
+# would fail with "No module named 'app'".
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 
 logging.basicConfig(level=logging.INFO)
