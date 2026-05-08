@@ -11,6 +11,7 @@ import {
   RobotOutlined,
   BugOutlined,
   PhoneOutlined,
+  CalendarOutlined,
 } from '@ant-design/icons';
 import { AdminOverview } from '../components/AdminOverview';
 import { UserManagement } from '../components/UserManagement';
@@ -23,6 +24,7 @@ import { SystemSettings } from '../components/SystemSettings';
 import { AISettings } from '../components/AISettings';
 import { BugReportManagement } from '../components/BugReportManagement';
 import { OnCallManagement } from '../components/OnCallManagement';
+import { OnCallScheduling } from '../components/OnCallScheduling';
 
 const { Title, Paragraph } = Typography;
 
@@ -77,6 +79,16 @@ export const AdminPage = () => {
         </span>
       ),
       children: <OnCallManagement />,
+    },
+    {
+      key: 'oncall-schedule',
+      label: (
+        <span>
+          <CalendarOutlined />
+          On-Call Schedule
+        </span>
+      ),
+      children: <OnCallScheduling />,
     },
     {
       key: 'roles',

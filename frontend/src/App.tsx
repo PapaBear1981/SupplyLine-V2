@@ -25,6 +25,7 @@ import { ProfilePage } from '@features/profile/pages/ProfilePage';
 import { AdminPageWrapper } from '@features/admin/components/AdminPageWrapper';
 import { KitsDashboard, KitDetailView, KitWizard, MobileKitWizard } from '@features/kits';
 import { DisplayPage } from '@features/display/pages/DisplayPage';
+import { OnCallSchedulePage } from '@features/oncall';
 import {
   OrdersDashboard,
   OrderDetailView,
@@ -151,6 +152,7 @@ function AppContent() {
                     }
                   />
 
+                  <Route path={ROUTES.ONCALL_SCHEDULE} element={<OnCallSchedulePage />} />
                   <Route path={ROUTES.WAREHOUSES} element={<WarehousesPage />} />
                   <Route path={ROUTES.TRANSFERS} element={<TransfersPage />} />
                   <Route path={ROUTES.REPORTS} element={<ReportsPage />} />

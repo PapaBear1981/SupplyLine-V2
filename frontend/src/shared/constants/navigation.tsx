@@ -14,6 +14,7 @@ import {
   FormOutlined,
   BarChartOutlined,
   AppstoreOutlined,
+  PhoneOutlined,
 } from '@ant-design/icons';
 import type { MenuProps } from 'antd';
 import { ROUTES } from './routes';
@@ -40,6 +41,7 @@ const NAV_TEST_IDS: Record<string, string> = {
   [ROUTES.WAREHOUSES]: 'nav-warehouses',
   [ROUTES.TRANSFERS]: 'nav-transfers',
   [ROUTES.REPORTS]: 'nav-reports',
+  [ROUTES.ONCALL_SCHEDULE]: 'nav-oncall',
   [ROUTES.ADMIN]: 'nav-admin',
 };
 
@@ -157,6 +159,11 @@ export const ALL_MENU_ITEMS: MenuItemWithPermission[] = [
     icon: <HomeOutlined />,
     label: 'Warehouses',
     permission: 'page.warehouses',
+  },
+  {
+    key: ROUTES.ONCALL_SCHEDULE,
+    icon: <PhoneOutlined />,
+    label: 'On-Call Schedule',
   },
   {
     key: ROUTES.REPORTS,

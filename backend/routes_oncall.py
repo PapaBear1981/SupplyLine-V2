@@ -1,12 +1,13 @@
 """Routes for managing and retrieving on-call personnel."""
 
 import logging
+from datetime import UTC, date, datetime, timedelta
 
 from flask import jsonify, request
 from sqlalchemy.exc import SQLAlchemyError
 
 from auth import admin_required, jwt_required
-from models import AuditLog, SystemSetting, User, db
+from models import AuditLog, OnCallSchedule, SystemSetting, User, db
 
 
 logger = logging.getLogger(__name__)
@@ -18,6 +19,19 @@ ONCALL_KEYS = {
     "materials": MATERIALS_ONCALL_KEY,
     "maintenance": MAINTENANCE_ONCALL_KEY,
 }
+
+VALID_ROLES = ("materials", "maintenance")
+
+
+def _parse_date(value, field_name):
+    if not value:
+        raise ValueError(f"{field_name} is required")
+    if isinstance(value, date) and not isinstance(value, datetime):
+        return value
+    try:
+        return datetime.strptime(value, "%Y-%m-%d").date()
+    except (TypeError, ValueError):
+        raise ValueError(f"{field_name} must be in YYYY-MM-DD format")
 
 
 def _serialize_user_brief(user: User | None) -> dict | None:
@@ -191,3 +205,267 @@ def register_oncall_routes(app):
             logger.exception("Error updating on-call personnel")
             db.session.rollback()
             return jsonify({"error": "Failed to update on-call personnel"}), 500
+
+    def _query_schedules():
+        role = request.args.get("role")
+        start_param = request.args.get("start")
+        end_param = request.args.get("end")
+
+        query = OnCallSchedule.query
+
+        if role:
+            if role not in VALID_ROLES:
+                return None, (jsonify({"error": f"role must be one of {VALID_ROLES}"}), 400)
+            query = query.filter(OnCallSchedule.role == role)
+
+        try:
+            if start_param:
+                start = _parse_date(start_param, "start")
+                query = query.filter(OnCallSchedule.end_date >= start)
+            if end_param:
+                end = _parse_date(end_param, "end")
+                query = query.filter(OnCallSchedule.start_date <= end)
+        except ValueError as exc:
+            return None, (jsonify({"error": str(exc)}), 400)
+
+        schedules = query.order_by(OnCallSchedule.start_date.asc(), OnCallSchedule.role.asc()).all()
+        return schedules, None
+
+    @app.route("/api/oncall/schedule", methods=["GET"])
+    @jwt_required
+    def get_oncall_schedule():
+        """Return scheduled on-call assignments. Visible to all authenticated users.
+
+        Query params: ``role`` (materials|maintenance), ``start`` (YYYY-MM-DD),
+        ``end`` (YYYY-MM-DD). When ``start`` and ``end`` are omitted the next
+        90 days are returned.
+        """
+        try:
+            role = request.args.get("role")
+            if role and role not in VALID_ROLES:
+                return jsonify({"error": f"role must be one of {VALID_ROLES}"}), 400
+
+            try:
+                if request.args.get("start"):
+                    start = _parse_date(request.args.get("start"), "start")
+                else:
+                    start = datetime.now(UTC).date()
+                if request.args.get("end"):
+                    end = _parse_date(request.args.get("end"), "end")
+                else:
+                    end = start + timedelta(days=90)
+            except ValueError as exc:
+                return jsonify({"error": str(exc)}), 400
+
+            query = OnCallSchedule.query.filter(
+                OnCallSchedule.end_date >= start,
+                OnCallSchedule.start_date <= end,
+            )
+            if role:
+                query = query.filter(OnCallSchedule.role == role)
+            schedules = query.order_by(
+                OnCallSchedule.start_date.asc(), OnCallSchedule.role.asc()
+            ).all()
+            return jsonify({"schedules": [s.to_dict() for s in schedules]})
+        except SQLAlchemyError:
+            logger.exception("Error fetching on-call schedule")
+            return jsonify({"error": "Failed to fetch on-call schedule"}), 500
+
+    @app.route("/api/admin/oncall/schedule", methods=["GET"])
+    @admin_required
+    def admin_list_oncall_schedule():
+        try:
+            schedules, err = _query_schedules()
+            if err is not None:
+                return err
+            return jsonify({"schedules": [s.to_dict() for s in schedules]})
+        except SQLAlchemyError:
+            logger.exception("Error fetching on-call schedule for admin")
+            return jsonify({"error": "Failed to fetch on-call schedule"}), 500
+
+    @app.route("/api/admin/oncall/schedule", methods=["POST"])
+    @admin_required
+    def admin_create_oncall_schedule():
+        try:
+            data = request.get_json() or {}
+            current_user = request.current_user
+            created_by_id = current_user["user_id"]
+
+            role = data.get("role")
+            user_id = data.get("user_id")
+            allow_overlap = bool(data.get("allow_overlap", False))
+
+            if role not in VALID_ROLES:
+                return jsonify({"error": f"role must be one of {VALID_ROLES}"}), 400
+
+            try:
+                user_id = int(user_id) if user_id is not None else None
+            except (TypeError, ValueError):
+                return jsonify({"error": "user_id must be an integer"}), 400
+            if not user_id or not db.session.get(User, user_id):
+                return jsonify({"error": "user_id is required and must reference an existing user"}), 400
+
+            try:
+                start = _parse_date(data.get("start_date"), "start_date")
+                end = _parse_date(data.get("end_date"), "end_date")
+            except ValueError as exc:
+                return jsonify({"error": str(exc)}), 400
+
+            if end < start:
+                return jsonify({"error": "end_date must be on or after start_date"}), 400
+
+            if not allow_overlap:
+                overlap = OnCallSchedule.query.filter(
+                    OnCallSchedule.role == role,
+                    OnCallSchedule.start_date <= end,
+                    OnCallSchedule.end_date >= start,
+                ).first()
+                if overlap:
+                    return jsonify({
+                        "error": "Overlapping schedule exists for this role. Pass allow_overlap=true to create anyway.",
+                        "conflict": overlap.to_dict(),
+                    }), 409
+
+            schedule = OnCallSchedule(
+                role=role,
+                user_id=user_id,
+                start_date=start,
+                end_date=end,
+                notes=(data.get("notes") or None),
+                created_by_id=created_by_id,
+            )
+            db.session.add(schedule)
+            db.session.commit()
+
+            AuditLog.log(
+                user_id=created_by_id,
+                action="oncall.schedule.create",
+                resource_type="oncall_schedule",
+                resource_id=schedule.id,
+                details={
+                    "role": role,
+                    "user_id": user_id,
+                    "start_date": start.isoformat(),
+                    "end_date": end.isoformat(),
+                },
+            )
+
+            return jsonify(schedule.to_dict()), 201
+        except SQLAlchemyError:
+            logger.exception("Error creating on-call schedule")
+            db.session.rollback()
+            return jsonify({"error": "Failed to create on-call schedule"}), 500
+
+    @app.route("/api/admin/oncall/schedule/<int:schedule_id>", methods=["PUT"])
+    @admin_required
+    def admin_update_oncall_schedule(schedule_id):
+        try:
+            schedule = db.session.get(OnCallSchedule, schedule_id)
+            if not schedule:
+                return jsonify({"error": "Schedule not found"}), 404
+
+            data = request.get_json() or {}
+            current_user = request.current_user
+            updated_by_id = current_user["user_id"]
+            allow_overlap = bool(data.get("allow_overlap", False))
+
+            if "role" in data:
+                if data["role"] not in VALID_ROLES:
+                    db.session.rollback()
+                    return jsonify({"error": f"role must be one of {VALID_ROLES}"}), 400
+                schedule.role = data["role"]
+
+            if "user_id" in data:
+                try:
+                    new_user_id = int(data["user_id"])
+                except (TypeError, ValueError):
+                    db.session.rollback()
+                    return jsonify({"error": "user_id must be an integer"}), 400
+                if not db.session.get(User, new_user_id):
+                    db.session.rollback()
+                    return jsonify({"error": f"User {new_user_id} not found"}), 404
+                schedule.user_id = new_user_id
+
+            try:
+                if "start_date" in data:
+                    schedule.start_date = _parse_date(data["start_date"], "start_date")
+                if "end_date" in data:
+                    schedule.end_date = _parse_date(data["end_date"], "end_date")
+            except ValueError as exc:
+                db.session.rollback()
+                return jsonify({"error": str(exc)}), 400
+
+            if schedule.end_date < schedule.start_date:
+                db.session.rollback()
+                return jsonify({"error": "end_date must be on or after start_date"}), 400
+
+            if "notes" in data:
+                schedule.notes = data["notes"] or None
+
+            if not allow_overlap:
+                overlap = OnCallSchedule.query.filter(
+                    OnCallSchedule.id != schedule.id,
+                    OnCallSchedule.role == schedule.role,
+                    OnCallSchedule.start_date <= schedule.end_date,
+                    OnCallSchedule.end_date >= schedule.start_date,
+                ).first()
+                if overlap:
+                    db.session.rollback()
+                    return jsonify({
+                        "error": "Overlapping schedule exists for this role. Pass allow_overlap=true to update anyway.",
+                        "conflict": overlap.to_dict(),
+                    }), 409
+
+            db.session.commit()
+
+            AuditLog.log(
+                user_id=updated_by_id,
+                action="oncall.schedule.update",
+                resource_type="oncall_schedule",
+                resource_id=schedule.id,
+                details={
+                    "role": schedule.role,
+                    "user_id": schedule.user_id,
+                    "start_date": schedule.start_date.isoformat(),
+                    "end_date": schedule.end_date.isoformat(),
+                },
+            )
+
+            return jsonify(schedule.to_dict())
+        except SQLAlchemyError:
+            logger.exception("Error updating on-call schedule")
+            db.session.rollback()
+            return jsonify({"error": "Failed to update on-call schedule"}), 500
+
+    @app.route("/api/admin/oncall/schedule/<int:schedule_id>", methods=["DELETE"])
+    @admin_required
+    def admin_delete_oncall_schedule(schedule_id):
+        try:
+            schedule = db.session.get(OnCallSchedule, schedule_id)
+            if not schedule:
+                return jsonify({"error": "Schedule not found"}), 404
+
+            current_user = request.current_user
+            details = {
+                "role": schedule.role,
+                "user_id": schedule.user_id,
+                "start_date": schedule.start_date.isoformat(),
+                "end_date": schedule.end_date.isoformat(),
+            }
+
+            db.session.delete(schedule)
+            db.session.commit()
+
+            AuditLog.log(
+                user_id=current_user["user_id"],
+                action="oncall.schedule.delete",
+                resource_type="oncall_schedule",
+                resource_id=schedule_id,
+                details=details,
+            )
+
+            return jsonify({"deleted": True, "id": schedule_id})
+        except SQLAlchemyError:
+            logger.exception("Error deleting on-call schedule")
+            db.session.rollback()
+            return jsonify({"error": "Failed to delete on-call schedule"}), 500

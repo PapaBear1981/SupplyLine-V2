@@ -599,6 +599,55 @@ class SystemSetting(db.Model):
         }
 
 
+class OnCallSchedule(db.Model):
+    """Future on-call assignments for a role over a date range."""
+
+    __tablename__ = "oncall_schedules"
+
+    id = db.Column(db.Integer, primary_key=True)
+    role = db.Column(db.String(32), nullable=False, index=True)
+    user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False, index=True)
+    start_date = db.Column(db.Date, nullable=False, index=True)
+    end_date = db.Column(db.Date, nullable=False, index=True)
+    notes = db.Column(db.String(500), nullable=True)
+    created_at = db.Column(db.DateTime, nullable=False, default=get_current_time)
+    updated_at = db.Column(db.DateTime, nullable=False, default=get_current_time, onupdate=get_current_time)
+    created_by_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=True)
+
+    user = db.relationship("User", foreign_keys=[user_id])
+    created_by = db.relationship("User", foreign_keys=[created_by_id])
+
+    __table_args__ = (
+        db.Index("ix_oncall_schedules_role_dates", "role", "start_date", "end_date"),
+        db.CheckConstraint("end_date >= start_date", name="ck_oncall_schedule_date_order"),
+    )
+
+    def to_dict(self):
+        return {
+            "id": self.id,
+            "role": self.role,
+            "user": {
+                "id": self.user.id,
+                "name": self.user.name,
+                "employee_number": self.user.employee_number,
+                "department": self.user.department,
+                "email": self.user.email,
+                "phone": self.user.phone,
+                "avatar": self.user.avatar,
+            } if self.user else None,
+            "start_date": self.start_date.isoformat() if self.start_date else None,
+            "end_date": self.end_date.isoformat() if self.end_date else None,
+            "notes": self.notes,
+            "created_at": self.created_at.isoformat() if self.created_at else None,
+            "updated_at": self.updated_at.isoformat() if self.updated_at else None,
+            "created_by": {
+                "id": self.created_by.id,
+                "name": self.created_by.name,
+                "employee_number": self.created_by.employee_number,
+            } if self.created_by else None,
+        }
+
+
 class Checkout(db.Model):
     __tablename__ = "checkouts"
     id = db.Column(db.Integer, primary_key=True)
