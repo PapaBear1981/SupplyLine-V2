@@ -371,6 +371,7 @@ def register_oncall_routes(app):
 
             if "role" in data:
                 if data["role"] not in VALID_ROLES:
+                    db.session.rollback()
                     return jsonify({"error": f"role must be one of {VALID_ROLES}"}), 400
                 schedule.role = data["role"]
 
@@ -378,8 +379,10 @@ def register_oncall_routes(app):
                 try:
                     new_user_id = int(data["user_id"])
                 except (TypeError, ValueError):
+                    db.session.rollback()
                     return jsonify({"error": "user_id must be an integer"}), 400
                 if not db.session.get(User, new_user_id):
+                    db.session.rollback()
                     return jsonify({"error": f"User {new_user_id} not found"}), 404
                 schedule.user_id = new_user_id
 
@@ -389,9 +392,11 @@ def register_oncall_routes(app):
                 if "end_date" in data:
                     schedule.end_date = _parse_date(data["end_date"], "end_date")
             except ValueError as exc:
+                db.session.rollback()
                 return jsonify({"error": str(exc)}), 400
 
             if schedule.end_date < schedule.start_date:
+                db.session.rollback()
                 return jsonify({"error": "end_date must be on or after start_date"}), 400
 
             if "notes" in data:

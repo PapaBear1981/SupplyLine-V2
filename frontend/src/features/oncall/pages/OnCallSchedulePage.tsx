@@ -24,6 +24,7 @@ import {
 } from '@ant-design/icons';
 import dayjs from 'dayjs';
 import isBetween from 'dayjs/plugin/isBetween';
+import relativeTime from 'dayjs/plugin/relativeTime';
 import {
   useGetOnCallScheduleQuery,
   type OnCallRole,
@@ -32,6 +33,7 @@ import {
 import { useGetOnCallPersonnelQuery } from '@features/admin/services/oncallApi';
 
 dayjs.extend(isBetween);
+dayjs.extend(relativeTime);
 
 const { Title, Paragraph, Text } = Typography;
 
