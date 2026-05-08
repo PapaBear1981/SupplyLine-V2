@@ -30,6 +30,21 @@ logger = logging.getLogger(__name__)
 # Decorator for Materials department access
 materials_required = department_required("Materials")
 
+
+def _clean_optional_text(field_name: str, value):
+    """Normalise an optional text field from JSON input.
+
+    Accepts ``None`` or a string (whitespace stripped, empty becomes ``None``).
+    Any other JSON type is rejected so callers get a clear validation error
+    rather than a database-level failure.
+    """
+    if value is None:
+        return None
+    if not isinstance(value, str):
+        raise ValidationError(f"{field_name} must be a string")
+    value = value.strip()
+    return value or None
+
 # US country name/abbreviation variants for geocoding restriction
 _US_COUNTRY_VARIANTS = {"us", "usa", "united states", "united states of america", "u.s.", "u.s.a."}
 
@@ -276,19 +291,18 @@ def register_kit_routes(app):
             raise ValidationError("Invalid aircraft type")
 
         # Create kit
-        def _clean(value):
-            if isinstance(value, str):
-                return value.strip() or None
-            return value
-
         kit = Kit(
             name=data["name"],
             aircraft_type_id=data["aircraft_type_id"],
             description=data.get("description", ""),
             status="active",
             created_by=request.current_user["user_id"],
-            aircraft_tail_number=_clean(data.get("aircraft_tail_number")),
-            tanker_scooper_number=_clean(data.get("tanker_scooper_number")),
+            aircraft_tail_number=_clean_optional_text(
+                "aircraft_tail_number", data.get("aircraft_tail_number")
+            ),
+            tanker_scooper_number=_clean_optional_text(
+                "tanker_scooper_number", data.get("tanker_scooper_number")
+            ),
         )
 
         db.session.add(kit)
@@ -367,10 +381,7 @@ def register_kit_routes(app):
         # Aircraft assignment fields
         for field in ("aircraft_tail_number", "tanker_scooper_number"):
             if field in data:
-                value = data[field]
-                if isinstance(value, str):
-                    value = value.strip() or None
-                setattr(kit, field, value)
+                setattr(kit, field, _clean_optional_text(field, data[field]))
 
         # Determine if the user explicitly provided NEW coordinates
         new_lat = data.get("latitude")
