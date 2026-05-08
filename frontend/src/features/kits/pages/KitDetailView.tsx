@@ -265,6 +265,12 @@ const KitDetailView = () => {
                 <Descriptions.Item label="Items">
                   <Badge count={kit.item_count} showZero />
                 </Descriptions.Item>
+                <Descriptions.Item label="Aircraft Tail Number">
+                  {kit.aircraft_tail_number || 'Not specified'}
+                </Descriptions.Item>
+                <Descriptions.Item label="Tanker / Scooper Number">
+                  {kit.tanker_scooper_number || 'Not specified'}
+                </Descriptions.Item>
                 <Descriptions.Item label="Description" span={2}>
                   {kit.description || 'No description'}
                 </Descriptions.Item>
@@ -369,12 +375,6 @@ const KitDetailView = () => {
                 </Descriptions.Item>
                 <Descriptions.Item label="Trailer Number" span={2}>
                   {kit.trailer_number || 'Not specified'}
-                </Descriptions.Item>
-                <Descriptions.Item label="Aircraft Tail Number">
-                  {kit.aircraft_tail_number || 'Not specified'}
-                </Descriptions.Item>
-                <Descriptions.Item label="Tanker / Scooper Number">
-                  {kit.tanker_scooper_number || 'Not specified'}
                 </Descriptions.Item>
                 <Descriptions.Item label="Location Notes" span={2}>
                   {kit.location_notes || 'No notes'}
