@@ -346,6 +346,29 @@ def create_app():
                             _conn.commit()
                             logger.info("Phase 2 auto-migration: backfilled users.active_warehouse_id from main warehouse")
 
+                    if "oncall_schedules" in tables:
+                        oncall_cols = {c["name"] for c in inspector.get_columns("oncall_schedules")}
+                        had_updated_by = "updated_by_id" in oncall_cols
+                        _auto_add_col(
+                            "oncall_schedules",
+                            "updated_by_id INTEGER REFERENCES users(id)",
+                            "updated_by_id",
+                            oncall_cols,
+                        )
+                        if not had_updated_by:
+                            # Backfill so the dashboard's "Schedule updated by"
+                            # label is at least correct for existing rows.
+                            _conn.execute(sa_text(
+                                "UPDATE oncall_schedules "
+                                "SET updated_by_id = created_by_id "
+                                "WHERE updated_by_id IS NULL"
+                            ))
+                            _conn.commit()
+                            logger.info(
+                                "Phase 2 auto-migration: backfilled "
+                                "oncall_schedules.updated_by_id from created_by_id"
+                            )
+
                     if "warehouse_transfers" in tables:
                         xfer_cols = {c["name"] for c in inspector.get_columns("warehouse_transfers")}
                         _auto_add_col("warehouse_transfers", "received_by_id INTEGER REFERENCES users(id)", "received_by_id", xfer_cols)
