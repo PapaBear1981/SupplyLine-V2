@@ -62,7 +62,46 @@ def _get_oncall_user(setting_key: str) -> tuple[User | None, SystemSetting | Non
     return user, setting
 
 
-def _serialize_oncall_entry(setting_key: str) -> dict:
+def _serialize_oncall_entry(role: str) -> dict:
+    """Resolve who is on call for ``role`` right now.
+
+    Prefers an active schedule entry covering today; otherwise falls back
+    to the manual SystemSetting override. The ``source`` field tells the
+    caller which one was used so the UI can label it.
+    """
+    today = datetime.now(UTC).date()
+    schedule = (
+        OnCallSchedule.query.filter(
+            OnCallSchedule.role == role,
+            OnCallSchedule.start_date <= today,
+            OnCallSchedule.end_date >= today,
+        )
+        .order_by(OnCallSchedule.start_date.desc(), OnCallSchedule.id.desc())
+        .first()
+    )
+
+    if schedule and schedule.user:
+        created_by = None
+        if schedule.created_by:
+            created_by = {
+                "id": schedule.created_by.id,
+                "name": schedule.created_by.name,
+                "employee_number": schedule.created_by.employee_number,
+            }
+        return {
+            "user": _serialize_user_brief(schedule.user),
+            "updated_at": schedule.updated_at.isoformat() if schedule.updated_at else None,
+            "updated_by": created_by,
+            "source": "schedule",
+            "schedule": {
+                "id": schedule.id,
+                "start_date": schedule.start_date.isoformat(),
+                "end_date": schedule.end_date.isoformat(),
+                "notes": schedule.notes,
+            },
+        }
+
+    setting_key = ONCALL_KEYS[role]
     user, setting = _get_oncall_user(setting_key)
     updated_by = None
     if setting and setting.updated_by:
@@ -76,6 +115,8 @@ def _serialize_oncall_entry(setting_key: str) -> dict:
         "user": _serialize_user_brief(user),
         "updated_at": setting.updated_at.isoformat() if setting and setting.updated_at else None,
         "updated_by": updated_by,
+        "source": "manual",
+        "schedule": None,
     }
 
 
@@ -108,8 +149,8 @@ def register_oncall_routes(app):
         """Return the currently configured on-call personnel for all tracked roles."""
         try:
             return jsonify({
-                "materials": _serialize_oncall_entry(MATERIALS_ONCALL_KEY),
-                "maintenance": _serialize_oncall_entry(MAINTENANCE_ONCALL_KEY),
+                "materials": _serialize_oncall_entry("materials"),
+                "maintenance": _serialize_oncall_entry("maintenance"),
             })
         except SQLAlchemyError:
             logger.exception("Error fetching on-call personnel")
@@ -121,8 +162,8 @@ def register_oncall_routes(app):
         """Admin view of the current on-call assignments."""
         try:
             return jsonify({
-                "materials": _serialize_oncall_entry(MATERIALS_ONCALL_KEY),
-                "maintenance": _serialize_oncall_entry(MAINTENANCE_ONCALL_KEY),
+                "materials": _serialize_oncall_entry("materials"),
+                "maintenance": _serialize_oncall_entry("maintenance"),
             })
         except SQLAlchemyError:
             logger.exception("Error fetching on-call personnel for admin")
@@ -198,8 +239,8 @@ def register_oncall_routes(app):
             )
 
             return jsonify({
-                "materials": _serialize_oncall_entry(MATERIALS_ONCALL_KEY),
-                "maintenance": _serialize_oncall_entry(MAINTENANCE_ONCALL_KEY),
+                "materials": _serialize_oncall_entry("materials"),
+                "maintenance": _serialize_oncall_entry("maintenance"),
             })
         except SQLAlchemyError:
             logger.exception("Error updating on-call personnel")

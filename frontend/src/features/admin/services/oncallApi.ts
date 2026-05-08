@@ -18,6 +18,13 @@ export interface OnCallEntry {
     name: string;
     employee_number: string;
   } | null;
+  source?: 'schedule' | 'manual';
+  schedule?: {
+    id: number;
+    start_date: string;
+    end_date: string;
+    notes: string | null;
+  } | null;
 }
 
 export interface OnCallPersonnel {

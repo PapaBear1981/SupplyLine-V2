@@ -337,3 +337,112 @@ class TestListAndFilters:
     def test_invalid_role_filter_rejected(self, client, auth_headers_user):
         r = client.get("/api/oncall/schedule?role=bogus", headers=auth_headers_user)
         assert r.status_code == 400
+
+
+class TestActiveScheduleOverridesManual:
+    """The dashboard's /api/oncall endpoint should reflect the schedule when
+    a schedule entry covers today, falling back to the manual SystemSetting
+    override otherwise."""
+
+    def _set_manual(self, client, auth_headers_admin, materials_id=None, maintenance_id=None):
+        body = {}
+        if materials_id is not None:
+            body["materials_user_id"] = materials_id
+        if maintenance_id is not None:
+            body["maintenance_user_id"] = maintenance_id
+        r = client.put("/api/admin/oncall", json=body, headers=auth_headers_admin)
+        assert r.status_code == 200
+
+    def _create_schedule(self, client, auth_headers_admin, user_id, role, days_offset=0):
+        start = _today() + timedelta(days=days_offset)
+        end = start + timedelta(days=6)
+        r = client.post(
+            "/api/admin/oncall/schedule",
+            json={
+                "role": role,
+                "user_id": user_id,
+                "start_date": start.isoformat(),
+                "end_date": end.isoformat(),
+            },
+            headers=auth_headers_admin,
+        )
+        assert r.status_code == 201
+        return r.get_json()
+
+    def test_dashboard_falls_back_to_manual_when_no_schedule_today(
+        self, client, auth_headers_admin, admin_user, auth_headers_user
+    ):
+        self._set_manual(client, auth_headers_admin, materials_id=admin_user.id)
+
+        r = client.get("/api/oncall", headers=auth_headers_user)
+        assert r.status_code == 200
+        data = r.get_json()
+        assert data["materials"]["user"]["id"] == admin_user.id
+        assert data["materials"]["source"] == "manual"
+        assert data["materials"]["schedule"] is None
+
+    def test_dashboard_uses_active_schedule_over_manual(
+        self, client, auth_headers_admin, admin_user, schedule_user, auth_headers_user
+    ):
+        # Manual fallback says admin
+        self._set_manual(client, auth_headers_admin, materials_id=admin_user.id)
+        # Active schedule says schedule_user (today is inside the range)
+        self._create_schedule(
+            client, auth_headers_admin, schedule_user.id, "materials", days_offset=0
+        )
+
+        r = client.get("/api/oncall", headers=auth_headers_user)
+        assert r.status_code == 200
+        data = r.get_json()
+        assert data["materials"]["user"]["id"] == schedule_user.id
+        assert data["materials"]["source"] == "schedule"
+        assert data["materials"]["schedule"] is not None
+        assert data["materials"]["schedule"]["start_date"] == _today().isoformat()
+
+    def test_future_schedule_does_not_override_manual(
+        self, client, auth_headers_admin, admin_user, schedule_user, auth_headers_user
+    ):
+        self._set_manual(client, auth_headers_admin, materials_id=admin_user.id)
+        # Schedule starts tomorrow — should not affect today
+        self._create_schedule(
+            client, auth_headers_admin, schedule_user.id, "materials", days_offset=1
+        )
+
+        r = client.get("/api/oncall", headers=auth_headers_user)
+        data = r.get_json()
+        assert data["materials"]["user"]["id"] == admin_user.id
+        assert data["materials"]["source"] == "manual"
+
+    def test_admin_endpoint_also_reflects_schedule(
+        self, client, auth_headers_admin, admin_user, schedule_user
+    ):
+        self._set_manual(client, auth_headers_admin, materials_id=admin_user.id)
+        self._create_schedule(
+            client, auth_headers_admin, schedule_user.id, "materials", days_offset=0
+        )
+
+        r = client.get("/api/admin/oncall", headers=auth_headers_admin)
+        data = r.get_json()
+        assert data["materials"]["user"]["id"] == schedule_user.id
+        assert data["materials"]["source"] == "schedule"
+
+    def test_schedule_for_one_role_does_not_affect_other(
+        self, client, auth_headers_admin, admin_user, schedule_user, auth_headers_user
+    ):
+        self._set_manual(
+            client,
+            auth_headers_admin,
+            materials_id=admin_user.id,
+            maintenance_id=admin_user.id,
+        )
+        # Active schedule only for materials
+        self._create_schedule(
+            client, auth_headers_admin, schedule_user.id, "materials", days_offset=0
+        )
+
+        r = client.get("/api/oncall", headers=auth_headers_user)
+        data = r.get_json()
+        assert data["materials"]["source"] == "schedule"
+        assert data["materials"]["user"]["id"] == schedule_user.id
+        assert data["maintenance"]["source"] == "manual"
+        assert data["maintenance"]["user"]["id"] == admin_user.id

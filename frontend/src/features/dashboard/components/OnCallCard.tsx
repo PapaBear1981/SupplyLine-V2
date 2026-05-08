@@ -5,6 +5,7 @@ import {
   InboxOutlined,
   UserOutlined,
   MailOutlined,
+  CalendarOutlined,
 } from '@ant-design/icons';
 import dayjs from 'dayjs';
 import relativeTime from 'dayjs/plugin/relativeTime';
@@ -130,9 +131,23 @@ const OnCallRole = ({ label, description, icon, accentColor, entry }: OnCallRole
         />
       )}
 
+      {entry?.source === 'schedule' && entry.schedule && (
+        <Tooltip
+          title={
+            entry.schedule.notes ||
+            `Scheduled coverage: ${dayjs(entry.schedule.start_date).format('MMM D')} – ${dayjs(entry.schedule.end_date).format('MMM D, YYYY')}`
+          }
+        >
+          <Tag color={accentColor} icon={<CalendarOutlined />} style={{ fontSize: 11 }}>
+            Scheduled through {dayjs(entry.schedule.end_date).format('MMM D')}
+          </Tag>
+        </Tooltip>
+      )}
+
       {entry?.updated_at && (
         <Text type="secondary" style={{ fontSize: 11 }}>
-          Updated {dayjs(entry.updated_at).fromNow()}
+          {entry.source === 'schedule' ? 'Schedule updated ' : 'Updated '}
+          {dayjs(entry.updated_at).fromNow()}
           {entry.updated_by ? ` by ${entry.updated_by.name}` : ''}
         </Text>
       )}
