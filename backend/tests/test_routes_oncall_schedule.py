@@ -473,6 +473,41 @@ class TestActiveScheduleOverridesManual:
         assert data["materials"]["source"] == "schedule"
         assert data["materials"]["updated_by"]["id"] == second_admin.id
 
+    def test_dashboard_falls_back_when_schedule_query_fails(
+        self,
+        client,
+        monkeypatch,
+        admin_user,
+        auth_headers_admin,
+        auth_headers_user,
+    ):
+        """Simulate the production case where the oncall_schedules table
+        exists but is missing the updated_by_id column (Phase 2
+        auto-migration hasn't run yet). The endpoint should not 500 — it
+        should log and fall back to the manual SystemSetting override.
+        """
+        from sqlalchemy.exc import SQLAlchemyError
+
+        from models import OnCallSchedule
+
+        self._set_manual(client, auth_headers_admin, materials_id=admin_user.id)
+
+        class _BoomQuery:
+            def filter(self, *_args, **_kwargs):
+                raise SQLAlchemyError(
+                    "simulated: column oncall_schedules.updated_by_id does not exist"
+                )
+
+        # Override the class-level `query` descriptor so the schedule lookup
+        # raises while the manual SystemSetting fallback still works.
+        monkeypatch.setattr(OnCallSchedule, "query", _BoomQuery())
+
+        r = client.get("/api/oncall", headers=auth_headers_user)
+        assert r.status_code == 200
+        data = r.get_json()
+        assert data["materials"]["user"]["id"] == admin_user.id
+        assert data["materials"]["source"] == "manual"
+
     def test_schedule_for_one_role_does_not_affect_other(
         self, client, auth_headers_admin, admin_user, schedule_user, auth_headers_user
     ):
