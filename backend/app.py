@@ -324,6 +324,18 @@ def create_app():
                             "assigned_user_id",
                             kit_cols,
                         )
+                        _auto_add_col(
+                            "kits",
+                            "aircraft_tail_number VARCHAR(50) NULL",
+                            "aircraft_tail_number",
+                            kit_cols,
+                        )
+                        _auto_add_col(
+                            "kits",
+                            "tanker_scooper_number VARCHAR(50) NULL",
+                            "tanker_scooper_number",
+                            kit_cols,
+                        )
 
                     if "users" in tables:
                         user_cols = {c["name"] for c in inspector.get_columns("users")}
