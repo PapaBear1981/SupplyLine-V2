@@ -1,7 +1,7 @@
 """Routes for managing and retrieving on-call personnel."""
 
 import logging
-from datetime import date, datetime, timedelta
+from datetime import UTC, date, datetime, timedelta
 
 from flask import jsonify, request
 from sqlalchemy.exc import SQLAlchemyError
@@ -249,7 +249,7 @@ def register_oncall_routes(app):
                 if request.args.get("start"):
                     start = _parse_date(request.args.get("start"), "start")
                 else:
-                    start = date.today()
+                    start = datetime.now(UTC).date()
                 if request.args.get("end"):
                     end = _parse_date(request.args.get("end"), "end")
                 else:

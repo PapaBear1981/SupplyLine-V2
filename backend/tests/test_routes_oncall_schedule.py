@@ -1,11 +1,16 @@
 """Tests for the on-call schedule routes (/api/oncall/schedule + admin CRUD)."""
 
 import uuid
-from datetime import date, timedelta
+from datetime import UTC, datetime, timedelta
 
 import pytest
 
 from models import OnCallSchedule, User, db
+
+
+def _today():
+    """Timezone-aware "today" used everywhere in this test module (DTZ011)."""
+    return datetime.now(UTC).date()
 
 
 @pytest.fixture
@@ -36,7 +41,7 @@ def _clean_schedules(db_session):
 
 
 def _payload(user_id, role="materials", days_ahead=0, length=7, notes=None):
-    start = date.today() + timedelta(days=days_ahead)
+    start = _today() + timedelta(days=days_ahead)
     end = start + timedelta(days=length - 1)
     body = {
         "role": role,
@@ -103,7 +108,7 @@ class TestCreateSchedule:
         assert response.status_code == 400
 
     def test_missing_user_id_rejected(self, client, auth_headers_admin):
-        start = date.today()
+        start = _today()
         body = {
             "role": "materials",
             "start_date": start.isoformat(),
@@ -122,7 +127,7 @@ class TestCreateSchedule:
         assert response.status_code == 400
 
     def test_end_before_start_rejected(self, client, auth_headers_admin, schedule_user):
-        start = date.today()
+        start = _today()
         body = {
             "role": "materials",
             "user_id": schedule_user.id,
@@ -211,7 +216,7 @@ class TestUpdateAndDelete:
         self, client, auth_headers_admin, schedule_user
     ):
         created = self._create(client, auth_headers_admin, schedule_user)
-        new_end = (date.today() + timedelta(days=14)).isoformat()
+        new_end = (_today() + timedelta(days=14)).isoformat()
         r = client.put(
             f"/api/admin/oncall/schedule/{created['id']}",
             json={"end_date": new_end, "notes": "Extended coverage"},
@@ -226,7 +231,7 @@ class TestUpdateAndDelete:
         self, client, auth_headers_admin, schedule_user
     ):
         created = self._create(client, auth_headers_admin, schedule_user)
-        bad_end = (date.today() - timedelta(days=10)).isoformat()
+        bad_end = (_today() - timedelta(days=10)).isoformat()
         r = client.put(
             f"/api/admin/oncall/schedule/{created['id']}",
             json={"end_date": bad_end},
@@ -264,7 +269,7 @@ class TestUpdateAndDelete:
 class TestListAndFilters:
     def _seed(self, client, auth_headers_admin, schedule_user):
         # Three entries: past (materials), current (materials), future (maintenance)
-        today = date.today()
+        today = _today()
         rows = [
             {
                 "role": "materials",
@@ -319,8 +324,8 @@ class TestListAndFilters:
         self, client, auth_headers_user, auth_headers_admin, schedule_user
     ):
         self._seed(client, auth_headers_admin, schedule_user)
-        start = (date.today() - timedelta(days=30)).isoformat()
-        end = (date.today() + timedelta(days=30)).isoformat()
+        start = (_today() - timedelta(days=30)).isoformat()
+        end = (_today() + timedelta(days=30)).isoformat()
         r = client.get(
             f"/api/oncall/schedule?start={start}&end={end}",
             headers=auth_headers_user,
