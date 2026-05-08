@@ -155,6 +155,7 @@ export const baseApi = createApi({
     'AISettings',
     'BugReport',
     'OnCall',
+    'OnCallSchedule',
     'TrustedDevice',
     'Transfer',
     'ActiveWarehouse',

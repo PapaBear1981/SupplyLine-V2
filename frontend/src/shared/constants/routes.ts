@@ -15,4 +15,5 @@ export const ROUTES = {
   SETTINGS: '/settings',
   CHEMICAL_FORECAST: '/chemicals/forecast',
   DISPLAY: '/display',
+  ONCALL_SCHEDULE: '/oncall',
 } as const;
