@@ -426,6 +426,53 @@ class TestActiveScheduleOverridesManual:
         assert data["materials"]["user"]["id"] == schedule_user.id
         assert data["materials"]["source"] == "schedule"
 
+    def test_dashboard_attributes_edits_to_the_editor_not_the_creator(
+        self,
+        client,
+        db_session,
+        jwt_manager,
+        admin_user,
+        schedule_user,
+        auth_headers_admin,
+        auth_headers_user,
+    ):
+        # Admin A creates the schedule.
+        created = self._create_schedule(
+            client, auth_headers_admin, schedule_user.id, "materials", days_offset=0
+        )
+        assert created["created_by"]["id"] == admin_user.id
+
+        # Admin B (a second admin) edits the schedule.
+        from models import User
+
+        second_admin = User(
+            name="Second Admin",
+            employee_number=f"ADM{uuid.uuid4().hex[:6].upper()}",
+            department="Administration",
+            is_admin=True,
+            is_active=True,
+        )
+        second_admin.set_password("admin456")
+        db_session.add(second_admin)
+        db_session.commit()
+        with client.application.app_context():
+            tokens = jwt_manager.generate_tokens(second_admin)
+        admin_b_headers = {"Authorization": f"Bearer {tokens['access_token']}"}
+
+        r = client.put(
+            f"/api/admin/oncall/schedule/{created['id']}",
+            json={"notes": "Edited by B"},
+            headers=admin_b_headers,
+        )
+        assert r.status_code == 200
+        assert r.get_json()["updated_by"]["id"] == second_admin.id
+
+        # The dashboard endpoint should now attribute the change to admin B.
+        r = client.get("/api/oncall", headers=auth_headers_user)
+        data = r.get_json()
+        assert data["materials"]["source"] == "schedule"
+        assert data["materials"]["updated_by"]["id"] == second_admin.id
+
     def test_schedule_for_one_role_does_not_affect_other(
         self, client, auth_headers_admin, admin_user, schedule_user, auth_headers_user
     ):

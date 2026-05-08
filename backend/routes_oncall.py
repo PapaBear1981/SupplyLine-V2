@@ -81,17 +81,20 @@ def _serialize_oncall_entry(role: str) -> dict:
     )
 
     if schedule and schedule.user:
-        created_by = None
-        if schedule.created_by:
-            created_by = {
-                "id": schedule.created_by.id,
-                "name": schedule.created_by.name,
-                "employee_number": schedule.created_by.employee_number,
+        # Whoever last touched the schedule row matches updated_at; fall back to
+        # the creator only for legacy rows that pre-date the updated_by column.
+        attributed = schedule.updated_by or schedule.created_by
+        updated_by = None
+        if attributed:
+            updated_by = {
+                "id": attributed.id,
+                "name": attributed.name,
+                "employee_number": attributed.employee_number,
             }
         return {
             "user": _serialize_user_brief(schedule.user),
             "updated_at": schedule.updated_at.isoformat() if schedule.updated_at else None,
-            "updated_by": created_by,
+            "updated_by": updated_by,
             "source": "schedule",
             "schedule": {
                 "id": schedule.id,
@@ -374,6 +377,7 @@ def register_oncall_routes(app):
                 end_date=end,
                 notes=(data.get("notes") or None),
                 created_by_id=created_by_id,
+                updated_by_id=created_by_id,
             )
             db.session.add(schedule)
             db.session.commit()
@@ -457,6 +461,7 @@ def register_oncall_routes(app):
                         "conflict": overlap.to_dict(),
                     }), 409
 
+            schedule.updated_by_id = updated_by_id
             db.session.commit()
 
             AuditLog.log(
