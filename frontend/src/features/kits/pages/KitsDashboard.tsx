@@ -135,27 +135,11 @@ const KitsDashboard = () => {
       sorter: (a, b) => (a.pending_reorders || 0) - (b.pending_reorders || 0),
     },
     {
-      title: 'Created By',
-      dataIndex: 'creator_name',
-      key: 'creator_name',
-    },
-    {
-      title: 'Actions',
-      key: 'actions',
-      render: (_, record: Kit) => (
-        <Space size="small">
-          <Button type="link" size="small" onClick={() => navigate(`/kits/${record.id}`)}>
-            View
-          </Button>
-          <Button
-            type="link"
-            size="small"
-            onClick={() => navigate(`/kits/${record.id}/edit`)}
-          >
-            Edit
-          </Button>
-        </Space>
-      ),
+      title: 'Assigned To',
+      dataIndex: 'assigned_user_name',
+      key: 'assigned_user_name',
+      render: (name?: string | null) => name || <span style={{ color: '#999' }}>Unassigned</span>,
+      sorter: (a, b) => (a.assigned_user_name || '').localeCompare(b.assigned_user_name || ''),
     },
   ];
 
