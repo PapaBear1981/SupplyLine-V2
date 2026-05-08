@@ -184,7 +184,9 @@ export const OnCallSchedulePage = () => {
     ...(roleFilter !== 'all' ? { role: roleFilter as OnCallRole } : {}),
   };
 
-  const { data: schedules = [], isLoading } = useGetOnCallScheduleQuery(queryArgs);
+  const { data: scheduleResult, isLoading } = useGetOnCallScheduleQuery(queryArgs);
+  const schedules = scheduleResult?.schedules ?? [];
+  const scheduleUnavailable = scheduleResult?.unavailable === true;
   const { data: currentOnCall } = useGetOnCallPersonnelQuery();
 
   const grouped = useMemo(() => groupByTime(schedules), [schedules]);
@@ -315,14 +317,21 @@ export const OnCallSchedulePage = () => {
         ]}
       />
 
-      {schedules.length === 0 && (
+      {scheduleUnavailable ? (
+        <Alert
+          type="warning"
+          showIcon
+          message="Schedule data is temporarily unavailable"
+          description="The schedule failed to load. Showing only the current manual on-call assignments above. Try again in a few minutes; if it persists, an admin should check the backend logs."
+        />
+      ) : schedules.length === 0 ? (
         <Alert
           type="info"
           showIcon
           message="No scheduled on-call coverage in this window"
           description="An admin can add schedule entries from the Admin → On-Call Schedule tab."
         />
-      )}
+      ) : null}
     </div>
   );
 };

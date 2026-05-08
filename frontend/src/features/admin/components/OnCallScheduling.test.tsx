@@ -4,17 +4,23 @@ import dayjs from 'dayjs';
 import { OnCallScheduling } from './OnCallScheduling';
 import type {
   OnCallScheduleEntry,
+  OnCallScheduleListResult,
   OnCallScheduleQuery,
 } from '../services/oncallScheduleApi';
 import type { User } from '@features/users/types';
 
 const scheduleSpy = vi.fn<
   (q?: OnCallScheduleQuery) => {
-    data: OnCallScheduleEntry[] | undefined;
+    data: OnCallScheduleListResult | undefined;
     isLoading: boolean;
     isFetching: boolean;
   }
 >();
+
+const buildResult = (
+  schedules: OnCallScheduleEntry[],
+  unavailable = false,
+): OnCallScheduleListResult => ({ schedules, unavailable });
 const usersSpy = vi.fn<() => { data: User[]; isLoading: boolean }>();
 const createMutate = vi.fn();
 const updateMutate = vi.fn();
@@ -76,7 +82,7 @@ describe('OnCallScheduling (admin)', () => {
 
   it('renders schedule rows with role tags and user info', () => {
     scheduleSpy.mockReturnValue({
-      data: [buildEntry()],
+      data: buildResult([buildEntry()]),
       isLoading: false,
       isFetching: false,
     });
@@ -93,7 +99,7 @@ describe('OnCallScheduling (admin)', () => {
 
   it('shows empty-state alert when no schedules exist', () => {
     scheduleSpy.mockReturnValue({
-      data: [],
+      data: buildResult([]),
       isLoading: false,
       isFetching: false,
     });
@@ -105,9 +111,23 @@ describe('OnCallScheduling (admin)', () => {
     ).toBeInTheDocument();
   });
 
+  it('shows the unavailable warning when the schedule failed to load', () => {
+    scheduleSpy.mockReturnValue({
+      data: buildResult([], true),
+      isLoading: false,
+      isFetching: false,
+    });
+
+    render(<OnCallScheduling />);
+
+    expect(
+      screen.getByText(/Schedule data is temporarily unavailable/i)
+    ).toBeInTheDocument();
+  });
+
   it('opens the create modal when Add Schedule Entry is clicked', async () => {
     scheduleSpy.mockReturnValue({
-      data: [],
+      data: buildResult([]),
       isLoading: false,
       isFetching: false,
     });
@@ -128,13 +148,13 @@ describe('OnCallScheduling (admin)', () => {
 
   it('marks an entry that includes today with the "Active now" tag', () => {
     scheduleSpy.mockReturnValue({
-      data: [
+      data: buildResult([
         buildEntry({
           id: 2,
           start_date: dayjs().subtract(1, 'day').format('YYYY-MM-DD'),
           end_date: dayjs().add(2, 'day').format('YYYY-MM-DD'),
         }),
-      ],
+      ]),
       isLoading: false,
       isFetching: false,
     });
@@ -146,7 +166,7 @@ describe('OnCallScheduling (admin)', () => {
 
   it('passes a date window to the schedule query', () => {
     scheduleSpy.mockReturnValue({
-      data: [],
+      data: buildResult([]),
       isLoading: false,
       isFetching: false,
     });

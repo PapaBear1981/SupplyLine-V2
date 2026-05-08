@@ -338,6 +338,49 @@ class TestListAndFilters:
         r = client.get("/api/oncall/schedule?role=bogus", headers=auth_headers_user)
         assert r.status_code == 400
 
+    def _install_boom_query(self, monkeypatch):
+        from sqlalchemy.exc import SQLAlchemyError
+
+        from models import OnCallSchedule
+
+        class _BoomQuery:
+            """Stand-in for OnCallSchedule.query that fails any access pattern
+            the route uses, mimicking a "column does not exist" SELECT error."""
+
+            def filter(self, *_args, **_kwargs):
+                raise SQLAlchemyError("simulated: missing column")
+
+            def order_by(self, *_args, **_kwargs):
+                raise SQLAlchemyError("simulated: missing column")
+
+        monkeypatch.setattr(OnCallSchedule, "query", _BoomQuery())
+
+    def test_admin_list_returns_unavailable_flag_when_query_fails(
+        self, client, auth_headers_admin, monkeypatch
+    ):
+        """Admin schedule list should degrade to an empty list with
+        ``schedule_unavailable: true`` if the OnCallSchedule query raises
+        (e.g. missing column from a pending migration), instead of 500-ing.
+        """
+        self._install_boom_query(monkeypatch)
+
+        r = client.get("/api/admin/oncall/schedule", headers=auth_headers_admin)
+        assert r.status_code == 200
+        data = r.get_json()
+        assert data["schedules"] == []
+        assert data["schedule_unavailable"] is True
+
+    def test_user_list_returns_unavailable_flag_when_query_fails(
+        self, client, auth_headers_user, monkeypatch
+    ):
+        self._install_boom_query(monkeypatch)
+
+        r = client.get("/api/oncall/schedule", headers=auth_headers_user)
+        assert r.status_code == 200
+        data = r.get_json()
+        assert data["schedules"] == []
+        assert data["schedule_unavailable"] is True
+
 
 class TestActiveScheduleOverridesManual:
     """The dashboard's /api/oncall endpoint should reflect the schedule when

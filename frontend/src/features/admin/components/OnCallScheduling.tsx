@@ -75,8 +75,10 @@ export const OnCallScheduling = () => {
     ...(roleFilter !== 'all' ? { role: roleFilter as OnCallRole } : {}),
   };
 
-  const { data: schedules = [], isLoading, isFetching } =
+  const { data: scheduleResult, isLoading, isFetching } =
     useGetAdminOnCallScheduleQuery(queryArgs);
+  const schedules = scheduleResult?.schedules ?? [];
+  const scheduleUnavailable = scheduleResult?.unavailable === true;
   const { data: users = [], isLoading: usersLoading } = useGetUsersQuery();
   const [createSchedule, { isLoading: isCreating }] = useCreateOnCallScheduleMutation();
   const [updateSchedule, { isLoading: isUpdating }] = useUpdateOnCallScheduleMutation();
@@ -329,7 +331,15 @@ export const OnCallScheduling = () => {
         </Col>
       </Row>
 
-      {schedules.length === 0 && !isLoading ? (
+      {scheduleUnavailable ? (
+        <Alert
+          type="warning"
+          showIcon
+          message="Schedule data is temporarily unavailable"
+          description="The on-call schedule table failed to load. This usually means a pending database migration hasn't run yet on this environment. The dashboard's manual on-call assignments are unaffected. Check the backend logs for the underlying error."
+          style={{ marginBottom: 16 }}
+        />
+      ) : schedules.length === 0 && !isLoading ? (
         <Alert
           type="info"
           showIcon
