@@ -21,6 +21,14 @@ export interface OnCallScheduleEntry {
 
 export interface OnCallScheduleListResponse {
   schedules: OnCallScheduleEntry[];
+  /** Backend sets this when reading oncall_schedules failed and we degraded
+   * to an empty list (typically a missing column from a pending migration). */
+  schedule_unavailable?: boolean;
+}
+
+export interface OnCallScheduleListResult {
+  schedules: OnCallScheduleEntry[];
+  unavailable: boolean;
 }
 
 export interface OnCallScheduleQuery {
@@ -59,14 +67,20 @@ const buildQuery = (params?: OnCallScheduleQuery) => {
 
 export const oncallScheduleApi = baseApi.injectEndpoints({
   endpoints: (builder) => ({
-    getOnCallSchedule: builder.query<OnCallScheduleEntry[], OnCallScheduleQuery | void>({
+    getOnCallSchedule: builder.query<OnCallScheduleListResult, OnCallScheduleQuery | void>({
       query: (params) => `/api/oncall/schedule${buildQuery(params || undefined)}`,
-      transformResponse: (response: OnCallScheduleListResponse) => response.schedules,
+      transformResponse: (response: OnCallScheduleListResponse) => ({
+        schedules: response.schedules,
+        unavailable: response.schedule_unavailable === true,
+      }),
       providesTags: ['OnCallSchedule'],
     }),
-    getAdminOnCallSchedule: builder.query<OnCallScheduleEntry[], OnCallScheduleQuery | void>({
+    getAdminOnCallSchedule: builder.query<OnCallScheduleListResult, OnCallScheduleQuery | void>({
       query: (params) => `/api/admin/oncall/schedule${buildQuery(params || undefined)}`,
-      transformResponse: (response: OnCallScheduleListResponse) => response.schedules,
+      transformResponse: (response: OnCallScheduleListResponse) => ({
+        schedules: response.schedules,
+        unavailable: response.schedule_unavailable === true,
+      }),
       providesTags: ['OnCallSchedule'],
     }),
     createOnCallSchedule: builder.mutation<OnCallScheduleEntry, CreateOnCallScheduleRequest>({

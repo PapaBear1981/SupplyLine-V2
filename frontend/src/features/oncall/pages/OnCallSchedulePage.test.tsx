@@ -4,13 +4,22 @@ import dayjs from 'dayjs';
 import { OnCallSchedulePage } from './OnCallSchedulePage';
 import type {
   OnCallScheduleEntry,
+  OnCallScheduleListResult,
   OnCallScheduleQuery,
 } from '@features/admin/services/oncallScheduleApi';
 import type { OnCallPersonnel } from '@features/admin/services/oncallApi';
 
 const scheduleSpy = vi.fn<
-  (q?: OnCallScheduleQuery) => { data: OnCallScheduleEntry[] | undefined; isLoading: boolean }
+  (q?: OnCallScheduleQuery) => {
+    data: OnCallScheduleListResult | undefined;
+    isLoading: boolean;
+  }
 >();
+
+const buildResult = (
+  schedules: OnCallScheduleEntry[],
+  unavailable = false,
+): OnCallScheduleListResult => ({ schedules, unavailable });
 const personnelSpy = vi.fn<() => { data: OnCallPersonnel | undefined }>();
 
 vi.mock('@features/admin/services/oncallScheduleApi', () => ({
@@ -58,7 +67,7 @@ describe('OnCallSchedulePage', () => {
 
   it('renders upcoming schedule entries with user details and date range', () => {
     const upcoming = buildEntry();
-    scheduleSpy.mockReturnValue({ data: [upcoming], isLoading: false });
+    scheduleSpy.mockReturnValue({ data: buildResult([upcoming]), isLoading: false });
 
     render(<OnCallSchedulePage />);
 
@@ -75,7 +84,7 @@ describe('OnCallSchedulePage', () => {
       start_date: dayjs().subtract(1, 'day').format('YYYY-MM-DD'),
       end_date: dayjs().add(2, 'day').format('YYYY-MM-DD'),
     });
-    scheduleSpy.mockReturnValue({ data: [active], isLoading: false });
+    scheduleSpy.mockReturnValue({ data: buildResult([active]), isLoading: false });
 
     render(<OnCallSchedulePage />);
 
@@ -85,7 +94,7 @@ describe('OnCallSchedulePage', () => {
   });
 
   it('shows the empty-state alert when there are no schedules', () => {
-    scheduleSpy.mockReturnValue({ data: [], isLoading: false });
+    scheduleSpy.mockReturnValue({ data: buildResult([]), isLoading: false });
 
     render(<OnCallSchedulePage />);
 
@@ -94,8 +103,22 @@ describe('OnCallSchedulePage', () => {
     ).toBeInTheDocument();
   });
 
+  it('shows the unavailable warning when the schedule failed to load', () => {
+    scheduleSpy.mockReturnValue({ data: buildResult([], true), isLoading: false });
+
+    render(<OnCallSchedulePage />);
+
+    expect(
+      screen.getByText(/Schedule data is temporarily unavailable/i)
+    ).toBeInTheDocument();
+    // The empty-state info alert should NOT also appear
+    expect(
+      screen.queryByText(/No scheduled on-call coverage in this window/i)
+    ).not.toBeInTheDocument();
+  });
+
   it('shows current on-call personnel cards from the legacy endpoint', () => {
-    scheduleSpy.mockReturnValue({ data: [], isLoading: false });
+    scheduleSpy.mockReturnValue({ data: buildResult([]), isLoading: false });
     personnelSpy.mockReturnValue({
       data: {
         materials: {
@@ -124,7 +147,7 @@ describe('OnCallSchedulePage', () => {
   });
 
   it('passes the start, end, and (when filtered) role into the schedule query', () => {
-    scheduleSpy.mockReturnValue({ data: [], isLoading: false });
+    scheduleSpy.mockReturnValue({ data: buildResult([]), isLoading: false });
 
     render(<OnCallSchedulePage />);
 

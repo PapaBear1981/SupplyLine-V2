@@ -325,16 +325,25 @@ def register_oncall_routes(app):
             except ValueError as exc:
                 return jsonify({"error": str(exc)}), 400
 
-            query = OnCallSchedule.query.filter(
-                OnCallSchedule.end_date >= start,
-                OnCallSchedule.start_date <= end,
-            )
-            if role:
-                query = query.filter(OnCallSchedule.role == role)
-            schedules = query.order_by(
-                OnCallSchedule.start_date.asc(), OnCallSchedule.role.asc()
-            ).all()
-            return jsonify({"schedules": [s.to_dict() for s in schedules]})
+            try:
+                query = OnCallSchedule.query.filter(
+                    OnCallSchedule.end_date >= start,
+                    OnCallSchedule.start_date <= end,
+                )
+                if role:
+                    query = query.filter(OnCallSchedule.role == role)
+                schedules = query.order_by(
+                    OnCallSchedule.start_date.asc(), OnCallSchedule.role.asc()
+                ).all()
+                return jsonify({"schedules": [s.to_dict() for s in schedules]})
+            except SQLAlchemyError:
+                logger.exception(
+                    "Error fetching on-call schedule; returning empty list. "
+                    "Likely a missing column on oncall_schedules — check that "
+                    "the Phase 2 auto-migration applied."
+                )
+                db.session.rollback()
+                return jsonify({"schedules": [], "schedule_unavailable": True})
         except SQLAlchemyError:
             logger.exception("Error fetching on-call schedule")
             return jsonify({"error": "Failed to fetch on-call schedule"}), 500
@@ -343,10 +352,27 @@ def register_oncall_routes(app):
     @admin_required
     def admin_list_oncall_schedule():
         try:
-            schedules, err = _query_schedules()
+            try:
+                schedules, err = _query_schedules()
+            except SQLAlchemyError:
+                logger.exception(
+                    "Error fetching on-call schedule for admin; returning "
+                    "empty list. Likely a missing column on oncall_schedules — "
+                    "check that the Phase 2 auto-migration applied."
+                )
+                db.session.rollback()
+                return jsonify({"schedules": [], "schedule_unavailable": True})
             if err is not None:
                 return err
-            return jsonify({"schedules": [s.to_dict() for s in schedules]})
+            try:
+                return jsonify({"schedules": [s.to_dict() for s in schedules]})
+            except SQLAlchemyError:
+                logger.exception(
+                    "Error serializing on-call schedule rows for admin; "
+                    "returning empty list."
+                )
+                db.session.rollback()
+                return jsonify({"schedules": [], "schedule_unavailable": True})
         except SQLAlchemyError:
             logger.exception("Error fetching on-call schedule for admin")
             return jsonify({"error": "Failed to fetch on-call schedule"}), 500
