@@ -613,9 +613,11 @@ class OnCallSchedule(db.Model):
     created_at = db.Column(db.DateTime, nullable=False, default=get_current_time)
     updated_at = db.Column(db.DateTime, nullable=False, default=get_current_time, onupdate=get_current_time)
     created_by_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=True)
+    updated_by_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=True)
 
     user = db.relationship("User", foreign_keys=[user_id])
     created_by = db.relationship("User", foreign_keys=[created_by_id])
+    updated_by = db.relationship("User", foreign_keys=[updated_by_id])
 
     __table_args__ = (
         db.Index("ix_oncall_schedules_role_dates", "role", "start_date", "end_date"),
@@ -645,6 +647,11 @@ class OnCallSchedule(db.Model):
                 "name": self.created_by.name,
                 "employee_number": self.created_by.employee_number,
             } if self.created_by else None,
+            "updated_by": {
+                "id": self.updated_by.id,
+                "name": self.updated_by.name,
+                "employee_number": self.updated_by.employee_number,
+            } if self.updated_by else None,
         }
 
 
