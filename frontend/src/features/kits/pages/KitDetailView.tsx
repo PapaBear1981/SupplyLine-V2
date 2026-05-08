@@ -250,6 +250,9 @@ const KitDetailView = () => {
                   {kit.aircraft_type_name}
                 </Descriptions.Item>
                 <Descriptions.Item label="Created By">{kit.creator_name}</Descriptions.Item>
+                <Descriptions.Item label="Assigned To">
+                  {kit.assigned_user_name || <span style={{ color: '#999' }}>Unassigned</span>}
+                </Descriptions.Item>
                 <Descriptions.Item label="Created At">
                   {new Date(kit.created_at).toLocaleString()}
                 </Descriptions.Item>

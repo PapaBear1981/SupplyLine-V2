@@ -414,6 +414,134 @@ class TestKitCRUDEndpoints:
         assert duplicated_kit is not None
 
 
+class TestKitAssignedUserEndpoint:
+    """Test the admin-only PUT /api/kits/<id>/assigned-user endpoint"""
+
+    def test_assign_user_admin(self, client, auth_headers_admin, test_kit, regular_user):
+        """Admin can assign a user to a kit; assignment carries no permission impact"""
+        response = client.put(
+            f"/api/kits/{test_kit.id}/assigned-user",
+            json={"assigned_user_id": regular_user.id},
+            headers=auth_headers_admin,
+        )
+
+        assert response.status_code == 200
+        data = json.loads(response.data)
+        assert data["assigned_user_id"] == regular_user.id
+        assert data["assigned_user_name"] == regular_user.name
+        assert data["assigned_user_employee_number"] == regular_user.employee_number
+
+        # Persisted
+        kit = Kit.query.get(test_kit.id)
+        assert kit.assigned_user_id == regular_user.id
+
+    def test_clear_assignment_admin(self, client, auth_headers_admin, test_kit, regular_user, db_session):
+        """Passing assigned_user_id: null clears the assignment"""
+        test_kit.assigned_user_id = regular_user.id
+        db_session.commit()
+
+        response = client.put(
+            f"/api/kits/{test_kit.id}/assigned-user",
+            json={"assigned_user_id": None},
+            headers=auth_headers_admin,
+        )
+
+        assert response.status_code == 200
+        data = json.loads(response.data)
+        assert data["assigned_user_id"] is None
+        assert data["assigned_user_name"] is None
+
+        kit = Kit.query.get(test_kit.id)
+        assert kit.assigned_user_id is None
+
+    def test_assign_user_non_admin_forbidden(self, client, auth_headers_materials, test_kit, regular_user):
+        """Materials users (and any non-admin) cannot assign — admin-only endpoint"""
+        response = client.put(
+            f"/api/kits/{test_kit.id}/assigned-user",
+            json={"assigned_user_id": regular_user.id},
+            headers=auth_headers_materials,
+        )
+
+        assert response.status_code == 403
+
+    def test_assign_user_regular_user_forbidden(self, client, auth_headers_user, test_kit, regular_user):
+        """Regular users cannot assign"""
+        response = client.put(
+            f"/api/kits/{test_kit.id}/assigned-user",
+            json={"assigned_user_id": regular_user.id},
+            headers=auth_headers_user,
+        )
+
+        assert response.status_code == 403
+
+    def test_assign_user_missing_field(self, client, auth_headers_admin, test_kit):
+        """Request body must include the assigned_user_id key (use null to clear)"""
+        response = client.put(
+            f"/api/kits/{test_kit.id}/assigned-user",
+            json={},
+            headers=auth_headers_admin,
+        )
+
+        assert response.status_code == 400
+
+    def test_assign_unknown_user(self, client, auth_headers_admin, test_kit):
+        """Assigning a non-existent user is rejected"""
+        response = client.put(
+            f"/api/kits/{test_kit.id}/assigned-user",
+            json={"assigned_user_id": 999_999},
+            headers=auth_headers_admin,
+        )
+
+        assert response.status_code == 400
+
+    def test_assign_inactive_user_rejected(self, client, auth_headers_admin, test_kit, db_session):
+        """Inactive users cannot be assigned — they're not part of the workload split"""
+        from models import User
+        import uuid
+
+        inactive = User(
+            name="Inactive Person",
+            employee_number=f"INA{uuid.uuid4().hex[:6].upper()}",
+            department="Materials",
+            is_admin=False,
+            is_active=False,
+        )
+        inactive.set_password("x")
+        db_session.add(inactive)
+        db_session.commit()
+
+        response = client.put(
+            f"/api/kits/{test_kit.id}/assigned-user",
+            json={"assigned_user_id": inactive.id},
+            headers=auth_headers_admin,
+        )
+
+        assert response.status_code == 400
+
+
+class TestKitLocationsEndpoint:
+    """Test that the locations endpoint surfaces the assignment for the TV display"""
+
+    def test_locations_include_assigned_user(
+        self, client, auth_headers_user, test_kit, regular_user, db_session
+    ):
+        """The TV display reads /api/kits/locations — assigned user must appear there"""
+        test_kit.assigned_user_id = regular_user.id
+        # Locations endpoint defaults to with_location_only=true; give the kit
+        # coordinates so it shows up in the response.
+        test_kit.latitude = 47.6
+        test_kit.longitude = -122.3
+        db_session.commit()
+
+        response = client.get("/api/kits/locations", headers=auth_headers_user)
+
+        assert response.status_code == 200
+        data = json.loads(response.data)
+        kit_payload = next(k for k in data["kits"] if k["id"] == test_kit.id)
+        assert kit_payload["assigned_user_id"] == regular_user.id
+        assert kit_payload["assigned_user_name"] == regular_user.name
+
+
 class TestKitWizardEndpoint:
     """Test kit wizard endpoint"""
 

@@ -201,6 +201,31 @@ $success: #6dd47e;
   font-weight: 500;
 }
 
+.kitAssignee {
+  color: $text;
+  font-weight: 500;
+
+  &::before {
+    content: 'Assigned: ';
+    color: $textMuted;
+    font-weight: 400;
+    margin-right: 0.25rem;
+  }
+}
+
+.kitAssigneeUnassigned {
+  color: $textMuted;
+  font-style: italic;
+
+  &::before {
+    content: 'Assigned: ';
+    color: $textMuted;
+    font-weight: 400;
+    font-style: normal;
+    margin-right: 0.25rem;
+  }
+}
+
 .kitCheckouts {
   display: flex;
   flex-direction: column;

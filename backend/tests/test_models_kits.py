@@ -143,6 +143,35 @@ class TestKitModel:
         assert "created_at" in data
         assert "updated_at" in data
 
+    def test_kit_to_dict_assigned_user_fields(self, db_session, admin_user, regular_user):
+        """to_dict surfaces the assigned-user fields, including the unassigned case"""
+        aircraft_type = get_or_create_aircraft_type(db_session, "Q400")
+
+        kit = Kit(
+            name=get_unique_kit_name("Assignee Kit"),
+            aircraft_type_id=aircraft_type.id,
+            status="active",
+            created_by=admin_user.id,
+        )
+        db_session.add(kit)
+        db_session.commit()
+
+        # Unassigned by default
+        data = kit.to_dict()
+        assert data["assigned_user_id"] is None
+        assert data["assigned_user_name"] is None
+        assert data["assigned_user_employee_number"] is None
+
+        # After assigning, the user's name and employee number flow through
+        kit.assigned_user_id = regular_user.id
+        db_session.commit()
+        db_session.refresh(kit)
+
+        data = kit.to_dict()
+        assert data["assigned_user_id"] == regular_user.id
+        assert data["assigned_user_name"] == regular_user.name
+        assert data["assigned_user_employee_number"] == regular_user.employee_number
+
     def test_kit_status_values(self, db_session, admin_user):
         """Test kit status values"""
         aircraft_type = get_or_create_aircraft_type(db_session, "Q400")

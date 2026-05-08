@@ -63,9 +63,14 @@ class Kit(db.Model):
     location_notes = db.Column(db.String(500), nullable=True)  # E.g., "Hangar 3, Bay 2"
     trailer_number = db.Column(db.String(100), nullable=True)  # Trailer number for kits assigned to trailers
 
+    # Workload assignment — admin assigns a user as the point of contact for the kit.
+    # Carries no extra permissions; informational only.
+    assigned_user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=True)
+
     # Relationships
     aircraft_type = db.relationship("AircraftType", back_populates="kits")
     creator = db.relationship("User", foreign_keys=[created_by])
+    assigned_user = db.relationship("User", foreign_keys=[assigned_user_id])
     boxes = db.relationship("KitBox", back_populates="kit", lazy="dynamic", cascade="all, delete-orphan")
     items = db.relationship("KitItem", back_populates="kit", lazy="dynamic", cascade="all, delete-orphan")
     expendables = db.relationship("KitExpendable", back_populates="kit", lazy="dynamic", cascade="all, delete-orphan")
@@ -99,6 +104,9 @@ class Kit(db.Model):
             "location_notes": self.location_notes,
             "trailer_number": self.trailer_number,
             "has_location": self.latitude is not None and self.longitude is not None,
+            "assigned_user_id": self.assigned_user_id,
+            "assigned_user_name": self.assigned_user.name if self.assigned_user else None,
+            "assigned_user_employee_number": self.assigned_user.employee_number if self.assigned_user else None,
         }
 
         if include_details:

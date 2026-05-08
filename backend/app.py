@@ -316,6 +316,15 @@ def create_app():
                         tool_cols = {c["name"] for c in inspector.get_columns("tools")}
                         _auto_add_col("tools", "maintenance_return_date TIMESTAMP NULL", "maintenance_return_date", tool_cols)
 
+                    if "kits" in tables:
+                        kit_cols = {c["name"] for c in inspector.get_columns("kits")}
+                        _auto_add_col(
+                            "kits",
+                            "assigned_user_id INTEGER REFERENCES users(id) ON DELETE SET NULL",
+                            "assigned_user_id",
+                            kit_cols,
+                        )
+
                     if "users" in tables:
                         user_cols = {c["name"] for c in inspector.get_columns("users")}
                         _auto_add_col("users", "phone VARCHAR(30) NULL", "phone", user_cols)

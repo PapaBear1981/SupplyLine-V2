@@ -114,4 +114,13 @@ describe('KitFieldCard', () => {
     render(<KitFieldCard kit={{ ...baseKit, status: 'maintenance' }} checkouts={[]} />);
     expect(screen.getByText('maintenance')).toBeInTheDocument();
   });
+
+  it('shows the assigned user when one is set, and "Unassigned" otherwise', () => {
+    const assigned: Kit = { ...baseKit, assigned_user_id: 7, assigned_user_name: 'Jane Doe' };
+    const { rerender } = render(<KitFieldCard kit={assigned} checkouts={[]} />);
+    expect(screen.getByText('Jane Doe')).toBeInTheDocument();
+
+    rerender(<KitFieldCard kit={baseKit} checkouts={[]} />);
+    expect(screen.getByText('Unassigned')).toBeInTheDocument();
+  });
 });

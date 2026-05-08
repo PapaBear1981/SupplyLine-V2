@@ -1,6 +1,12 @@
 import { useEffect } from 'react';
 import { Modal, Form, Input, Select, InputNumber, Row, Col, Divider, message } from 'antd';
-import { useGetAircraftTypesQuery, useUpdateKitMutation } from '../services/kitsApi';
+import {
+  useGetAircraftTypesQuery,
+  useUpdateKitMutation,
+  useAssignKitUserMutation,
+} from '../services/kitsApi';
+import { useGetUsersQuery } from '@features/users/services/usersApi';
+import { useIsAdmin } from '@features/auth/hooks/usePermission';
 import type { Kit } from '../types';
 
 const { TextArea } = Input;
@@ -12,10 +18,17 @@ interface EditKitModalProps {
   onSuccess?: () => void;
 }
 
+type EditKitFormValues = Partial<Kit> & { assigned_user_id?: number | null };
+
 export function EditKitModal({ open, kit, onClose, onSuccess }: EditKitModalProps) {
-  const [form] = Form.useForm();
+  const [form] = Form.useForm<EditKitFormValues>();
+  const isAdmin = useIsAdmin();
   const { data: aircraftTypes, isLoading: loadingTypes } = useGetAircraftTypesQuery({});
+  const { data: users, isLoading: loadingUsers } = useGetUsersQuery(undefined, {
+    skip: !isAdmin || !open,
+  });
   const [updateKit, { isLoading: isUpdating }] = useUpdateKitMutation();
+  const [assignKitUser, { isLoading: isAssigning }] = useAssignKitUserMutation();
 
   useEffect(() => {
     if (kit && open) {
@@ -33,18 +46,30 @@ export function EditKitModal({ open, kit, onClose, onSuccess }: EditKitModalProp
         longitude: kit.longitude,
         location_notes: kit.location_notes,
         trailer_number: kit.trailer_number,
+        assigned_user_id: kit.assigned_user_id ?? null,
       });
     }
   }, [kit, open, form]);
 
-  const handleSubmit = async (values: unknown) => {
+  const handleSubmit = async (values: EditKitFormValues) => {
     if (!kit) return;
+
+    const { assigned_user_id, ...kitFields } = values;
 
     try {
       await updateKit({
         id: kit.id,
-        data: values as Partial<Kit>,
+        data: kitFields as Partial<Kit>,
       }).unwrap();
+
+      // Admins can also (re)assign the responsible user. Fire only when changed
+      // so non-admins (who never see the field) never trigger this call.
+      if (isAdmin && assigned_user_id !== (kit.assigned_user_id ?? null)) {
+        await assignKitUser({
+          id: kit.id,
+          assigned_user_id: assigned_user_id ?? null,
+        }).unwrap();
+      }
 
       message.success('Kit updated successfully');
       form.resetFields();
@@ -67,7 +92,7 @@ export function EditKitModal({ open, kit, onClose, onSuccess }: EditKitModalProp
       open={open}
       onOk={() => form.submit()}
       onCancel={handleCancel}
-      confirmLoading={isUpdating}
+      confirmLoading={isUpdating || isAssigning}
       width={800}
       okText="Save Changes"
     >
@@ -126,6 +151,29 @@ export function EditKitModal({ open, kit, onClose, onSuccess }: EditKitModalProp
               />
             </Form.Item>
           </Col>
+          {isAdmin && (
+            <Col span={12}>
+              <Form.Item
+                label="Assigned To"
+                name="assigned_user_id"
+                help="Point of contact for this kit (workload split — no extra permissions)"
+              >
+                <Select
+                  placeholder="Unassigned"
+                  loading={loadingUsers}
+                  allowClear
+                  showSearch
+                  optionFilterProp="label"
+                  options={(users ?? [])
+                    .filter((u) => u.is_active)
+                    .map((u) => ({
+                      label: `${u.name} (${u.employee_number})`,
+                      value: u.id,
+                    }))}
+                />
+              </Form.Item>
+            </Col>
+          )}
         </Row>
 
         <Form.Item label="Description" name="description">
