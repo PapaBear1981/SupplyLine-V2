@@ -1,7 +1,7 @@
 import { useState, useMemo, useEffect } from 'react';
 import { Card, Select, Space, Typography, Spin, Empty, Tag, Descriptions, Badge, Button } from 'antd';
 import { EnvironmentOutlined, ReloadOutlined, InboxOutlined } from '@ant-design/icons';
-import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet';
+import { MapContainer, TileLayer, Marker, Popup, Tooltip, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { useGetKitLocationsQuery, useGetAircraftTypesQuery } from '../services/kitsApi';
@@ -56,6 +56,25 @@ mapStyles.textContent = `
   .leaflet-container.kit-map-container-dark .leaflet-bar a.leaflet-disabled {
     background-color: rgba(24, 32, 46, 0.6);
     color: #6b7280;
+  }
+  .kit-map-pin-label.leaflet-tooltip {
+    background-color: rgba(255, 255, 255, 0.95);
+    border: 1px solid #d9d9d9;
+    color: #1f2937;
+    font-size: 11px;
+    font-weight: 600;
+    padding: 2px 6px;
+    border-radius: 4px;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.15);
+    white-space: nowrap;
+  }
+  .kit-map-pin-label.leaflet-tooltip::before {
+    display: none;
+  }
+  .leaflet-container.kit-map-container-dark .kit-map-pin-label.leaflet-tooltip {
+    background-color: rgba(24, 32, 46, 0.95);
+    border-color: #24334a;
+    color: #f5f7fb;
   }
 `;
 if (!document.head.querySelector('#kit-map-styles')) {
@@ -345,47 +364,75 @@ export function KitLocationMap({ height = 400 }: KitLocationMapProps) {
             />
             <MapController selectedKit={selectedKit} kits={kitsWithLocation} />
 
-            {kitsWithLocation.map(kit => (
-              <Marker
-                key={kit.id}
-                position={[kit.latitude!, kit.longitude!]}
-                icon={createColoredIcon(getAircraftTypeColor(kit.aircraft_type_id))}
-                eventHandlers={{
-                  click: () => setSelectedKitId(kit.id),
-                  mouseover: (e) => e.target.openPopup(),
-                  mouseout: (e) => e.target.closePopup(),
-                }}
-              >
-                <Popup className={isDarkMode ? 'dark-mode' : ''}>
-                  <div style={{ minWidth: 200 }}>
-                    <Title level={5} style={{ margin: 0, marginBottom: 8 }}>
-                      {kit.name}
-                    </Title>
-                    <Tag color={STATUS_COLORS[kit.status]}>
-                      {STATUS_LABELS[kit.status] || kit.status}
-                    </Tag>
-                    {kit.aircraft_type_name && (
-                      <Tag color={getAircraftTypeColor(kit.aircraft_type_id)}>{kit.aircraft_type_name}</Tag>
-                    )}
-                    <div style={{ marginTop: 8 }}>
-                      <Text type="secondary" style={{ fontSize: 12 }}>
-                        {kit.full_address || kit.location_address || 'No address'}
-                      </Text>
+            {kitsWithLocation.map(kit => {
+              const pinLabelParts = [
+                kit.aircraft_tail_number,
+                kit.tanker_scooper_number,
+              ].filter((part): part is string => Boolean(part));
+              const pinLabel = pinLabelParts.join(' · ');
+
+              return (
+                <Marker
+                  key={kit.id}
+                  position={[kit.latitude!, kit.longitude!]}
+                  icon={createColoredIcon(getAircraftTypeColor(kit.aircraft_type_id))}
+                  eventHandlers={{
+                    click: () => setSelectedKitId(kit.id),
+                    mouseover: (e) => e.target.openPopup(),
+                    mouseout: (e) => e.target.closePopup(),
+                  }}
+                >
+                  {pinLabel && (
+                    <Tooltip
+                      permanent
+                      direction="top"
+                      offset={[0, -22]}
+                      className="kit-map-pin-label"
+                    >
+                      {pinLabel}
+                    </Tooltip>
+                  )}
+                  <Popup className={isDarkMode ? 'dark-mode' : ''}>
+                    <div style={{ minWidth: 200 }}>
+                      <Title level={5} style={{ margin: 0, marginBottom: 8 }}>
+                        {kit.name}
+                      </Title>
+                      <Tag color={STATUS_COLORS[kit.status]}>
+                        {STATUS_LABELS[kit.status] || kit.status}
+                      </Tag>
+                      {kit.aircraft_type_name && (
+                        <Tag color={getAircraftTypeColor(kit.aircraft_type_id)}>{kit.aircraft_type_name}</Tag>
+                      )}
+                      <div style={{ marginTop: 8 }}>
+                        <Text type="secondary" style={{ fontSize: 12 }}>
+                          {kit.full_address || kit.location_address || 'No address'}
+                        </Text>
+                      </div>
+                      {kit.aircraft_tail_number && (
+                        <div style={{ marginTop: 4 }}>
+                          <Text strong style={{ fontSize: 12 }}>Tail #: {kit.aircraft_tail_number}</Text>
+                        </div>
+                      )}
+                      {kit.tanker_scooper_number && (
+                        <div style={{ marginTop: 4 }}>
+                          <Text strong style={{ fontSize: 12 }}>Tanker/Scooper #: {kit.tanker_scooper_number}</Text>
+                        </div>
+                      )}
+                      {kit.trailer_number && (
+                        <div style={{ marginTop: 4 }}>
+                          <Text strong style={{ fontSize: 12 }}>Trailer: {kit.trailer_number}</Text>
+                        </div>
+                      )}
+                      {kit.description && (
+                        <div style={{ marginTop: 4 }}>
+                          <Text style={{ fontSize: 12 }}>{kit.description}</Text>
+                        </div>
+                      )}
                     </div>
-                    {kit.trailer_number && (
-                      <div style={{ marginTop: 4 }}>
-                        <Text strong style={{ fontSize: 12 }}>Trailer: {kit.trailer_number}</Text>
-                      </div>
-                    )}
-                    {kit.description && (
-                      <div style={{ marginTop: 4 }}>
-                        <Text style={{ fontSize: 12 }}>{kit.description}</Text>
-                      </div>
-                    )}
-                  </div>
-                </Popup>
-              </Marker>
-            ))}
+                  </Popup>
+                </Marker>
+              );
+            })}
           </MapContainer>
         )}
       </div>
@@ -440,6 +487,16 @@ export function KitLocationMap({ height = 400 }: KitLocationMapProps) {
               {selectedKit.latitude && selectedKit.longitude && (
                 <Descriptions.Item label="Coordinates" span={2}>
                   {selectedKit.latitude.toFixed(6)}, {selectedKit.longitude.toFixed(6)}
+                </Descriptions.Item>
+              )}
+              {selectedKit.aircraft_tail_number && (
+                <Descriptions.Item label="Tail Number" span={2}>
+                  {selectedKit.aircraft_tail_number}
+                </Descriptions.Item>
+              )}
+              {selectedKit.tanker_scooper_number && (
+                <Descriptions.Item label="Tanker/Scooper Number" span={2}>
+                  {selectedKit.tanker_scooper_number}
                 </Descriptions.Item>
               )}
               {selectedKit.trailer_number && (
