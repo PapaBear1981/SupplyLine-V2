@@ -46,6 +46,8 @@ export interface Kit {
   longitude?: number | null;
   location_notes?: string | null;
   trailer_number?: string | null;
+  aircraft_tail_number?: string | null;
+  tanker_scooper_number?: string | null;
   has_location?: boolean;
   // Workload assignment — admin-only field, no permission impact.
   assigned_user_id?: number | null;
@@ -70,6 +72,8 @@ export interface KitLocation {
   longitude: number | null;
   location_notes?: string | null;
   trailer_number?: string | null;
+  aircraft_tail_number?: string | null;
+  tanker_scooper_number?: string | null;
   full_address?: string | null;
   has_location: boolean;
   box_count?: number;

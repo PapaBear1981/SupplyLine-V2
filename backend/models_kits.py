@@ -62,6 +62,8 @@ class Kit(db.Model):
     longitude = db.Column(db.Float, nullable=True)
     location_notes = db.Column(db.String(500), nullable=True)  # E.g., "Hangar 3, Bay 2"
     trailer_number = db.Column(db.String(100), nullable=True)  # Trailer number for kits assigned to trailers
+    aircraft_tail_number = db.Column(db.String(50), nullable=True)  # Tail number of the aircraft this kit is assigned to
+    tanker_scooper_number = db.Column(db.String(50), nullable=True)  # Tanker or scooper number assigned to the kit
 
     # Workload assignment — admin assigns a user as the point of contact for the kit.
     # Carries no extra permissions; informational only.
@@ -103,6 +105,8 @@ class Kit(db.Model):
             "longitude": self.longitude,
             "location_notes": self.location_notes,
             "trailer_number": self.trailer_number,
+            "aircraft_tail_number": self.aircraft_tail_number,
+            "tanker_scooper_number": self.tanker_scooper_number,
             "has_location": self.latitude is not None and self.longitude is not None,
             "assigned_user_id": self.assigned_user_id,
             "assigned_user_name": self.assigned_user.name if self.assigned_user else None,

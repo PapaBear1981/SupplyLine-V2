@@ -196,6 +196,34 @@ $success: #6dd47e;
   font-weight: 600;
 }
 
+.kitTailNumber {
+  color: $text;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+
+  &::before {
+    content: 'Tail: ';
+    color: $textMuted;
+    font-weight: 400;
+    letter-spacing: normal;
+    margin-right: 0.25rem;
+  }
+}
+
+.kitTankerNumber {
+  color: $text;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+
+  &::before {
+    content: 'Tanker/Scooper: ';
+    color: $textMuted;
+    font-weight: 400;
+    letter-spacing: normal;
+    margin-right: 0.25rem;
+  }
+}
+
 .kitLocation {
   color: $text;
   font-weight: 500;

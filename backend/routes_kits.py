@@ -30,6 +30,21 @@ logger = logging.getLogger(__name__)
 # Decorator for Materials department access
 materials_required = department_required("Materials")
 
+
+def _clean_optional_text(field_name: str, value):
+    """Normalise an optional text field from JSON input.
+
+    Accepts ``None`` or a string (whitespace stripped, empty becomes ``None``).
+    Any other JSON type is rejected so callers get a clear validation error
+    rather than a database-level failure.
+    """
+    if value is None:
+        return None
+    if not isinstance(value, str):
+        raise ValidationError(f"{field_name} must be a string")
+    value = value.strip()
+    return value or None
+
 # US country name/abbreviation variants for geocoding restriction
 _US_COUNTRY_VARIANTS = {"us", "usa", "united states", "united states of america", "u.s.", "u.s.a."}
 
@@ -281,7 +296,13 @@ def register_kit_routes(app):
             aircraft_type_id=data["aircraft_type_id"],
             description=data.get("description", ""),
             status="active",
-            created_by=request.current_user["user_id"]
+            created_by=request.current_user["user_id"],
+            aircraft_tail_number=_clean_optional_text(
+                "aircraft_tail_number", data.get("aircraft_tail_number")
+            ),
+            tanker_scooper_number=_clean_optional_text(
+                "tanker_scooper_number", data.get("tanker_scooper_number")
+            ),
         )
 
         db.session.add(kit)
@@ -356,6 +377,11 @@ def register_kit_routes(app):
                     if field in address_fields:
                         address_changed = True
                 setattr(kit, field, data[field])
+
+        # Aircraft assignment fields
+        for field in ("aircraft_tail_number", "tanker_scooper_number"):
+            if field in data:
+                setattr(kit, field, _clean_optional_text(field, data[field]))
 
         # Determine if the user explicitly provided NEW coordinates
         new_lat = data.get("latitude")
@@ -595,6 +621,8 @@ def register_kit_routes(app):
                 "longitude": kit.longitude,
                 "location_notes": kit.location_notes,
                 "trailer_number": kit.trailer_number,
+                "aircraft_tail_number": kit.aircraft_tail_number,
+                "tanker_scooper_number": kit.tanker_scooper_number,
                 "full_address": kit.get_full_address(),
                 "has_location": kit.latitude is not None and kit.longitude is not None,
                 "box_count": kit.boxes.count() if kit.boxes else 0,
