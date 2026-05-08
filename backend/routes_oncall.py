@@ -68,22 +68,46 @@ def _serialize_oncall_entry(role: str) -> dict:
     Prefers an active schedule entry covering today; otherwise falls back
     to the manual SystemSetting override. The ``source`` field tells the
     caller which one was used so the UI can label it.
+
+    The schedule lookup is wrapped defensively: if the ``oncall_schedules``
+    table or any of its columns are missing (e.g. on a deploy where the
+    Phase 2 auto-migration hasn't run yet), we log and fall back to the
+    manual override instead of 500-ing the entire dashboard.
     """
     today = datetime.now(UTC).date()
-    schedule = (
-        OnCallSchedule.query.filter(
-            OnCallSchedule.role == role,
-            OnCallSchedule.start_date <= today,
-            OnCallSchedule.end_date >= today,
+    schedule = None
+    try:
+        schedule = (
+            OnCallSchedule.query.filter(
+                OnCallSchedule.role == role,
+                OnCallSchedule.start_date <= today,
+                OnCallSchedule.end_date >= today,
+            )
+            .order_by(OnCallSchedule.start_date.desc(), OnCallSchedule.id.desc())
+            .first()
         )
-        .order_by(OnCallSchedule.start_date.desc(), OnCallSchedule.id.desc())
-        .first()
-    )
+    except SQLAlchemyError:
+        logger.warning(
+            "Could not read oncall_schedules for role=%s; falling back to "
+            "manual override. The Phase 2 auto-migration may not have run.",
+            role,
+            exc_info=True,
+        )
+        db.session.rollback()
 
     if schedule and schedule.user:
         # Whoever last touched the schedule row matches updated_at; fall back to
         # the creator only for legacy rows that pre-date the updated_by column.
-        attributed = schedule.updated_by or schedule.created_by
+        attributed = None
+        try:
+            attributed = schedule.updated_by or schedule.created_by
+        except SQLAlchemyError:
+            logger.warning(
+                "Failed to load updated_by/created_by for schedule id=%s",
+                schedule.id,
+                exc_info=True,
+            )
+            db.session.rollback()
         updated_by = None
         if attributed:
             updated_by = {
