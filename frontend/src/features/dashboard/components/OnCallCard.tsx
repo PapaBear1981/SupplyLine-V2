@@ -138,7 +138,17 @@ const OnCallRole = ({ label, description, icon, accentColor, entry }: OnCallRole
             `Scheduled coverage: ${dayjs(entry.schedule.start_date).format('MMM D')} – ${dayjs(entry.schedule.end_date).format('MMM D, YYYY')}`
           }
         >
-          <Tag color={accentColor} icon={<CalendarOutlined />} style={{ fontSize: 11 }}>
+          <Tag
+            icon={<CalendarOutlined />}
+            bordered
+            style={{
+              fontSize: 11,
+              alignSelf: 'flex-start',
+              background: `${accentColor}1f`,
+              borderColor: `${accentColor}66`,
+              color: accentColor,
+            }}
+          >
             Scheduled through {dayjs(entry.schedule.end_date).format('MMM D')}
           </Tag>
         </Tooltip>
