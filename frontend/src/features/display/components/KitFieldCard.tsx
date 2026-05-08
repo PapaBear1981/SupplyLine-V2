@@ -40,6 +40,11 @@ export const KitFieldCard = ({ kit, checkouts }: KitFieldCardProps) => {
         <div className={styles.kitMeta}>
           {kit.aircraft_type_name && <span className={styles.aircraftType}>{kit.aircraft_type_name}</span>}
           <span className={styles.kitLocation}>{formatLocation(kit)}</span>
+          {kit.assigned_user_name ? (
+            <span className={styles.kitAssignee}>{kit.assigned_user_name}</span>
+          ) : (
+            <span className={styles.kitAssigneeUnassigned}>Unassigned</span>
+          )}
         </div>
       </header>
 

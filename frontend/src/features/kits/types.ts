@@ -47,6 +47,10 @@ export interface Kit {
   location_notes?: string | null;
   trailer_number?: string | null;
   has_location?: boolean;
+  // Workload assignment — admin-only field, no permission impact.
+  assigned_user_id?: number | null;
+  assigned_user_name?: string | null;
+  assigned_user_employee_number?: string | null;
 }
 
 // Kit Location (for map display)
@@ -70,6 +74,8 @@ export interface KitLocation {
   has_location: boolean;
   box_count?: number;
   item_count?: number;
+  assigned_user_id?: number | null;
+  assigned_user_name?: string | null;
 }
 
 export interface KitLocationsResponse {

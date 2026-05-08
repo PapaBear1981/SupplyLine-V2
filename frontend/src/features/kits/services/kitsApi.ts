@@ -133,6 +133,18 @@ export const kitsApi = baseApi.injectEndpoints({
       invalidatesTags: [{ type: 'Kit', id: 'LIST' }],
     }),
 
+    assignKitUser: builder.mutation<Kit, { id: number; assigned_user_id: number | null }>({
+      query: ({ id, assigned_user_id }) => ({
+        url: `/api/kits/${id}/assigned-user`,
+        method: 'PUT',
+        body: { assigned_user_id },
+      }),
+      invalidatesTags: (_result, _error, { id }) => [
+        { type: 'Kit', id },
+        { type: 'Kit', id: 'LIST' },
+      ],
+    }),
+
     // Kit Wizard
     kitWizard: builder.mutation<KitWizardResponse, { step: number; [key: string]: unknown }>({
       query: (body) => ({
@@ -640,6 +652,7 @@ export const {
   useUpdateKitMutation,
   useDeleteKitMutation,
   useDuplicateKitMutation,
+  useAssignKitUserMutation,
   useKitWizardMutation,
 
   // Boxes

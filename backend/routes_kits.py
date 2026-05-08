@@ -503,6 +503,50 @@ def register_kit_routes(app):
         logger.info(f"Kit duplicated: {source_kit.name} -> {new_kit.name}")
         return jsonify(new_kit.to_dict(include_details=True)), 201
 
+    @app.route("/api/kits/<int:id>/assigned-user", methods=["PUT"])
+    @admin_required
+    @handle_errors
+    def assign_kit_user(id):
+        """Assign (or clear) the user responsible for a kit. Admin only.
+
+        The assignment is informational — splits workload across the team and
+        grants no extra permissions. Pass ``assigned_user_id: null`` to clear.
+        """
+        kit = Kit.query.get_or_404(id)
+        data = request.get_json() or {}
+        current_user_id = request.current_user.get("user_id")
+
+        if "assigned_user_id" not in data:
+            raise ValidationError("assigned_user_id is required (use null to clear)")
+
+        new_user_id = data["assigned_user_id"]
+        old_user_id = kit.assigned_user_id
+
+        if new_user_id is not None:
+            target_user = db.session.get(User, new_user_id)
+            if not target_user or not getattr(target_user, "is_active", True):
+                raise ValidationError("Assigned user not found or inactive")
+            kit.assigned_user_id = target_user.id
+        else:
+            kit.assigned_user_id = None
+
+        db.session.commit()
+
+        AuditLog.log(
+            user_id=current_user_id,
+            action="kit_assigned_user_updated",
+            resource_type="kit",
+            resource_id=kit.id,
+            details={
+                "name": kit.name,
+                "old_assigned_user_id": old_user_id,
+                "new_assigned_user_id": kit.assigned_user_id,
+            },
+            ip_address=request.remote_addr,
+        )
+
+        return jsonify(kit.to_dict()), 200
+
     # ==================== Kit Locations (for Map) ====================
 
     @app.route("/api/kits/locations", methods=["GET"])
@@ -555,6 +599,8 @@ def register_kit_routes(app):
                 "has_location": kit.latitude is not None and kit.longitude is not None,
                 "box_count": kit.boxes.count() if kit.boxes else 0,
                 "item_count": kit.items.count() + kit.expendables.count() if kit.items and kit.expendables else 0,
+                "assigned_user_id": kit.assigned_user_id,
+                "assigned_user_name": kit.assigned_user.name if kit.assigned_user else None,
             })
 
         return jsonify({
