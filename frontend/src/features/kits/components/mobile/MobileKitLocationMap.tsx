@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import { MapContainer, TileLayer, Marker, Popup, Tooltip } from 'react-leaflet';
+import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { SpinLoading, Tag } from 'antd-mobile';
@@ -100,64 +100,46 @@ export const MobileKitLocationMap = ({ height = 260 }: MobileKitLocationMapProps
               : 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png'
           }
         />
-        {kitsWithLocation.map((kit) => {
-          const pinLabelParts = [
-            kit.aircraft_tail_number,
-            kit.tanker_scooper_number,
-          ].filter((part): part is string => Boolean(part));
-          const pinLabel = pinLabelParts.join(' · ');
-
-          return (
-            <Marker
-              key={kit.id}
-              position={[kit.latitude as number, kit.longitude as number]}
-              icon={makeStatusIcon(kit.status)}
-            >
-              {pinLabel && (
-                <Tooltip
-                  permanent
-                  direction="top"
-                  offset={[0, -12]}
-                  className="mobile-kit-map-pin-label"
-                >
-                  {pinLabel}
-                </Tooltip>
-              )}
-              <Popup>
-                <div style={{ minWidth: 180 }}>
-                  <div style={{ fontWeight: 600, marginBottom: 4 }}>{kit.name}</div>
-                  <div style={{ fontSize: 12, color: '#666', marginBottom: 6 }}>
-                    {kit.aircraft_type_name ?? 'No aircraft type'}
-                  </div>
-                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginBottom: 6 }}>
-                    <Tag color={STATUS_COLOR[kit.status]} fill="outline">
-                      {kit.status}
-                    </Tag>
-                    {kit.box_count !== undefined && (
-                      <Tag fill="outline">{kit.box_count} boxes</Tag>
-                    )}
-                    {kit.item_count !== undefined && (
-                      <Tag fill="outline">{kit.item_count} items</Tag>
-                    )}
-                  </div>
-                  {kit.aircraft_tail_number && (
-                    <div style={{ fontSize: 12, marginBottom: 2 }}>
-                      <strong>Tail #:</strong> {kit.aircraft_tail_number}
-                    </div>
+        {kitsWithLocation.map((kit) => (
+          <Marker
+            key={kit.id}
+            position={[kit.latitude as number, kit.longitude as number]}
+            icon={makeStatusIcon(kit.status)}
+          >
+            <Popup>
+              <div style={{ minWidth: 180 }}>
+                <div style={{ fontWeight: 600, marginBottom: 4 }}>{kit.name}</div>
+                <div style={{ fontSize: 12, color: '#666', marginBottom: 6 }}>
+                  {kit.aircraft_type_name ?? 'No aircraft type'}
+                </div>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginBottom: 6 }}>
+                  <Tag color={STATUS_COLOR[kit.status]} fill="outline">
+                    {kit.status}
+                  </Tag>
+                  {kit.box_count !== undefined && (
+                    <Tag fill="outline">{kit.box_count} boxes</Tag>
                   )}
-                  {kit.tanker_scooper_number && (
-                    <div style={{ fontSize: 12, marginBottom: 2 }}>
-                      <strong>Tanker/Scooper #:</strong> {kit.tanker_scooper_number}
-                    </div>
-                  )}
-                  {kit.full_address && (
-                    <div style={{ fontSize: 11, color: '#999' }}>{kit.full_address}</div>
+                  {kit.item_count !== undefined && (
+                    <Tag fill="outline">{kit.item_count} items</Tag>
                   )}
                 </div>
-              </Popup>
-            </Marker>
-          );
-        })}
+                {kit.aircraft_tail_number && (
+                  <div style={{ fontSize: 12, marginBottom: 2 }}>
+                    <strong>Tail #:</strong> {kit.aircraft_tail_number}
+                  </div>
+                )}
+                {kit.tanker_scooper_number && (
+                  <div style={{ fontSize: 12, marginBottom: 2 }}>
+                    <strong>Tanker/Scooper #:</strong> {kit.tanker_scooper_number}
+                  </div>
+                )}
+                {kit.full_address && (
+                  <div style={{ fontSize: 11, color: '#999' }}>{kit.full_address}</div>
+                )}
+              </div>
+            </Popup>
+          </Marker>
+        ))}
       </MapContainer>
       <div className="mobile-kit-map__footer">
         {kitsWithLocation.length} of {data.kits.length} kit
