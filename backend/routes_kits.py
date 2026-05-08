@@ -276,12 +276,19 @@ def register_kit_routes(app):
             raise ValidationError("Invalid aircraft type")
 
         # Create kit
+        def _clean(value):
+            if isinstance(value, str):
+                return value.strip() or None
+            return value
+
         kit = Kit(
             name=data["name"],
             aircraft_type_id=data["aircraft_type_id"],
             description=data.get("description", ""),
             status="active",
-            created_by=request.current_user["user_id"]
+            created_by=request.current_user["user_id"],
+            aircraft_tail_number=_clean(data.get("aircraft_tail_number")),
+            tanker_scooper_number=_clean(data.get("tanker_scooper_number")),
         )
 
         db.session.add(kit)
@@ -356,6 +363,14 @@ def register_kit_routes(app):
                     if field in address_fields:
                         address_changed = True
                 setattr(kit, field, data[field])
+
+        # Aircraft assignment fields
+        for field in ("aircraft_tail_number", "tanker_scooper_number"):
+            if field in data:
+                value = data[field]
+                if isinstance(value, str):
+                    value = value.strip() or None
+                setattr(kit, field, value)
 
         # Determine if the user explicitly provided NEW coordinates
         new_lat = data.get("latitude")
@@ -595,6 +610,8 @@ def register_kit_routes(app):
                 "longitude": kit.longitude,
                 "location_notes": kit.location_notes,
                 "trailer_number": kit.trailer_number,
+                "aircraft_tail_number": kit.aircraft_tail_number,
+                "tanker_scooper_number": kit.tanker_scooper_number,
                 "full_address": kit.get_full_address(),
                 "has_location": kit.latitude is not None and kit.longitude is not None,
                 "box_count": kit.boxes.count() if kit.boxes else 0,

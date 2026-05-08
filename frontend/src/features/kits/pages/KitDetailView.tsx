@@ -370,6 +370,12 @@ const KitDetailView = () => {
                 <Descriptions.Item label="Trailer Number" span={2}>
                   {kit.trailer_number || 'Not specified'}
                 </Descriptions.Item>
+                <Descriptions.Item label="Aircraft Tail Number">
+                  {kit.aircraft_tail_number || 'Not specified'}
+                </Descriptions.Item>
+                <Descriptions.Item label="Tanker / Scooper Number">
+                  {kit.tanker_scooper_number || 'Not specified'}
+                </Descriptions.Item>
                 <Descriptions.Item label="Location Notes" span={2}>
                   {kit.location_notes || 'No notes'}
                 </Descriptions.Item>

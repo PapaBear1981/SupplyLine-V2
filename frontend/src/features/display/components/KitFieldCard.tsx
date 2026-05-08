@@ -39,6 +39,12 @@ export const KitFieldCard = ({ kit, checkouts }: KitFieldCardProps) => {
         </div>
         <div className={styles.kitMeta}>
           {kit.aircraft_type_name && <span className={styles.aircraftType}>{kit.aircraft_type_name}</span>}
+          {kit.aircraft_tail_number && (
+            <span className={styles.kitTailNumber}>{kit.aircraft_tail_number}</span>
+          )}
+          {kit.tanker_scooper_number && (
+            <span className={styles.kitTankerNumber}>{kit.tanker_scooper_number}</span>
+          )}
           <span className={styles.kitLocation}>{formatLocation(kit)}</span>
           {kit.assigned_user_name ? (
             <span className={styles.kitAssignee}>{kit.assigned_user_name}</span>

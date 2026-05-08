@@ -46,6 +46,8 @@ export function EditKitModal({ open, kit, onClose, onSuccess }: EditKitModalProp
         longitude: kit.longitude,
         location_notes: kit.location_notes,
         trailer_number: kit.trailer_number,
+        aircraft_tail_number: kit.aircraft_tail_number,
+        tanker_scooper_number: kit.tanker_scooper_number,
         assigned_user_id: kit.assigned_user_id ?? null,
       });
     }
@@ -179,6 +181,29 @@ export function EditKitModal({ open, kit, onClose, onSuccess }: EditKitModalProp
         <Form.Item label="Description" name="description">
           <TextArea rows={3} placeholder="Enter kit description" />
         </Form.Item>
+
+        <Divider>Aircraft Assignment</Divider>
+
+        <Row gutter={16}>
+          <Col span={12}>
+            <Form.Item
+              label="Aircraft Tail Number"
+              name="aircraft_tail_number"
+              help="Tail number of the aircraft this kit supports (e.g., N123AB)"
+            >
+              <Input placeholder="e.g., N123AB" />
+            </Form.Item>
+          </Col>
+          <Col span={12}>
+            <Form.Item
+              label="Tanker / Scooper Number"
+              name="tanker_scooper_number"
+              help="Tanker or scooper number assigned to this kit"
+            >
+              <Input placeholder="e.g., T-12 or S-3" />
+            </Form.Item>
+          </Col>
+        </Row>
 
         <Divider>Location Information</Divider>
 

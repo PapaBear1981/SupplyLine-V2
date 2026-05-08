@@ -115,6 +115,17 @@ describe('KitFieldCard', () => {
     expect(screen.getByText('maintenance')).toBeInTheDocument();
   });
 
+  it('shows the aircraft tail number and tanker/scooper number when set', () => {
+    const tagged: Kit = {
+      ...baseKit,
+      aircraft_tail_number: 'N123AB',
+      tanker_scooper_number: 'T-12',
+    };
+    render(<KitFieldCard kit={tagged} checkouts={[]} />);
+    expect(screen.getByText('N123AB')).toBeInTheDocument();
+    expect(screen.getByText('T-12')).toBeInTheDocument();
+  });
+
   it('shows the assigned user when one is set, and "Unassigned" otherwise', () => {
     const assigned: Kit = { ...baseKit, assigned_user_id: 7, assigned_user_name: 'Jane Doe' };
     const { rerender } = render(<KitFieldCard kit={assigned} checkouts={[]} />);
