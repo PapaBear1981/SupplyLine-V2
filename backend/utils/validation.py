@@ -151,7 +151,7 @@ TOOL_SCHEMA = {
 
 CHEMICAL_SCHEMA = {
     "required": ["part_number", "lot_number", "quantity", "unit"],
-    "optional": ["description", "manufacturer", "location", "expiration_date", "msds_url", "category", "status", "minimum_stock_level", "notes", "warehouse_id"],
+    "optional": ["description", "manufacturer", "location", "expiration_date", "msds_url", "category", "status", "minimum_stock_level", "notes", "warehouse_id", "chemical_part_id"],
     "types": {
         "part_number": str,
         "lot_number": str,
@@ -165,7 +165,8 @@ CHEMICAL_SCHEMA = {
         "status": str,
         "minimum_stock_level": (int, float),
         "notes": str,
-        "warehouse_id": int
+        "warehouse_id": int,
+        "chemical_part_id": int
     },
     "constraints": {
         "part_number": {"max_length": 100},

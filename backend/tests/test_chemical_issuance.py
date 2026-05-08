@@ -406,6 +406,120 @@ class TestChemicalIssuanceEndpoint:
         )
         assert len(items) >= 1
 
+    def test_create_chemical_rejects_duplicate_part_number(
+        self, client, admin_user, jwt_manager, db_session
+    ):
+        """POST /api/chemicals must reject a new part_number that already exists."""
+        from models import ChemicalPart
+        wh = _warehouse(db_session)
+        existing = ChemicalPart(
+            part_number=f"P-DUP-{uuid.uuid4().hex[:6]}",
+            description="Existing part",
+            default_unit="oz",
+        )
+        db_session.add(existing)
+        db_session.commit()
+
+        admin_user.active_warehouse_id = wh.id
+        db_session.commit()
+        with client.application.app_context():
+            tokens = jwt_manager.generate_tokens(admin_user)
+        headers = {"Authorization": f"Bearer {tokens['access_token']}"}
+
+        # No chemical_part_id supplied → server should treat this as a
+        # "create new part" attempt and fail because the part already exists.
+        resp = client.post("/api/chemicals", json={
+            "part_number": existing.part_number,
+            "lot_number": f"L-{uuid.uuid4().hex[:6]}",
+            "description": "Trying to duplicate",
+            "quantity": 5,
+            "unit": "oz",
+            "warehouse_id": wh.id,
+        }, headers=headers)
+
+        assert resp.status_code == 400, resp.data
+        assert b"already exists" in resp.data
+
+    def test_create_chemical_adds_lot_to_existing_part(
+        self, client, admin_user, jwt_manager, db_session
+    ):
+        """Passing chemical_part_id adds a lot to an existing part record."""
+        from models import Chemical, ChemicalPart
+        wh = _warehouse(db_session)
+        part = ChemicalPart(
+            part_number=f"P-ADD-{uuid.uuid4().hex[:6]}",
+            description="Existing part for add-lot test",
+            manufacturer="ACME",
+            default_unit="oz",
+            minimum_stock_level=5,
+        )
+        db_session.add(part)
+        db_session.commit()
+
+        admin_user.active_warehouse_id = wh.id
+        db_session.commit()
+        with client.application.app_context():
+            tokens = jwt_manager.generate_tokens(admin_user)
+        headers = {"Authorization": f"Bearer {tokens['access_token']}"}
+
+        new_lot = f"L-{uuid.uuid4().hex[:6]}"
+        resp = client.post("/api/chemicals", json={
+            "chemical_part_id": part.id,
+            "part_number": part.part_number,
+            "lot_number": new_lot,
+            "quantity": 12,
+            "unit": "oz",
+            "warehouse_id": wh.id,
+        }, headers=headers)
+
+        assert resp.status_code == 201, resp.data
+        body = json.loads(resp.data)
+        assert body["chemical_part_id"] == part.id
+        assert body["lot_number"] == new_lot
+
+        # Lot inherits master metadata when the request omits it
+        created = db_session.query(Chemical).filter_by(lot_number=new_lot).first()
+        assert created is not None
+        assert created.description == "Existing part for add-lot test"
+        assert created.manufacturer == "ACME"
+        assert created.minimum_stock_level == 5
+        # No second ChemicalPart was created
+        part_count = db_session.query(ChemicalPart).filter_by(
+            part_number=part.part_number
+        ).count()
+        assert part_count == 1
+
+    def test_create_chemical_rejects_mismatched_part_id(
+        self, client, admin_user, jwt_manager, db_session
+    ):
+        """chemical_part_id and part_number must agree, otherwise 400."""
+        from models import ChemicalPart
+        wh = _warehouse(db_session)
+        part = ChemicalPart(
+            part_number=f"P-MISMATCH-{uuid.uuid4().hex[:6]}",
+            description="Real part",
+            default_unit="oz",
+        )
+        db_session.add(part)
+        db_session.commit()
+
+        admin_user.active_warehouse_id = wh.id
+        db_session.commit()
+        with client.application.app_context():
+            tokens = jwt_manager.generate_tokens(admin_user)
+        headers = {"Authorization": f"Bearer {tokens['access_token']}"}
+
+        resp = client.post("/api/chemicals", json={
+            "chemical_part_id": part.id,
+            "part_number": "TOTALLY-DIFFERENT-PN",
+            "lot_number": f"L-{uuid.uuid4().hex[:6]}",
+            "quantity": 1,
+            "unit": "oz",
+            "warehouse_id": wh.id,
+        }, headers=headers)
+
+        assert resp.status_code == 400, resp.data
+
     def test_parts_endpoint_aggregates_lots(self, client, admin_user, db_session):
         """/api/chemicals/parts returns one row per part with embedded lots."""
         from models import ChemicalPart

@@ -432,16 +432,56 @@ def register_chemical_routes(app):
         except SerialLotValidationError as e:
             raise ValidationError(str(e))
 
-        # Find or create the master ChemicalPart record so this lot can be
-        # aggregated with other lots of the same part number for stock,
-        # reorder, and forecasting purposes.
-        part = ChemicalPart.get_or_create(
-            validated_data["part_number"],
-            description=validated_data.get("description"),
-            manufacturer=validated_data.get("manufacturer"),
-            category=validated_data.get("category"),
-            default_unit=validated_data.get("unit"),
-            minimum_stock_level=validated_data.get("minimum_stock_level"),
+        # Resolve the master ChemicalPart for this lot. Two flows are
+        # supported:
+        #   1. The client passes `chemical_part_id` — they're explicitly
+        #      adding a lot to an existing part. The part's part_number
+        #      must match; metadata fields on the request are ignored in
+        #      favor of the part's curated values.
+        #   2. The client doesn't pass `chemical_part_id` — they intend
+        #      to create a brand-new part. Reject if a part with the same
+        #      part_number already exists, so users can't accidentally
+        #      create duplicate part records via a typo or stale form.
+        provided_part_id = validated_data.get("chemical_part_id")
+        if provided_part_id is not None:
+            part = ChemicalPart.query.get(provided_part_id)
+            if part is None:
+                raise ValidationError(
+                    f"chemical_part_id {provided_part_id} does not exist"
+                )
+            if part.part_number != validated_data["part_number"]:
+                raise ValidationError(
+                    "Part number does not match the selected chemical part"
+                )
+        else:
+            existing_part = ChemicalPart.query.filter_by(
+                part_number=validated_data["part_number"]
+            ).first()
+            if existing_part is not None:
+                raise ValidationError(
+                    f"Part number '{validated_data['part_number']}' already "
+                    "exists. Add a new lot to the existing part instead of "
+                    "creating a duplicate."
+                )
+            part = ChemicalPart.get_or_create(
+                validated_data["part_number"],
+                description=validated_data.get("description"),
+                manufacturer=validated_data.get("manufacturer"),
+                category=validated_data.get("category"),
+                default_unit=validated_data.get("unit"),
+                minimum_stock_level=validated_data.get("minimum_stock_level"),
+            )
+
+        # When adding a lot to an existing part, inherit master metadata so
+        # the lot row stays consistent with the part record. The caller can
+        # still override per-lot fields like location/expiration/quantity.
+        lot_description = validated_data.get("description") or (part.description if part else "")
+        lot_manufacturer = validated_data.get("manufacturer") or (part.manufacturer if part else "")
+        lot_category = validated_data.get("category") or (part.category if part else "General")
+        lot_min_stock = (
+            validated_data.get("minimum_stock_level")
+            if validated_data.get("minimum_stock_level") is not None
+            else (part.minimum_stock_level if part else None)
         )
 
         # Create new chemical - warehouse_id is required
@@ -449,16 +489,16 @@ def register_chemical_routes(app):
             part_number=validated_data["part_number"],
             chemical_part_id=part.id if part else None,
             lot_number=validated_data["lot_number"],
-            description=validated_data.get("description", ""),
-            manufacturer=validated_data.get("manufacturer", ""),
+            description=lot_description or "",
+            manufacturer=lot_manufacturer or "",
             quantity=validated_data["quantity"],
             unit=validated_data["unit"],
             location=validated_data.get("location", ""),
-            category=validated_data.get("category", "General"),
+            category=lot_category,
             status=validated_data.get("status", "available"),
             warehouse_id=data["warehouse_id"],  # Required field
             expiration_date=validated_data.get("expiration_date"),
-            minimum_stock_level=validated_data.get("minimum_stock_level"),
+            minimum_stock_level=lot_min_stock,
             notes=validated_data.get("notes", "")
         )
 
