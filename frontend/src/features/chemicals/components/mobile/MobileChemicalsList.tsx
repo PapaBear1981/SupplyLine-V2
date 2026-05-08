@@ -232,8 +232,9 @@ export const MobileChemicalsList = () => {
       }
       setShowFormPopup(false);
       refetch();
-    } catch {
-      Toast.show({ content: 'Failed to save chemical', icon: 'fail' });
+    } catch (error: unknown) {
+      const err = error as { data?: { error?: string } };
+      Toast.show({ content: err.data?.error || 'Failed to save chemical', icon: 'fail' });
     }
   };
 
