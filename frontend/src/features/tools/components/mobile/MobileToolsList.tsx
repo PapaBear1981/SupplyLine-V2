@@ -167,6 +167,15 @@ export const MobileToolsList = () => {
   const [selectedTool, setSelectedTool] = useState<Tool | null>(null);
   const [formMode, setFormMode] = useState<'create' | 'edit'>('create');
   const [page, setPage] = useState(1);
+  // Accumulate tools across pages so InfiniteScroll grows the list instead of
+  // replacing it. We can't push this into RTK Query's serializeQueryArgs/merge
+  // because the desktop ToolsTable shares the endpoint with traditional
+  // pagination and expects each page to replace, not append.
+  const [accumulator, setAccumulator] = useState<{
+    key: string;
+    tools: Tool[];
+    lastMergedSource: Tool[] | null;
+  }>({ key: '', tools: [], lastMergedSource: null });
   const [labelSheetOpen, setLabelSheetOpen] = useState(false);
   const [form] = Form.useForm();
 
@@ -213,7 +222,40 @@ export const MobileToolsList = () => {
   const [updateTool, { isLoading: isUpdating }] = useUpdateToolMutation();
   const [deleteTool] = useDeleteToolMutation();
 
-  const tools = toolsData?.tools || [];
+  // Merge successive pages into a single displayed list. Without this, setting
+  // page=2 would refetch and render only items 21-40 (page 1 vanishes),
+  // shrinking the list below viewport height. Because InfiniteScroll's loader
+  // element stays in view, it would re-fire loadMore immediately, trapping the
+  // scroll container at the bottom in a fetch loop until reload.
+  //
+  // We update the accumulator by setting state during render (a documented
+  // React pattern for adjusting state when an external value changes; see
+  // react.dev/learn/you-might-not-need-an-effect#adjusting-some-state-when-a-prop-changes).
+  // The conditions guarantee at most one extra render per fetch.
+  const queryKey = `${searchQuery}|${statusFilter}`;
+  if (accumulator.key !== queryKey) {
+    setAccumulator({ key: queryKey, tools: [], lastMergedSource: null });
+  } else if (toolsData?.tools && toolsData.tools !== accumulator.lastMergedSource) {
+    // RTK Query returns a fresh array reference on every successful fetch, so
+    // identity comparison handles both new pages and pull-to-refresh refetches.
+    if (page === 1) {
+      setAccumulator({
+        key: queryKey,
+        tools: toolsData.tools,
+        lastMergedSource: toolsData.tools,
+      });
+    } else {
+      const seen = new Set(accumulator.tools.map((t) => t.id));
+      const additions = toolsData.tools.filter((t) => !seen.has(t.id));
+      setAccumulator({
+        key: queryKey,
+        tools: additions.length === 0 ? accumulator.tools : [...accumulator.tools, ...additions],
+        lastMergedSource: toolsData.tools,
+      });
+    }
+  }
+
+  const tools = accumulator.key === queryKey ? accumulator.tools : [];
   const hasMore = toolsData ? page < toolsData.pages : false;
 
   const warehouseOptions = useMemo(() => {
@@ -226,20 +268,23 @@ export const MobileToolsList = () => {
     ]];
   }, [warehousesData]);
 
-  const handleSearch = (value: string) => {
-    setSearchQuery(value);
+  const resetList = () => {
     setPage(1);
   };
 
+  const handleSearch = (value: string) => {
+    setSearchQuery(value);
+    resetList();
+  };
+
   const handleRefresh = async () => {
-    setPage(1);
+    resetList();
     await refetch();
   };
 
   const loadMore = async () => {
-    if (hasMore) {
-      setPage(p => p + 1);
-    }
+    if (isFetching || !hasMore) return;
+    setPage((p) => p + 1);
   };
 
   const handleToolClick = (tool: Tool) => {
@@ -416,7 +461,7 @@ export const MobileToolsList = () => {
             <CloseOutline
               onClick={() => {
                 setStatusFilter('');
-                setPage(1);
+                resetList();
               }}
               style={{ marginLeft: 4 }}
             />
@@ -426,7 +471,7 @@ export const MobileToolsList = () => {
 
       {/* Tool List */}
       <PullToRefresh onRefresh={handleRefresh}>
-        {isLoading ? (
+        {(isLoading || isFetching) && tools.length === 0 ? (
           <div style={{ padding: 16 }}>
             {[1, 2, 3, 4, 5].map(i => (
               <Skeleton key={i} animated className="tool-skeleton" />
@@ -435,13 +480,14 @@ export const MobileToolsList = () => {
         ) : tools.length === 0 ? (
           <Empty description="No tools found" style={{ padding: '48px 0' }} />
         ) : (
-          <List>
-            {tools.map(renderToolItem)}
-          </List>
+          <>
+            <List>
+              {tools.map(renderToolItem)}
+            </List>
+            <InfiniteScroll loadMore={loadMore} hasMore={hasMore && !isFetching} />
+          </>
         )}
       </PullToRefresh>
-
-      <InfiniteScroll loadMore={loadMore} hasMore={hasMore && !isFetching} />
 
       {/* Floating Add Button */}
       <FloatingBubble
@@ -471,7 +517,7 @@ export const MobileToolsList = () => {
               onClick={() => {
                 setStatusFilter('');
                 setShowFilterPopup(false);
-                setPage(1);
+                resetList();
               }}
             >
               Clear
@@ -493,7 +539,7 @@ export const MobileToolsList = () => {
                 onClick={() => {
                   setStatusFilter(option.value as ToolStatus);
                   setShowFilterPopup(false);
-                  setPage(1);
+                  resetList();
                 }}
                 style={{ margin: 4, padding: '6px 12px' }}
               >
