@@ -14,7 +14,7 @@ import json
 
 import pytest
 
-from models import User
+from models import RequestItem, User, UserRequest
 from models_kits import AircraftType, Kit, KitBox, KitExpendable, KitReorderRequest, KitTransfer
 
 
@@ -243,6 +243,112 @@ class TestIssuanceTriggeringReorder:
         assert reorder.quantity_requested == 50.0  # Should request minimum_stock_level
         assert reorder.priority in ["medium", "high"]
         assert reorder.part_number == "EXP-REORDER"
+
+        # Verify a unified UserRequest was also created so the reorder shows up
+        # on the Requests/Fulfillment page (not only on the kit screen).
+        request_item = RequestItem.query.filter_by(
+            source_type="kit_reorder",
+            kit_reorder_request_id=reorder.id,
+        ).first()
+        assert request_item is not None, "Auto-reorder must create a RequestItem"
+        assert request_item.part_number == "EXP-REORDER"
+        assert request_item.kit_id == kit.id
+
+        user_request = UserRequest.query.get(request_item.request_id)
+        assert user_request is not None
+        assert user_request.request_number is not None
+        assert user_request.request_number.startswith("REQ-")
+        # Surfaced on the Requests page in a non-terminal state
+        assert user_request.status in {"new", "in_progress"}
+
+    def test_issuance_triggers_automatic_reorder_kititem_path(
+        self, client, auth_headers_materials, auth_headers_admin, aircraft_type, db_session
+    ):
+        """Auto-reorder must also create a UserRequest when stock is tracked
+        in the newer KitItem table (not the legacy KitExpendable table)."""
+        from models import Expendable
+        from models_kits import KitItem
+
+        import uuid
+        kit = Kit(
+            name=f"KitItem Reorder Kit {uuid.uuid4().hex[:8]}",
+            aircraft_type_id=aircraft_type.id,
+            description="KitItem reorder path",
+            status="active",
+            created_by=1,
+        )
+        db_session.add(kit)
+        db_session.flush()
+
+        box = KitBox(
+            kit_id=kit.id,
+            box_number="1",
+            box_type="expendable",
+            description="Expendables",
+        )
+        db_session.add(box)
+        db_session.flush()
+
+        # Underlying Expendable inventory record
+        expendable = Expendable(
+            part_number="EXP-KITITEM",
+            lot_number=f"LOT-{uuid.uuid4().hex[:8]}",
+            description="KitItem-tracked expendable",
+            quantity=5.0,
+            unit="ea",
+            status="available",
+        )
+        db_session.add(expendable)
+        db_session.flush()
+
+        # KitItem linking it to the kit (this is the row /issue updates)
+        kit_item = KitItem(
+            kit_id=kit.id,
+            box_id=box.id,
+            item_type="expendable",
+            item_id=expendable.id,
+            part_number=expendable.part_number,
+            lot_number=expendable.lot_number,
+            description=expendable.description,
+            quantity=5.0,
+            location="Box 1",
+            status="available",
+        )
+        db_session.add(kit_item)
+        db_session.commit()
+
+        # Issue the entire quantity — triggers auto-reorder (out of stock)
+        response = client.post(
+            f"/api/kits/{kit.id}/issue",
+            json={
+                "item_type": "expendable",
+                "item_id": kit_item.id,
+                "quantity": 5.0,
+                "purpose": "Drain stock",
+            },
+            headers=auth_headers_admin,
+        )
+        assert response.status_code == 201
+
+        reorder = KitReorderRequest.query.filter_by(
+            kit_id=kit.id,
+            item_id=kit_item.id,
+            is_automatic=True,
+        ).first()
+        assert reorder is not None
+        assert reorder.status == "pending"
+        assert reorder.priority == "high"  # quantity == 0
+
+        # The unified UserRequest must exist so the reorder surfaces on the
+        # Requests/Fulfillment page rather than only on the kit screen.
+        request_item = RequestItem.query.filter_by(
+            source_type="kit_reorder",
+            kit_reorder_request_id=reorder.id,
+        ).first()
+        assert request_item is not None
+        user_request = UserRequest.query.get(request_item.request_id)
+        assert user_request is not None
+        assert user_request.request_number is not None
 
 
 class TestTransferCompletingAndUpdatingInventory:
