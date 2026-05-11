@@ -29,7 +29,8 @@ import {
   ClockCircleOutlined,
 } from '@ant-design/icons';
 import dayjs from 'dayjs';
-import { useGetToolsQuery, useGetToolQuery, useCreateToolMutation, useUpdateToolMutation, useDeleteToolMutation, useGetToolCalibrationsQuery } from '../../services/toolsApi';
+import { useAppDispatch } from '@app/hooks';
+import { useGetToolsQuery, useGetToolQuery, useCreateToolMutation, useUpdateToolMutation, useDeleteToolMutation, useGetToolCalibrationsQuery, toolsApi } from '../../services/toolsApi';
 import { useGetWarehousesQuery } from '@features/warehouses/services/warehousesApi';
 import { useGetToolTimelineQuery } from '@features/tool-checkout';
 import type { Tool, ToolStatus, CalibrationStatus, ToolFormData } from '../../types';
@@ -171,11 +172,15 @@ export const MobileToolsList = () => {
   // replacing it. We can't push this into RTK Query's serializeQueryArgs/merge
   // because the desktop ToolsTable shares the endpoint with traditional
   // pagination and expects each page to replace, not append.
+  //
+  // Slices are stored per page so an in-place refetch of page N (after an
+  // edit/delete/refresh) replaces that page's rows instead of being silently
+  // skipped by an append-only merge.
   const [accumulator, setAccumulator] = useState<{
     key: string;
-    tools: Tool[];
-    lastMergedSource: Tool[] | null;
-  }>({ key: '', tools: [], lastMergedSource: null });
+    pageSlices: Record<number, Tool[]>;
+    sourceRefs: Record<number, Tool[]>;
+  }>({ key: '', pageSlices: {}, sourceRefs: {} });
   const [labelSheetOpen, setLabelSheetOpen] = useState(false);
   const [form] = Form.useForm();
 
@@ -221,6 +226,7 @@ export const MobileToolsList = () => {
   const [createTool, { isLoading: isCreating }] = useCreateToolMutation();
   const [updateTool, { isLoading: isUpdating }] = useUpdateToolMutation();
   const [deleteTool] = useDeleteToolMutation();
+  const dispatch = useAppDispatch();
 
   // Merge successive pages into a single displayed list. Without this, setting
   // page=2 would refetch and render only items 21-40 (page 1 vanishes),
@@ -228,34 +234,49 @@ export const MobileToolsList = () => {
   // element stays in view, it would re-fire loadMore immediately, trapping the
   // scroll container at the bottom in a fetch loop until reload.
   //
-  // We update the accumulator by setting state during render (a documented
+  // We store per-page slices so a refetch of page N (after an edit/delete or
+  // pull-to-refresh) replaces that page's rows in place. RTK Query returns a
+  // fresh array reference on every successful fetch, so identity comparison
+  // distinguishes a real refetch from a no-op re-render.
+  //
+  // The accumulator is updated by setting state during render — a documented
   // React pattern for adjusting state when an external value changes; see
-  // react.dev/learn/you-might-not-need-an-effect#adjusting-some-state-when-a-prop-changes).
+  // react.dev/learn/you-might-not-need-an-effect#adjusting-some-state-when-a-prop-changes.
   // The conditions guarantee at most one extra render per fetch.
   const queryKey = `${searchQuery}|${statusFilter}`;
   if (accumulator.key !== queryKey) {
-    setAccumulator({ key: queryKey, tools: [], lastMergedSource: null });
-  } else if (toolsData?.tools && toolsData.tools !== accumulator.lastMergedSource) {
-    // RTK Query returns a fresh array reference on every successful fetch, so
-    // identity comparison handles both new pages and pull-to-refresh refetches.
-    if (page === 1) {
-      setAccumulator({
-        key: queryKey,
-        tools: toolsData.tools,
-        lastMergedSource: toolsData.tools,
-      });
-    } else {
-      const seen = new Set(accumulator.tools.map((t) => t.id));
-      const additions = toolsData.tools.filter((t) => !seen.has(t.id));
-      setAccumulator({
-        key: queryKey,
-        tools: additions.length === 0 ? accumulator.tools : [...accumulator.tools, ...additions],
-        lastMergedSource: toolsData.tools,
-      });
-    }
+    setAccumulator({ key: queryKey, pageSlices: {}, sourceRefs: {} });
+  } else if (
+    toolsData?.tools &&
+    toolsData.tools !== accumulator.sourceRefs[page]
+  ) {
+    setAccumulator({
+      key: queryKey,
+      pageSlices: { ...accumulator.pageSlices, [page]: toolsData.tools },
+      sourceRefs: { ...accumulator.sourceRefs, [page]: toolsData.tools },
+    });
   }
 
-  const tools = accumulator.key === queryKey ? accumulator.tools : [];
+  // Flatten the per-page slices in page order. Deduplicate by id so that a
+  // tool moving between pages (e.g. after a sort or backend reorder) doesn't
+  // appear twice; the lower-numbered page wins.
+  const tools = useMemo<Tool[]>(() => {
+    if (accumulator.key !== queryKey) return [];
+    const pages = Object.keys(accumulator.pageSlices)
+      .map(Number)
+      .sort((a, b) => a - b);
+    const seen = new Set<number>();
+    const flat: Tool[] = [];
+    for (const p of pages) {
+      for (const t of accumulator.pageSlices[p]) {
+        if (seen.has(t.id)) continue;
+        seen.add(t.id);
+        flat.push(t);
+      }
+    }
+    return flat;
+  }, [accumulator, queryKey]);
+
   const hasMore = toolsData ? page < toolsData.pages : false;
 
   const warehouseOptions = useMemo(() => {
@@ -278,8 +299,28 @@ export const MobileToolsList = () => {
   };
 
   const handleRefresh = async () => {
-    resetList();
-    await refetch();
+    if (page === 1) {
+      // Already subscribed to {page:1}; refetch hits the right cache entry,
+      // and the merge logic replaces pageSlices[1] when the new array
+      // reference arrives.
+      await refetch();
+      return;
+    }
+    // Otherwise refetch() would target the still-subscribed {page:N>1} entry
+    // (state updates aren't visible until the next render), and once we drop
+    // back to page 1 RTK Query would serve the existing page-1 cache without
+    // refetching. Invalidate the LIST tag so every paged cache entry is
+    // marked stale; the new {page:1} subscription triggered by setPage(1)
+    // will refetch fresh data. We also drop the stale page-2+ slices from
+    // the accumulator so they don't briefly trail the fresh page-1 list
+    // while it's reloading.
+    setAccumulator((prev) => ({
+      ...prev,
+      pageSlices: {},
+      sourceRefs: {},
+    }));
+    dispatch(toolsApi.util.invalidateTags([{ type: 'Tool', id: 'LIST' }]));
+    setPage(1);
   };
 
   const loadMore = async () => {

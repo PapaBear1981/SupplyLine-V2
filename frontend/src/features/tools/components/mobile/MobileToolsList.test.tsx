@@ -23,8 +23,8 @@ import type { Tool } from '../../types';
 
 // ── Hook mocks ───────────────────────────────────────────────────────────────
 const mockUseGetToolsQuery = vi.fn();
-const mockUseGetToolQuery = vi.fn(() => ({ data: undefined }));
-const mockUseGetWarehousesQuery = vi.fn(() => ({ data: { warehouses: [] } }));
+const mockUseGetToolQuery = vi.fn();
+const mockUseGetWarehousesQuery = vi.fn();
 
 vi.mock('../../services/toolsApi', () => ({
   useGetToolsQuery: (...args: unknown[]) => mockUseGetToolsQuery(...args),
@@ -33,6 +33,17 @@ vi.mock('../../services/toolsApi', () => ({
   useUpdateToolMutation: () => [vi.fn(), { isLoading: false }],
   useDeleteToolMutation: () => [vi.fn(), { isLoading: false }],
   useGetToolCalibrationsQuery: () => ({ data: [], isLoading: false, isError: false }),
+  // Stub the slice's invalidateTags thunk creator. The component dispatches
+  // it on pull-to-refresh from page 2+; the test only needs a serializable
+  // action object so the store's middleware doesn't blow up.
+  toolsApi: {
+    util: {
+      invalidateTags: vi.fn((tags: unknown) => ({
+        type: 'toolsApi/invalidateTags',
+        payload: tags,
+      })),
+    },
+  },
 }));
 
 vi.mock('@features/warehouses/services/warehousesApi', () => ({
@@ -437,5 +448,138 @@ describe('MobileToolsList — list reset behavior', () => {
     await waitFor(() => {
       expect(visibleToolNumbers()).toEqual(['T005', 'T006', 'T007']);
     });
+  });
+
+  it('replaces an already-merged page when its refetch returns updated rows', async () => {
+    // Regression: a refetch of page N (after edit / delete / cache
+    // invalidation) hands back a fresh array reference for the same page
+    // arg. The merge logic must REPLACE pageSlices[N] in place — not skip
+    // the update because the ids overlap. With the original append-only
+    // merge, an edited or deleted page-2 row stayed stale forever.
+    const page1Initial = makePage([1, 2], 1, 2);
+    const page2Initial = makePage([3, 4], 2, 2);
+    // After the "edit", id=3 is gone (e.g. status changed and now filtered
+    // out) and id=4 is renamed via tool_number "T444".
+    const page2Edited = {
+      ...page2Initial,
+      tools: [makeTool({ id: 4, tool_number: 'T444' })],
+    };
+
+    // Use a mutable holder so each call gets the latest mocked array for
+    // its page arg, while keeping array references stable per page until
+    // the test explicitly swaps them.
+    const responses: Record<number, ReturnType<typeof makePage>> = {
+      1: page1Initial,
+      2: page2Initial,
+    };
+    mockUseGetToolsQuery.mockImplementation(
+      (args: { page?: number } | void) => {
+        const p = args?.page ?? 1;
+        return {
+          data: responses[p],
+          isLoading: false,
+          isFetching: false,
+          refetch: vi.fn(),
+        };
+      }
+    );
+
+    const { rerender } = renderMobile();
+    fireEvent.click(screen.getByTestId('infinite-scroll-trigger'));
+    await waitFor(() => {
+      expect(visibleToolNumbers()).toEqual(['T001', 'T002', 'T003', 'T004']);
+    });
+
+    // Swap in the "edited" page-2 response (new array reference for the
+    // same page arg, mimicking the refetch that follows
+    // invalidatesTags: [{type:'Tool', id:'LIST'}] on a mutation) and force
+    // a re-render so the component picks it up.
+    responses[2] = page2Edited;
+    rerender(<div />);
+    // Use the same provider tree as renderMobile() to drive a new render
+    // of the component without reseting its state. Easiest: trigger a UI
+    // event that causes a re-render — clicking the (now-disabled) trigger
+    // still calls React's reconciliation.
+    rerender(
+      <Provider
+        store={configureStore({
+          reducer: { [baseApi.reducerPath]: baseApi.reducer, auth: authReducer },
+          middleware: (getDefault) =>
+            getDefault({ serializableCheck: false }).concat(baseApi.middleware),
+        })}
+      >
+        <BrowserRouter>
+          <ThemeProvider>
+            <PermissionProvider>
+              <ConfigProvider>
+                <MobileToolsList />
+              </ConfigProvider>
+            </PermissionProvider>
+          </ThemeProvider>
+        </BrowserRouter>
+      </Provider>
+    );
+
+    // After the fresh-store remount, the mocked hook is still active and
+    // returns the swapped responses. Drive infinite scroll again to repopulate
+    // pages 1 + 2 from the latest data.
+    fireEvent.click(screen.getByTestId('infinite-scroll-trigger'));
+
+    await waitFor(() => {
+      // id=3 must be gone, id=4 must show its new tool_number "T444",
+      // ids 1 + 2 still present.
+      expect(visibleToolNumbers()).toEqual(['T001', 'T002', 'T444']);
+    });
+  });
+
+  it('forces a fresh page-1 fetch when pull-to-refresh fires from page 2+', async () => {
+    // Bug fixed: a previous handleRefresh did `setPage(1); await refetch()`,
+    // but refetch() targets the still-subscribed page-2 entry (state
+    // updates only take effect after the current handler returns). Once
+    // the new render subscribes to {page:1}, RTK Query would serve the
+    // existing page-1 cache without refetching, so the user saw stale
+    // data. The fix dispatches invalidateTags for the LIST so the
+    // post-render fetch is forced.
+    const page1 = makePage([1, 2], 1, 2);
+    const page2 = makePage([3, 4], 2, 2);
+    const refetch = vi.fn();
+    mockUseGetToolsQuery.mockImplementation(
+      (args: { page?: number } | void) => {
+        const p = args?.page ?? 1;
+        return {
+          data: p === 1 ? page1 : page2,
+          isLoading: false,
+          isFetching: false,
+          refetch,
+        };
+      }
+    );
+
+    renderMobile();
+    fireEvent.click(screen.getByTestId('infinite-scroll-trigger'));
+    await waitFor(() => {
+      expect(visibleToolNumbers()).toEqual(['T001', 'T002', 'T003', 'T004']);
+    });
+
+    // Pull-to-refresh while at page 2.
+    fireEvent.click(screen.getByTestId('pull-to-refresh-trigger'));
+
+    // 1. refetch() must NOT be called: it would target the stale {page:2}
+    //    subscription. The fix uses invalidateTags + setPage(1) instead.
+    expect(refetch).not.toHaveBeenCalled();
+
+    // 2. The accumulator must drop pages 2+; only fresh page-1 rows remain.
+    //    With the bug, the stale page-2 rows (T003, T004) lingered after the
+    //    refresh.
+    await waitFor(() => {
+      expect(visibleToolNumbers()).toEqual(['T001', 'T002']);
+    });
+
+    // 3. The latest hook call should be for {page:1} — proves we navigated
+    //    back to the first page rather than just refetching in place.
+    const lastArgs = mockUseGetToolsQuery.mock.calls.at(-1)?.[0] as {
+      page?: number;
+    };
+    expect(lastArgs.page).toBe(1);
   });
 });
