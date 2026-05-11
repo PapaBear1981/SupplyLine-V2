@@ -152,6 +152,11 @@ export const ALL_MENU_ITEMS: MenuItemWithPermission[] = [
         label: 'Transfers',
         permission: 'transfer.view',
       },
+      {
+        key: ROUTES.ONCALL_SCHEDULE,
+        icon: <PhoneOutlined />,
+        label: 'On-Call Schedule',
+      },
     ],
   },
   {
@@ -159,11 +164,6 @@ export const ALL_MENU_ITEMS: MenuItemWithPermission[] = [
     icon: <HomeOutlined />,
     label: 'Warehouses',
     permission: 'page.warehouses',
-  },
-  {
-    key: ROUTES.ONCALL_SCHEDULE,
-    icon: <PhoneOutlined />,
-    label: 'On-Call Schedule',
   },
   {
     key: ROUTES.REPORTS,
