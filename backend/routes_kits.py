@@ -1190,6 +1190,15 @@ def register_kit_routes(app):
             if not item:
                 raise ValidationError("Chemical not found")
 
+            # Enforce master chemical list: only chemicals linked to a
+            # ChemicalPart record can be transferred into a kit.
+            if item.chemical_part_id is None:
+                raise ValidationError(
+                    f"Chemical '{item.part_number}' is not linked to the "
+                    "master chemical list. Add the part to the master list "
+                    "before transferring it to a kit."
+                )
+
             # Verify chemical is in the specified warehouse
             if item.warehouse_id != data["warehouse_id"]:
                 raise ValidationError(f"Chemical is not in the specified warehouse. Chemical is in warehouse ID: {item.warehouse_id}")

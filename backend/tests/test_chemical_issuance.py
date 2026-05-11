@@ -406,11 +406,11 @@ class TestChemicalIssuanceEndpoint:
         )
         assert len(items) >= 1
 
-    def test_create_chemical_rejects_duplicate_part_number(
+    def test_create_chemical_resolves_existing_part_by_part_number(
         self, client, admin_user, jwt_manager, db_session
     ):
-        """POST /api/chemicals must reject a new part_number that already exists."""
-        from models import ChemicalPart
+        """Without chemical_part_id, the lot is attached to a matching master part."""
+        from models import Chemical, ChemicalPart
         wh = _warehouse(db_session)
         existing = ChemicalPart(
             part_number=f"P-DUP-{uuid.uuid4().hex[:6]}",
@@ -426,19 +426,52 @@ class TestChemicalIssuanceEndpoint:
             tokens = jwt_manager.generate_tokens(admin_user)
         headers = {"Authorization": f"Bearer {tokens['access_token']}"}
 
-        # No chemical_part_id supplied → server should treat this as a
-        # "create new part" attempt and fail because the part already exists.
+        # No chemical_part_id supplied: the route should look up the master
+        # part by part_number and attach the new lot to it.
+        new_lot = f"L-{uuid.uuid4().hex[:6]}"
         resp = client.post("/api/chemicals", json={
             "part_number": existing.part_number,
+            "lot_number": new_lot,
+            "description": "Adding a lot via part_number",
+            "quantity": 5,
+            "unit": "oz",
+            "warehouse_id": wh.id,
+        }, headers=headers)
+
+        assert resp.status_code == 201, resp.data
+        created = db_session.query(Chemical).filter_by(lot_number=new_lot).first()
+        assert created is not None
+        assert created.chemical_part_id == existing.id
+        # No duplicate ChemicalPart was created
+        part_count = db_session.query(ChemicalPart).filter_by(
+            part_number=existing.part_number
+        ).count()
+        assert part_count == 1
+
+    def test_create_chemical_rejects_unknown_part_number(
+        self, client, admin_user, jwt_manager, db_session
+    ):
+        """POST /api/chemicals must reject a part_number not on the master list."""
+        wh = _warehouse(db_session)
+
+        admin_user.active_warehouse_id = wh.id
+        db_session.commit()
+        with client.application.app_context():
+            tokens = jwt_manager.generate_tokens(admin_user)
+        headers = {"Authorization": f"Bearer {tokens['access_token']}"}
+
+        unknown_part = f"P-UNKNOWN-{uuid.uuid4().hex[:6]}"
+        resp = client.post("/api/chemicals", json={
+            "part_number": unknown_part,
             "lot_number": f"L-{uuid.uuid4().hex[:6]}",
-            "description": "Trying to duplicate",
+            "description": "No master part",
             "quantity": 5,
             "unit": "oz",
             "warehouse_id": wh.id,
         }, headers=headers)
 
         assert resp.status_code == 400, resp.data
-        assert b"already exists" in resp.data
+        assert b"master chemical list" in resp.data
 
     def test_create_chemical_adds_lot_to_existing_part(
         self, client, admin_user, jwt_manager, db_session

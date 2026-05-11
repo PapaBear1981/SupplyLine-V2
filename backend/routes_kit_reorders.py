@@ -11,7 +11,7 @@ from datetime import datetime
 from flask import current_app, jsonify, request
 
 from auth import department_required, jwt_required
-from models import AuditLog, ProcurementOrder, db
+from models import AuditLog, ChemicalPart, ProcurementOrder, db
 from models_kits import Kit, KitBox, KitExpendable, KitItem, KitReorderRequest
 from utils.error_handler import ValidationError, handle_errors
 from utils.file_validation import FileValidationError, validate_image_upload
@@ -550,6 +550,12 @@ def register_kit_reorder_routes(app):
 
                     # Validate quantity for chemicals (check warehouse stock)
                     if reorder.item_type == "chemical":
+                        if warehouse_item.chemical_part_id is None:
+                            raise ValidationError(
+                                f"Chemical '{warehouse_item.part_number}' is not "
+                                "linked to the master chemical list. Add the part "
+                                "to the master list before transferring it to a kit."
+                            )
                         if warehouse_item.quantity < reorder.quantity_requested:
                             raise ValidationError(
                                 f"Insufficient quantity in warehouse. Available: {warehouse_item.quantity}, Requested: {reorder.quantity_requested}"
@@ -629,21 +635,39 @@ def register_kit_reorder_routes(app):
                         created_at=datetime.now()
                     )
                 else:  # chemical
+                    # Enforce master chemical list: a new lot can only be
+                    # auto-created if the part_number is already on the
+                    # master chemical list (ChemicalPart). If the part is
+                    # not on the list, refuse to fulfill the reorder so
+                    # rogue chemicals can't enter the system through the
+                    # kit reorder flow.
+                    chemical_part = ChemicalPart.query.filter_by(
+                        part_number=reorder.part_number
+                    ).first()
+                    if chemical_part is None:
+                        raise ValidationError(
+                            f"Part number '{reorder.part_number}' is not on the "
+                            "master chemical list. Add the chemical part to the "
+                            "master list before fulfilling this reorder."
+                        )
+
                     # For chemicals, we need a lot number (required field)
                     # Generate one if not provided
                     lot_number = reorder.notes or f'LOT-{reorder.part_number}-{datetime.now().strftime("%Y%m%d%H%M%S")}'
 
                     warehouse_item = Chemical(
                         part_number=reorder.part_number,
+                        chemical_part_id=chemical_part.id,
                         lot_number=lot_number,
-                        description=reorder.description,
-                        manufacturer="Unknown",
+                        description=reorder.description or chemical_part.description,
+                        manufacturer=chemical_part.manufacturer or "Unknown",
                         quantity=int(reorder.quantity_requested),
-                        unit="ea",
+                        unit=chemical_part.default_unit or "ea",
                         location=f"Warehouse {default_warehouse.name}",
-                        category="General",
+                        category=chemical_part.category or "General",
                         status="available",
                         warehouse_id=default_warehouse.id,
+                        minimum_stock_level=chemical_part.minimum_stock_level,
                         date_added=datetime.now()
                     )
 

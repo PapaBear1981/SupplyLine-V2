@@ -282,9 +282,18 @@ def test_tool(db_session, test_warehouse):
 @pytest.fixture
 def test_chemical(db_session, test_warehouse):
     """Create a test chemical in the test warehouse."""
-    from models import Chemical
+    from models import Chemical, ChemicalPart
+    part_number = f"CHEM{uuid.uuid4().hex[:6].upper()}"
+    part = ChemicalPart(
+        part_number=part_number,
+        description="Test Chemical",
+        default_unit="each",
+    )
+    db_session.add(part)
+    db_session.flush()
     chemical = Chemical(
-        part_number=f"CHEM{uuid.uuid4().hex[:6].upper()}",
+        part_number=part_number,
+        chemical_part_id=part.id,
         lot_number=f"LOT{uuid.uuid4().hex[:6].upper()}",
         description="Test Chemical",
         quantity=100,
@@ -300,9 +309,18 @@ def test_chemical(db_session, test_warehouse):
 @pytest.fixture
 def sample_chemical(db_session, test_warehouse):
     """Create a chemical with ample stock for issuance/return workflow tests."""
-    from models import Chemical
+    from models import Chemical, ChemicalPart
+    part_number = f"SAMP{uuid.uuid4().hex[:6].upper()}"
+    part = ChemicalPart(
+        part_number=part_number,
+        description="Sample Chemical for testing",
+        default_unit="oz",
+    )
+    db_session.add(part)
+    db_session.flush()
     chemical = Chemical(
-        part_number=f"SAMP{uuid.uuid4().hex[:6].upper()}",
+        part_number=part_number,
+        chemical_part_id=part.id,
         lot_number=f"SL{uuid.uuid4().hex[:6].upper()}",
         description="Sample Chemical for testing",
         quantity=100,

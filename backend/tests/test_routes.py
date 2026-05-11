@@ -318,6 +318,14 @@ class TestChemicalRoutes:
 
     def test_create_chemical_materials_user(self, client, auth_headers_materials, db_session, test_warehouse):
         """Test creating chemical as materials user"""
+        from models import ChemicalPart
+        db_session.add(ChemicalPart(
+            part_number="C002",
+            description="Master part for C002",
+            default_unit="ml",
+        ))
+        db_session.commit()
+
         chemical_data = {
             "part_number": "C002",
             "lot_number": "L002",

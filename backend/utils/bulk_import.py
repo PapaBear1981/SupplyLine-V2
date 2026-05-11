@@ -7,7 +7,7 @@ import logging
 from datetime import datetime
 from typing import Any
 
-from models import Chemical, Tool, db
+from models import Chemical, ChemicalPart, Tool, db
 from utils.file_validation import neutralize_csv_formula, sanitize_csv_cell
 from utils.validation import ValidationError, validate_schema
 
@@ -380,6 +380,22 @@ def bulk_import_chemicals(csv_content: str, skip_duplicates: bool = True) -> Bul
             # Validate chemical data
             chemical_data = validate_chemical_data(row)
 
+            # Enforce master chemical list: every imported lot must belong to
+            # an existing ChemicalPart. Bulk import cannot create part records;
+            # the part must be curated up front via the master list.
+            part = ChemicalPart.query.filter_by(
+                part_number=chemical_data["part_number"]
+            ).first()
+            if part is None:
+                result.add_error(
+                    row_number,
+                    row,
+                    f"Part number '{chemical_data['part_number']}' is not on "
+                    "the master chemical list. Add it to the master list "
+                    "before importing lots."
+                )
+                continue
+
             # Check for duplicates
             existing_chemical = check_duplicate_chemical(chemical_data)
             if existing_chemical:
@@ -393,6 +409,7 @@ def bulk_import_chemicals(csv_content: str, skip_duplicates: bool = True) -> Bul
 
             # Create new chemical - remove fields that don't exist in the model
             chemical_model_data = {k: v for k, v in chemical_data.items() if k != "msds_url"}
+            chemical_model_data["chemical_part_id"] = part.id
             chemical = Chemical(**chemical_model_data)
             db.session.add(chemical)
             db.session.flush()  # Get the ID without committing
