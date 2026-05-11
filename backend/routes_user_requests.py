@@ -609,11 +609,17 @@ def register_user_request_routes(app):
         if user_request.status in CLOSED_STATUSES:
             raise ValidationError("Cannot cancel a closed request")
 
+        from models_kits import KitReorderRequest
+
         user_request.status = "cancelled"
-        # Cancel all pending items
+        # Cancel all pending items and propagate to linked kit reorder requests
         for item in user_request.items.all():
             if item.status not in ("received", "cancelled"):
                 item.status = "cancelled"
+            if item.source_type == "kit_reorder" and item.kit_reorder_request_id:
+                reorder = db.session.get(KitReorderRequest, item.kit_reorder_request_id)
+                if reorder and reorder.status not in ("fulfilled", "cancelled"):
+                    reorder.status = "cancelled"
 
         actor_id = current_user.get("user_id")
         audit = AuditLog(
@@ -658,6 +664,8 @@ def register_user_request_routes(app):
         if len(cancellation_reason) < 10:
             raise ValidationError("Cancellation reason must be at least 10 characters")
 
+        from models_kits import KitReorderRequest
+
         cancelled_items = []
         for item_id in item_ids:
             item = db.session.get(RequestItem, item_id)
@@ -670,6 +678,11 @@ def register_user_request_routes(app):
             item.status = "cancelled"
             item.order_notes = f"CANCELLED: {cancellation_reason}" + (f"\n\nPrevious notes: {item.order_notes}" if item.order_notes else "")
             cancelled_items.append(item.id)
+
+            if item.source_type == "kit_reorder" and item.kit_reorder_request_id:
+                reorder = db.session.get(KitReorderRequest, item.kit_reorder_request_id)
+                if reorder and reorder.status not in ("fulfilled", "cancelled"):
+                    reorder.status = "cancelled"
 
         if not cancelled_items:
             raise ValidationError("No items were cancelled. Items may already be received or cancelled.")
@@ -1089,6 +1102,12 @@ def register_user_request_routes(app):
         if not item_ids:
             raise ValidationError("At least one item_id is required")
 
+        from models_kits import KitReorderRequest
+        from utils.kit_fulfillment import restore_kit_from_reorder
+
+        actor_id = current_user.get("user_id")
+        actor_addr = request.remote_addr
+
         for item_id in item_ids:
             request_item = RequestItem.query.filter_by(id=item_id, request_id=request_id).first()
             if not request_item:
@@ -1098,6 +1117,18 @@ def register_user_request_routes(app):
             request_item.received_date = get_current_time()
             if not request_item.received_quantity:
                 request_item.received_quantity = request_item.quantity
+
+            # When a kit-generated request item is received, restore the
+            # part/lot back to the originating kit so the "hole" left by
+            # the previous issuance gets filled.
+            if request_item.source_type == "kit_reorder" and request_item.kit_reorder_request_id:
+                reorder = db.session.get(KitReorderRequest, request_item.kit_reorder_request_id)
+                if reorder and reorder.status == "ordered":
+                    restore_kit_from_reorder(
+                        reorder,
+                        current_user_id=actor_id,
+                        remote_addr=actor_addr,
+                    )
 
         user_request.update_status_from_items()
 
