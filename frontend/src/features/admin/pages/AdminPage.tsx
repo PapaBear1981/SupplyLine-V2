@@ -12,6 +12,7 @@ import {
   BugOutlined,
   PhoneOutlined,
   CloudUploadOutlined,
+  HomeOutlined,
 } from '@ant-design/icons';
 import { AdminOverview } from '../components/AdminOverview';
 import { UserManagement } from '../components/UserManagement';
@@ -25,6 +26,7 @@ import { AISettings } from '../components/AISettings';
 import { BugReportManagement } from '../components/BugReportManagement';
 import { OnCallAdmin } from '../components/OnCallAdmin';
 import { BulkImports } from '../components/BulkImports';
+import { WarehousesPage } from '@features/warehouses/pages/WarehousesPage';
 
 const { Title, Paragraph } = Typography;
 
@@ -59,6 +61,16 @@ export const AdminPage = () => {
         </span>
       ),
       children: <DepartmentManagement />,
+    },
+    {
+      key: 'warehouses',
+      label: (
+        <span>
+          <HomeOutlined />
+          Warehouses
+        </span>
+      ),
+      children: <WarehousesPage />,
     },
     {
       key: 'announcements',

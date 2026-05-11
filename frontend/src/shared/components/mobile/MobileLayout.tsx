@@ -23,7 +23,6 @@ import {
   ToolOutlined,
   ExperimentOutlined,
   InboxOutlined,
-  HomeOutlined,
   FileTextOutlined,
   SwapOutlined,
   ShoppingCartOutlined,
@@ -59,7 +58,6 @@ const routeNames: Record<string, string> = {
   [ROUTES.TRANSFERS]: 'Transfers',
   '/orders': 'Fulfillment',
   '/requests': 'Requests',
-  [ROUTES.WAREHOUSES]: 'Warehouses',
   [ROUTES.REPORTS]: 'Reports',
   [ROUTES.ADMIN]: 'Admin',
   [ROUTES.PROFILE]: 'Profile',
@@ -77,7 +75,6 @@ const routeIcons: Record<string, React.ReactNode> = {
   [ROUTES.TRANSFERS]: <RetweetOutlined />,
   '/orders': <ShoppingCartOutlined />,
   '/requests': <FormOutlined />,
-  [ROUTES.WAREHOUSES]: <HomeOutlined />,
   [ROUTES.REPORTS]: <FileTextOutlined />,
   [ROUTES.ADMIN]: <SettingOutlined />,
 };
@@ -115,7 +112,6 @@ export const MobileLayout = () => {
       ROUTES.TRANSFERS,
       '/orders',
       '/requests',
-      ROUTES.WAREHOUSES,
       ROUTES.REPORTS,
       ROUTES.ADMIN,
     ];
