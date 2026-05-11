@@ -721,6 +721,63 @@ class TestKitItemEndpoints:
 
         assert response.status_code == 403
 
+    def test_get_kit_item_details_for_expendable_kititem(
+        self, client, auth_headers_user, test_kit, test_kit_box, db_session
+    ):
+        """Regression: /api/kits/<id>/items/<id>/details must not 500 for
+        expendable items stored in the KitItem table.
+
+        Previously this endpoint read kit_item.minimum_stock_level (KitItem
+        has no such field) and expendable.tracking_type (Expendable exposes
+        that only via to_dict), raising AttributeError -> 500."""
+        from models import Expendable
+        from models_kits import KitItem
+
+        import uuid
+        expendable = Expendable(
+            part_number="EXP-DETAIL",
+            lot_number=f"LOT-{uuid.uuid4().hex[:8]}",
+            description="Expendable for details endpoint",
+            quantity=10.0,
+            unit="ea",
+            status="available",
+            minimum_stock_level=2.0,
+        )
+        db_session.add(expendable)
+        db_session.flush()
+
+        kit_item = KitItem(
+            kit_id=test_kit.id,
+            box_id=test_kit_box.id,
+            item_type="expendable",
+            item_id=expendable.id,
+            part_number=expendable.part_number,
+            lot_number=expendable.lot_number,
+            description=expendable.description,
+            quantity=10.0,
+            location="Box 1",
+            status="available",
+        )
+        db_session.add(kit_item)
+        db_session.commit()
+
+        response = client.get(
+            f"/api/kits/{test_kit.id}/items/{kit_item.id}/details",
+            headers=auth_headers_user,
+        )
+
+        assert response.status_code == 200, response.data
+        data = json.loads(response.data)
+        assert "item" in data
+        item = data["item"]
+        assert item["item_type"] == "expendable"
+        assert item["part_number"] == "EXP-DETAIL"
+        # Pulled from the Expendable, not from KitItem
+        assert item["minimum_stock_level"] == 2.0
+        # Derived from serial_number presence (lot-tracked here)
+        assert item["tracking_type"] == "lot"
+        assert "history" in data
+
 
 class TestKitExpendableEndpoints:
     """Test kit expendable management endpoints"""
