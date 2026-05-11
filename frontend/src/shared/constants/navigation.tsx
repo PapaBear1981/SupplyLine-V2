@@ -5,7 +5,6 @@ import {
   ToolOutlined,
   ExperimentOutlined,
   InboxOutlined,
-  HomeOutlined,
   FileTextOutlined,
   SettingOutlined,
   SwapOutlined,
@@ -38,7 +37,6 @@ const NAV_TEST_IDS: Record<string, string> = {
   'operations-group': 'nav-operations',
   '/orders': 'nav-orders',
   '/requests': 'nav-requests',
-  [ROUTES.WAREHOUSES]: 'nav-warehouses',
   [ROUTES.TRANSFERS]: 'nav-transfers',
   [ROUTES.REPORTS]: 'nav-reports',
   [ROUTES.ONCALL_SCHEDULE]: 'nav-oncall',
@@ -158,12 +156,6 @@ export const ALL_MENU_ITEMS: MenuItemWithPermission[] = [
         label: 'On-Call Schedule',
       },
     ],
-  },
-  {
-    key: ROUTES.WAREHOUSES,
-    icon: <HomeOutlined />,
-    label: 'Warehouses',
-    permission: 'page.warehouses',
   },
   {
     key: ROUTES.REPORTS,
