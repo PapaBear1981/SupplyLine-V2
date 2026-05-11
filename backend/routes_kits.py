@@ -1109,8 +1109,8 @@ def register_kit_routes(app):
                     "manufacturer": expendable.manufacturer,
                     "unit": expendable.unit,
                     "category": expendable.category,
-                    "minimum_stock_level": kit_item.minimum_stock_level,
-                    "tracking_type": expendable.tracking_type,
+                    "minimum_stock_level": expendable.minimum_stock_level,
+                    "tracking_type": "serial" if expendable.serial_number else "lot",
                 })
 
         # Get issuance history for this specific item
@@ -1561,6 +1561,16 @@ def register_kit_routes(app):
                             is_automatic=True
                         )
                         db.session.add(reorder)
+                        db.session.flush()  # Get reorder ID before creating unified request
+
+                        # Also create a unified UserRequest so this shows on the
+                        # Requests/Fulfillment page (where reorders are managed).
+                        from utils.unified_requests import create_kit_reorder_request
+                        create_kit_reorder_request(
+                            kit=kit,
+                            reorder_request=reorder,
+                            requester_id=request.current_user["user_id"]
+                        )
             else:
                 # Fall back to old KitExpendable table for backward compatibility
                 item = KitExpendable.query.filter_by(id=data["item_id"], kit_id=kit_id).first()
@@ -1604,6 +1614,16 @@ def register_kit_routes(app):
                             is_automatic=True
                         )
                         db.session.add(reorder)
+                        db.session.flush()  # Get reorder ID before creating unified request
+
+                        # Also create a unified UserRequest so this shows on the
+                        # Requests/Fulfillment page (where reorders are managed).
+                        from utils.unified_requests import create_kit_reorder_request
+                        create_kit_reorder_request(
+                            kit=kit,
+                            reorder_request=reorder,
+                            requester_id=request.current_user["user_id"]
+                        )
 
         else:  # tool or chemical from kit_items
             item = KitItem.query.filter_by(id=data["item_id"], kit_id=kit_id).first()
