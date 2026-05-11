@@ -136,8 +136,8 @@ function makePage(ids: number[], pageNum: number, totalPages: number) {
   };
 }
 
-function renderMobile() {
-  const store = configureStore({
+function makeStore() {
+  return configureStore({
     reducer: {
       [baseApi.reducerPath]: baseApi.reducer,
       auth: authReducer,
@@ -162,19 +162,38 @@ function renderMobile() {
     middleware: (getDefault) =>
       getDefault({ serializableCheck: false }).concat(baseApi.middleware),
   });
-  return render(
+}
+
+function withProviders(
+  store: ReturnType<typeof makeStore>,
+  children: React.ReactNode
+): React.ReactElement {
+  return (
     <Provider store={store}>
       <BrowserRouter>
         <ThemeProvider>
           <PermissionProvider>
             <ConfigProvider>
-              <MobileToolsList />
+              {children}
             </ConfigProvider>
           </PermissionProvider>
         </ThemeProvider>
       </BrowserRouter>
     </Provider>
   );
+}
+
+function renderMobile() {
+  const store = makeStore();
+  const utils = render(withProviders(store, <MobileToolsList />));
+  // Returning the store + a state-preserving rerender helper lets individual
+  // tests force a re-render of the same component instance (so its accumulator
+  // state survives) without duplicating the provider tree.
+  return {
+    ...utils,
+    store,
+    rerenderSame: () => utils.rerender(withProviders(store, <MobileToolsList />)),
+  };
 }
 
 // Returns the visible tool numbers in the order they appear in the DOM.
@@ -350,10 +369,11 @@ describe('MobileToolsList — list reset behavior', () => {
     });
 
     // Type a search query — must reset the accumulated list to the new
-    // query's page-1 results, not append onto the old four.
-    const searchInput = screen
-      .getByTestId('mobile-tools-search')
-      .querySelector('input')!;
+    // query's page-1 results, not append onto the old four. SearchBar
+    // renders <input type="search">, whose implicit ARIA role is "searchbox".
+    const searchInput = within(screen.getByTestId('mobile-tools-search')).getByRole(
+      'searchbox'
+    );
     fireEvent.change(searchInput, { target: { value: 'wrench' } });
 
     await waitFor(() => {
@@ -391,7 +411,8 @@ describe('MobileToolsList — list reset behavior', () => {
     // Open the filter popup and pick "Maintenance".
     fireEvent.click(screen.getByTestId('mobile-tools-filter-button'));
     const filterPopup = await screen.findByText('Filter Tools');
-    const popupRoot = filterPopup.closest('.filter-popup')!;
+    const popupRoot = filterPopup.closest('.filter-popup');
+    expect(popupRoot).not.toBeNull();
     fireEvent.click(within(popupRoot as HTMLElement).getByText('Maintenance'));
 
     await waitFor(() => {
@@ -415,35 +436,15 @@ describe('MobileToolsList — list reset behavior', () => {
       refetch,
     }));
 
-    const { rerender } = renderMobile();
+    const { rerenderSame } = renderMobile();
     expect(visibleToolNumbers()).toEqual(['T001', 'T002']);
 
-    // Pull-to-refresh triggers refetch(); flip the served data and rerender
-    // to mimic RTK Query handing back a fresh array reference.
+    // Pull-to-refresh triggers refetch(); flip the served data and force
+    // a re-render of the same component instance so the merge picks up
+    // the new array reference for page 1 and replaces pageSlices[1].
     fireEvent.click(screen.getByTestId('pull-to-refresh-trigger'));
     expect(refetch).toHaveBeenCalled();
-    rerender(
-      <Provider
-        store={configureStore({
-          reducer: {
-            [baseApi.reducerPath]: baseApi.reducer,
-            auth: authReducer,
-          },
-          middleware: (getDefault) =>
-            getDefault({ serializableCheck: false }).concat(baseApi.middleware),
-        })}
-      >
-        <BrowserRouter>
-          <ThemeProvider>
-            <PermissionProvider>
-              <ConfigProvider>
-                <MobileToolsList />
-              </ConfigProvider>
-            </PermissionProvider>
-          </ThemeProvider>
-        </BrowserRouter>
-      </Provider>
-    );
+    rerenderSame();
 
     await waitFor(() => {
       expect(visibleToolNumbers()).toEqual(['T005', 'T006', 'T007']);
@@ -484,50 +485,26 @@ describe('MobileToolsList — list reset behavior', () => {
       }
     );
 
-    const { rerender } = renderMobile();
+    const { rerenderSame } = renderMobile();
     fireEvent.click(screen.getByTestId('infinite-scroll-trigger'));
     await waitFor(() => {
       expect(visibleToolNumbers()).toEqual(['T001', 'T002', 'T003', 'T004']);
     });
 
-    // Swap in the "edited" page-2 response (new array reference for the
-    // same page arg, mimicking the refetch that follows
-    // invalidatesTags: [{type:'Tool', id:'LIST'}] on a mutation) and force
-    // a re-render so the component picks it up.
+    // Swap in the "edited" page-2 response — a new array reference for the
+    // same {page:2} arg, mimicking the refetch that follows
+    // invalidatesTags([{type:'Tool', id:'LIST'}]) on a mutation. Then force
+    // a re-render of the SAME component instance (same store, same React
+    // tree) so the accumulator state is preserved and the merge has to
+    // decide whether to replace pageSlices[2] in place.
     responses[2] = page2Edited;
-    rerender(<div />);
-    // Use the same provider tree as renderMobile() to drive a new render
-    // of the component without reseting its state. Easiest: trigger a UI
-    // event that causes a re-render — clicking the (now-disabled) trigger
-    // still calls React's reconciliation.
-    rerender(
-      <Provider
-        store={configureStore({
-          reducer: { [baseApi.reducerPath]: baseApi.reducer, auth: authReducer },
-          middleware: (getDefault) =>
-            getDefault({ serializableCheck: false }).concat(baseApi.middleware),
-        })}
-      >
-        <BrowserRouter>
-          <ThemeProvider>
-            <PermissionProvider>
-              <ConfigProvider>
-                <MobileToolsList />
-              </ConfigProvider>
-            </PermissionProvider>
-          </ThemeProvider>
-        </BrowserRouter>
-      </Provider>
-    );
-
-    // After the fresh-store remount, the mocked hook is still active and
-    // returns the swapped responses. Drive infinite scroll again to repopulate
-    // pages 1 + 2 from the latest data.
-    fireEvent.click(screen.getByTestId('infinite-scroll-trigger'));
+    rerenderSame();
 
     await waitFor(() => {
-      // id=3 must be gone, id=4 must show its new tool_number "T444",
-      // ids 1 + 2 still present.
+      // id=3 must be gone, id=4 must show its new tool_number "T444";
+      // page-1 ids 1 + 2 are untouched. With the old append-only merge,
+      // T003 + T004 would have lingered (T444 ignored because id=4 was
+      // already in the set).
       expect(visibleToolNumbers()).toEqual(['T001', 'T002', 'T444']);
     });
   });
