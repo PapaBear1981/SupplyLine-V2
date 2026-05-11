@@ -7,7 +7,7 @@ import logging
 from datetime import datetime
 from typing import Any
 
-from models import Chemical, Tool, db
+from models import Chemical, ChemicalPart, Tool, db
 from utils.file_validation import neutralize_csv_formula, sanitize_csv_cell
 from utils.validation import ValidationError, validate_schema
 
@@ -28,6 +28,10 @@ class BulkImportResult:
         self.warnings = []
         self.created_items = []
         self.skipped_items = []
+        # Master parts auto-created during a chemical import (when the
+        # caller opts in via create_missing_parts). Empty for tool imports
+        # or when the flag is off.
+        self.created_master_parts: list[str] = []
 
     def add_success(self, item_data: dict[str, Any], created_item: Any):
         """Add a successful import"""
@@ -72,7 +76,8 @@ class BulkImportResult:
             "errors": self.errors,
             "warnings": self.warnings,
             "created_items": self.created_items,
-            "skipped_items": self.skipped_items
+            "skipped_items": self.skipped_items,
+            "created_master_parts": self.created_master_parts,
         }
 
 
@@ -348,13 +353,22 @@ def bulk_import_tools(csv_content: str, skip_duplicates: bool = True) -> BulkImp
     return result
 
 
-def bulk_import_chemicals(csv_content: str, skip_duplicates: bool = True) -> BulkImportResult:
+def bulk_import_chemicals(
+    csv_content: str,
+    skip_duplicates: bool = True,
+    create_missing_parts: bool = False,
+) -> BulkImportResult:
     """
     Bulk import chemicals from CSV content
 
     Args:
         csv_content: CSV content as string
         skip_duplicates: Whether to skip duplicate chemicals or raise error
+        create_missing_parts: If True, auto-create master ChemicalPart entries
+            for part_numbers that aren't already on the master list, using
+            the metadata (description/manufacturer/category/unit/min stock)
+            from the CSV row. If False, rows with unknown part_numbers are
+            rejected.
 
     Returns:
         BulkImportResult object with import results
@@ -372,6 +386,10 @@ def bulk_import_chemicals(csv_content: str, skip_duplicates: bool = True) -> Bul
             result.add_error(0, {}, error)
         return result
 
+    # Track parts created during this import so a single import run can
+    # reuse a newly-created master part across multiple lot rows.
+    created_part_numbers: set[str] = set()
+
     # Process each row
     for row in rows:
         row_number = row.pop("_row_number")
@@ -379,6 +397,32 @@ def bulk_import_chemicals(csv_content: str, skip_duplicates: bool = True) -> Bul
         try:
             # Validate chemical data
             chemical_data = validate_chemical_data(row)
+
+            # Resolve (or create) the master ChemicalPart for this lot.
+            part = ChemicalPart.query.filter_by(
+                part_number=chemical_data["part_number"]
+            ).first()
+            if part is None:
+                if not create_missing_parts:
+                    result.add_error(
+                        row_number,
+                        row,
+                        f"Part number '{chemical_data['part_number']}' is not on "
+                        "the master chemical list. Add it to the master list "
+                        "before importing lots, or enable 'Create missing "
+                        "master parts' on the import."
+                    )
+                    continue
+                # Bootstrap the master part from the CSV row metadata.
+                part = ChemicalPart.get_or_create(
+                    chemical_data["part_number"],
+                    description=chemical_data.get("description") or None,
+                    manufacturer=chemical_data.get("manufacturer") or None,
+                    category=chemical_data.get("category") or None,
+                    default_unit=chemical_data.get("unit") or None,
+                    minimum_stock_level=chemical_data.get("minimum_stock_level"),
+                )
+                created_part_numbers.add(part.part_number)
 
             # Check for duplicates
             existing_chemical = check_duplicate_chemical(chemical_data)
@@ -393,6 +437,7 @@ def bulk_import_chemicals(csv_content: str, skip_duplicates: bool = True) -> Bul
 
             # Create new chemical - remove fields that don't exist in the model
             chemical_model_data = {k: v for k, v in chemical_data.items() if k != "msds_url"}
+            chemical_model_data["chemical_part_id"] = part.id
             chemical = Chemical(**chemical_model_data)
             db.session.add(chemical)
             db.session.flush()  # Get the ID without committing
@@ -410,6 +455,9 @@ def bulk_import_chemicals(csv_content: str, skip_duplicates: bool = True) -> Bul
         if result.success_count > 0:
             db.session.commit()
             logger.info(f"Successfully imported {result.success_count} chemicals")
+            # Only surface auto-created master parts when the import actually
+            # committed; on rollback the parts disappear with the lots.
+            result.created_master_parts = sorted(created_part_numbers)
         else:
             db.session.rollback()
     except Exception as e:
@@ -420,6 +468,7 @@ def bulk_import_chemicals(csv_content: str, skip_duplicates: bool = True) -> Bul
             result.add_error(0, item["data"], f"Database commit failed: {e!s}")
         result.success_count = 0
         result.created_items = []
+        result.created_master_parts = []
 
     return result
 

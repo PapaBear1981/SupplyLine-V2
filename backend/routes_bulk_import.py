@@ -180,6 +180,9 @@ def register_bulk_import_routes(app):
 
             # Get import options
             skip_duplicates = request.form.get("skip_duplicates", "true").lower() == "true"
+            create_missing_parts = (
+                request.form.get("create_missing_parts", "false").lower() == "true"
+            )
 
             # Read file content
             try:
@@ -205,8 +208,15 @@ def register_bulk_import_routes(app):
                 }), 400
 
             # Perform bulk import
-            logger.info(f"Starting bulk import of {row_count} chemicals, skip_duplicates={skip_duplicates}")
-            result = bulk_import_chemicals(csv_content, skip_duplicates=skip_duplicates)
+            logger.info(
+                "Starting bulk import of %d chemicals, skip_duplicates=%s, create_missing_parts=%s",
+                row_count, skip_duplicates, create_missing_parts,
+            )
+            result = bulk_import_chemicals(
+                csv_content,
+                skip_duplicates=skip_duplicates,
+                create_missing_parts=create_missing_parts,
+            )
 
             # Log results
             logger.info(f"Bulk import completed: {result.success_count} success, {result.error_count} errors")
@@ -217,6 +227,12 @@ def register_bulk_import_routes(app):
 
             if result.error_count > 0:
                 response_data["message"] += f", {result.error_count} errors occurred"
+
+            if result.created_master_parts:
+                response_data["message"] += (
+                    f", {len(result.created_master_parts)} new master chemical "
+                    "part(s) added to the master list"
+                )
 
             if len(result.skipped_items) > 0:
                 response_data["message"] += f", {len(result.skipped_items)} items skipped"

@@ -11,6 +11,7 @@ import {
   RobotOutlined,
   BugOutlined,
   PhoneOutlined,
+  CloudUploadOutlined,
 } from '@ant-design/icons';
 import { AdminOverview } from '../components/AdminOverview';
 import { UserManagement } from '../components/UserManagement';
@@ -23,6 +24,7 @@ import { SystemSettings } from '../components/SystemSettings';
 import { AISettings } from '../components/AISettings';
 import { BugReportManagement } from '../components/BugReportManagement';
 import { OnCallAdmin } from '../components/OnCallAdmin';
+import { BulkImports } from '../components/BulkImports';
 
 const { Title, Paragraph } = Typography;
 
@@ -107,6 +109,16 @@ export const AdminPage = () => {
         </span>
       ),
       children: <AircraftTypeManagement />,
+    },
+    {
+      key: 'imports',
+      label: (
+        <span>
+          <CloudUploadOutlined />
+          Imports
+        </span>
+      ),
+      children: <BulkImports />,
     },
     {
       key: 'system',

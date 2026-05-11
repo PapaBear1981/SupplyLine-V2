@@ -13,7 +13,21 @@ from io import BytesIO, StringIO
 
 import pytest
 
-from models import Chemical, Tool, User
+from models import Chemical, ChemicalPart, Tool, User
+
+
+def _ensure_chemical_parts(db_session, part_numbers):
+    """Create master ChemicalPart rows so bulk-import lots can resolve them."""
+    for part_number in part_numbers:
+        existing = ChemicalPart.query.filter_by(part_number=part_number).first()
+        if existing is None:
+            db_session.add(ChemicalPart(
+                part_number=part_number,
+                description=f"Master part for {part_number}",
+                default_unit="ml",
+                category="Category1",
+            ))
+    db_session.commit()
 
 
 @pytest.mark.bulk
@@ -23,6 +37,7 @@ class TestChemicalBulkImport:
 
     def test_bulk_import_valid_chemicals(self, client, db_session, admin_user, auth_headers, test_warehouse):
         """Test importing valid chemicals from CSV"""
+        _ensure_chemical_parts(db_session, ["BULK001", "BULK002", "BULK003"])
         csv_data = f"""part_number,lot_number,description,manufacturer,quantity,unit,location,category,warehouse_id
 BULK001,LOT001,Test Chemical 1,Manufacturer A,100.0,ml,Storage A,Category1,{test_warehouse.id}
 BULK002,LOT002,Test Chemical 2,Manufacturer B,200.0,ml,Storage B,Category2,{test_warehouse.id}
@@ -114,6 +129,7 @@ BULK007,LOT007,Duplicate Chemical,Manufacturer A,200.0,ml,Storage A,Category1,{t
 
     def test_bulk_import_large_dataset(self, client, db_session, admin_user, auth_headers, test_warehouse):
         """Test importing a large dataset"""
+        _ensure_chemical_parts(db_session, [f"LARGE{i:04d}" for i in range(100)])
         # Generate CSV with 100 chemicals
         csv_lines = ["part_number,lot_number,description,manufacturer,quantity,unit,location,category,warehouse_id"]
 
@@ -164,6 +180,7 @@ BULK007,LOT007,Duplicate Chemical,Manufacturer A,200.0,ml,Storage A,Category1,{t
 
     def test_bulk_import_with_special_characters(self, client, db_session, admin_user, auth_headers, test_warehouse):
         """Test import with special characters in data"""
+        _ensure_chemical_parts(db_session, ["BULK009", "BULK010"])
         # Using different quote style to avoid triple-quote ambiguity
         csv_data = "part_number,lot_number,description,manufacturer,quantity,unit,location,category,warehouse_id\n"
         csv_data += f'BULK009,LOT009,"Chemical with quotes",Manufacturer,100.0,ml,Storage,Category,{test_warehouse.id}\n'
@@ -211,6 +228,93 @@ BULK014,LOT014,Valid Chemical 3,Manufacturer,300.0,ml,Storage,Category,{test_war
             count_after = Chemical.query.filter(Chemical.part_number.like("BULK01%")).count()
             # None should be imported
             assert count_after == count_before
+
+    def test_bulk_import_create_missing_parts_flag(
+        self, client, db_session, admin_user, auth_headers, test_warehouse
+    ):
+        """With create_missing_parts=true, the importer adds new master parts."""
+        from models import ChemicalPart
+
+        csv_data = f"""part_number,lot_number,description,manufacturer,quantity,unit,location,category,warehouse_id
+NEWMASTER1,LOT_A,Auto-created part one,Acme,100.0,ml,Storage,Adhesive,{test_warehouse.id}
+NEWMASTER1,LOT_B,Auto-created part one,Acme,50.0,ml,Storage,Adhesive,{test_warehouse.id}
+NEWMASTER2,LOT_C,Auto-created part two,Beta,25.0,ml,Storage,Sealant,{test_warehouse.id}
+"""
+
+        data = {
+            "file": (BytesIO(csv_data.encode()), "chemicals.csv"),
+            "create_missing_parts": "true",
+        }
+
+        response = client.post(
+            "/api/chemicals/bulk-import",
+            headers=auth_headers,
+            data=data,
+            content_type="multipart/form-data",
+        )
+
+        assert response.status_code == 200, response.data
+        body = response.get_json()
+        assert body["success_count"] == 3
+        assert body["error_count"] == 0
+        # Two distinct part numbers were auto-created on the master list,
+        # not three — the duplicate part_number reused the same master.
+        assert sorted(body["created_master_parts"]) == ["NEWMASTER1", "NEWMASTER2"]
+
+        # Verify the master records exist with metadata from the CSV row
+        master1 = ChemicalPart.query.filter_by(part_number="NEWMASTER1").first()
+        assert master1 is not None
+        assert master1.description == "Auto-created part one"
+        assert master1.manufacturer == "Acme"
+        assert master1.category == "Adhesive"
+
+        master2 = ChemicalPart.query.filter_by(part_number="NEWMASTER2").first()
+        assert master2 is not None
+
+        # All three lot rows link to the appropriate master part
+        lots = Chemical.query.filter(Chemical.part_number.in_(["NEWMASTER1", "NEWMASTER2"])).all()
+        assert len(lots) == 3
+        for lot in lots:
+            assert lot.chemical_part_id is not None
+
+    def test_bulk_import_rejects_rows_without_master_part(
+        self, client, db_session, admin_user, auth_headers, test_warehouse
+    ):
+        """Bulk import must reject any row whose part_number has no ChemicalPart."""
+        # Only create master part for the first row
+        _ensure_chemical_parts(db_session, ["BULK_MASTER_OK"])
+
+        csv_data = f"""part_number,lot_number,description,manufacturer,quantity,unit,location,category,warehouse_id
+BULK_MASTER_OK,LOT_OK,Valid Chemical,Manufacturer,100.0,ml,Storage,Category,{test_warehouse.id}
+BULK_NO_MASTER,LOT_BAD,Unknown Master,Manufacturer,100.0,ml,Storage,Category,{test_warehouse.id}
+"""
+
+        data = {
+            "file": (BytesIO(csv_data.encode()), "chemicals.csv")
+        }
+
+        response = client.post(
+            "/api/chemicals/bulk-import",
+            headers=auth_headers,
+            data=data,
+            content_type="multipart/form-data"
+        )
+
+        # Partial success: 1 imported, 1 rejected
+        assert response.status_code in [200, 207]
+        body = response.get_json()
+        assert body["success_count"] == 1
+        assert body["error_count"] == 1
+        error_messages = " ".join(err.get("error", "") for err in body.get("errors", []))
+        assert "master chemical list" in error_messages
+
+        # Imported row was linked to its master part
+        imported = Chemical.query.filter_by(part_number="BULK_MASTER_OK").first()
+        assert imported is not None
+        assert imported.chemical_part_id is not None
+        # Rejected row was not persisted
+        rejected = Chemical.query.filter_by(part_number="BULK_NO_MASTER").first()
+        assert rejected is None
 
 
 @pytest.mark.bulk
@@ -309,6 +413,7 @@ class TestBulkImportPerformance:
 
     def test_import_memory_efficiency(self, client, db_session, admin_user, auth_headers, test_warehouse):
         """Test that import handles large files efficiently"""
+        _ensure_chemical_parts(db_session, [f"MEM{i:04d}" for i in range(1000)])
         # Generate very large CSV
         csv_lines = ["part_number,lot_number,description,manufacturer,quantity,unit,location,category,warehouse_id"]
 

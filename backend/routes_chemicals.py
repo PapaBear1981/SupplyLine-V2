@@ -432,16 +432,17 @@ def register_chemical_routes(app):
         except SerialLotValidationError as e:
             raise ValidationError(str(e))
 
-        # Resolve the master ChemicalPart for this lot. Two flows are
-        # supported:
+        # Resolve the master ChemicalPart for this lot. A chemical lot can
+        # only be added if the part_number already exists on the master
+        # chemical list — ad-hoc creation of new ChemicalPart records via
+        # this endpoint is not allowed. Two flows are supported:
         #   1. The client passes `chemical_part_id` — they're explicitly
-        #      adding a lot to an existing part. The part's part_number
-        #      must match; metadata fields on the request are ignored in
-        #      favor of the part's curated values.
-        #   2. The client doesn't pass `chemical_part_id` — they intend
-        #      to create a brand-new part. Reject if a part with the same
-        #      part_number already exists, so users can't accidentally
-        #      create duplicate part records via a typo or stale form.
+        #      adding a lot to a known part. The part's part_number
+        #      must match.
+        #   2. The client only passes `part_number` — look up the part
+        #      by part_number. If no matching ChemicalPart exists, reject
+        #      the request and direct the user to add the part to the
+        #      master chemical list first.
         provided_part_id = validated_data.get("chemical_part_id")
         if provided_part_id is not None:
             part = ChemicalPart.query.get(provided_part_id)
@@ -454,40 +455,32 @@ def register_chemical_routes(app):
                     "Part number does not match the selected chemical part"
                 )
         else:
-            existing_part = ChemicalPart.query.filter_by(
+            part = ChemicalPart.query.filter_by(
                 part_number=validated_data["part_number"]
             ).first()
-            if existing_part is not None:
+            if part is None:
                 raise ValidationError(
-                    f"Part number '{validated_data['part_number']}' already "
-                    "exists. Add a new lot to the existing part instead of "
-                    "creating a duplicate."
+                    f"Part number '{validated_data['part_number']}' is not on "
+                    "the master chemical list. Add the chemical part to the "
+                    "master list before creating a lot for it."
                 )
-            part = ChemicalPart.get_or_create(
-                validated_data["part_number"],
-                description=validated_data.get("description"),
-                manufacturer=validated_data.get("manufacturer"),
-                category=validated_data.get("category"),
-                default_unit=validated_data.get("unit"),
-                minimum_stock_level=validated_data.get("minimum_stock_level"),
-            )
 
-        # When adding a lot to an existing part, inherit master metadata so
-        # the lot row stays consistent with the part record. The caller can
-        # still override per-lot fields like location/expiration/quantity.
-        lot_description = validated_data.get("description") or (part.description if part else "")
-        lot_manufacturer = validated_data.get("manufacturer") or (part.manufacturer if part else "")
-        lot_category = validated_data.get("category") or (part.category if part else "General")
+        # Inherit master metadata so the lot row stays consistent with the
+        # part record. The caller can still override per-lot fields like
+        # location/expiration/quantity.
+        lot_description = validated_data.get("description") or part.description
+        lot_manufacturer = validated_data.get("manufacturer") or part.manufacturer
+        lot_category = validated_data.get("category") or part.category or "General"
         lot_min_stock = (
             validated_data.get("minimum_stock_level")
             if validated_data.get("minimum_stock_level") is not None
-            else (part.minimum_stock_level if part else None)
+            else part.minimum_stock_level
         )
 
         # Create new chemical - warehouse_id is required
         chemical = Chemical(
             part_number=validated_data["part_number"],
-            chemical_part_id=part.id if part else None,
+            chemical_part_id=part.id,
             lot_number=validated_data["lot_number"],
             description=lot_description or "",
             manufacturer=lot_manufacturer or "",
@@ -1129,6 +1122,19 @@ def register_chemical_routes(app):
         try:
             # Get the chemical
             chemical = Chemical.query.get_or_404(id)
+
+            # A reorder can only be raised against a chemical that's on the
+            # master chemical list. Legacy lots without a ChemicalPart link
+            # must be reconciled first so part-level reorder thresholds and
+            # metadata are well-defined.
+            if chemical.chemical_part_id is None:
+                return jsonify({
+                    "error": (
+                        f"Chemical '{chemical.part_number}' is not linked to the "
+                        "master chemical list. Add the part to the master list "
+                        "before requesting a reorder."
+                    )
+                }), 400
 
             # Get request data
             data = request.get_json() or {}
