@@ -229,6 +229,54 @@ BULK014,LOT014,Valid Chemical 3,Manufacturer,300.0,ml,Storage,Category,{test_war
             # None should be imported
             assert count_after == count_before
 
+    def test_bulk_import_create_missing_parts_flag(
+        self, client, db_session, admin_user, auth_headers, test_warehouse
+    ):
+        """With create_missing_parts=true, the importer adds new master parts."""
+        from models import ChemicalPart
+
+        csv_data = f"""part_number,lot_number,description,manufacturer,quantity,unit,location,category,warehouse_id
+NEWMASTER1,LOT_A,Auto-created part one,Acme,100.0,ml,Storage,Adhesive,{test_warehouse.id}
+NEWMASTER1,LOT_B,Auto-created part one,Acme,50.0,ml,Storage,Adhesive,{test_warehouse.id}
+NEWMASTER2,LOT_C,Auto-created part two,Beta,25.0,ml,Storage,Sealant,{test_warehouse.id}
+"""
+
+        data = {
+            "file": (BytesIO(csv_data.encode()), "chemicals.csv"),
+            "create_missing_parts": "true",
+        }
+
+        response = client.post(
+            "/api/chemicals/bulk-import",
+            headers=auth_headers,
+            data=data,
+            content_type="multipart/form-data",
+        )
+
+        assert response.status_code == 200, response.data
+        body = response.get_json()
+        assert body["success_count"] == 3
+        assert body["error_count"] == 0
+        # Two distinct part numbers were auto-created on the master list,
+        # not three — the duplicate part_number reused the same master.
+        assert sorted(body["created_master_parts"]) == ["NEWMASTER1", "NEWMASTER2"]
+
+        # Verify the master records exist with metadata from the CSV row
+        master1 = ChemicalPart.query.filter_by(part_number="NEWMASTER1").first()
+        assert master1 is not None
+        assert master1.description == "Auto-created part one"
+        assert master1.manufacturer == "Acme"
+        assert master1.category == "Adhesive"
+
+        master2 = ChemicalPart.query.filter_by(part_number="NEWMASTER2").first()
+        assert master2 is not None
+
+        # All three lot rows link to the appropriate master part
+        lots = Chemical.query.filter(Chemical.part_number.in_(["NEWMASTER1", "NEWMASTER2"])).all()
+        assert len(lots) == 3
+        for lot in lots:
+            assert lot.chemical_part_id is not None
+
     def test_bulk_import_rejects_rows_without_master_part(
         self, client, db_session, admin_user, auth_headers, test_warehouse
     ):
