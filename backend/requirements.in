@@ -67,6 +67,11 @@ openpyxl==3.1.5
 # HTTP Requests Library (for geocoding)
 requests==2.32.3
 
+# Pinned to clear CVE-2026-44431 (cross-origin header leak via low-level
+# redirects) and CVE-2026-44432 (decompression-bomb bypass in the streaming
+# API) — both fixed in 2.7.0. `requests` doesn't yet require this directly.
+urllib3==2.7.0
+
 # Environment Variables
 python-dotenv==1.0.1
 

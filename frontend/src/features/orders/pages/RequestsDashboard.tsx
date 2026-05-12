@@ -14,6 +14,7 @@ import {
   Badge,
   Tag,
   Tooltip,
+  Tabs,
 } from 'antd';
 import {
   PlusOutlined,
@@ -25,6 +26,7 @@ import {
   InboxOutlined,
   EyeOutlined,
   ToolOutlined,
+  HistoryOutlined,
 } from '@ant-design/icons';
 import dayjs from 'dayjs';
 import relativeTime from 'dayjs/plugin/relativeTime';
@@ -35,6 +37,24 @@ import type { UserRequest, RequestStatus, RequestPriority, RequestType } from '.
 import type { ColumnsType } from 'antd/es/table';
 
 dayjs.extend(relativeTime);
+
+const ACTIVE_REQUEST_STATUSES: RequestStatus[] = [
+  'new',
+  'under_review',
+  'pending_fulfillment',
+  'in_transfer',
+  'awaiting_external_procurement',
+  'partially_fulfilled',
+  'needs_info',
+  // Legacy values kept active for backward compatibility
+  'awaiting_info',
+  'in_progress',
+  'partially_ordered',
+  'ordered',
+  'partially_received',
+];
+
+const HISTORY_REQUEST_STATUSES: RequestStatus[] = ['fulfilled', 'cancelled', 'received'];
 
 const REQUEST_TYPE_LABELS: Record<string, string> = {
   manual: 'Manual',
@@ -55,6 +75,7 @@ const REQUEST_TYPE_COLORS: Record<string, string> = {
 export const RequestsDashboard: React.FC = () => {
   const navigate = useNavigate();
   const isMobile = useIsMobile();
+  const [activeTab, setActiveTab] = useState<'active' | 'history'>('active');
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<RequestStatus[]>([]);
   const [priorityFilter, setPriorityFilter] = useState<RequestPriority[]>([]);
@@ -62,9 +83,17 @@ export const RequestsDashboard: React.FC = () => {
   const [detailModalVisible, setDetailModalVisible] = useState(false);
   const [selectedRequestId, setSelectedRequestId] = useState<number | null>(null);
 
+  // The tab determines which status set we ask the backend for. If the user
+  // also picked specific statuses, intersect with the tab's allowed set so
+  // they can't accidentally pull history rows into the active view.
+  const allowedStatuses = activeTab === 'history' ? HISTORY_REQUEST_STATUSES : ACTIVE_REQUEST_STATUSES;
+  const effectiveStatuses = statusFilter.length > 0
+    ? statusFilter.filter((s) => allowedStatuses.includes(s))
+    : allowedStatuses;
+
   const queryParams = {
     search: searchQuery || undefined,
-    status: statusFilter.length > 0 ? statusFilter.join(',') : undefined,
+    status: effectiveStatuses.join(','),
     priority: priorityFilter.length > 0 ? priorityFilter.join(',') : undefined,
     request_type: requestTypeFilter.length > 0 ? requestTypeFilter.join(',') : undefined,
   };
@@ -321,91 +350,150 @@ export const RequestsDashboard: React.FC = () => {
         </Row>
       )}
 
-      <Card style={{ marginBottom: 16 }}>
-        <Row gutter={[16, 16]}>
-          <Col xs={24} md={8}>
-            <Input
-              placeholder="Search requests..."
-              prefix={<SearchOutlined />}
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              allowClear
-            />
-          </Col>
-          <Col xs={24} md={5}>
-            <Select
-              mode="multiple"
-              placeholder="Filter by Status"
-              value={statusFilter}
-              onChange={setStatusFilter}
-              style={{ width: '100%' }}
-              allowClear
-            >
-              <Select.Option value="new">New</Select.Option>
-              <Select.Option value="under_review">Under Review</Select.Option>
-              <Select.Option value="pending_fulfillment">Pending Fulfillment</Select.Option>
-              <Select.Option value="in_transfer">In Transfer</Select.Option>
-              <Select.Option value="awaiting_external_procurement">Awaiting Procurement</Select.Option>
-              <Select.Option value="partially_fulfilled">Partially Fulfilled</Select.Option>
-              <Select.Option value="fulfilled">Fulfilled</Select.Option>
-              <Select.Option value="needs_info">Needs Info</Select.Option>
-              <Select.Option value="cancelled">Cancelled</Select.Option>
-            </Select>
-          </Col>
-          <Col xs={24} md={5}>
-            <Select
-              mode="multiple"
-              placeholder="Filter by Priority"
-              value={priorityFilter}
-              onChange={setPriorityFilter}
-              style={{ width: '100%' }}
-              allowClear
-            >
-              <Select.Option value="routine">Routine</Select.Option>
-              <Select.Option value="urgent">Urgent</Select.Option>
-              <Select.Option value="aog">AOG</Select.Option>
-            </Select>
-          </Col>
-          <Col xs={24} md={6}>
-            <Select
-              mode="multiple"
-              placeholder="Filter by Type"
-              value={requestTypeFilter}
-              onChange={setRequestTypeFilter}
-              style={{ width: '100%' }}
-              allowClear
-            >
-              <Select.Option value="manual">Manual</Select.Option>
-              <Select.Option value="kit_replenishment">Kit Replenishment</Select.Option>
-              <Select.Option value="warehouse_replenishment">Warehouse Replenishment</Select.Option>
-              <Select.Option value="transfer">Transfer</Select.Option>
-              <Select.Option value="repairable_return">Repairable Return</Select.Option>
-            </Select>
-          </Col>
-        </Row>
-      </Card>
+      {(() => {
+        const statusOptions = activeTab === 'history'
+          ? [
+              { value: 'fulfilled', label: 'Fulfilled' },
+              { value: 'cancelled', label: 'Cancelled' },
+            ]
+          : [
+              { value: 'new', label: 'New' },
+              { value: 'under_review', label: 'Under Review' },
+              { value: 'pending_fulfillment', label: 'Pending Fulfillment' },
+              { value: 'in_transfer', label: 'In Transfer' },
+              { value: 'awaiting_external_procurement', label: 'Awaiting Procurement' },
+              { value: 'partially_fulfilled', label: 'Partially Fulfilled' },
+              { value: 'needs_info', label: 'Needs Info' },
+            ];
+        const filtersAndTable = (
+          <>
+            <Card style={{ marginBottom: 16 }}>
+              <Row gutter={[16, 16]}>
+                <Col xs={24} md={8}>
+                  <Input
+                    placeholder={
+                      activeTab === 'history'
+                        ? 'Search request history...'
+                        : 'Search active requests...'
+                    }
+                    prefix={<SearchOutlined />}
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    allowClear
+                  />
+                </Col>
+                <Col xs={24} md={5}>
+                  <Select
+                    mode="multiple"
+                    placeholder="Filter by Status"
+                    value={statusFilter}
+                    onChange={setStatusFilter}
+                    style={{ width: '100%' }}
+                    allowClear
+                    options={statusOptions}
+                  />
+                </Col>
+                <Col xs={24} md={5}>
+                  <Select
+                    mode="multiple"
+                    placeholder="Filter by Priority"
+                    value={priorityFilter}
+                    onChange={setPriorityFilter}
+                    style={{ width: '100%' }}
+                    allowClear
+                  >
+                    <Select.Option value="routine">Routine</Select.Option>
+                    <Select.Option value="urgent">Urgent</Select.Option>
+                    <Select.Option value="aog">AOG</Select.Option>
+                  </Select>
+                </Col>
+                <Col xs={24} md={6}>
+                  <Select
+                    mode="multiple"
+                    placeholder="Filter by Type"
+                    value={requestTypeFilter}
+                    onChange={setRequestTypeFilter}
+                    style={{ width: '100%' }}
+                    allowClear
+                  >
+                    <Select.Option value="manual">Manual</Select.Option>
+                    <Select.Option value="kit_replenishment">Kit Replenishment</Select.Option>
+                    <Select.Option value="warehouse_replenishment">Warehouse Replenishment</Select.Option>
+                    <Select.Option value="transfer">Transfer</Select.Option>
+                    <Select.Option value="repairable_return">Repairable Return</Select.Option>
+                  </Select>
+                </Col>
+              </Row>
+            </Card>
 
-      <Card>
-        <Table
-          columns={columns}
-          dataSource={requests}
-          loading={isLoading}
-          rowKey="id"
-          scroll={{ x: 1500 }}
-          onRow={(record) => ({
-            onClick: () => handleViewDetails(record),
-            style: { cursor: 'pointer' },
-          })}
-          pagination={{
-            pageSize: 20,
-            showSizeChanger: true,
-            showTotal: (total) => `Total ${total} requests`,
-          }}
-          locale={{
-            emptyText: <Empty description="No requests found" image={Empty.PRESENTED_IMAGE_SIMPLE} />,
-          }}
-        />
-      </Card>
+            <Card>
+              <Table
+                columns={columns}
+                dataSource={requests}
+                loading={isLoading}
+                rowKey="id"
+                scroll={{ x: 1500 }}
+                onRow={(record) => ({
+                  onClick: () => handleViewDetails(record),
+                  style: { cursor: 'pointer' },
+                })}
+                pagination={{
+                  pageSize: 20,
+                  showSizeChanger: true,
+                  showTotal: (total) =>
+                    activeTab === 'history'
+                      ? `${total} historical request${total === 1 ? '' : 's'}`
+                      : `${total} active request${total === 1 ? '' : 's'}`,
+                }}
+                locale={{
+                  emptyText: (
+                    <Empty
+                      description={
+                        activeTab === 'history'
+                          ? 'No historical requests'
+                          : 'No active requests'
+                      }
+                      image={Empty.PRESENTED_IMAGE_SIMPLE}
+                    />
+                  ),
+                }}
+              />
+            </Card>
+          </>
+        );
+
+        return (
+          <Tabs
+            activeKey={activeTab}
+            onChange={(key) => {
+              setActiveTab(key as 'active' | 'history');
+              setStatusFilter([]);
+            }}
+            size="large"
+            destroyInactiveTabPane
+            items={[
+              {
+                key: 'active',
+                label: (
+                  <span>
+                    <FileTextOutlined /> Active Requests
+                  </span>
+                ),
+                children: filtersAndTable,
+              },
+              {
+                key: 'history',
+                label: (
+                  <span>
+                    <HistoryOutlined /> History
+                  </span>
+                ),
+                children: filtersAndTable,
+              },
+            ]}
+          />
+        );
+      })()}
 
       {selectedRequestId && (
         <RequestDetailModal

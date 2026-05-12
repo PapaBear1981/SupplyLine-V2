@@ -3,10 +3,9 @@ import { test, expect } from '@playwright/test';
 /**
  * Orders (Fulfillment) dashboard smoke coverage.
  *
- * Drives the live seeded backend via the shared authenticated
- * storageState. Deep fulfillment flows (create/approve/ship) are out of
- * Phase 4 scope — this spec guards the landing page and verifies the
- * primary CTA is wired up.
+ * The Fulfillment page now exposes Active Requests / History tabs instead of
+ * the old Requests / Fulfillment Queue split. These tests cover the landing
+ * page, the tab structure, and the CTA wiring against the seeded backend.
  */
 test.describe('Orders / Fulfillment (desktop)', () => {
   test('orders dashboard renders', async ({ page }) => {
@@ -14,9 +13,29 @@ test.describe('Orders / Fulfillment (desktop)', () => {
     await expect(page.getByTestId('orders-page')).toBeVisible();
   });
 
-  test('an antd Tabs control is mounted to switch fulfillment views', async ({ page }) => {
+  test('exposes Active Requests and History tabs (and no Fulfillment Queue tab)', async ({
+    page,
+  }) => {
     await page.goto('/orders');
-    await expect(page.locator('.ant-tabs').first()).toBeVisible();
+    await expect(page.getByRole('tab', { name: /Active Requests/i })).toBeVisible({
+      timeout: 10_000,
+    });
+    await expect(page.getByRole('tab', { name: /History/i })).toBeVisible();
+    await expect(page.getByRole('tab', { name: /Fulfillment Queue/i })).toHaveCount(0);
+  });
+
+  test('History tab switches the dashboard view to closed requests', async ({ page }) => {
+    await page.goto('/orders');
+    const historyTab = page.getByRole('tab', { name: /History/i });
+    await historyTab.click();
+    await expect(historyTab).toHaveAttribute('aria-selected', 'true', { timeout: 5_000 });
+    // The history view labels its search input differently from the active view.
+    // `destroyInactiveTabPane` is set on the Tabs, so only the active pane's
+    // placeholder is in the DOM; `.first()` keeps the selector resilient if
+    // that prop ever changes.
+    await expect(
+      page.getByPlaceholder(/search request history/i).first()
+    ).toBeVisible({ timeout: 10_000 });
   });
 
   test('sidebar auto-expands the Operations group when landing on the orders page', async ({ page }) => {
@@ -25,16 +44,8 @@ test.describe('Orders / Fulfillment (desktop)', () => {
     await expect(page.getByTestId('nav-orders')).toBeVisible();
   });
 
-  test('New Fulfillment Action button is visible on the Orders tab', async ({ page }) => {
+  test('New Request CTA is visible on the Fulfillment page', async ({ page }) => {
     await page.goto('/orders');
-    // activeTab defaults to 'requests'; the create button is conditionally
-    // rendered only when the Orders (fulfillment) tab is active. Click the
-    // tab by its accessible role+name so the selector is stable against
-    // icon + text markup.
-    const ordersTab = page.getByRole('tab', { name: /Fulfillment Queue/i });
-    await expect(ordersTab).toBeVisible({ timeout: 10_000 });
-    await ordersTab.click();
-    await expect(ordersTab).toHaveAttribute('aria-selected', 'true', { timeout: 5_000 });
-    await expect(page.getByTestId('orders-create-button')).toBeVisible({ timeout: 10_000 });
+    await expect(page.getByTestId('requests-create-button')).toBeVisible({ timeout: 10_000 });
   });
 });

@@ -11,8 +11,8 @@ from datetime import datetime
 from flask import current_app, jsonify, request
 
 from auth import department_required, jwt_required
-from models import AuditLog, ChemicalPart, ProcurementOrder, db
-from models_kits import Kit, KitBox, KitExpendable, KitItem, KitReorderRequest
+from models import AuditLog, ProcurementOrder, db
+from models_kits import Kit, KitBox, KitReorderRequest
 from utils.error_handler import ValidationError, handle_errors
 from utils.file_validation import FileValidationError, validate_image_upload
 
@@ -317,6 +317,8 @@ def register_kit_reorder_routes(app):
     @handle_errors
     def fulfill_reorder_request(id):
         """Mark a reorder request as fulfilled"""
+        from utils.kit_fulfillment import restore_kit_from_reorder
+
         current_user_id = request.current_user.get("user_id")
         reorder = KitReorderRequest.query.get_or_404(id)
 
@@ -327,397 +329,20 @@ def register_kit_reorder_routes(app):
             "status": reorder.status
         })
 
-        if reorder.status != "ordered":
-            raise ValidationError("Can only fulfill ordered requests")
-
-        # Validate quantity_requested
-        if reorder.quantity_requested <= 0:
-            raise ValidationError("Quantity requested must be greater than zero")
-
-        # Validate quantity for tools (should be 1 for individual items)
-        if reorder.item_type == "tool" and reorder.quantity_requested != 1:
-            raise ValidationError("Tool quantity must be 1 (tools are individual items)")
-
-        # Import models needed for fulfillment
-        from models import Chemical, Tool, Warehouse, WarehouseTransfer
-
-        # Get box_id from request body (optional - default to first box)
         data = request.get_json(silent=True) or {}
-
-        box = None
         box_id = data.get("box_id")
-        logger.info("Box ID from request", extra={"box_id": box_id, "box_id_type": type(box_id).__name__})
 
-        if box_id:
-            box = KitBox.query.filter_by(id=box_id, kit_id=reorder.kit_id).first()
-            if not box:
-                raise ValidationError("Invalid box_id for this kit")
-        else:
-            box = KitBox.query.filter_by(kit_id=reorder.kit_id).order_by(KitBox.box_number).first()
-            if not box:
-                raise ValidationError("box_id is required to fulfill reorder")
-            box_id = box.id
+        restore_kit_from_reorder(
+            reorder,
+            box_id=box_id,
+            current_user_id=current_user_id,
+            remote_addr=request.remote_addr,
+        )
 
-        reorder.status = "fulfilled"
-        reorder.fulfillment_date = datetime.now()
-
-        # Update or create item based on type
-        if reorder.item_type == "expendable":
-            # Check if this is updating an existing expendable or creating a new one
-            if reorder.item_id:
-                # Update existing expendable
-                existing_expendable = db.session.get(KitExpendable, reorder.item_id)
-                if not existing_expendable:
-                    raise ValidationError("Referenced expendable not found")
-
-                existing_expendable.quantity += reorder.quantity_requested
-                existing_expendable.last_updated = datetime.now()
-                # Update status to available when quantity is restored
-                existing_expendable.status = "available"
-
-                logger.info("Updated existing expendable", extra={
-                    "expendable_id": existing_expendable.id,
-                    "quantity_added": reorder.quantity_requested
-                })
-
-                # Log action
-                AuditLog.log(
-                    user_id=current_user_id,
-                    action="expendable_quantity_updated_via_reorder",
-                    resource_type="expendable",
-                    resource_id=existing_expendable.id,
-                    details={
-                        "part_number": existing_expendable.part_number,
-                        "quantity_added": reorder.quantity_requested,
-                        "reorder_id": reorder.id
-                    },
-                    ip_address=request.remote_addr
-                )
-            else:
-                # Create new expendable with auto-generated lot number
-                from models import Expendable, LotNumberSequence
-
-                # Auto-generate lot number
-                lot_number = LotNumberSequence.generate_lot_number()
-
-                logger.info("Creating new expendable", extra={
-                    "part_number": reorder.part_number,
-                    "lot_number": lot_number
-                })
-
-                # Create new Expendable (warehouse_id will be forced to None)
-                expendable = Expendable(
-                    part_number=reorder.part_number,
-                    serial_number=None,
-                    lot_number=lot_number,
-                    description=reorder.description or f"Expendable {reorder.part_number}",
-                    manufacturer=None,
-                    quantity=reorder.quantity_requested,
-                    unit="ea",
-                    location=f"Box {box.box_number}",
-                    category="General",
-                    status="available",
-                    minimum_stock_level=None,
-                    notes=f"Created via reorder request {reorder.id}"
-                )
-                db.session.add(expendable)
-                db.session.flush()  # Get expendable ID
-
-                # Create KitItem to link expendable to kit
-                kit_item = KitItem(
-                    kit_id=reorder.kit_id,
-                    box_id=box_id,
-                    item_type="expendable",
-                    item_id=expendable.id,
-                    part_number=expendable.part_number,
-                    serial_number=None,
-                    lot_number=expendable.lot_number,
-                    description=expendable.description,
-                    quantity=expendable.quantity,
-                    location=expendable.location,
-                    status="available",
-                    added_date=datetime.now(),
-                    last_updated=datetime.now()
-                )
-                db.session.add(kit_item)
-
-                # Log action
-                AuditLog.log(
-                    user_id=current_user_id,
-                    action="expendable_added_via_reorder",
-                    resource_type="expendable",
-                    resource_id=expendable.id,
-                    details={
-                        "part_number": expendable.part_number,
-                        "lot_number": lot_number,
-                        "kit_id": reorder.kit_id,
-                        "kit_name": reorder.kit.name,
-                        "reorder_id": reorder.id
-                    },
-                    ip_address=request.remote_addr
-                )
-
-                logger.info("Created expendable and kit item for reorder", extra={
-                    "expendable_id": expendable.id,
-                    "reorder_id": reorder.id
-                })
-
-        elif reorder.item_type in ["tool", "chemical"]:
-            if reorder.item_id:
-                # The item_id could be either a KitItem ID (for reordering existing kit items)
-                # or a Tool/Chemical ID (for transferring from warehouse)
-                # First, check if it's a KitItem
-                existing_kit_item = db.session.get(KitItem, reorder.item_id)
-
-                if existing_kit_item and existing_kit_item.item_type == reorder.item_type:
-                    # This is an existing KitItem - find another instance in warehouse to transfer
-                    logger.info("Reordering existing item - searching for warehouse stock", extra={
-                        "part_number": existing_kit_item.part_number
-                    })
-
-                    # Find a tool/chemical with the same part number that IS in a warehouse
-                    if reorder.item_type == "tool":
-                        warehouse_item = Tool.query.filter(
-                            Tool.tool_number == existing_kit_item.part_number,
-                            Tool.warehouse_id.isnot(None)
-                        ).first()
-                    else:
-                        warehouse_item = Chemical.query.filter(
-                            Chemical.part_number == existing_kit_item.part_number,
-                            Chemical.warehouse_id.isnot(None)
-                        ).first()
-
-                    if not warehouse_item:
-                        raise ValidationError(f"No {reorder.item_type} with part number {existing_kit_item.part_number} found in warehouse. Please add stock to warehouse first.")
-
-                    # Validate quantity for chemicals (check warehouse stock)
-                    if reorder.item_type == "chemical":
-                        if warehouse_item.quantity < reorder.quantity_requested:
-                            raise ValidationError(
-                                f"Insufficient quantity in warehouse. Available: {warehouse_item.quantity}, Requested: {reorder.quantity_requested}"
-                            )
-
-                    logger.info("Found warehouse item", extra={
-                        "item_type": reorder.item_type,
-                        "item_id": warehouse_item.id,
-                        "part_number": existing_kit_item.part_number
-                    })
-
-                    # Create new kit item based on the warehouse item
-                    kit_item = KitItem(
-                        kit_id=reorder.kit_id,
-                        box_id=box_id,
-                        item_type=reorder.item_type,
-                        item_id=warehouse_item.id,
-                        part_number=existing_kit_item.part_number,
-                        serial_number=warehouse_item.serial_number if reorder.item_type == "tool" else None,
-                        lot_number=warehouse_item.lot_number,
-                        description=existing_kit_item.description,
-                        quantity=round(reorder.quantity_requested, 2),
-                        location=f"Box {box.box_number}",
-                        status="available"
-                    )
-                    db.session.add(kit_item)
-                    db.session.flush()
-
-                    # Create warehouse transfer record
-                    transfer = WarehouseTransfer(
-                        from_warehouse_id=warehouse_item.warehouse_id,
-                        to_kit_id=reorder.kit_id,
-                        item_type=reorder.item_type,
-                        item_id=warehouse_item.id,
-                        quantity=reorder.quantity_requested,
-                        transferred_by_id=request.current_user["user_id"],
-                        notes=f"Transferred to fulfill reorder request #{reorder.id}",
-                        status="completed"
-                    )
-                    db.session.add(transfer)
-
-                    # Remove from warehouse
-                    warehouse_item.warehouse_id = None
-                else:
-                    # This is a direct Tool/Chemical ID - transfer from warehouse
-                    if reorder.item_type == "tool":
-                        warehouse_item = db.session.get(Tool, reorder.item_id)
-                    else:
-                        warehouse_item = db.session.get(Chemical, reorder.item_id)
-
-                    if not warehouse_item:
-                        raise ValidationError(f"{reorder.item_type.capitalize()} not found")
-
-                    if not warehouse_item.warehouse_id:
-                        raise ValidationError(f"{reorder.item_type.capitalize()} is not in a warehouse. Please add it to a warehouse first.")
-
-                    # Validate quantity for chemicals (check warehouse stock)
-                    if reorder.item_type == "chemical":
-                        if warehouse_item.chemical_part_id is None:
-                            raise ValidationError(
-                                f"Chemical '{warehouse_item.part_number}' is not "
-                                "linked to the master chemical list. Add the part "
-                                "to the master list before transferring it to a kit."
-                            )
-                        if warehouse_item.quantity < reorder.quantity_requested:
-                            raise ValidationError(
-                                f"Insufficient quantity in warehouse. Available: {warehouse_item.quantity}, Requested: {reorder.quantity_requested}"
-                            )
-
-                    # Create kit item
-                    kit_item = KitItem(
-                        kit_id=reorder.kit_id,
-                        box_id=box_id,
-                        item_type=reorder.item_type,
-                        item_id=warehouse_item.id,
-                        part_number=warehouse_item.tool_number if reorder.item_type == "tool" else warehouse_item.part_number,
-                        serial_number=warehouse_item.serial_number if reorder.item_type == "tool" else None,
-                        lot_number=warehouse_item.lot_number,
-                        description=warehouse_item.description,
-                        quantity=round(reorder.quantity_requested, 2),
-                        location=f"Box {box.box_number}",
-                        status="available"
-                    )
-                    db.session.add(kit_item)
-                    db.session.flush()
-
-                    # Create warehouse transfer record
-                    transfer = WarehouseTransfer(
-                        from_warehouse_id=warehouse_item.warehouse_id,
-                        to_kit_id=reorder.kit_id,
-                        item_type=reorder.item_type,
-                        item_id=warehouse_item.id,
-                        quantity=reorder.quantity_requested,
-                        transferred_by_id=request.current_user["user_id"],
-                        notes=f"Transferred to fulfill reorder request #{reorder.id}",
-                        status="completed"
-                    )
-                    db.session.add(transfer)
-
-                    # Remove from warehouse
-                    warehouse_item.warehouse_id = None
-            else:
-                # For NEW items (item_id is None), auto-create in warehouse then transfer
-                # This maintains compliance: tools/chemicals must originate in warehouses
-
-                # Find default warehouse (prefer 'main' type, fallback to any active warehouse)
-                default_warehouse = Warehouse.query.filter_by(
-                    warehouse_type="main",
-                    is_active=True
-                ).first()
-
-                if not default_warehouse:
-                    # Fallback to any active warehouse
-                    default_warehouse = Warehouse.query.filter_by(is_active=True).first()
-
-                if not default_warehouse:
-                    raise ValidationError(
-                        "No active warehouse found. Please create a warehouse before fulfilling new item requests."
-                    )
-
-                logger.info("Auto-creating new item in warehouse", extra={
-                    "item_type": reorder.item_type,
-                    "warehouse_name": default_warehouse.name
-                })
-
-                # Create the item in the warehouse
-                if reorder.item_type == "tool":
-                    # For tools, we need a serial number (required field)
-                    # Generate one if not provided in the reorder request
-                    serial_number = reorder.notes or f'SN-{reorder.part_number}-{datetime.now().strftime("%Y%m%d%H%M%S")}'
-
-                    warehouse_item = Tool(
-                        tool_number=reorder.part_number,
-                        serial_number=serial_number,
-                        description=reorder.description,
-                        condition="new",
-                        location=f"Warehouse {default_warehouse.name}",
-                        category="General",
-                        status="available",
-                        warehouse_id=default_warehouse.id,
-                        created_at=datetime.now()
-                    )
-                else:  # chemical
-                    # Enforce master chemical list: a new lot can only be
-                    # auto-created if the part_number is already on the
-                    # master chemical list (ChemicalPart). If the part is
-                    # not on the list, refuse to fulfill the reorder so
-                    # rogue chemicals can't enter the system through the
-                    # kit reorder flow.
-                    chemical_part = ChemicalPart.query.filter_by(
-                        part_number=reorder.part_number
-                    ).first()
-                    if chemical_part is None:
-                        raise ValidationError(
-                            f"Part number '{reorder.part_number}' is not on the "
-                            "master chemical list. Add the chemical part to the "
-                            "master list before fulfilling this reorder."
-                        )
-
-                    # For chemicals, we need a lot number (required field)
-                    # Generate one if not provided
-                    lot_number = reorder.notes or f'LOT-{reorder.part_number}-{datetime.now().strftime("%Y%m%d%H%M%S")}'
-
-                    warehouse_item = Chemical(
-                        part_number=reorder.part_number,
-                        chemical_part_id=chemical_part.id,
-                        lot_number=lot_number,
-                        description=reorder.description or chemical_part.description,
-                        manufacturer=chemical_part.manufacturer or "Unknown",
-                        quantity=int(reorder.quantity_requested),
-                        unit=chemical_part.default_unit or "ea",
-                        location=f"Warehouse {default_warehouse.name}",
-                        category=chemical_part.category or "General",
-                        status="available",
-                        warehouse_id=default_warehouse.id,
-                        minimum_stock_level=chemical_part.minimum_stock_level,
-                        date_added=datetime.now()
-                    )
-
-                db.session.add(warehouse_item)
-                db.session.flush()  # Get the ID
-
-                logger.info("Created item in warehouse", extra={
-                    "item_type": reorder.item_type,
-                    "item_id": warehouse_item.id,
-                    "warehouse_name": default_warehouse.name
-                })
-
-                # Now transfer it to the kit
-                kit_item = KitItem(
-                    kit_id=reorder.kit_id,
-                    box_id=box_id,
-                    item_type=reorder.item_type,
-                    item_id=warehouse_item.id,
-                    part_number=warehouse_item.tool_number if reorder.item_type == "tool" else warehouse_item.part_number,
-                    serial_number=warehouse_item.serial_number if reorder.item_type == "tool" else None,
-                    lot_number=warehouse_item.lot_number,
-                    description=warehouse_item.description,
-                    quantity=round(reorder.quantity_requested, 2),
-                    location=f"Box {box.box_number}",
-                    status="available"
-                )
-                db.session.add(kit_item)
-                db.session.flush()
-
-                # Create warehouse transfer record for audit trail
-                transfer = WarehouseTransfer(
-                    from_warehouse_id=default_warehouse.id,
-                    to_kit_id=reorder.kit_id,
-                    item_type=reorder.item_type,
-                    item_id=warehouse_item.id,
-                    quantity=reorder.quantity_requested,
-                    transferred_by_id=request.current_user["user_id"],
-                    notes=f"Auto-created and transferred to fulfill reorder request #{reorder.id}",
-                    status="completed"
-                )
-                db.session.add(transfer)
-
-                # Remove from warehouse (it's now in the kit)
-                warehouse_item.warehouse_id = None
-
-                logger.info("Transferred item to kit", extra={
-                    "item_type": reorder.item_type,
-                    "item_id": warehouse_item.id,
-                    "kit_id": reorder.kit_id
-                })
+        # Resolve the box used (re-query in case helper picked the default)
+        box = KitBox.query.filter_by(id=box_id, kit_id=reorder.kit_id).first() if box_id else (
+            KitBox.query.filter_by(kit_id=reorder.kit_id).order_by(KitBox.box_number).first()
+        )
 
         # Update the unified request system if a request item exists for this kit reorder
         from utils.unified_requests import update_request_item_status
@@ -726,12 +351,11 @@ def register_kit_reorder_routes(app):
             source_id=reorder.id,
             new_status="received",
             received_date=datetime.now(),
-            received_quantity=int(reorder.quantity_requested)
+            received_quantity=int(reorder.quantity_requested),
         )
 
         db.session.commit()
 
-        # Log action
         AuditLog.log(
             user_id=current_user_id,
             action="kit_reorder_fulfilled",
@@ -739,11 +363,11 @@ def register_kit_reorder_routes(app):
             resource_id=reorder.id,
             details={
                 "kit_id": reorder.kit_id,
-                "box_id": box.id,
-                "box_number": box.box_number,
-                "item_type": reorder.item_type
+                "box_id": box.id if box else None,
+                "box_number": box.box_number if box else None,
+                "item_type": reorder.item_type,
             },
-            ip_address=request.remote_addr
+            ip_address=request.remote_addr,
         )
         db.session.commit()
 
