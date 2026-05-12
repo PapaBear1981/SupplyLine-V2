@@ -106,7 +106,7 @@ def on_master_entry_updated(entry, changed_fields):
     if not any(f in changed_fields for f in ("entry_type", "part_number")):
         return {"action": "lazy", "entry_id": entry.id}
 
-    from models_kits import KitItem, KitExpendable
+    from models_kits import KitExpendable, KitItem
 
     # Anything currently linked to this entry whose (entry_type, part_number) no longer
     # matches must be unlinked.
@@ -129,7 +129,7 @@ def on_master_entry_updated(entry, changed_fields):
 
 def on_master_entry_deleted(entry_id):
     """Soft-unlink kit rows that referenced this entry. Caller deletes the entry itself."""
-    from models_kits import KitItem, KitExpendable
+    from models_kits import KitExpendable, KitItem
 
     unlinked = 0
     for row in KitItem.query.filter_by(master_entry_id=entry_id).all():
@@ -212,22 +212,28 @@ def compute_compliance(kit):
     missing = []
     deviations = []
     matched_keys = set()
+    required_total = 0
     for entry in master_entries:
         key = (entry.entry_type, (entry.part_number or "").strip())
+        # Optional entries are tracked for matching (so they're not counted as extras)
+        # but never add to missing/deviations or the compliance denominator.
+        if entry.is_required:
+            required_total += 1
         rows = present.get(key, [])
         if not rows:
-            missing.append({
-                "master_entry_id": entry.id,
-                "entry_type": entry.entry_type,
-                "part_number": entry.part_number,
-                "description": entry.description,
-                "required_quantity": entry.required_quantity,
-                "unit": entry.unit,
-            })
+            if entry.is_required:
+                missing.append({
+                    "master_entry_id": entry.id,
+                    "entry_type": entry.entry_type,
+                    "part_number": entry.part_number,
+                    "description": entry.description,
+                    "required_quantity": entry.required_quantity,
+                    "unit": entry.unit,
+                })
             continue
         matched_keys.add(key)
         total_qty = sum((r.quantity or 0.0) for r in rows)
-        if entry.required_quantity and total_qty + 1e-9 < entry.required_quantity:
+        if entry.is_required and entry.required_quantity and total_qty + 1e-9 < entry.required_quantity:
             deviations.append({
                 "master_entry_id": entry.id,
                 "entry_type": entry.entry_type,
@@ -255,9 +261,8 @@ def compute_compliance(kit):
                 "is_orphan": row.master_entry_id is not None,
             })
 
-    total = len(master_entries)
-    compliant_count = total - len(missing) - len(deviations)
-    pct = (compliant_count / total * 100.0) if total else 100.0
+    compliant_count = required_total - len(missing) - len(deviations)
+    pct = (compliant_count / required_total * 100.0) if required_total else 100.0
 
     return {
         "missing": missing,
@@ -292,8 +297,8 @@ def populate_from_wizard(kit, entry_population, current_user_id, audit_log_fn=No
 
     Raises ValueError on validation failures so the caller can wrap with handle_errors.
     """
-    from models_kits import KitItem, KitExpendable, KitBox, MasterKitEntry
     from models import Tool
+    from models_kits import KitBox, KitExpendable, KitItem, MasterKitEntry
 
     summary = {"items_created": 0, "expendables_created": 0, "transfers_created": []}
 
@@ -326,7 +331,8 @@ def populate_from_wizard(kit, entry_population, current_user_id, audit_log_fn=No
         if box is None:
             raise ValueError(f"Kit {kit.id} has no boxes; cannot place entry {entry.id}.")
 
-        mode = (ep.get("mode") or "manual").lower()
+        # ep["mode"] ('manual' | 'import' | 'inventory') is informational and currently
+        # affects only the dispatch within this loop; the result is identical regardless.
         rows = ep.get("items") or []
         for row in rows:
             if entry.entry_type == "expendable":

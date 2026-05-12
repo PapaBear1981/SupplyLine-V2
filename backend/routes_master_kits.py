@@ -13,7 +13,11 @@ from flask import jsonify, request
 from auth import admin_required, jwt_required
 from models import AuditLog, db
 from models_kits import (
-    AircraftType, Kit, MasterKit, MasterKitBox, MasterKitEntry,
+    AircraftType,
+    Kit,
+    MasterKit,
+    MasterKitBox,
+    MasterKitEntry,
 )
 from services import master_kit_service
 from utils.error_handler import ValidationError, handle_errors

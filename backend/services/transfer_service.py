@@ -23,7 +23,12 @@ from datetime import datetime
 
 from models import AuditLog, Chemical, ChemicalPart, Tool, Warehouse, db
 from models_kits import (
-    Kit, KitBox, KitExpendable, KitItem, KitToolCheckout, KitTransfer,
+    Kit,
+    KitBox,
+    KitExpendable,
+    KitItem,
+    KitToolCheckout,
+    KitTransfer,
 )
 
 
@@ -211,6 +216,11 @@ def kit_to_warehouse(*, kit_id, kit_row, to_warehouse_id, transferred_by,
         raise ValueError(f"Kit {kit_id} not found.")
     if warehouse is None:
         raise ValueError(f"Warehouse {to_warehouse_id} not found.")
+    # Defend against the caller passing a row from another kit.
+    if getattr(kit_row, "kit_id", None) != kit.id:
+        raise ValueError(
+            f"kit_row {getattr(kit_row, 'id', None)} does not belong to kit {kit.id}."
+        )
 
     if isinstance(kit_row, KitItem):
         if kit_row.item_type == "tool":
@@ -323,6 +333,10 @@ def kit_to_kit(*, source_kit_id, source_row, dest_kit_id, dest_box_id,
         raise ValueError(f"Destination kit {dest_kit_id} not found.")
     if dest_box is None or dest_box.kit_id != dest_kit.id:
         raise ValueError("Destination box does not belong to the specified kit.")
+    if getattr(source_row, "kit_id", None) != source_kit.id:
+        raise ValueError(
+            f"source_row {getattr(source_row, 'id', None)} does not belong to source kit {source_kit.id}."
+        )
 
     same_master = (
         source_kit.master_kit_id is not None
@@ -340,9 +354,14 @@ def kit_to_kit(*, source_kit_id, source_row, dest_kit_id, dest_box_id,
             master_entry_id=carry, is_custom=(carry is None),
         )
         db.session.add(new_item)
-        db.session.delete(source_row)
+        # Partial transfers leave the remainder behind. Tools are always
+        # whole-item (quantity==1) so this branch only matters for chemical
+        # KitItems where partial quantities are meaningful.
+        if quantity < (source_row.quantity or 0):
+            source_row.quantity = (source_row.quantity or 0) - quantity
+        else:
+            db.session.delete(source_row)
         item_type = new_item.item_type
-        item_id = new_item.item_id
         moved_row = new_item
 
     elif isinstance(source_row, KitExpendable):
@@ -371,7 +390,6 @@ def kit_to_kit(*, source_kit_id, source_row, dest_kit_id, dest_box_id,
             db.session.add(new_exp)
             db.session.delete(source_row)
         item_type = "expendable"
-        item_id = new_exp.id if new_exp.id else 0
         moved_row = new_exp
 
     else:

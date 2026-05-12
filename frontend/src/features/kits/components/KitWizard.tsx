@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Steps,
@@ -139,7 +139,18 @@ const KitWizard = () => {
 
   const handleFinish = async () => {
     try {
-      const payload: any = {
+      interface WizardSubmitPayload {
+        [key: string]: unknown;
+        step: number;
+        name?: string;
+        aircraft_type_id?: number;
+        description?: string;
+        boxes: Array<{ box_number: string; box_type: BoxType; description: string }>;
+        master_kit_id?: number;
+        use_master?: boolean;
+        customizations?: { removed_entry_ids: number[] };
+      }
+      const payload: WizardSubmitPayload = {
         step: 4,
         name: wizardData.name,
         aircraft_type_id: wizardData.aircraft_type_id,
@@ -421,7 +432,7 @@ const KitWizard = () => {
                   ]}
                   onRow={(row) => ({
                     'data-testid': `wizard-entry-row-${row.id}`,
-                  } as any)}
+                  } as React.HTMLAttributes<HTMLElement>)}
                 />
               </Card>
             )}

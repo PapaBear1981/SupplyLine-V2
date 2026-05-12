@@ -158,7 +158,12 @@ def register_kit_transfer_routes(app):
                     raise ValidationError("Source item not found")
                 transfer_item_id = kit_item.item_id
 
-        transfer_mode = (data.get("mode") or "field").strip().lower()
+        raw_mode = data.get("mode", "field")
+        if raw_mode is None:
+            raw_mode = "field"
+        if not isinstance(raw_mode, str):
+            raise ValidationError("mode must be 'field' or 'permanent'")
+        transfer_mode = raw_mode.strip().lower()
         if transfer_mode not in ("field", "permanent"):
             raise ValidationError("mode must be 'field' or 'permanent'")
         transfer = KitTransfer(

@@ -110,7 +110,6 @@ function AppContent() {
                   <Route path="/kits/:id" element={<KitDetailView />} />
                   <Route path="/kits/:id/edit" element={<div>Edit Kit (Coming Soon)</div>} />
                   <Route path="/kits/:id/duplicate" element={<div>Duplicate Kit (Coming Soon)</div>} />
-                  <Route path={ROUTES.MASTER_KITS} element={<MasterKitsAdmin />} />
 
                   {/* Orders Routes */}
                   <Route path="/orders" element={<OrdersDashboard />} />
@@ -164,6 +163,7 @@ function AppContent() {
                   {/* Admin-only routes - Desktop only on mobile */}
                   <Route element={<AdminRoute />}>
                     <Route path={ROUTES.ADMIN} element={<AdminPageWrapper />} />
+                    <Route path={ROUTES.MASTER_KITS} element={<MasterKitsAdmin />} />
                   </Route>
                 </Route>
               </Route>

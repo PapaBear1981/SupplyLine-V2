@@ -23,8 +23,13 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 # Import app from run.py to get proper Flask context with all models loaded
 from models import Chemical, LotNumberSequence, Tool, User, Warehouse, db
 from models_kits import (
-    AircraftType, Kit, KitBox, KitExpendable, KitItem,
-    MasterKit, MasterKitBox, MasterKitEntry,
+    AircraftType,
+    Kit,
+    KitBox,
+    KitExpendable,
+    MasterKit,
+    MasterKitBox,
+    MasterKitEntry,
 )
 from run import app
 
@@ -556,7 +561,7 @@ def seed_master_kits(aircraft_types, kits, admin):
              "description": "Q400 nitrile gloves (per kit)",
              "required_quantity": 50, "tracking_type": "lot", "unit": "pair"},
             {"entry_type": "expendable", "part_number": "EXP-Q400-002",
-             "description": "Q400 lockwire 0.032\"",
+             "description": 'Q400 lockwire 0.032"',
              "required_quantity": 2, "tracking_type": "lot", "unit": "spool"},
             {"entry_type": "chemical", "part_number": "PR-1422",
              "description": "PR-1422 sealant", "required_quantity": 4, "unit": "tube"},

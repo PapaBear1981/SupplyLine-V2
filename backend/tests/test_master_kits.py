@@ -9,6 +9,9 @@ import uuid
 import pytest
 
 from models import ChemicalPart, Chemical, Warehouse, db
+
+
+pytestmark = pytest.mark.integration
 from models_kits import (
     AircraftType, Kit, KitBox, KitExpendable, KitItem, KitTransfer,
     MasterKit, MasterKitBox, MasterKitEntry,
@@ -45,12 +48,14 @@ def master_kit_with_entries(db_session, aircraft_type):
     db_session.commit()
 
     master = MasterKit(aircraft_type_id=aircraft_type.id, name="Test Master", is_active=True)
-    db_session.add(master); db_session.commit()
+    db_session.add(master)
+    db_session.commit()
     box1 = MasterKitBox(master_kit_id=master.id, box_number="Box1", box_type="expendable",
                         description="Expendables", sort_order=0)
     box2 = MasterKitBox(master_kit_id=master.id, box_number="Box2", box_type="tooling",
                         description="Tools", sort_order=1)
-    db_session.add_all([box1, box2]); db_session.commit()
+    db_session.add_all([box1, box2])
+    db_session.commit()
 
     e1 = MasterKitEntry(master_kit_id=master.id, master_box_id=box1.id,
                        entry_type="expendable", part_number="EXP-001",
@@ -64,7 +69,8 @@ def master_kit_with_entries(db_session, aircraft_type):
                        entry_type="expendable", part_number="EXP-002",
                        description="Cotter pin", required_quantity=20,
                        unit="each", tracking_type="lot", is_required=True)
-    db_session.add_all([e1, e2, e3]); db_session.commit()
+    db_session.add_all([e1, e2, e3])
+    db_session.commit()
     return {"master": master, "box1": box1, "box2": box2, "entries": [e1, e2, e3], "chemical_part": cp}
 
 
@@ -74,7 +80,8 @@ def linked_kit(db_session, master_kit_with_entries, admin_user):
     m = master_kit_with_entries["master"]
     kit = Kit(name=f"TestKit-{uuid.uuid4().hex[:6]}", aircraft_type_id=m.aircraft_type_id,
               status="active", created_by=admin_user.id, master_kit_id=m.id)
-    db_session.add(kit); db_session.commit()
+    db_session.add(kit)
+    db_session.commit()
     master_kit_service.seed_kit_from_master(kit, m)
     db_session.commit()
     return kit
@@ -88,7 +95,8 @@ class TestSeeding:
         m = master_kit_with_entries["master"]
         kit = Kit(name=f"K-{uuid.uuid4().hex[:6]}", aircraft_type_id=m.aircraft_type_id,
                   status="active", created_by=admin_user.id, master_kit_id=m.id)
-        db_session.add(kit); db_session.commit()
+        db_session.add(kit)
+        db_session.commit()
         result = master_kit_service.seed_kit_from_master(kit, m)
         db_session.commit()
         assert result["boxes_created"] == 2
@@ -115,7 +123,8 @@ class TestSeeding:
         skip = {master_kit_with_entries["entries"][0].id}
         kit = Kit(name=f"K-{uuid.uuid4().hex[:6]}", aircraft_type_id=m.aircraft_type_id,
                   status="active", created_by=admin_user.id, master_kit_id=m.id)
-        db_session.add(kit); db_session.commit()
+        db_session.add(kit)
+        db_session.commit()
         result = master_kit_service.seed_kit_from_master(kit, m, skip_entry_ids=skip)
         db_session.commit()
         deferred_ids = {d["master_entry_id"] for d in result["entries_deferred_to_population"]}
@@ -129,7 +138,8 @@ class TestCompliance:
     def test_unlinked_kit_returns_not_linked(self, db_session, aircraft_type, admin_user):
         kit = Kit(name=f"K-{uuid.uuid4().hex[:6]}", aircraft_type_id=aircraft_type.id,
                   status="active", created_by=admin_user.id)
-        db_session.add(kit); db_session.commit()
+        db_session.add(kit)
+        db_session.commit()
         report = master_kit_service.compute_compliance(kit)
         assert report["linked_to_master"] is False
 
@@ -150,7 +160,8 @@ class TestCompliance:
             quantity=entry.required_quantity, unit="each",
             master_entry_id=entry.id, is_custom=False,
         )
-        db_session.add(exp); db_session.commit()
+        db_session.add(exp)
+        db_session.commit()
         report = master_kit_service.compute_compliance(linked_kit)
         missing_pns = {m["part_number"] for m in report["missing"]}
         assert entry.part_number not in missing_pns
@@ -165,7 +176,8 @@ class TestCompliance:
             tracking_type="lot", description=entry.description,
             quantity=3, unit="each", master_entry_id=entry.id, is_custom=False,
         )
-        db_session.add(exp); db_session.commit()
+        db_session.add(exp)
+        db_session.commit()
         report = master_kit_service.compute_compliance(linked_kit)
         dev_pns = {d["part_number"] for d in report["deviations"]}
         assert entry.part_number in dev_pns
@@ -178,7 +190,8 @@ class TestCompliance:
             tracking_type="lot", description="not in master",
             quantity=1, unit="each", is_custom=True,
         )
-        db_session.add(exp); db_session.commit()
+        db_session.add(exp)
+        db_session.commit()
         report = master_kit_service.compute_compliance(linked_kit)
         extras_pns = {e["part_number"] for e in report["extras"]}
         assert "EXP-WILDCARD" in extras_pns
@@ -193,7 +206,8 @@ class TestCompliance:
             tracking_type="lot", description=entry.description, quantity=1,
             unit="each", master_entry_id=entry.id, is_custom=False,
         )
-        db_session.add(exp); db_session.commit()
+        db_session.add(exp)
+        db_session.commit()
         master_kit_service.on_master_entry_deleted(entry.id)
         db_session.commit()
         db_session.refresh(exp)
@@ -213,15 +227,18 @@ class TestMinStockInheritance:
 
         kit = Kit(name=f"K-{uuid.uuid4().hex[:6]}", aircraft_type_id=m.aircraft_type_id,
                   status="active", created_by=admin_user.id, master_kit_id=m.id)
-        db_session.add(kit); db_session.commit()
-        master_kit_service.seed_kit_from_master(kit, m); db_session.commit()
+        db_session.add(kit)
+        db_session.commit()
+        master_kit_service.seed_kit_from_master(kit, m)
+        db_session.commit()
         box = kit.boxes.first()
         exp = KitExpendable(
             kit_id=kit.id, box_id=box.id, part_number=entry.part_number,
             lot_number="LOT-1", tracking_type="lot", description="x",
             quantity=10, unit="each", master_entry_id=entry.id,
         )
-        db_session.add(exp); db_session.commit()
+        db_session.add(exp)
+        db_session.commit()
         assert master_kit_service.effective_min_stock(exp) == 5
 
     def test_override_takes_precedence(self, db_session, master_kit_with_entries, admin_user):
@@ -231,8 +248,10 @@ class TestMinStockInheritance:
         db_session.commit()
         kit = Kit(name=f"K-{uuid.uuid4().hex[:6]}", aircraft_type_id=m.aircraft_type_id,
                   status="active", created_by=admin_user.id, master_kit_id=m.id)
-        db_session.add(kit); db_session.commit()
-        master_kit_service.seed_kit_from_master(kit, m); db_session.commit()
+        db_session.add(kit)
+        db_session.commit()
+        master_kit_service.seed_kit_from_master(kit, m)
+        db_session.commit()
         box = kit.boxes.first()
         exp = KitExpendable(
             kit_id=kit.id, box_id=box.id, part_number=entry.part_number,
@@ -240,7 +259,8 @@ class TestMinStockInheritance:
             quantity=10, unit="each", master_entry_id=entry.id,
             min_stock_override=2.0,
         )
-        db_session.add(exp); db_session.commit()
+        db_session.add(exp)
+        db_session.commit()
         assert master_kit_service.effective_min_stock(exp) == 2.0
 
 
@@ -331,7 +351,8 @@ class TestWizard:
 
         # Create a master, then expect has_master=True.
         mk = MasterKit(aircraft_type_id=aircraft_type.id, name="X", is_active=True)
-        db_session.add(mk); db_session.commit()
+        db_session.add(mk)
+        db_session.commit()
         r2 = client.post("/api/kits/wizard", json={"step": 1}, headers=auth_headers_admin)
         ours2 = next((at for at in r2.get_json()["aircraft_types"] if at["id"] == aircraft_type.id), None)
         assert ours2["has_master"] is True
@@ -458,7 +479,8 @@ class TestTransferService:
             quantity=1, transferred_by=admin_user.id, status="completed",
             transfer_mode="field",
         )
-        db_session.add(t); db_session.commit()
+        db_session.add(t)
+        db_session.commit()
         with pytest.raises(ValueError, match="permanent"):
             transfer_service.cancel_permanent_transfer(transfer_id=t.id, user_id=admin_user.id)
 
@@ -467,7 +489,8 @@ class TestTransferService:
         tool = Tool(tool_number=f"T-{uuid.uuid4().hex[:6]}",
                     serial_number=f"S-{uuid.uuid4().hex[:6]}",
                     description="t", warehouse_id=warehouse.id, status="available")
-        db_session.add(tool); db_session.commit()
+        db_session.add(tool)
+        db_session.commit()
 
         # Use the service for a real permanent transfer so the state changes are
         # consistent and the revert has something to undo.

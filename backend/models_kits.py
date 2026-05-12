@@ -880,6 +880,10 @@ class MasterKitEntry(db.Model):
         - expendable entries: both refs are NULL; part_number is required
         """
         et = (self.entry_type or "").strip().lower()
+        # Compliance, wizard matching, and the migration all key entries by
+        # (entry_type, part_number), so part_number is required for every type.
+        if et in ("tool", "chemical", "expendable") and not (self.part_number or "").strip():
+            return False, f"{et.capitalize()} entries require a part_number."
         if et == "tool":
             if self.ref_chemical_part_id is not None:
                 return False, "Tool entries cannot reference a chemical part."
@@ -889,6 +893,20 @@ class MasterKitEntry(db.Model):
                 return False, "Chemical entries cannot reference a tool."
             if self.ref_chemical_part_id is None:
                 return False, "Chemical entries must reference a ChemicalPart (ref_chemical_part_id)."
+            # part_number must match the referenced ChemicalPart so cross-kit
+            # aggregation and reorder reports stay consistent.
+            try:
+                pn = (self.part_number or "").strip()
+                ref_pn = (self.ref_chemical_part.part_number or "").strip() if self.ref_chemical_part else None
+                if ref_pn and pn != ref_pn:
+                    return False, (
+                        f"Chemical entry part_number ({pn!r}) does not match the "
+                        f"referenced ChemicalPart ({ref_pn!r})."
+                    )
+            except Exception:
+                # If the relationship isn't loaded yet, validation will run
+                # again after flush and the check will succeed or fail cleanly.
+                pass
             return True, None
         if et == "expendable":
             if self.ref_tool_id is not None or self.ref_chemical_part_id is not None:

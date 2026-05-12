@@ -23,7 +23,6 @@ from models_kits import (
     KitTransfer,
     MasterKit,
     MasterKitBox,
-    MasterKitEntry,
 )
 from services import master_kit_service
 from utils.error_handler import ValidationError, handle_errors
@@ -778,12 +777,15 @@ def register_kit_routes(app):
             }), 200
 
         if step == 3:
+            # aircraft_type_id is optional so legacy clients (that just ask for
+            # the suggested boxes without specifying a type) still get the
+            # default layout. When provided, we look up the matching master.
             aircraft_type_id = data.get("aircraft_type_id")
-            if not aircraft_type_id:
-                raise ValidationError("aircraft_type_id is required for step 3")
-            master = MasterKit.query.filter_by(
-                aircraft_type_id=aircraft_type_id, is_active=True,
-            ).first()
+            master = None
+            if aircraft_type_id:
+                master = MasterKit.query.filter_by(
+                    aircraft_type_id=aircraft_type_id, is_active=True,
+                ).first()
             if master:
                 suggested_boxes = []
                 for mb in master.boxes.order_by(MasterKitBox.sort_order).all():
@@ -807,6 +809,14 @@ def register_kit_routes(app):
         if step == 4:
             if not data.get("name") or not data.get("aircraft_type_id"):
                 raise ValidationError("Missing required fields")
+
+            # The endpoint can be called directly without first going through
+            # step 2, so revalidate name uniqueness and aircraft_type existence
+            # here to return clean 400s instead of falling through to DB errors.
+            if Kit.query.filter_by(name=data["name"]).first() is not None:
+                raise ValidationError(f'Kit "{data["name"]}" already exists')
+            if db.session.get(AircraftType, data["aircraft_type_id"]) is None:
+                raise ValidationError("Invalid aircraft type")
 
             current_user_id = request.current_user.get("user_id")
             master_kit_id = data.get("master_kit_id")
@@ -864,7 +874,9 @@ def register_kit_routes(app):
                     # Pick the first box of a matching type, or just the first box.
                     box = kit.boxes.first()
                 else:
-                    box = db.session.get(KitBox, box_id)
+                    # Scope to this kit so a caller can't attach a row to
+                    # another kit's box via a forged box_id.
+                    box = KitBox.query.filter_by(id=box_id, kit_id=kit.id).first()
                 if box is None:
                     continue
                 if extra.get("entry_type") == "expendable":
@@ -973,7 +985,23 @@ def register_kit_routes(app):
             ws = wb.active
             rows_iter = ws.iter_rows(values_only=True)
             header = [str(c or "").strip() for c in next(rows_iter, [])]
-            raw_rows = [dict(zip(header, [str(c) if c is not None else "" for c in r])) for r in rows_iter]
+            raw_rows = []
+            xlsx_errors = []
+            for row_idx, r in enumerate(rows_iter, start=2):  # +2 for header + 1-based
+                # Trim trailing None cells (openpyxl pads rows out to the worksheet width).
+                trimmed = list(r)
+                while trimmed and trimmed[-1] is None:
+                    trimmed.pop()
+                if len(trimmed) != len(header):
+                    xlsx_errors.append({
+                        "row": row_idx,
+                        "error": f"row has {len(trimmed)} cells but header has {len(header)}",
+                    })
+                    continue
+                raw_rows.append({
+                    h: (str(c) if c is not None else "")
+                    for h, c in zip(header, trimmed, strict=True)
+                })
         else:
             # CSV (with simple parsing). Reuse the bulk_import module's CSV reader so we
             # match its encoding fallback and row-cap behaviour.
@@ -991,7 +1019,8 @@ def register_kit_routes(app):
             raise ValidationError("Import is capped at 10,000 rows.")
 
         rows = []
-        errors = []
+        # XLSX path may have collected row-width errors before per-row parsing.
+        errors = list(locals().get("xlsx_errors", []))
         warnings = []
         for idx, row in enumerate(raw_rows, start=2):  # +2 for header + 1-based
             try:
@@ -1023,6 +1052,16 @@ def register_kit_routes(app):
             elif entry.entry_type == "expendable":
                 if bool(lot) == bool(serial):
                     errors.append({"row": idx, "error": "Expendable rows require exactly one of lot_number or serial_number"})
+                    continue
+                # The master entry pins which identifier the kit row must carry —
+                # reject mismatches now instead of letting populate_from_wizard
+                # fail later in step 4.
+                tt = (entry.tracking_type or "lot").lower()
+                if tt == "lot" and not lot:
+                    errors.append({"row": idx, "error": "Master entry is lot-tracked; lot_number is required"})
+                    continue
+                if tt == "serial" and not serial:
+                    errors.append({"row": idx, "error": "Master entry is serial-tracked; serial_number is required"})
                     continue
                 rows.append({
                     "row": idx, "master_entry_id": entry_id,

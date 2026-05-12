@@ -5,6 +5,16 @@ import {
 } from 'antd';
 import { PlusOutlined, EditOutlined, DeleteOutlined, AppstoreAddOutlined } from '@ant-design/icons';
 import type { ColumnsType } from 'antd/es/table';
+
+// Narrow shape of an RTK Query error payload — used to surface server-supplied
+// error messages without resorting to `any` in catch blocks.
+interface ApiError {
+  data?: { error?: string; message?: string };
+}
+function apiErrorMessage(e: unknown, fallback: string): string {
+  const err = e as ApiError | undefined;
+  return err?.data?.error || err?.data?.message || fallback;
+}
 import {
   useListMasterKitsQuery,
   useGetMasterKitQuery,
@@ -44,9 +54,8 @@ export default function MasterKitsAdmin() {
       message.success('Master kit created');
       setCreateOpen(false);
       form.resetFields();
-    } catch (e: any) {
-      const detail = e?.data?.error || e?.data?.message || 'Failed to create master kit';
-      message.error(detail);
+    } catch (e: unknown) {
+      message.error(apiErrorMessage(e, 'Failed to create master kit'));
     }
   };
 
@@ -121,7 +130,7 @@ export default function MasterKitsAdmin() {
 
       {error && (
         <Alert type="error" message="Failed to load master kits"
-          description={(error as any)?.data?.error || 'Unknown error'} closable
+          description={apiErrorMessage(error, 'Unknown error')} closable
           style={{ marginBottom: 12 }} />
       )}
 
@@ -203,8 +212,8 @@ function MasterKitEditor({ masterId, onClose }: EditorProps) {
       setBoxOpen(false);
       boxForm.resetFields();
       refetch();
-    } catch (e: any) {
-      message.error(e?.data?.error || 'Failed to add box');
+    } catch (e: unknown) {
+      message.error(apiErrorMessage(e, 'Failed to add box'));
     }
   };
 
@@ -230,8 +239,8 @@ function MasterKitEditor({ masterId, onClose }: EditorProps) {
       setEntryBox(null);
       entryForm.resetFields();
       refetch();
-    } catch (e: any) {
-      message.error(e?.data?.error || 'Failed to add entry');
+    } catch (e: unknown) {
+      message.error(apiErrorMessage(e, 'Failed to add entry'));
     }
   };
 

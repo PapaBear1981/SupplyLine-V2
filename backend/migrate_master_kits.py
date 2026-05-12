@@ -18,7 +18,7 @@ aircraft types that already have an active master.
 
 import argparse
 import sys
-from collections import Counter, defaultdict
+from collections import defaultdict
 from statistics import median
 
 from sqlalchemy import inspect, text
@@ -85,11 +85,15 @@ def _create_new_tables(db, inspector, dry_run, report):
 
 def _infer_masters(db, threshold, dry_run, report):
     """For each AircraftType, build a MasterKit from its existing kits."""
+    from models import ChemicalPart, Tool
     from models_kits import (
-        AircraftType, Kit, KitBox, KitItem, KitExpendable,
-        MasterKit, MasterKitBox, MasterKitEntry,
+        AircraftType,
+        Kit,
+        KitBox,
+        MasterKit,
+        MasterKitBox,
+        MasterKitEntry,
     )
-    from models import Chemical, ChemicalPart, Tool
 
     aircraft_types = AircraftType.query.filter_by(is_active=True).all()
     for at in aircraft_types:
@@ -350,6 +354,8 @@ def main():
         help="Fraction of kits an entry must appear in to be inferred (default 0.5).",
     )
     args = parser.parse_args()
+    if not 0.0 <= args.threshold <= 1.0:
+        parser.error("--threshold must be between 0 and 1")
 
     report = migrate_database(dry_run=args.dry_run, threshold=args.threshold)
     _print_report(report, dry_run=args.dry_run)
