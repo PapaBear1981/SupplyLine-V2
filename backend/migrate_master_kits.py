@@ -155,10 +155,14 @@ def _infer_masters(db, threshold, dry_run, report):
         validation_failures_this_pass = []
         try:
             sp = db.session.begin_nested()
-        except Exception:
-            # SQLAlchemy raises if the session has no outer transaction; rare in
-            # the migrate flow but harmless to fall through without a savepoint.
-            sp = None
+        except Exception as exc:
+            # Fail closed — if we can't open a savepoint we can't guarantee
+            # atomicity, so abort the migration rather than risk a partial
+            # backfill that survives across re-runs.
+            db.session.rollback()
+            raise RuntimeError(
+                f"Could not open a savepoint for aircraft type {at.name}: {exc}"
+            ) from exc
 
         master = MasterKit(
             aircraft_type_id=at.id,
@@ -206,7 +210,13 @@ def _infer_masters(db, threshold, dry_run, report):
             if item.part_number:
                 template_box_by_part[(item.item_type, item.part_number.strip())] = item.box.box_number if item.box else None
         for exp in template_kit.expendables.all():
-            template_box_by_part[("expendable", exp.part_number.strip())] = exp.box.box_number if exp.box else None
+            # part_number can be NULL on legacy expendables; skip rather than crash.
+            part_number = (exp.part_number or "").strip()
+            if not part_number:
+                continue
+            template_box_by_part[("expendable", part_number)] = (
+                exp.box.box_number if exp.box else None
+            )
 
         for (entry_type, part_number), rows in kept_entries.items():
             box_number = template_box_by_part.get((entry_type, part_number))
@@ -278,15 +288,14 @@ def _infer_masters(db, threshold, dry_run, report):
                 exp.master_entry_id = eid
                 exp.is_custom = eid is None
 
-        if validation_failures_this_pass and sp is not None:
+        if validation_failures_this_pass:
             # One or more entries failed validation — undo everything we
             # inserted for this aircraft type so re-running can complete it
             # cleanly once the underlying data is fixed.
             sp.rollback()
             report.setdefault("aircraft_rolled_back", []).append(at.name)
             continue
-        if sp is not None:
-            sp.commit()
+        sp.commit()
         db.session.commit()
 
 
