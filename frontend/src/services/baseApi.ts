@@ -159,6 +159,7 @@ export const baseApi = createApi({
     'TrustedDevice',
     'Transfer',
     'ActiveWarehouse',
+    'MasterKit',
   ],
   endpoints: () => ({}),
 });

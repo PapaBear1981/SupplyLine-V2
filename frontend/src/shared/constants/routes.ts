@@ -7,6 +7,7 @@ export const ROUTES = {
   TOOL_HISTORY: '/tool-history',
   CHEMICALS: '/chemicals',
   KITS: '/kits',
+  MASTER_KITS: '/admin/master-kits',
   WAREHOUSES: '/warehouses',
   TRANSFERS: '/transfers',
   REPORTS: '/reports',

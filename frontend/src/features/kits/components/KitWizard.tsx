@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Steps,
@@ -14,16 +14,21 @@ import {
   message,
   Typography,
   Divider,
+  Alert,
+  Switch,
+  Tag,
 } from 'antd';
 import {
   PlusOutlined,
   MinusCircleOutlined,
   CheckCircleOutlined,
   ArrowLeftOutlined,
+  AppstoreOutlined,
 } from '@ant-design/icons';
 import type { ColumnsType } from 'antd/es/table';
 import { useKitWizardMutation, useGetAircraftTypesQuery } from '../services/kitsApi';
-import type { BoxType } from '../types';
+import { useGetMasterKitForAircraftTypeQuery } from '@features/master-kits/services/masterKitsApi';
+import type { BoxType, MasterKitEntry } from '../types';
 
 const { Option } = Select;
 const { Title, Text } = Typography;
@@ -46,9 +51,18 @@ const KitWizard = () => {
     description?: string;
     boxes?: BoxConfig[];
   }>({});
+  // Master-kit linkage state. `useMaster` defaults to true when a master exists
+  // for the chosen aircraft type; users can opt out via the toggle on step 2.
+  const [useMaster, setUseMaster] = useState(true);
+  const [removedEntryIds, setRemovedEntryIds] = useState<Set<number>>(new Set());
 
   const { data: aircraftTypes = [] } = useGetAircraftTypesQuery({});
   const [kitWizard, { isLoading }] = useKitWizardMutation();
+  const { data: masterLookup } = useGetMasterKitForAircraftTypeQuery(
+    wizardData.aircraft_type_id ?? 0,
+    { skip: !wizardData.aircraft_type_id },
+  );
+  const master = masterLookup?.master_kit || null;
 
   const defaultBoxes: BoxConfig[] = [
     { key: '1', box_number: 'Box1', box_type: 'expendable', description: 'Expendable items' },
@@ -58,7 +72,30 @@ const KitWizard = () => {
     { key: '5', box_number: 'Floor', box_type: 'floor', description: 'Large items on floor' },
   ];
 
+  // When a master exists and the user hasn't opted out, derive boxes from it.
+  const masterDerivedBoxes: BoxConfig[] = (master && useMaster)
+    ? (master.boxes || []).map((mb) => ({
+        key: `master-${mb.id}`,
+        box_number: mb.box_number,
+        box_type: mb.box_type as BoxType,
+        description: mb.description || '',
+      }))
+    : defaultBoxes;
+
   const [boxes, setBoxes] = useState<BoxConfig[]>(defaultBoxes);
+
+  // Re-derive boxes when the master kit or the useMaster toggle changes —
+  // but only before step 3 (review) so we don't clobber user-customised boxes
+  // once they've started editing.
+  useEffect(() => {
+    if (currentStep <= 2) {
+      setBoxes(masterDerivedBoxes);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [master?.id, useMaster]);
+
+  const allMasterEntries: MasterKitEntry[] = (master?.boxes || [])
+    .flatMap((b) => b.entries || []);
 
   const handleNext = async () => {
     try {
@@ -102,7 +139,7 @@ const KitWizard = () => {
 
   const handleFinish = async () => {
     try {
-      const result = await kitWizard({
+      const payload: any = {
         step: 4,
         name: wizardData.name,
         aircraft_type_id: wizardData.aircraft_type_id,
@@ -112,7 +149,19 @@ const KitWizard = () => {
           box_type,
           description,
         })),
-      }).unwrap();
+      };
+      if (master && useMaster) {
+        payload.master_kit_id = master.id;
+        payload.use_master = true;
+        if (removedEntryIds.size > 0) {
+          payload.customizations = {
+            removed_entry_ids: Array.from(removedEntryIds),
+          };
+        }
+      } else if (master && !useMaster) {
+        payload.use_master = false;
+      }
+      const result = await kitWizard(payload).unwrap();
 
       if ('kit' in result && result.kit) {
         message.success('Kit created successfully!');
@@ -217,12 +266,23 @@ const KitWizard = () => {
             rules={[{ required: true, message: 'Please select an aircraft type' }]}
             initialValue={wizardData.aircraft_type_id}
           >
-            <Select placeholder="Select aircraft type" size="large">
+            <Select
+              placeholder="Select aircraft type"
+              size="large"
+              data-testid="wizard-aircraft-type-select"
+            >
               {aircraftTypes
                 .filter((type) => type.is_active)
                 .map((type) => (
-                  <Option key={type.id} value={type.id}>
+                  <Option
+                    key={type.id}
+                    value={type.id}
+                    data-testid={`wizard-aircraft-option-${type.id}`}
+                  >
                     {type.name} - {type.description}
+                    {type.has_master && (
+                      <Tag color="blue" style={{ marginLeft: 8 }}>Master available</Tag>
+                    )}
                   </Option>
                 ))}
             </Select>
@@ -234,13 +294,47 @@ const KitWizard = () => {
       title: 'Kit Details',
       content: (
         <Form form={form} layout="vertical">
+          {master && (
+            <Alert
+              type="info"
+              showIcon
+              icon={<AppstoreOutlined />}
+              style={{ marginBottom: 16 }}
+              data-testid="wizard-master-banner"
+              message={`This kit will be linked to the ${master.name} master kit`}
+              description={
+                <Space direction="vertical" size={4}>
+                  <Text>
+                    Linking populates {master.box_count} box{master.box_count === 1 ? '' : 'es'}{' '}
+                    and tracks compliance against {master.entry_count} required
+                    {' '}entr{master.entry_count === 1 ? 'y' : 'ies'} for this aircraft type.
+                  </Text>
+                  <Space>
+                    <Text strong>Link to master?</Text>
+                    <Switch
+                      checked={useMaster}
+                      onChange={setUseMaster}
+                      data-testid="wizard-master-toggle"
+                    />
+                    <Text type="secondary">
+                      {useMaster ? 'Yes — kit inherits the canonical structure' : 'No — kit will be unlinked'}
+                    </Text>
+                  </Space>
+                </Space>
+              }
+            />
+          )}
           <Form.Item
             name="name"
             label="Kit Name"
             rules={[{ required: true, message: 'Please enter kit name' }]}
             initialValue={wizardData.name}
           >
-            <Input placeholder="Enter unique kit name" size="large" />
+            <Input
+              placeholder="Enter unique kit name"
+              size="large"
+              data-testid="wizard-kit-name-input"
+            />
           </Form.Item>
           <Form.Item
             name="description"
@@ -260,10 +354,19 @@ const KitWizard = () => {
       content: (
         <div>
           <Space direction="vertical" style={{ width: '100%' }} size="large">
-            <Text>
-              Configure the boxes that will be in this kit. You can customize the suggested
-              boxes or add your own.
-            </Text>
+            {master && useMaster ? (
+              <Alert
+                type="success"
+                showIcon
+                message={`Boxes derived from master "${master.name}"`}
+                description="You can still add custom boxes or edit details. Removing master-derived boxes is not recommended — they keep the kit compliant."
+              />
+            ) : (
+              <Text>
+                Configure the boxes that will be in this kit. You can customize the suggested
+                boxes or add your own.
+              </Text>
+            )}
             <Table
               columns={boxColumns}
               dataSource={boxes}
@@ -273,6 +376,55 @@ const KitWizard = () => {
             <Button type="dashed" onClick={addBox} icon={<PlusOutlined />} block>
               Add Box
             </Button>
+
+            {master && useMaster && allMasterEntries.length > 0 && (
+              <Card
+                size="small"
+                title={
+                  <Space>
+                    <AppstoreOutlined />
+                    <span>Master entries</span>
+                    <Tag color="blue">{allMasterEntries.length}</Tag>
+                  </Space>
+                }
+                data-testid="wizard-entries-preview"
+              >
+                <Text type="secondary" style={{ display: 'block', marginBottom: 8 }}>
+                  These items will be tracked for this kit. Uncheck any you don't want to
+                  include in this specific kit.
+                </Text>
+                <Table<MasterKitEntry>
+                  rowKey="id"
+                  size="small"
+                  pagination={false}
+                  dataSource={allMasterEntries}
+                  rowSelection={{
+                    selectedRowKeys: allMasterEntries
+                      .filter((e) => !removedEntryIds.has(e.id))
+                      .map((e) => e.id),
+                    onChange: (keys) => {
+                      const kept = new Set(keys as number[]);
+                      const removed = new Set<number>();
+                      allMasterEntries.forEach((e) => {
+                        if (!kept.has(e.id)) removed.add(e.id);
+                      });
+                      setRemovedEntryIds(removed);
+                    },
+                  }}
+                  columns={[
+                    { title: 'Type', dataIndex: 'entry_type',
+                      render: (v) => <Tag>{v}</Tag>, width: 110 },
+                    { title: 'Part #', dataIndex: 'part_number', width: 160 },
+                    { title: 'Description', dataIndex: 'description', ellipsis: true },
+                    { title: 'Qty', dataIndex: 'required_quantity', align: 'right', width: 70 },
+                    { title: 'Unit', dataIndex: 'unit', width: 80 },
+                  ]}
+                  onRow={(row) => ({
+                    'data-testid': `wizard-entry-row-${row.id}`,
+                  } as any)}
+                />
+              </Card>
+            )}
           </Space>
         </div>
       ),
@@ -372,6 +524,7 @@ const KitWizard = () => {
                   icon={<CheckCircleOutlined />}
                   onClick={handleFinish}
                   loading={isLoading}
+                  data-testid="wizard-submit"
                 >
                   Create Kit
                 </Button>

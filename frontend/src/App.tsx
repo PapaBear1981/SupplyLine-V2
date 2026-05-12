@@ -24,6 +24,7 @@ import { SettingsPage } from '@features/settings/pages/SettingsPage';
 import { ProfilePage } from '@features/profile/pages/ProfilePage';
 import { AdminPageWrapper } from '@features/admin/components/AdminPageWrapper';
 import { KitsDashboard, KitDetailView, KitWizard, MobileKitWizard } from '@features/kits';
+import MasterKitsAdmin from '@features/master-kits/pages/MasterKitsAdmin';
 import { DisplayPage } from '@features/display/pages/DisplayPage';
 import { OnCallSchedulePage } from '@features/oncall';
 import {
@@ -109,6 +110,7 @@ function AppContent() {
                   <Route path="/kits/:id" element={<KitDetailView />} />
                   <Route path="/kits/:id/edit" element={<div>Edit Kit (Coming Soon)</div>} />
                   <Route path="/kits/:id/duplicate" element={<div>Duplicate Kit (Coming Soon)</div>} />
+                  <Route path={ROUTES.MASTER_KITS} element={<MasterKitsAdmin />} />
 
                   {/* Orders Routes */}
                   <Route path="/orders" element={<OrdersDashboard />} />

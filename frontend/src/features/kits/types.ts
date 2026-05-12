@@ -17,6 +17,93 @@ export interface AircraftType {
   is_active: boolean;
   created_at: string;
   kit_count?: number;
+  // Set by the wizard's step 1 endpoint when this type has a canonical master kit.
+  has_master?: boolean;
+  master_kit_id?: number | null;
+}
+
+// Master Kit (canonical template per aircraft type)
+export type MasterKitEntryType = 'tool' | 'chemical' | 'expendable';
+
+export interface MasterKitEntry {
+  id: number;
+  master_kit_id: number;
+  master_box_id: number;
+  entry_type: MasterKitEntryType;
+  ref_tool_id: number | null;
+  ref_chemical_part_id: number | null;
+  part_number: string | null;
+  description: string | null;
+  required_quantity: number;
+  minimum_stock_level: number | null;
+  unit: string;
+  tracking_type: 'lot' | 'serial' | null;
+  is_required: boolean;
+  notes: string | null;
+  sort_order: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface MasterKitBox {
+  id: number;
+  master_kit_id: number;
+  box_number: string;
+  box_type: string;
+  description: string | null;
+  sort_order: number;
+  entries?: MasterKitEntry[];
+}
+
+export interface MasterKit {
+  id: number;
+  aircraft_type_id: number;
+  aircraft_type_name: string | null;
+  name: string;
+  description: string | null;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+  created_by: number | null;
+  box_count: number;
+  entry_count: number;
+  boxes?: MasterKitBox[];
+}
+
+// Compliance report (returned by GET /api/kits/<id>/compliance)
+export interface KitComplianceMissing {
+  master_entry_id: number;
+  entry_type: MasterKitEntryType;
+  part_number: string | null;
+  description: string | null;
+  required_quantity: number;
+  unit: string;
+}
+export interface KitComplianceExtra {
+  kit_row_id: number;
+  row_kind: 'item' | 'expendable';
+  entry_type: MasterKitEntryType;
+  part_number: string | null;
+  description: string | null;
+  quantity: number;
+  is_orphan: boolean;
+}
+export interface KitComplianceDeviation {
+  master_entry_id: number;
+  entry_type: MasterKitEntryType;
+  part_number: string | null;
+  expected_quantity: number;
+  actual_quantity: number;
+  reason: string;
+}
+export interface KitComplianceReport {
+  missing: KitComplianceMissing[];
+  extras: KitComplianceExtra[];
+  deviations: KitComplianceDeviation[];
+  percent_compliant: number | null;
+  linked_to_master: boolean;
+  master_kit_id?: number;
+  master_kit_name?: string;
 }
 
 // Kit
@@ -53,6 +140,9 @@ export interface Kit {
   assigned_user_id?: number | null;
   assigned_user_name?: string | null;
   assigned_user_employee_number?: string | null;
+  // Master-kit linkage (null for legacy / unlinked kits).
+  master_kit_id?: number | null;
+  master_kit_name?: string | null;
 }
 
 // Kit Location (for map display)
