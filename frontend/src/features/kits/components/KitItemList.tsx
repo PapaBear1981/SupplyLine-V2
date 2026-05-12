@@ -19,6 +19,7 @@ import {
 import type { ColumnsType } from 'antd/es/table';
 import { useGetKitItemsQuery } from '../services/kitsApi';
 import type { KitItem, ItemStatus } from '../types';
+import AddKitItemModal from './AddKitItemModal';
 import KitIssuanceForm from './KitIssuanceForm';
 import KitItemDetailModal from './KitItemDetailModal';
 
@@ -36,6 +37,7 @@ const KitItemList = ({ kitId }: KitItemListProps) => {
   const [selectedItem, setSelectedItem] = useState<KitItem | null>(null);
   const [detailModalVisible, setDetailModalVisible] = useState(false);
   const [selectedItemId, setSelectedItemId] = useState<number | null>(null);
+  const [addModalVisible, setAddModalVisible] = useState(false);
 
   const { data: itemsData, isLoading } = useGetKitItemsQuery({
     kitId,
@@ -261,7 +263,11 @@ const KitItemList = ({ kitId }: KitItemListProps) => {
               <Option value="issued">Issued</Option>
               <Option value="maintenance">Maintenance</Option>
             </Select>
-            <Button type="primary" icon={<PlusOutlined />}>
+            <Button
+              type="primary"
+              icon={<PlusOutlined />}
+              onClick={() => setAddModalVisible(true)}
+            >
               Add Item
             </Button>
           </Space>
@@ -283,6 +289,12 @@ const KitItemList = ({ kitId }: KitItemListProps) => {
           }}
         />
       </Card>
+
+      <AddKitItemModal
+        visible={addModalVisible}
+        kitId={kitId}
+        onClose={() => setAddModalVisible(false)}
+      />
 
       <KitIssuanceForm
         visible={issuanceModalVisible}
