@@ -317,6 +317,191 @@ class TestCancelPropagatesToKitReorder:
         assert reorder.status == "cancelled"
 
 
+class TestCancelCascadeIsGated:
+    """Cancellation must not flip a kit reorder's status when the item was
+    already received — the cascade is nested under the item-cancel branch."""
+
+    def test_cancel_does_not_overwrite_already_received_kit_reorder(
+        self,
+        client,
+        auth_headers_admin,
+        auth_headers_materials,
+        aircraft_type,
+        db_session,
+    ):
+        kit, _, _ = _make_kit(db_session, aircraft_type)
+        reorder_id, _ = _create_and_approve_reorder(
+            client, auth_headers_admin, auth_headers_materials, kit, "EXP-CASCADE-GATE"
+        )
+        request_item = RequestItem.query.filter_by(
+            source_type="kit_reorder", kit_reorder_request_id=reorder_id
+        ).first()
+
+        # Receive the item first — reorder is now fulfilled.
+        client.post(
+            f"/api/user-requests/{request_item.request_id}/items/mark-received",
+            json={"item_ids": [request_item.id]},
+            headers=auth_headers_admin,
+        )
+        reorder = db_session.get(KitReorderRequest, reorder_id)
+        db_session.refresh(reorder)
+        assert reorder.status == "fulfilled"
+
+        # Now try to cancel the whole user request. The fulfilled item must
+        # remain received, and the linked KitReorderRequest must remain
+        # fulfilled — it must not be flipped to cancelled by the cascade.
+        client.delete(
+            f"/api/user-requests/{request_item.request_id}",
+            headers=auth_headers_admin,
+        )
+        db_session.refresh(reorder)
+        assert reorder.status == "fulfilled"
+
+
+class TestOriginatingBoxPreference:
+    """When ``box_id`` is omitted, the kit helper should restore the new lot
+    into the originating KitExpendable's box (not silently default to box 1)."""
+
+    def test_restore_targets_originating_box_for_existing_expendable(
+        self,
+        client,
+        auth_headers_admin,
+        auth_headers_materials,
+        aircraft_type,
+        db_session,
+    ):
+        # Build a kit with TWO boxes; put the existing expendable in box #2 so
+        # the test distinguishes "originating box" from "lowest-numbered box".
+        kit = Kit(
+            name=f"Box-pref Kit {uuid.uuid4().hex[:8]}",
+            aircraft_type_id=aircraft_type.id,
+            description="Originating-box test",
+            status="active",
+            created_by=1,
+        )
+        db_session.add(kit)
+        db_session.flush()
+
+        box1 = KitBox(kit_id=kit.id, box_number="1", box_type="expendable", description="Box 1")
+        box2 = KitBox(kit_id=kit.id, box_number="2", box_type="expendable", description="Box 2")
+        db_session.add_all([box1, box2])
+        db_session.flush()
+
+        expendable = KitExpendable(
+            kit_id=kit.id,
+            box_id=box2.id,
+            part_number="EXP-BOX2",
+            description="Lives in box 2",
+            quantity=5.0,
+            unit="ea",
+            status="low_stock",
+        )
+        db_session.add(expendable)
+        db_session.commit()
+
+        reorder_id, _ = _create_and_approve_reorder(
+            client,
+            auth_headers_admin,
+            auth_headers_materials,
+            kit,
+            expendable.part_number,
+            item_id=expendable.id,
+        )
+        request_item = RequestItem.query.filter_by(
+            source_type="kit_reorder", kit_reorder_request_id=reorder_id
+        ).first()
+
+        # mark-received omits box_id; the helper must NOT default to box #1.
+        resp = client.post(
+            f"/api/user-requests/{request_item.request_id}/items/mark-received",
+            json={"item_ids": [request_item.id]},
+            headers=auth_headers_admin,
+        )
+        assert resp.status_code == 200, resp.data
+
+        db_session.refresh(expendable)
+        # Existing expendable is in box #2; top-up should leave it there.
+        assert expendable.box_id == box2.id
+        # And the quantity was actually topped up.
+        assert expendable.quantity == 5.0 + 25.0
+
+
+class TestChemicalPartialTransferDecrements:
+    """When a chemical reorder uses warehouse stock, only the transferred
+    amount may leave inventory — the remainder must stay in the warehouse."""
+
+    def test_partial_chemical_transfer_decrements_warehouse_quantity(
+        self,
+        client,
+        auth_headers_admin,
+        auth_headers_materials,
+        aircraft_type,
+        db_session,
+    ):
+        from models import Chemical, ChemicalPart, Warehouse
+        from utils.kit_fulfillment import restore_kit_from_reorder
+
+        # Master chemical part is required so warehouse Chemical can be created.
+        part_no = f"CHEM-{uuid.uuid4().hex[:6].upper()}"
+        master = ChemicalPart(
+            part_number=part_no,
+            description="Test chemical",
+            manufacturer="Acme",
+            default_unit="L",
+            category="General",
+        )
+        db_session.add(master)
+
+        wh = Warehouse.query.filter_by(is_active=True).first()
+        if not wh:
+            wh = Warehouse(name="Main", warehouse_type="main", is_active=True)
+            db_session.add(wh)
+            db_session.flush()
+
+        warehouse_chem = Chemical(
+            part_number=part_no,
+            chemical_part_id=master.id,
+            lot_number=f"LOT-{uuid.uuid4().hex[:6]}",
+            description="Stocked chemical",
+            manufacturer="Acme",
+            quantity=50,
+            unit="L",
+            location=f"Warehouse {wh.name}",
+            category="General",
+            status="available",
+            warehouse_id=wh.id,
+        )
+        db_session.add(warehouse_chem)
+        db_session.flush()
+
+        kit, box, _ = _make_kit(db_session, aircraft_type)
+
+        reorder = KitReorderRequest(
+            kit_id=kit.id,
+            item_type="chemical",
+            item_id=warehouse_chem.id,
+            part_number=part_no,
+            description="Stocked chemical",
+            quantity_requested=5,  # only 5 of 50 — partial transfer
+            priority="medium",
+            requested_by=1,
+            status="ordered",
+        )
+        db_session.add(reorder)
+        db_session.commit()
+
+        # Drive the helper directly to keep the test focused on the inventory math.
+        restore_kit_from_reorder(reorder, box_id=box.id, current_user_id=1)
+        db_session.commit()
+
+        db_session.refresh(warehouse_chem)
+        # Critical: the row must still live in the warehouse and 45 of the
+        # original 50 L must remain. The previous code stranded the leftover
+        # on a row with ``warehouse_id=NULL``.
+        assert warehouse_chem.warehouse_id == wh.id
+        assert warehouse_chem.quantity == 45
+
+
 class TestUserRequestsHistoryFilter:
     """The unified list endpoint accepts comma-separated status filters that
     the new History tab relies on to scope its query."""

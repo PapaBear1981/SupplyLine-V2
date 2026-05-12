@@ -612,14 +612,16 @@ def register_user_request_routes(app):
         from models_kits import KitReorderRequest
 
         user_request.status = "cancelled"
-        # Cancel all pending items and propagate to linked kit reorder requests
+        # Cancel all pending items and propagate to linked kit reorder requests.
+        # The cascade is nested inside the item-cancel branch so we never flip
+        # a fulfilled item's KitReorderRequest to cancelled.
         for item in user_request.items.all():
             if item.status not in ("received", "cancelled"):
                 item.status = "cancelled"
-            if item.source_type == "kit_reorder" and item.kit_reorder_request_id:
-                reorder = db.session.get(KitReorderRequest, item.kit_reorder_request_id)
-                if reorder and reorder.status not in ("fulfilled", "cancelled"):
-                    reorder.status = "cancelled"
+                if item.source_type == "kit_reorder" and item.kit_reorder_request_id:
+                    reorder = db.session.get(KitReorderRequest, item.kit_reorder_request_id)
+                    if reorder and reorder.status not in ("fulfilled", "cancelled"):
+                        reorder.status = "cancelled"
 
         actor_id = current_user.get("user_id")
         audit = AuditLog(

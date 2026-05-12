@@ -29,9 +29,11 @@ test.describe('Requests (desktop)', () => {
     const historyTab = page.getByRole('tab', { name: /History/i });
     await historyTab.click();
     await expect(historyTab).toHaveAttribute('aria-selected', 'true', { timeout: 5_000 });
-    await expect(page.getByPlaceholder(/search request history/i)).toBeVisible({
-      timeout: 10_000,
-    });
+    // `destroyInactiveTabPane` removes the inactive pane, but `.first()` keeps
+    // this resilient if the dashboard ever toggles that prop off.
+    await expect(
+      page.getByPlaceholder(/search request history/i).first()
+    ).toBeVisible({ timeout: 10_000 });
   });
 
   test('sidebar auto-expands the Operations group when landing on the requests page', async ({ page }) => {

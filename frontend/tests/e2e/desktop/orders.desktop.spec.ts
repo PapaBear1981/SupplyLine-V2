@@ -29,10 +29,13 @@ test.describe('Orders / Fulfillment (desktop)', () => {
     const historyTab = page.getByRole('tab', { name: /History/i });
     await historyTab.click();
     await expect(historyTab).toHaveAttribute('aria-selected', 'true', { timeout: 5_000 });
-    // The history view labels itself differently from the active view.
-    await expect(page.getByPlaceholder(/search request history/i)).toBeVisible({
-      timeout: 10_000,
-    });
+    // The history view labels its search input differently from the active view.
+    // `destroyInactiveTabPane` is set on the Tabs, so only the active pane's
+    // placeholder is in the DOM; `.first()` keeps the selector resilient if
+    // that prop ever changes.
+    await expect(
+      page.getByPlaceholder(/search request history/i).first()
+    ).toBeVisible({ timeout: 10_000 });
   });
 
   test('sidebar auto-expands the Operations group when landing on the orders page', async ({ page }) => {

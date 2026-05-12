@@ -99,13 +99,12 @@ export const OrdersDashboard: React.FC = () => {
   } = useGetRequestsQuery(requestQueryParams);
   const { data: requestAnalytics } = useGetRequestAnalyticsQuery();
 
-  // Pending requests that need fulfillment action (drives the Active tab badge).
-  const pendingRequestsCount =
-    (requestAnalytics?.status_breakdown?.new || 0) +
-    (requestAnalytics?.status_breakdown?.under_review || 0) +
-    (requestAnalytics?.status_breakdown?.pending_fulfillment || 0) +
-    (requestAnalytics?.status_breakdown?.in_progress || 0) +
-    (requestAnalytics?.status_breakdown?.awaiting_info || 0);
+  // Active requests count drives the Active tab badge and must match the set
+  // of rows actually shown on the tab, so sum every status in ACTIVE_REQUEST_STATUSES.
+  const pendingRequestsCount = ACTIVE_REQUEST_STATUSES.reduce(
+    (sum, status) => sum + (requestAnalytics?.status_breakdown?.[status] || 0),
+    0
+  );
 
   if (isMobile) {
     return <MobileOrdersList />;
@@ -289,7 +288,7 @@ export const OrdersDashboard: React.FC = () => {
           <Col xs={24} sm={12} lg={6}>
             <Card>
               <Statistic
-                title="Pending Fulfillment"
+                title="Active"
                 value={pendingRequestsCount}
                 prefix={<ClockCircleOutlined style={{ color: '#faad14' }} />}
                 valueStyle={{ color: '#faad14' }}
@@ -477,6 +476,7 @@ export const OrdersDashboard: React.FC = () => {
         }}
         items={tabItems}
         size="large"
+        destroyInactiveTabPane
       />
     </div>
   );

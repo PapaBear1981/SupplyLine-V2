@@ -67,11 +67,29 @@ def restore_kit_from_reorder(
         if not box:
             raise ValidationError("Invalid box_id for this kit")
     else:
-        box = (
-            KitBox.query.filter_by(kit_id=reorder.kit_id)
-            .order_by(KitBox.box_number)
-            .first()
-        )
+        # Prefer the originating KitItem's box when the caller didn't specify
+        # one, so the new lot ends up where the consumed one was issued from.
+        # The unified mark-received path always omits box_id; falling back to
+        # box #1 silently re-routed stock to the wrong location.
+        box = None
+        if reorder.item_id and reorder.item_type in ("tool", "chemical"):
+            prior = db.session.get(KitItem, reorder.item_id)
+            if prior and prior.kit_id == reorder.kit_id and prior.box_id:
+                box = KitBox.query.filter_by(
+                    id=prior.box_id, kit_id=reorder.kit_id
+                ).first()
+        elif reorder.item_id and reorder.item_type == "expendable":
+            prior = db.session.get(KitExpendable, reorder.item_id)
+            if prior and prior.kit_id == reorder.kit_id and prior.box_id:
+                box = KitBox.query.filter_by(
+                    id=prior.box_id, kit_id=reorder.kit_id
+                ).first()
+        if box is None:
+            box = (
+                KitBox.query.filter_by(kit_id=reorder.kit_id)
+                .order_by(KitBox.box_number)
+                .first()
+            )
         if not box:
             raise ValidationError("box_id is required to fulfill reorder")
         box_id = box.id
@@ -268,7 +286,7 @@ def _transfer_existing_part_number(reorder, existing_kit_item, box, box_id, curr
         status="completed",
     )
     db.session.add(transfer)
-    warehouse_item.warehouse_id = None
+    _consume_warehouse_stock(warehouse_item, reorder)
 
 
 def _transfer_specific_warehouse_item(reorder, box, box_id, current_user_id):
@@ -326,6 +344,30 @@ def _transfer_specific_warehouse_item(reorder, box, box_id, current_user_id):
         status="completed",
     )
     db.session.add(transfer)
+    _consume_warehouse_stock(warehouse_item, reorder)
+
+
+def _consume_warehouse_stock(warehouse_item, reorder):
+    """Reduce warehouse stock by the transferred amount.
+
+    Tools and serialised items are 1-per-row, so the whole row leaves the
+    warehouse. Chemicals are quantity-tracked, so only ``quantity_requested``
+    units come out; the remaining stock stays in the warehouse until depleted.
+    Without this, transferring 5 L from a 50 L drum stranded the other 45 L
+    on a row with ``warehouse_id=NULL`` and no kit link.
+    """
+    if reorder.item_type == "tool":
+        warehouse_item.warehouse_id = None
+        return
+    if reorder.item_type == "chemical":
+        new_qty = round((warehouse_item.quantity or 0) - reorder.quantity_requested, 4)
+        if new_qty <= 0:
+            warehouse_item.quantity = 0
+            warehouse_item.warehouse_id = None
+        else:
+            warehouse_item.quantity = new_qty
+        return
+    # Other types (defensive — current callers only pass tool/chemical here)
     warehouse_item.warehouse_id = None
 
 
@@ -383,7 +425,9 @@ def _autocreate_and_transfer(reorder, box, box_id, current_user_id):
             lot_number=lot_number,
             description=reorder.description or chemical_part.description,
             manufacturer=chemical_part.manufacturer or "Unknown",
-            quantity=int(reorder.quantity_requested),
+            # Match the precision used when writing the KitItem below so the
+            # warehouse and kit rows agree (e.g. 2.75 L stays 2.75, not 2).
+            quantity=round(reorder.quantity_requested, 2),
             unit=chemical_part.default_unit or "ea",
             location=f"Warehouse {default_warehouse.name}",
             category=chemical_part.category or "General",

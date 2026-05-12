@@ -470,6 +470,7 @@ export const RequestsDashboard: React.FC = () => {
               setStatusFilter([]);
             }}
             size="large"
+            destroyInactiveTabPane
             items={[
               {
                 key: 'active',
