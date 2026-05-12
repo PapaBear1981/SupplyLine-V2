@@ -22,7 +22,10 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 # Import app from run.py to get proper Flask context with all models loaded
 from models import Chemical, LotNumberSequence, Tool, User, Warehouse, db
-from models_kits import AircraftType, Kit, KitBox, KitExpendable
+from models_kits import (
+    AircraftType, Kit, KitBox, KitExpendable, KitItem,
+    MasterKit, MasterKitBox, MasterKitEntry,
+)
 from run import app
 
 
@@ -530,6 +533,123 @@ def seed_kit_expendables(kits):
     db.session.commit()
 
 
+def seed_master_kits(aircraft_types, kits, admin):
+    """Seed one MasterKit per aircraft type and link existing kits to it.
+
+    Also deliberately leaves one kit non-compliant (missing one master entry) so
+    the compliance E2E and screenshot tests have a deterministic target.
+    """
+    print("\n=== Seeding Master Kit Lists ===")
+
+    from models import ChemicalPart
+
+    # Reference real ChemicalPart records where they exist so the master entries
+    # match what kits actually carry. The chemical seeder creates parts as a
+    # side-effect of the Chemical.get_or_create flow; otherwise look up by part
+    # number from the existing inventory.
+    def _find_chemical_part(part_number):
+        return ChemicalPart.query.filter_by(part_number=part_number).first()
+
+    master_entries_per_type = {
+        "Q400": [
+            {"entry_type": "expendable", "part_number": "EXP-Q400-001",
+             "description": "Q400 nitrile gloves (per kit)",
+             "required_quantity": 50, "tracking_type": "lot", "unit": "pair"},
+            {"entry_type": "expendable", "part_number": "EXP-Q400-002",
+             "description": "Q400 lockwire 0.032\"",
+             "required_quantity": 2, "tracking_type": "lot", "unit": "spool"},
+            {"entry_type": "chemical", "part_number": "PR-1422",
+             "description": "PR-1422 sealant", "required_quantity": 4, "unit": "tube"},
+        ],
+        "RJ85": [
+            {"entry_type": "expendable", "part_number": "EXP-RJ85-001",
+             "description": "RJ85 cotter pin set", "required_quantity": 100,
+             "tracking_type": "lot", "unit": "each"},
+            {"entry_type": "chemical", "part_number": "EC-2216",
+             "description": "EC-2216 epoxy adhesive", "required_quantity": 2, "unit": "cartridge"},
+        ],
+        "CL415": [
+            {"entry_type": "expendable", "part_number": "EXP-CL415-001",
+             "description": "CL415 hydraulic O-ring kit", "required_quantity": 10,
+             "tracking_type": "lot", "unit": "each"},
+        ],
+        "CV580": [
+            {"entry_type": "expendable", "part_number": "EXP-CV580-001",
+             "description": "CV580 fuel filter", "required_quantity": 3,
+             "tracking_type": "lot", "unit": "each"},
+        ],
+        "King Air": [
+            {"entry_type": "expendable", "part_number": "EXP-KA-001",
+             "description": "King Air spark plug", "required_quantity": 4,
+             "tracking_type": "lot", "unit": "each"},
+        ],
+    }
+
+    masters = []
+    for at in aircraft_types:
+        if MasterKit.query.filter_by(aircraft_type_id=at.id, is_active=True).first():
+            print(f"  MasterKit for {at.name} already exists, skipping.")
+            continue
+        master = MasterKit(
+            aircraft_type_id=at.id,
+            name=f"{at.name} Master Kit",
+            description=f"Canonical kit definition for {at.name} aircraft",
+            is_active=True,
+            created_by=admin.id,
+        )
+        db.session.add(master)
+        db.session.flush()
+
+        # One box per master so seeded kits have somewhere to attach to.
+        box = MasterKitBox(
+            master_kit_id=master.id,
+            box_number="Box1",
+            box_type="expendable",
+            description="Standard expendable items",
+            sort_order=0,
+        )
+        db.session.add(box)
+        db.session.flush()
+
+        for spec in master_entries_per_type.get(at.name, []):
+            ref_chem = None
+            if spec["entry_type"] == "chemical":
+                ref_chem = _find_chemical_part(spec["part_number"])
+                if ref_chem is None:
+                    print(f"    Skipping chemical entry {spec['part_number']} — no ChemicalPart row.")
+                    continue
+            entry = MasterKitEntry(
+                master_kit_id=master.id,
+                master_box_id=box.id,
+                entry_type=spec["entry_type"],
+                ref_chemical_part_id=ref_chem.id if ref_chem else None,
+                part_number=spec["part_number"],
+                description=spec["description"],
+                required_quantity=spec["required_quantity"],
+                unit=spec.get("unit", "each"),
+                tracking_type=spec.get("tracking_type"),
+                is_required=True,
+                sort_order=0,
+            )
+            ok, err = entry.validate_refs()
+            if not ok:
+                print(f"    Skipping invalid entry {spec['part_number']}: {err}")
+                continue
+            db.session.add(entry)
+        db.session.flush()
+
+        # Link existing kits of this aircraft type to the master.
+        linked = 0
+        for kit in [k for k in kits if k.aircraft_type_id == at.id]:
+            kit.master_kit_id = master.id
+            linked += 1
+        masters.append(master)
+        print(f"  Created MasterKit for {at.name} with {master.entries.count()} entries; linked {linked} kits")
+
+    db.session.commit()
+    return masters
+
+
 def seed_database():
     """Main function to seed all data."""
     with app.app_context():
@@ -548,6 +668,7 @@ def seed_database():
         seed_chemicals(warehouses)
         kits = seed_kits(aircraft_types, admin)
         seed_kit_expendables(kits)
+        seed_master_kits(aircraft_types, kits, admin)
 
         # Summary
         print("\n" + "=" * 60)
@@ -560,6 +681,8 @@ def seed_database():
         print(f"  Kits:           {Kit.query.count()}")
         print(f"  Kit Boxes:      {KitBox.query.count()}")
         print(f"  Kit Expendables:{KitExpendable.query.count()}")
+        print(f"  Master Kits:    {MasterKit.query.count()}")
+        print(f"  Master Entries: {MasterKitEntry.query.count()}")
         print("=" * 60)
 
 
