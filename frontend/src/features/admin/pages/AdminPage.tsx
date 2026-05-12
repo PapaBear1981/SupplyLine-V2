@@ -13,6 +13,7 @@ import {
   PhoneOutlined,
   CloudUploadOutlined,
   HomeOutlined,
+  AppstoreOutlined,
 } from '@ant-design/icons';
 import { AdminOverview } from '../components/AdminOverview';
 import { UserManagement } from '../components/UserManagement';
@@ -27,6 +28,7 @@ import { BugReportManagement } from '../components/BugReportManagement';
 import { OnCallAdmin } from '../components/OnCallAdmin';
 import { BulkImports } from '../components/BulkImports';
 import { WarehousesPage } from '@features/warehouses/pages/WarehousesPage';
+import MasterKitsAdmin from '@features/master-kits/pages/MasterKitsAdmin';
 
 const { Title, Paragraph } = Typography;
 
@@ -121,6 +123,16 @@ export const AdminPage = () => {
         </span>
       ),
       children: <AircraftTypeManagement />,
+    },
+    {
+      key: 'master-kits',
+      label: (
+        <span>
+          <AppstoreOutlined />
+          Master Kits
+        </span>
+      ),
+      children: <MasterKitsAdmin />,
     },
     {
       key: 'imports',
