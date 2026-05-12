@@ -21,8 +21,23 @@ from models_kits import (
     KitItem,
     KitReorderRequest,
     KitTransfer,
+    MasterKit,
+    MasterKitBox,
 )
+from services import master_kit_service
 from utils.error_handler import ValidationError, handle_errors
+
+
+# Default box layout used by the wizard when no MasterKit exists for the chosen
+# aircraft type. Lifted from the original hardcoded list so it can be reused by
+# both the wizard's step 3 and tests.
+DEFAULT_WIZARD_BOXES = [
+    {"box_number": "Box1", "box_type": "expendable", "description": "Expendable items"},
+    {"box_number": "Box2", "box_type": "tooling", "description": "Tools"},
+    {"box_number": "Box3", "box_type": "consumable", "description": "Consumables"},
+    {"box_number": "Loose", "box_type": "loose", "description": "Loose items in cabinets"},
+    {"box_number": "Floor", "box_type": "floor", "description": "Large items on floor"},
+]
 
 
 logger = logging.getLogger(__name__)
@@ -708,103 +723,354 @@ def register_kit_routes(app):
     @materials_required
     @handle_errors
     def kit_wizard():
-        """Multi-step kit creation wizard"""
+        """Multi-step kit creation wizard.
+
+        Master-aware: when the chosen aircraft type has an active MasterKit, step 3
+        seeds boxes and entries from the master and step 4 links the new kit and
+        populates it from the supplied entry data. Falls back to the legacy
+        hardcoded box list when no master exists.
+        """
         data = request.get_json() or {}
         step = data.get("step", 1)
 
         if step == 1:
-            # Step 1: Aircraft type selection - return available types
             aircraft_types = AircraftType.query.filter_by(is_active=True).all()
+            # Index masters by aircraft type so the UI can show a "Master available" tag.
+            masters_by_at = {
+                m.aircraft_type_id: m
+                for m in MasterKit.query.filter_by(is_active=True).all()
+            }
+            payload = []
+            for at in aircraft_types:
+                d = at.to_dict()
+                m = masters_by_at.get(at.id)
+                d["has_master"] = m is not None
+                d["master_kit_id"] = m.id if m else None
+                payload.append(d)
             return jsonify({
                 "step": 1,
-                "aircraft_types": [at.to_dict() for at in aircraft_types],
-                "next_step": 2
+                "aircraft_types": payload,
+                "next_step": 2,
             }), 200
 
         if step == 2:
-            # Step 2: Kit details validation
             if not data.get("name"):
                 raise ValidationError("Kit name is required")
             if not data.get("aircraft_type_id"):
                 raise ValidationError("Aircraft type is required")
-
-            # Check if name exists
             existing = Kit.query.filter_by(name=data["name"]).first()
             if existing:
                 raise ValidationError(f'Kit "{data["name"]}" already exists')
 
+            master = MasterKit.query.filter_by(
+                aircraft_type_id=data["aircraft_type_id"], is_active=True,
+            ).first()
             return jsonify({
                 "step": 2,
                 "valid": True,
-                "next_step": 3
+                "next_step": 3,
+                "master": {
+                    "id": master.id, "name": master.name,
+                    "box_count": master.boxes.count(),
+                    "entry_count": master.entries.count(),
+                } if master else None,
             }), 200
 
         if step == 3:
-            # Step 3: Box configuration - suggest required boxes
-            required_boxes = [
-                {"box_number": "Box1", "box_type": "expendable", "description": "Expendable items"},
-                {"box_number": "Box2", "box_type": "tooling", "description": "Tools"},
-                {"box_number": "Box3", "box_type": "consumable", "description": "Consumables"},
-                {"box_number": "Loose", "box_type": "loose", "description": "Loose items in cabinets"},
-                {"box_number": "Floor", "box_type": "floor", "description": "Large items on floor"}
-            ]
-
+            # aircraft_type_id is optional so legacy clients (that just ask for
+            # the suggested boxes without specifying a type) still get the
+            # default layout. When provided, we look up the matching master.
+            aircraft_type_id = data.get("aircraft_type_id")
+            master = None
+            if aircraft_type_id:
+                master = MasterKit.query.filter_by(
+                    aircraft_type_id=aircraft_type_id, is_active=True,
+                ).first()
+            if master:
+                suggested_boxes = []
+                for mb in master.boxes.order_by(MasterKitBox.sort_order).all():
+                    box_dict = mb.to_dict(include_entries=True)
+                    suggested_boxes.append(box_dict)
+                return jsonify({
+                    "step": 3,
+                    "mode": "master",
+                    "master_kit_id": master.id,
+                    "suggested_boxes": suggested_boxes,
+                    "next_step": 4,
+                }), 200
             return jsonify({
                 "step": 3,
-                "suggested_boxes": required_boxes,
-                "next_step": 4
+                "mode": "default",
+                "master_kit_id": None,
+                "suggested_boxes": DEFAULT_WIZARD_BOXES,
+                "next_step": 4,
             }), 200
 
         if step == 4:
-            # Step 4: Create the kit with all data
-            # Validate all required fields
             if not data.get("name") or not data.get("aircraft_type_id"):
                 raise ValidationError("Missing required fields")
 
-            current_user_id = request.current_user.get("user_id")
+            # The endpoint can be called directly without first going through
+            # step 2, so revalidate name uniqueness and aircraft_type existence
+            # here to return clean 400s instead of falling through to DB errors.
+            if Kit.query.filter_by(name=data["name"]).first() is not None:
+                raise ValidationError(f'Kit "{data["name"]}" already exists')
+            if db.session.get(AircraftType, data["aircraft_type_id"]) is None:
+                raise ValidationError("Invalid aircraft type")
 
-            # Create kit
+            current_user_id = request.current_user.get("user_id")
+            master_kit_id = data.get("master_kit_id")
+            use_master = data.get("use_master", True) if master_kit_id else False
+            customizations = data.get("customizations") or {}
+            entry_population = data.get("entry_population") or []
+
+            master = None
+            if use_master:
+                master = MasterKit.query.filter_by(
+                    id=master_kit_id, is_active=True,
+                ).first()
+                if master is None:
+                    raise ValidationError(
+                        f"master_kit_id={master_kit_id} not found or inactive"
+                    )
+                if master.aircraft_type_id != data["aircraft_type_id"]:
+                    raise ValidationError(
+                        "master_kit aircraft_type_id does not match the kit's aircraft_type_id"
+                    )
+
             kit = Kit(
                 name=data["name"],
                 aircraft_type_id=data["aircraft_type_id"],
                 description=data.get("description", ""),
                 status="active",
-                created_by=request.current_user["user_id"]
+                created_by=current_user_id,
+                master_kit_id=master.id if master else None,
             )
-
             db.session.add(kit)
             db.session.flush()
 
-            # Create boxes
-            boxes = data.get("boxes", [])
-            for box_data in boxes:
-                box = KitBox(
-                    kit_id=kit.id,
-                    box_number=box_data["box_number"],
-                    box_type=box_data["box_type"],
-                    description=box_data.get("description", "")
+            seed_summary = None
+            if master is not None:
+                skip_entry_ids = set(customizations.get("removed_entry_ids") or [])
+                seed_summary = master_kit_service.seed_kit_from_master(
+                    kit, master, skip_entry_ids=skip_entry_ids,
                 )
-                db.session.add(box)
+            else:
+                # Default path: create boxes from request payload (falls back to legacy
+                # behaviour when the client didn't read the new step-3 response).
+                for box_data in (data.get("boxes") or DEFAULT_WIZARD_BOXES):
+                    db.session.add(KitBox(
+                        kit_id=kit.id,
+                        box_number=box_data["box_number"],
+                        box_type=box_data["box_type"],
+                        description=box_data.get("description", ""),
+                        is_custom=True,
+                    ))
+
+            # User-added custom extras (apply regardless of mode).
+            for extra in customizations.get("added_extras") or []:
+                box_id = extra.get("box_id")
+                if box_id is None:
+                    # Pick the first box of a matching type, or just the first box.
+                    box = kit.boxes.first()
+                else:
+                    # Scope to this kit so a caller can't attach a row to
+                    # another kit's box via a forged box_id.
+                    box = KitBox.query.filter_by(id=box_id, kit_id=kit.id).first()
+                if box is None:
+                    continue
+                if extra.get("entry_type") == "expendable":
+                    exp = KitExpendable(
+                        kit_id=kit.id, box_id=box.id,
+                        part_number=extra.get("part_number") or "CUSTOM",
+                        lot_number=extra.get("lot_number"),
+                        serial_number=extra.get("serial_number"),
+                        tracking_type=extra.get("tracking_type") or "lot",
+                        description=extra.get("description") or "Custom expendable",
+                        quantity=float(extra.get("quantity") or 1.0),
+                        unit=extra.get("unit") or "each",
+                        is_custom=True,
+                    )
+                    ok, err = exp.validate_tracking()
+                    if not ok:
+                        raise ValidationError(f"Custom extra invalid: {err}")
+                    db.session.add(exp)
+
+            db.session.flush()
+
+            # Populate master-driven entries from manual / import / inventory data.
+            population_summary = master_kit_service.populate_from_wizard(
+                kit, entry_population, current_user_id,
+            ) if entry_population else None
 
             db.session.commit()
 
-            # Log action
             AuditLog.log(
                 user_id=current_user_id,
                 action="kit_created_wizard",
                 resource_type="kit",
                 resource_id=kit.id,
-                details={"name": kit.name},
-                ip_address=request.remote_addr
+                details={
+                    "name": kit.name,
+                    "master_kit_id": master.id if master else None,
+                    "mode": "master" if master else "default",
+                    "use_master": use_master,
+                    "seed_summary": seed_summary,
+                    "population_summary": population_summary,
+                },
+                ip_address=request.remote_addr,
             )
 
             return jsonify({
                 "step": 4,
                 "complete": True,
-                "kit": kit.to_dict(include_details=True)
+                "kit": kit.to_dict(include_details=True),
+                "seed_summary": seed_summary,
+                "population_summary": population_summary,
             }), 201
 
         raise ValidationError("Invalid wizard step")
+
+    @app.route("/api/kits/wizard/import-template", methods=["GET"])
+    @materials_required
+    @handle_errors
+    def wizard_import_template():
+        """Return a CSV template the wizard's import tab can download."""
+        entry_type = (request.args.get("entry_type") or "").strip().lower()
+        if entry_type == "tool":
+            headers = ["master_entry_id", "part_number", "serial_number", "quantity"]
+        elif entry_type == "expendable":
+            headers = ["master_entry_id", "part_number", "lot_number", "serial_number", "quantity"]
+        else:
+            raise ValidationError("entry_type query parameter must be 'tool' or 'expendable'")
+        csv = ",".join(headers) + "\n"
+        from flask import Response
+        return Response(
+            csv,
+            mimetype="text/csv",
+            headers={"Content-Disposition": f"attachment; filename=wizard-{entry_type}-template.csv"},
+        )
+
+    @app.route("/api/kits/wizard/import-entries", methods=["POST"])
+    @materials_required
+    @handle_errors
+    def wizard_import_entries():
+        """Parse a CSV/XLSX upload of serial/lot data for wizard step 3.5.
+
+        Form fields:
+          - file: the uploaded CSV/XLSX
+          - master_kit_id: int (validates that all rows reference this master)
+        Returns: { rows: [...], errors: [...], warnings: [...] }
+        """
+        if "file" not in request.files:
+            raise ValidationError("file is required")
+        f = request.files["file"]
+        try:
+            master_kit_id = int(request.form.get("master_kit_id") or 0)
+        except ValueError:
+            raise ValidationError("master_kit_id must be an integer")
+        if not master_kit_id:
+            raise ValidationError("master_kit_id is required")
+
+        master = MasterKit.query.get(master_kit_id)
+        if master is None:
+            raise ValidationError(f"master_kit_id {master_kit_id} not found")
+        entry_ids = {e.id for e in master.entries.all()}
+        entries_by_id = {e.id: e for e in master.entries.all()}
+
+        filename = (f.filename or "").lower()
+        if filename.endswith(".xlsx"):
+            from openpyxl import load_workbook
+            wb = load_workbook(f, read_only=True)
+            ws = wb.active
+            rows_iter = ws.iter_rows(values_only=True)
+            header = [str(c or "").strip() for c in next(rows_iter, [])]
+            raw_rows = []
+            xlsx_errors = []
+            for row_idx, r in enumerate(rows_iter, start=2):  # +2 for header + 1-based
+                # Trim trailing None cells (openpyxl pads rows out to the worksheet width).
+                trimmed = list(r)
+                while trimmed and trimmed[-1] is None:
+                    trimmed.pop()
+                if len(trimmed) != len(header):
+                    xlsx_errors.append({
+                        "row": row_idx,
+                        "error": f"row has {len(trimmed)} cells but header has {len(header)}",
+                    })
+                    continue
+                raw_rows.append({
+                    h: (str(c) if c is not None else "")
+                    for h, c in zip(header, trimmed, strict=True)
+                })
+        else:
+            # CSV (with simple parsing). Reuse the bulk_import module's CSV reader so we
+            # match its encoding fallback and row-cap behaviour.
+            import csv
+            content = f.read()
+            try:
+                text = content.decode("utf-8-sig")
+            except UnicodeDecodeError:
+                text = content.decode("latin-1")
+            from io import StringIO
+            reader = csv.DictReader(StringIO(text))
+            raw_rows = list(reader)
+
+        if len(raw_rows) > 10000:
+            raise ValidationError("Import is capped at 10,000 rows.")
+
+        rows = []
+        # XLSX path may have collected row-width errors before per-row parsing.
+        errors = list(locals().get("xlsx_errors", []))
+        warnings = []
+        for idx, row in enumerate(raw_rows, start=2):  # +2 for header + 1-based
+            try:
+                entry_id = int(row.get("master_entry_id") or 0)
+            except (TypeError, ValueError):
+                errors.append({"row": idx, "error": "master_entry_id must be an integer"})
+                continue
+            if entry_id not in entry_ids:
+                errors.append({"row": idx, "error": f"master_entry_id {entry_id} does not belong to master {master_kit_id}"})
+                continue
+            entry = entries_by_id[entry_id]
+            lot = (row.get("lot_number") or "").strip() or None
+            serial = (row.get("serial_number") or "").strip() or None
+            qty_str = (row.get("quantity") or "").strip()
+            try:
+                qty = float(qty_str) if qty_str else 1.0
+            except ValueError:
+                errors.append({"row": idx, "error": "quantity must be a number"})
+                continue
+
+            if entry.entry_type == "tool":
+                if not serial:
+                    errors.append({"row": idx, "error": "Tool rows require serial_number"})
+                    continue
+                rows.append({
+                    "row": idx, "master_entry_id": entry_id,
+                    "entry_type": "tool", "serial_number": serial, "quantity": qty,
+                })
+            elif entry.entry_type == "expendable":
+                if bool(lot) == bool(serial):
+                    errors.append({"row": idx, "error": "Expendable rows require exactly one of lot_number or serial_number"})
+                    continue
+                # The master entry pins which identifier the kit row must carry —
+                # reject mismatches now instead of letting populate_from_wizard
+                # fail later in step 4.
+                tt = (entry.tracking_type or "lot").lower()
+                if tt == "lot" and not lot:
+                    errors.append({"row": idx, "error": "Master entry is lot-tracked; lot_number is required"})
+                    continue
+                if tt == "serial" and not serial:
+                    errors.append({"row": idx, "error": "Master entry is serial-tracked; serial_number is required"})
+                    continue
+                rows.append({
+                    "row": idx, "master_entry_id": entry_id,
+                    "entry_type": "expendable", "lot_number": lot, "serial_number": serial, "quantity": qty,
+                })
+            else:
+                errors.append({"row": idx, "error": f"Entry {entry_id} has entry_type={entry.entry_type!r}; cannot import"})
+
+        return jsonify({"rows": rows, "errors": errors, "warnings": warnings}), 200
 
     # ==================== Kit Box Management ====================
 

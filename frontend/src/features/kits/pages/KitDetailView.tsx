@@ -40,6 +40,8 @@ import KitIssuanceHistory from '../components/KitIssuanceHistory';
 import KitReordersManager from '../components/KitReordersManager';
 import KitToolsTab from '../components/KitToolsTab';
 import EditKitModal from '../components/EditKitModal';
+import { KitComplianceTab } from '@features/master-kits/components/KitComplianceTab';
+import { CheckSquareOutlined } from '@ant-design/icons';
 import { MobileKitDetailPage } from '../components/mobile';
 import { useIsMobile } from '@shared/hooks/useMobile';
 import { useGetKitToolCheckoutsQuery } from '../services/kitsApi';
@@ -290,6 +292,17 @@ const KitDetailView = () => {
                 <KitBoxManager kitId={kitId} />
                 <KitItemList kitId={kitId} />
               </Space>
+            </TabPane>
+
+            <TabPane
+              tab={
+                <span>
+                  <CheckSquareOutlined /> Compliance
+                </span>
+              }
+              key="compliance"
+            >
+              <KitComplianceTab kitId={kitId} />
             </TabPane>
 
             <TabPane

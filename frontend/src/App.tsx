@@ -24,6 +24,7 @@ import { SettingsPage } from '@features/settings/pages/SettingsPage';
 import { ProfilePage } from '@features/profile/pages/ProfilePage';
 import { AdminPageWrapper } from '@features/admin/components/AdminPageWrapper';
 import { KitsDashboard, KitDetailView, KitWizard, MobileKitWizard } from '@features/kits';
+import MasterKitsAdmin from '@features/master-kits/pages/MasterKitsAdmin';
 import { DisplayPage } from '@features/display/pages/DisplayPage';
 import { OnCallSchedulePage } from '@features/oncall';
 import {
@@ -162,6 +163,7 @@ function AppContent() {
                   {/* Admin-only routes - Desktop only on mobile */}
                   <Route element={<AdminRoute />}>
                     <Route path={ROUTES.ADMIN} element={<AdminPageWrapper />} />
+                    <Route path={ROUTES.MASTER_KITS} element={<MasterKitsAdmin />} />
                   </Route>
                 </Route>
               </Route>

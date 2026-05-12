@@ -446,6 +446,115 @@ def create_app():
                             """))
                             _conn.commit()
 
+                    # Master Kit Lists — additive columns on existing tables.
+                    # The three new tables (master_kits, master_kit_boxes,
+                    # master_kit_entries) are created by db.create_all() above; this
+                    # block only handles columns added to pre-existing tables.
+                    if "kits" in tables:
+                        kit_cols = {c["name"] for c in inspector.get_columns("kits")}
+                        _auto_add_col(
+                            "kits",
+                            "master_kit_id INTEGER REFERENCES master_kits(id)",
+                            "master_kit_id",
+                            kit_cols,
+                        )
+                        if "master_kit_id" not in kit_cols:
+                            _conn.execute(sa_text(
+                                "CREATE INDEX IF NOT EXISTS ix_kits_master_kit_id "
+                                "ON kits(master_kit_id)"
+                            ))
+                            _conn.commit()
+
+                    if "kit_boxes" in tables:
+                        kb_cols = {c["name"] for c in inspector.get_columns("kit_boxes")}
+                        _auto_add_col(
+                            "kit_boxes",
+                            "master_box_id INTEGER REFERENCES master_kit_boxes(id)",
+                            "master_box_id",
+                            kb_cols,
+                        )
+                        if "master_box_id" not in kb_cols:
+                            _conn.execute(sa_text(
+                                "CREATE INDEX IF NOT EXISTS ix_kit_boxes_master_box_id "
+                                "ON kit_boxes(master_box_id)"
+                            ))
+                            _conn.commit()
+                        _auto_add_col(
+                            "kit_boxes",
+                            "is_custom BOOLEAN NOT NULL DEFAULT FALSE",
+                            "is_custom",
+                            kb_cols,
+                        )
+
+                    if "kit_items" in tables:
+                        ki_cols = {c["name"] for c in inspector.get_columns("kit_items")}
+                        _auto_add_col(
+                            "kit_items",
+                            "master_entry_id INTEGER REFERENCES master_kit_entries(id)",
+                            "master_entry_id",
+                            ki_cols,
+                        )
+                        if "master_entry_id" not in ki_cols:
+                            _conn.execute(sa_text(
+                                "CREATE INDEX IF NOT EXISTS ix_kit_items_master_entry_id "
+                                "ON kit_items(master_entry_id)"
+                            ))
+                            _conn.commit()
+                        _auto_add_col(
+                            "kit_items",
+                            "is_custom BOOLEAN NOT NULL DEFAULT FALSE",
+                            "is_custom",
+                            ki_cols,
+                        )
+                        _auto_add_col(
+                            "kit_items",
+                            "min_stock_override FLOAT NULL",
+                            "min_stock_override",
+                            ki_cols,
+                        )
+
+                    if "kit_expendables" in tables:
+                        ke_cols = {c["name"] for c in inspector.get_columns("kit_expendables")}
+                        _auto_add_col(
+                            "kit_expendables",
+                            "master_entry_id INTEGER REFERENCES master_kit_entries(id)",
+                            "master_entry_id",
+                            ke_cols,
+                        )
+                        if "master_entry_id" not in ke_cols:
+                            _conn.execute(sa_text(
+                                "CREATE INDEX IF NOT EXISTS ix_kit_expendables_master_entry_id "
+                                "ON kit_expendables(master_entry_id)"
+                            ))
+                            _conn.commit()
+                        _auto_add_col(
+                            "kit_expendables",
+                            "is_custom BOOLEAN NOT NULL DEFAULT FALSE",
+                            "is_custom",
+                            ke_cols,
+                        )
+                        _auto_add_col(
+                            "kit_expendables",
+                            "min_stock_override FLOAT NULL",
+                            "min_stock_override",
+                            ke_cols,
+                        )
+
+                    if "kit_transfers" in tables:
+                        kt_cols = {c["name"] for c in inspector.get_columns("kit_transfers")}
+                        _auto_add_col(
+                            "kit_transfers",
+                            "transfer_mode VARCHAR(20) NOT NULL DEFAULT 'field'",
+                            "transfer_mode",
+                            kt_cols,
+                        )
+                        _auto_add_col(
+                            "kit_transfers",
+                            "reverts_transfer_id INTEGER REFERENCES kit_transfers(id)",
+                            "reverts_transfer_id",
+                            kt_cols,
+                        )
+
                     # Widen users.totp_secret — PostgreSQL-only syntax; SQLite skips cleanly.
                     if "users" in tables:
                         try:
