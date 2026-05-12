@@ -158,6 +158,9 @@ def register_kit_transfer_routes(app):
                     raise ValidationError("Source item not found")
                 transfer_item_id = kit_item.item_id
 
+        transfer_mode = (data.get("mode") or "field").strip().lower()
+        if transfer_mode not in ("field", "permanent"):
+            raise ValidationError("mode must be 'field' or 'permanent'")
         transfer = KitTransfer(
             item_type=data["item_type"],
             item_id=transfer_item_id,
@@ -167,7 +170,8 @@ def register_kit_transfer_routes(app):
             to_location_id=data["to_location_id"],
             quantity=quantity,
             transferred_by=request.current_user["user_id"],
-            notes=data.get("notes", "")
+            notes=data.get("notes", ""),
+            transfer_mode=transfer_mode,
         )
 
         db.session.add(transfer)

@@ -40,6 +40,7 @@ from routes_kit_reorders import register_kit_reorder_routes
 from routes_kit_tool_checkout import register_kit_tool_checkout_routes
 from routes_kit_transfers import register_kit_transfer_routes
 from routes_kits import register_kit_routes
+from routes_master_kits import register_master_kit_routes
 from routes_message_search import register_message_search_routes
 from routes_orders import register_order_routes
 from routes_password_reset import register_password_reset_routes
@@ -242,6 +243,7 @@ def register_routes(app):
 
     # Register kit/mobile warehouse routes
     register_kit_routes(app)
+    register_master_kit_routes(app)
     register_kit_transfer_routes(app)
     register_kit_reorder_routes(app)
     register_kit_message_routes(app)

@@ -69,8 +69,13 @@ class Kit(db.Model):
     # Carries no extra permissions; informational only.
     assigned_user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=True)
 
+    # Optional link to the canonical master kit list for this aircraft type. Nullable so
+    # legacy kits remain valid; new kits created via the wizard auto-populate this.
+    master_kit_id = db.Column(db.Integer, db.ForeignKey("master_kits.id"), nullable=True, index=True)
+
     # Relationships
     aircraft_type = db.relationship("AircraftType", back_populates="kits")
+    master_kit = db.relationship("MasterKit", foreign_keys=[master_kit_id])
     creator = db.relationship("User", foreign_keys=[created_by])
     assigned_user = db.relationship("User", foreign_keys=[assigned_user_id])
     boxes = db.relationship("KitBox", back_populates="kit", lazy="dynamic", cascade="all, delete-orphan")
@@ -111,6 +116,8 @@ class Kit(db.Model):
             "assigned_user_id": self.assigned_user_id,
             "assigned_user_name": self.assigned_user.name if self.assigned_user else None,
             "assigned_user_employee_number": self.assigned_user.employee_number if self.assigned_user else None,
+            "master_kit_id": self.master_kit_id,
+            "master_kit_name": self.master_kit.name if self.master_kit else None,
         }
 
         if include_details:
@@ -153,8 +160,14 @@ class KitBox(db.Model):
     description = db.Column(db.String(255))
     created_at = db.Column(db.DateTime, default=get_current_time, nullable=False)
 
+    # Master-list linkage. master_box_id is the canonical template this box was seeded from
+    # (NULL for unlinked / custom boxes). is_custom=True means a user diverged from the master.
+    master_box_id = db.Column(db.Integer, db.ForeignKey("master_kit_boxes.id"), nullable=True, index=True)
+    is_custom = db.Column(db.Boolean, nullable=False, default=False)
+
     # Relationships
     kit = db.relationship("Kit", back_populates="boxes")
+    master_box = db.relationship("MasterKitBox", foreign_keys=[master_box_id])
     items = db.relationship("KitItem", back_populates="box", lazy="dynamic", cascade="all, delete-orphan")
     expendables = db.relationship("KitExpendable", back_populates="box", lazy="dynamic", cascade="all, delete-orphan")
 
@@ -172,7 +185,9 @@ class KitBox(db.Model):
             "box_type": self.box_type,
             "description": self.description,
             "created_at": self.created_at.isoformat() if self.created_at else None,
-            "item_count": (self.items.count() if self.items else 0) + (self.expendables.count() if self.expendables else 0)
+            "item_count": (self.items.count() if self.items else 0) + (self.expendables.count() if self.expendables else 0),
+            "master_box_id": self.master_box_id,
+            "is_custom": self.is_custom,
         }
 
 
@@ -198,9 +213,18 @@ class KitItem(db.Model):
     added_date = db.Column(db.DateTime, default=get_current_time, nullable=False)
     last_updated = db.Column(db.DateTime, default=get_current_time, onupdate=get_current_time, nullable=False)
 
+    # Master-list linkage. master_entry_id is the canonical template entry this row was
+    # seeded from (NULL for custom additions). is_custom marks user-diverged rows so
+    # propagation from the master skips them. min_stock_override lets a single kit hold
+    # a different minimum without touching the master.
+    master_entry_id = db.Column(db.Integer, db.ForeignKey("master_kit_entries.id"), nullable=True, index=True)
+    is_custom = db.Column(db.Boolean, nullable=False, default=False)
+    min_stock_override = db.Column(db.Float, nullable=True)
+
     # Relationships
     kit = db.relationship("Kit", back_populates="items")
     box = db.relationship("KitBox", back_populates="items")
+    master_entry = db.relationship("MasterKitEntry", foreign_keys=[master_entry_id])
 
     def to_dict(self):
         """Convert model to dictionary"""
@@ -219,7 +243,10 @@ class KitItem(db.Model):
             "location": self.location,
             "status": self.status,
             "added_date": self.added_date.isoformat() if self.added_date else None,
-            "last_updated": self.last_updated.isoformat() if self.last_updated else None
+            "last_updated": self.last_updated.isoformat() if self.last_updated else None,
+            "master_entry_id": self.master_entry_id,
+            "is_custom": self.is_custom,
+            "min_stock_override": self.min_stock_override,
         }
 
 
@@ -258,9 +285,15 @@ class KitExpendable(db.Model):
     parent_lot_number = db.Column(db.String(100), nullable=True)  # Parent lot if this is a child lot
     lot_sequence = db.Column(db.Integer, nullable=True, default=0)  # Number of child lots created from this
 
+    # Master-list linkage (same semantics as KitItem).
+    master_entry_id = db.Column(db.Integer, db.ForeignKey("master_kit_entries.id"), nullable=True, index=True)
+    is_custom = db.Column(db.Boolean, nullable=False, default=False)
+    min_stock_override = db.Column(db.Float, nullable=True)
+
     # Relationships
     kit = db.relationship("Kit", back_populates="expendables")
     box = db.relationship("KitBox", back_populates="expendables")
+    master_entry = db.relationship("MasterKitEntry", foreign_keys=[master_entry_id])
 
     def to_dict(self):
         """Convert model to dictionary"""
@@ -285,7 +318,10 @@ class KitExpendable(db.Model):
             "last_updated": self.last_updated.isoformat() if self.last_updated else None,
             "parent_lot_number": self.parent_lot_number,
             "lot_sequence": self.lot_sequence or 0,
-            "source": "expendable"  # Indicates this came from kit_expendables table
+            "source": "expendable",  # Indicates this came from kit_expendables table
+            "master_entry_id": self.master_entry_id,
+            "is_custom": self.is_custom,
+            "min_stock_override": self.min_stock_override,
         }
 
     def is_low_stock(self):
@@ -418,8 +454,19 @@ class KitTransfer(db.Model):
     completed_date = db.Column(db.DateTime)
     notes = db.Column(db.String(1000))
 
+    # transfer_mode distinguishes a temporary field deployment (default — origin retains
+    # ownership / warehouse_id, the item is expected back) from a permanent ownership swap
+    # (warehouse_id is reassigned, chemical lots are archived at origin, etc.). Existing
+    # rows default to 'field' so the migration is non-destructive.
+    transfer_mode = db.Column(db.String(20), nullable=False, default="field")  # field, permanent
+
+    # When a completed permanent transfer is cancelled the service writes a compensating
+    # transfer; this column links the two so audits can see the pair.
+    reverts_transfer_id = db.Column(db.Integer, db.ForeignKey("kit_transfers.id"), nullable=True)
+
     # Relationships
     transferrer = db.relationship("User", foreign_keys=[transferred_by])
+    reverts_transfer = db.relationship("KitTransfer", remote_side=[id], foreign_keys=[reverts_transfer_id])
 
     def to_dict(self):
         """Convert model to dictionary with item details"""
@@ -440,7 +487,9 @@ class KitTransfer(db.Model):
             "transfer_date": self.transfer_date.isoformat() if self.transfer_date else None,
             "status": self.status,
             "completed_date": self.completed_date.isoformat() if self.completed_date else None,
-            "notes": self.notes
+            "notes": self.notes,
+            "transfer_mode": self.transfer_mode,
+            "reverts_transfer_id": self.reverts_transfer_id,
         }
 
         # Add location names
@@ -668,3 +717,185 @@ class KitMessage(db.Model):
             data["replies"] = [reply.to_dict() for reply in self.replies]
 
         return data
+
+
+# ==================== Master Kit Lists ====================
+# Canonical "what a standard kit for this aircraft type should contain" definition.
+# Mirrors the ChemicalPart -> Chemical (master -> lot) pattern: kits link to a master and
+# inherit defaults; per-kit divergence is captured via is_custom flags + override columns
+# on KitBox / KitItem / KitExpendable.
+
+
+class MasterKit(db.Model):
+    """
+    MasterKit is the canonical template for a given AircraftType. At most one
+    *active* MasterKit per aircraft type — uniqueness is enforced in the route
+    handler (partial unique indexes aren't portable across SQLite/Postgres).
+    """
+    __tablename__ = "master_kits"
+
+    id = db.Column(db.Integer, primary_key=True)
+    aircraft_type_id = db.Column(db.Integer, db.ForeignKey("aircraft_types.id"), nullable=False, index=True)
+    name = db.Column(db.String(100), nullable=False)
+    description = db.Column(db.String(500))
+    is_active = db.Column(db.Boolean, nullable=False, default=True)
+    created_at = db.Column(db.DateTime, default=get_current_time, nullable=False)
+    updated_at = db.Column(db.DateTime, default=get_current_time, onupdate=get_current_time, nullable=False)
+    created_by = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=True)
+
+    # Relationships
+    aircraft_type = db.relationship("AircraftType", foreign_keys=[aircraft_type_id])
+    creator = db.relationship("User", foreign_keys=[created_by])
+    boxes = db.relationship(
+        "MasterKitBox", back_populates="master_kit", lazy="dynamic",
+        cascade="all, delete-orphan", order_by="MasterKitBox.sort_order"
+    )
+    entries = db.relationship(
+        "MasterKitEntry", back_populates="master_kit", lazy="dynamic",
+        cascade="all, delete-orphan", order_by="MasterKitEntry.sort_order"
+    )
+
+    def to_dict(self, include_boxes=False, include_entries=False):
+        data = {
+            "id": self.id,
+            "aircraft_type_id": self.aircraft_type_id,
+            "aircraft_type_name": self.aircraft_type.name if self.aircraft_type else None,
+            "name": self.name,
+            "description": self.description,
+            "is_active": self.is_active,
+            "created_at": self.created_at.isoformat() if self.created_at else None,
+            "updated_at": self.updated_at.isoformat() if self.updated_at else None,
+            "created_by": self.created_by,
+            "box_count": self.boxes.count() if self.boxes else 0,
+            "entry_count": self.entries.count() if self.entries else 0,
+        }
+        if include_boxes:
+            data["boxes"] = [b.to_dict(include_entries=include_entries) for b in self.boxes.all()]
+        return data
+
+
+class MasterKitBox(db.Model):
+    """Canonical box definition within a MasterKit (e.g. 'Box1' for tooling)."""
+    __tablename__ = "master_kit_boxes"
+
+    id = db.Column(db.Integer, primary_key=True)
+    master_kit_id = db.Column(db.Integer, db.ForeignKey("master_kits.id"), nullable=False, index=True)
+    box_number = db.Column(db.String(20), nullable=False)
+    box_type = db.Column(db.String(20), nullable=False)  # expendable, tooling, consumable, loose, floor
+    description = db.Column(db.String(255))
+    sort_order = db.Column(db.Integer, nullable=False, default=0)
+    created_at = db.Column(db.DateTime, default=get_current_time, nullable=False)
+
+    __table_args__ = (
+        db.UniqueConstraint("master_kit_id", "box_number", name="uix_master_kit_box_number"),
+    )
+
+    # Relationships
+    master_kit = db.relationship("MasterKit", back_populates="boxes")
+    entries = db.relationship(
+        "MasterKitEntry", back_populates="master_box", lazy="dynamic",
+        cascade="all, delete-orphan", order_by="MasterKitEntry.sort_order"
+    )
+
+    def to_dict(self, include_entries=False):
+        data = {
+            "id": self.id,
+            "master_kit_id": self.master_kit_id,
+            "box_number": self.box_number,
+            "box_type": self.box_type,
+            "description": self.description,
+            "sort_order": self.sort_order,
+        }
+        if include_entries:
+            data["entries"] = [e.to_dict() for e in self.entries.all()]
+        return data
+
+
+class MasterKitEntry(db.Model):
+    """
+    Canonical line item within a MasterKit box. Each entry declares "this kit should
+    contain N of part X." Entries reference real Tool / ChemicalPart records where
+    possible so cross-kit aggregation (reorder, usage) works; expendable entries are
+    free-form (part_number + description) since they don't have a warehouse counterpart.
+    """
+    __tablename__ = "master_kit_entries"
+
+    id = db.Column(db.Integer, primary_key=True)
+    master_kit_id = db.Column(db.Integer, db.ForeignKey("master_kits.id"), nullable=False, index=True)
+    master_box_id = db.Column(db.Integer, db.ForeignKey("master_kit_boxes.id"), nullable=False, index=True)
+
+    entry_type = db.Column(db.String(20), nullable=False)  # tool, chemical, expendable
+    ref_tool_id = db.Column(db.Integer, db.ForeignKey("tools.id"), nullable=True)
+    ref_chemical_part_id = db.Column(db.Integer, db.ForeignKey("chemical_parts.id"), nullable=True)
+
+    part_number = db.Column(db.String(100), nullable=True, index=True)
+    description = db.Column(db.String(500))
+    required_quantity = db.Column(db.Float, nullable=False, default=1.0)
+    minimum_stock_level = db.Column(db.Float, nullable=True)
+    unit = db.Column(db.String(20), nullable=False, default="each")
+    tracking_type = db.Column(db.String(20), nullable=True)  # 'lot' | 'serial' | None (expendable-only)
+    is_required = db.Column(db.Boolean, nullable=False, default=True)
+    notes = db.Column(db.String(1000))
+    sort_order = db.Column(db.Integer, nullable=False, default=0)
+
+    created_at = db.Column(db.DateTime, default=get_current_time, nullable=False)
+    updated_at = db.Column(db.DateTime, default=get_current_time, onupdate=get_current_time, nullable=False)
+
+    __table_args__ = (
+        db.UniqueConstraint("master_kit_id", "entry_type", "part_number", name="uix_master_kit_entry_part"),
+    )
+
+    # Relationships
+    master_kit = db.relationship("MasterKit", back_populates="entries")
+    master_box = db.relationship("MasterKitBox", back_populates="entries")
+    ref_tool = db.relationship("Tool", foreign_keys=[ref_tool_id])
+    ref_chemical_part = db.relationship("ChemicalPart", foreign_keys=[ref_chemical_part_id])
+
+    def to_dict(self):
+        return {
+            "id": self.id,
+            "master_kit_id": self.master_kit_id,
+            "master_box_id": self.master_box_id,
+            "entry_type": self.entry_type,
+            "ref_tool_id": self.ref_tool_id,
+            "ref_chemical_part_id": self.ref_chemical_part_id,
+            "part_number": self.part_number,
+            "description": self.description,
+            "required_quantity": self.required_quantity,
+            "minimum_stock_level": self.minimum_stock_level,
+            "unit": self.unit,
+            "tracking_type": self.tracking_type,
+            "is_required": self.is_required,
+            "notes": self.notes,
+            "sort_order": self.sort_order,
+            "created_at": self.created_at.isoformat() if self.created_at else None,
+            "updated_at": self.updated_at.isoformat() if self.updated_at else None,
+        }
+
+    def validate_refs(self):
+        """
+        Ensure entry_type and ref columns are consistent.
+        - tool entries: ref_tool_id is optional but must point to a real Tool when set
+        - chemical entries: ref_chemical_part_id is required (chemicals are pulled from inventory)
+        - expendable entries: both refs are NULL; part_number is required
+        """
+        et = (self.entry_type or "").strip().lower()
+        if et == "tool":
+            if self.ref_chemical_part_id is not None:
+                return False, "Tool entries cannot reference a chemical part."
+            return True, None
+        if et == "chemical":
+            if self.ref_tool_id is not None:
+                return False, "Chemical entries cannot reference a tool."
+            if self.ref_chemical_part_id is None:
+                return False, "Chemical entries must reference a ChemicalPart (ref_chemical_part_id)."
+            return True, None
+        if et == "expendable":
+            if self.ref_tool_id is not None or self.ref_chemical_part_id is not None:
+                return False, "Expendable entries cannot reference Tool or ChemicalPart records."
+            if not self.part_number:
+                return False, "Expendable entries require a part_number."
+            if (self.tracking_type or "").strip().lower() not in ("lot", "serial"):
+                return False, "Expendable entries must declare tracking_type ('lot' or 'serial')."
+            return True, None
+        return False, f"Invalid entry_type: {self.entry_type!r}. Must be tool, chemical, or expendable."
