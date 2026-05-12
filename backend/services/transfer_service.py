@@ -166,19 +166,46 @@ def warehouse_to_kit(*, item_type, item_id, kit_id, quantity, transferred_by,
     if chem is None:
         raise ValueError(f"Chemical {item_id} not found.")
     from_warehouse_id = chem.warehouse_id or 0
+    full_lot = quantity >= (chem.quantity or 0)
+    moved_chem = chem
     if mode == "permanent":
-        chem.warehouse_id = None
-        chem.is_archived = True
-        chem.archived_reason = "moved_to_kit_permanent"
-        chem.archived_date = datetime.now()
+        if full_lot:
+            # Whole lot moves to the kit — detach and archive the source row.
+            chem.warehouse_id = None
+            chem.is_archived = True
+            chem.archived_reason = "moved_to_kit_permanent"
+            chem.archived_date = datetime.now()
+        else:
+            # Partial move — decrement the warehouse lot and materialize a
+            # new Chemical row carrying the moved quantity so the KitItem
+            # points at a distinct lot record. Existing lot history at the
+            # warehouse is preserved.
+            chem.quantity = (chem.quantity or 0) - quantity
+            moved_chem = Chemical(
+                chemical_part_id=getattr(chem, "chemical_part_id", None),
+                part_number=chem.part_number,
+                lot_number=chem.lot_number,
+                description=chem.description,
+                manufacturer=getattr(chem, "manufacturer", None),
+                category=getattr(chem, "category", None),
+                quantity=quantity,
+                unit=getattr(chem, "unit", None) or "each",
+                warehouse_id=None,
+                is_archived=True,
+                archived_reason="moved_to_kit_permanent_split",
+                archived_date=datetime.now(),
+                date_added=datetime.now(),
+            )
+            db.session.add(moved_chem)
+            db.session.flush()
     ki = KitItem(
-        kit_id=kit.id, box_id=box.id, item_type="chemical", item_id=chem.id,
-        part_number=chem.part_number, lot_number=chem.lot_number,
-        description=chem.description, quantity=quantity, status="available",
+        kit_id=kit.id, box_id=box.id, item_type="chemical", item_id=moved_chem.id,
+        part_number=moved_chem.part_number, lot_number=moved_chem.lot_number,
+        description=moved_chem.description, quantity=quantity, status="available",
     )
     db.session.add(ki)
     transfer = _record_kit_transfer(
-        item_type="chemical", item_id=chem.id,
+        item_type="chemical", item_id=moved_chem.id,
         from_location_type="warehouse", from_location_id=from_warehouse_id,
         to_location_type="kit", to_location_id=kit.id,
         quantity=quantity, transferred_by=transferred_by, mode=mode,
@@ -227,7 +254,28 @@ def kit_to_warehouse(*, kit_id, kit_row, to_warehouse_id, transferred_by,
             tool = db.session.get(Tool, kit_row.item_id)
             if tool is None:
                 raise ValueError(f"Underlying tool {kit_row.item_id} not found.")
-            tool.warehouse_id = warehouse.id
+            # Field-mode tool returns must close the active KitToolCheckout
+            # (if any) and restore the tool's saved pre-checkout state,
+            # otherwise the field-tools tab keeps showing the deployment as
+            # active forever.
+            if mode == "field":
+                checkout = KitToolCheckout.query.filter_by(
+                    tool_id=tool.id, kit_id=kit.id, status="active",
+                ).order_by(KitToolCheckout.id.desc()).first()
+                if checkout is not None:
+                    checkout.status = "returned"
+                    checkout.return_date = datetime.now()
+                    checkout.returned_by_id = transferred_by
+                    # Restore the saved warehouse_id and location if present,
+                    # otherwise land at the requested destination warehouse.
+                    target_warehouse_id = checkout.previous_warehouse_id or warehouse.id
+                    tool.warehouse_id = target_warehouse_id
+                    if checkout.previous_location is not None:
+                        tool.location = checkout.previous_location
+                else:
+                    tool.warehouse_id = warehouse.id
+            else:
+                tool.warehouse_id = warehouse.id
             transfer = _record_kit_transfer(
                 item_type="tool", item_id=tool.id,
                 from_location_type="kit", from_location_id=kit.id,
@@ -457,15 +505,49 @@ def cancel_permanent_transfer(*, transfer_id, user_id, audit_log_fn=None):
             if kit_item:
                 db.session.delete(kit_item)
     elif original.from_location_type == "kit" and original.to_location_type == "warehouse":
+        # Recreate the source-kit row so the audit trail and runtime state agree
+        # (otherwise the item appears to have moved back but is unassigned).
+        src_kit = db.session.get(Kit, original.from_location_id)
+        if src_kit is None:
+            raise ValueError(f"Source kit {original.from_location_id} no longer exists; cannot revert.")
+        src_box = src_kit.boxes.first()
+        if src_box is None:
+            raise ValueError(
+                "Source kit has no boxes; create one before reverting this transfer."
+            )
         if original.item_type == "tool":
             tool = db.session.get(Tool, original.item_id)
-            tool.warehouse_id = None  # back to "in transit" / unassigned for re-routing
+            if tool is None:
+                raise ValueError(f"Tool {original.item_id} no longer exists; cannot revert.")
+            # Detach from the destination warehouse and re-add to the source kit.
+            tool.warehouse_id = None
+            db.session.add(KitItem(
+                kit_id=src_kit.id, box_id=src_box.id,
+                item_type="tool", item_id=tool.id,
+                part_number=tool.tool_number, serial_number=tool.serial_number,
+                description=tool.description, quantity=1, status="available",
+            ))
         elif original.item_type == "chemical":
             chem = db.session.get(Chemical, original.item_id)
+            if chem is None:
+                raise ValueError(f"Chemical {original.item_id} no longer exists; cannot revert.")
             chem.warehouse_id = None
-        # NOTE: expendable kit->warehouse permanent reversion would need to delete the
-        # materialized Chemical lot; we leave that for future hardening since it's a
-        # rare path. Document the limitation.
+            db.session.add(KitItem(
+                kit_id=src_kit.id, box_id=src_box.id,
+                item_type="chemical", item_id=chem.id,
+                part_number=chem.part_number, lot_number=chem.lot_number,
+                description=chem.description, quantity=original.quantity, status="available",
+            ))
+        elif original.item_type == "expendable":
+            # Expendable kit->warehouse permanent transfers materialize a Chemical
+            # lot at the destination. Recreating the original KitExpendable from
+            # that lot needs the originating lot/serial/tracking_type, which
+            # aren't reliably recoverable after the Chemical was created. Reject
+            # rather than leave the system in a half-reverted state.
+            raise NotImplementedError(
+                "Reverting an expendable kit->warehouse permanent transfer is not "
+                "supported (the source expendable identity is lost on materialization)."
+            )
     elif original.from_location_type == "kit" and original.to_location_type == "kit":
         # Swap directions: we can't undo a delete, so we move the destination row back.
         # Implement only for KitItem-with-tool (single asset); chemicals/expendables

@@ -148,6 +148,18 @@ def _infer_masters(db, threshold, dry_run, report):
         if dry_run:
             continue
 
+        # Per-aircraft-type atomicity: anything we write below is wrapped in a
+        # savepoint so a single bad entry rolls back the partial master, the
+        # boxes, and any kit-row backfill we'd already applied for THIS
+        # aircraft type. Other aircraft types keep their commits.
+        validation_failures_this_pass = []
+        try:
+            sp = db.session.begin_nested()
+        except Exception:
+            # SQLAlchemy raises if the session has no outer transaction; rare in
+            # the migrate flow but harmless to fall through without a savepoint.
+            sp = None
+
         master = MasterKit(
             aircraft_type_id=at.id,
             name=f"{at.name} Master Kit",
@@ -238,9 +250,9 @@ def _infer_masters(db, threshold, dry_run, report):
             )
             ok, err = entry.validate_refs()
             if not ok:
-                report["entries_validation_failed"].append(
-                    f"{at.name}: {entry_type} {part_number} — {err}"
-                )
+                msg = f"{at.name}: {entry_type} {part_number} — {err}"
+                report["entries_validation_failed"].append(msg)
+                validation_failures_this_pass.append(msg)
                 continue
             db.session.add(entry)
             db.session.flush()
@@ -266,6 +278,15 @@ def _infer_masters(db, threshold, dry_run, report):
                 exp.master_entry_id = eid
                 exp.is_custom = eid is None
 
+        if validation_failures_this_pass and sp is not None:
+            # One or more entries failed validation — undo everything we
+            # inserted for this aircraft type so re-running can complete it
+            # cleanly once the underlying data is fixed.
+            sp.rollback()
+            report.setdefault("aircraft_rolled_back", []).append(at.name)
+            continue
+        if sp is not None:
+            sp.commit()
         db.session.commit()
 
 

@@ -336,12 +336,30 @@ def populate_from_wizard(kit, entry_population, current_user_id, audit_log_fn=No
         rows = ep.get("items") or []
         for row in rows:
             if entry.entry_type == "expendable":
+                serial = row.get("serial_number") or None
+                lot = row.get("lot_number") or None
+                # Run the same global uniqueness check the regular add-expendable
+                # API uses so wizard imports can't smuggle in duplicate
+                # serial/lot identities.
+                from utils.serial_lot_validation import (
+                    SerialLotValidationError,
+                    validate_item_tracking,
+                )
+                try:
+                    validate_item_tracking(
+                        part_number=entry.part_number,
+                        serial_number=serial,
+                        lot_number=lot,
+                        item_type="expendable",
+                    )
+                except SerialLotValidationError as e:
+                    raise ValueError(f"Expendable validation failed for entry {entry.id}: {e}")
                 exp = KitExpendable(
                     kit_id=kit.id,
                     box_id=box.id,
                     part_number=entry.part_number,
-                    serial_number=row.get("serial_number") or None,
-                    lot_number=row.get("lot_number") or None,
+                    serial_number=serial,
+                    lot_number=lot,
                     tracking_type=entry.tracking_type or "lot",
                     description=row.get("description") or entry.description or entry.part_number,
                     quantity=float(row.get("quantity") or 1.0),
@@ -368,6 +386,19 @@ def populate_from_wizard(kit, entry_population, current_user_id, audit_log_fn=No
                     raise ValueError(
                         f"Tool not found for entry {entry.id}: tool_id={tool_id} serial={serial}"
                     )
+                # The chosen tool must actually match the master entry — by
+                # ref_tool_id when the entry pins a specific tool, otherwise
+                # by part_number (the canonical compliance key).
+                if entry.ref_tool_id is not None and tool.id != entry.ref_tool_id:
+                    raise ValueError(
+                        f"Tool {tool.id} does not match master entry {entry.id} "
+                        f"(expected tool_id={entry.ref_tool_id})."
+                    )
+                if entry.part_number and (tool.tool_number or "").strip() != entry.part_number.strip():
+                    raise ValueError(
+                        f"Tool part_number {tool.tool_number!r} does not match master entry "
+                        f"{entry.part_number!r}."
+                    )
                 # Defer field-mode warehouse->kit transfer to transfer_service so the
                 # source warehouse_id handling lives in one place.
                 from services.transfer_service import warehouse_to_kit
@@ -392,6 +423,18 @@ def populate_from_wizard(kit, entry_population, current_user_id, audit_log_fn=No
                 if chemical_id is None:
                     raise ValueError(
                         f"Chemical entry {entry.id} requires chemical_id (selected from inventory)."
+                    )
+                # The chosen chemical lot must point at the same ChemicalPart the
+                # master entry references; otherwise the kit row would satisfy
+                # the wrong line.
+                from models import Chemical
+                chem = db.session.get(Chemical, chemical_id)
+                if chem is None:
+                    raise ValueError(f"Chemical {chemical_id} not found.")
+                if entry.ref_chemical_part_id and getattr(chem, "chemical_part_id", None) != entry.ref_chemical_part_id:
+                    raise ValueError(
+                        f"Chemical lot {chem.id} (part_id={chem.chemical_part_id}) does not "
+                        f"match master entry {entry.id} (expected part_id={entry.ref_chemical_part_id})."
                     )
                 from services.transfer_service import warehouse_to_kit
                 t = warehouse_to_kit(
