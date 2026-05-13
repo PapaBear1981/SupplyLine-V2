@@ -82,11 +82,20 @@ export const MobileKitsList = () => {
   const [updateKit, { isLoading: isUpdating }] = useUpdateKitMutation();
   const [deleteKit] = useDeleteKitMutation();
 
-  // Filter kits by search query
+  // Filter kits by search query — also matches the field-location identifiers
+  // (tail / tanker / trailer / address) so they're searchable in the slim mode.
   const filteredKits = useMemo(() => {
+    const query = searchQuery.toLowerCase();
+    if (!query) return kits;
     return kits.filter((kit) =>
-      kit.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      kit.aircraft_type_name?.toLowerCase().includes(searchQuery.toLowerCase())
+      [
+        kit.name,
+        kit.aircraft_type_name,
+        kit.aircraft_tail_number,
+        kit.tanker_scooper_number,
+        kit.trailer_number,
+        kit.location_address,
+      ].some((value) => value?.toLowerCase().includes(query))
     );
   }, [kits, searchQuery]);
 
