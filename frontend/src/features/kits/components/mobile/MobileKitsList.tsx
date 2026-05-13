@@ -33,6 +33,8 @@ import {
 } from '../../services/kitsApi';
 import type { Kit, KitStatus, KitFormData } from '../../types';
 import { MobileKitDetail } from './MobileKitDetail';
+import { useFeatures } from '@features/auth/hooks/useFeatures';
+import { useIsAdmin } from '@features/auth/hooks/usePermission';
 import './MobileKitsList.css';
 
 // Status color mapping
@@ -55,6 +57,11 @@ const statusOptions = [
 ];
 
 export const MobileKitsList = () => {
+  const { kitManagement } = useFeatures();
+  const isAdmin = useIsAdmin();
+  const noun = kitManagement ? 'kit' : 'field location';
+  const nounPlural = kitManagement ? 'kits' : 'field locations';
+
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<KitStatus | ''>('');
   const [aircraftTypeFilter, setAircraftTypeFilter] = useState<number | undefined>();
@@ -75,11 +82,20 @@ export const MobileKitsList = () => {
   const [updateKit, { isLoading: isUpdating }] = useUpdateKitMutation();
   const [deleteKit] = useDeleteKitMutation();
 
-  // Filter kits by search query
+  // Filter kits by search query — also matches the field-location identifiers
+  // (tail / tanker / trailer / address) so they're searchable in the slim mode.
   const filteredKits = useMemo(() => {
+    const query = searchQuery.toLowerCase();
+    if (!query) return kits;
     return kits.filter((kit) =>
-      kit.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      kit.aircraft_type_name?.toLowerCase().includes(searchQuery.toLowerCase())
+      [
+        kit.name,
+        kit.aircraft_type_name,
+        kit.aircraft_tail_number,
+        kit.tanker_scooper_number,
+        kit.trailer_number,
+        kit.location_address,
+      ].some((value) => value?.toLowerCase().includes(query))
     );
   }, [kits, searchQuery]);
 
@@ -102,6 +118,13 @@ export const MobileKitsList = () => {
   };
 
   const handleKitClick = (kit: Kit) => {
+    // When Kit Management is hidden, the MobileKitDetail popup (with its
+    // boxes / items / reorders tabs) isn't reachable — open the slim edit
+    // form directly so tapping a row still does something useful.
+    if (!kitManagement) {
+      handleEdit(kit);
+      return;
+    }
     setSelectedKit(kit);
     setShowDetailPopup(true);
   };
@@ -121,6 +144,10 @@ export const MobileKitsList = () => {
       aircraft_type_id: kit.aircraft_type_id,
       description: kit.description || '',
       status: kit.status,
+      aircraft_tail_number: kit.aircraft_tail_number || '',
+      tanker_scooper_number: kit.tanker_scooper_number || '',
+      trailer_number: kit.trailer_number || '',
+      location_address: kit.location_address || '',
     });
     setShowDetailPopup(false);
     setShowFormPopup(true);
@@ -128,15 +155,15 @@ export const MobileKitsList = () => {
 
   const handleDelete = async (kit: Kit) => {
     const confirmed = await Dialog.confirm({
-      content: `Are you sure you want to delete kit "${kit.name}"?`,
+      content: `Are you sure you want to delete ${noun} "${kit.name}"?`,
     });
     if (confirmed) {
       try {
         await deleteKit(kit.id).unwrap();
-        Toast.show({ content: 'Kit deleted', icon: 'success' });
+        Toast.show({ content: `${noun[0].toUpperCase() + noun.slice(1)} deleted`, icon: 'success' });
         refetch();
       } catch {
-        Toast.show({ content: 'Failed to delete kit', icon: 'fail' });
+        Toast.show({ content: `Failed to delete ${noun}`, icon: 'fail' });
       }
     }
   };
@@ -149,19 +176,31 @@ export const MobileKitsList = () => {
         aircraft_type_id: values.aircraft_type_id,
         description: values.description || undefined,
         status: values.status || 'active',
+        trailer_number: values.trailer_number || undefined,
+        location_address: values.location_address || undefined,
       };
+      // Tail/tanker are admin-only on the backend; silently drop them for
+      // non-admins so the request doesn't 403 the whole save.
+      if (isAdmin) {
+        if (values.aircraft_tail_number) {
+          formData.aircraft_tail_number = values.aircraft_tail_number;
+        }
+        if (values.tanker_scooper_number) {
+          formData.tanker_scooper_number = values.tanker_scooper_number;
+        }
+      }
 
       if (formMode === 'create') {
         await createKit(formData).unwrap();
-        Toast.show({ content: 'Kit created', icon: 'success' });
+        Toast.show({ content: `${noun[0].toUpperCase() + noun.slice(1)} created`, icon: 'success' });
       } else if (selectedKit) {
         await updateKit({ id: selectedKit.id, data: formData }).unwrap();
-        Toast.show({ content: 'Kit updated', icon: 'success' });
+        Toast.show({ content: `${noun[0].toUpperCase() + noun.slice(1)} updated`, icon: 'success' });
       }
       setShowFormPopup(false);
       refetch();
     } catch {
-      Toast.show({ content: 'Failed to save kit', icon: 'fail' });
+      Toast.show({ content: `Failed to save ${noun}`, icon: 'fail' });
     }
   };
 
@@ -211,19 +250,29 @@ export const MobileKitsList = () => {
               <Tag color={statusColors[kit.status]} fill="outline" style={{ '--border-radius': '4px' }}>
                 {kit.status.replace('_', ' ')}
               </Tag>
-              {kit.box_count !== undefined && (
+              {kitManagement && kit.box_count !== undefined && (
                 <Tag color="default" fill="outline" style={{ '--border-radius': '4px' }}>
                   {kit.box_count} {kit.box_count === 1 ? 'box' : 'boxes'}
                 </Tag>
               )}
-              {kit.item_count !== undefined && (
+              {kitManagement && kit.item_count !== undefined && (
                 <Tag color="default" fill="outline" style={{ '--border-radius': '4px' }}>
                   {kit.item_count} {kit.item_count === 1 ? 'item' : 'items'}
                 </Tag>
               )}
-              {kit.pending_reorders !== undefined && kit.pending_reorders > 0 && (
+              {kitManagement && kit.pending_reorders !== undefined && kit.pending_reorders > 0 && (
                 <Tag color="warning" fill="solid" style={{ '--border-radius': '4px' }}>
                   <ExclamationCircleOutlined /> {kit.pending_reorders} pending
+                </Tag>
+              )}
+              {!kitManagement && kit.aircraft_tail_number && (
+                <Tag color="primary" fill="outline" style={{ '--border-radius': '4px' }}>
+                  Tail {kit.aircraft_tail_number}
+                </Tag>
+              )}
+              {!kitManagement && kit.tanker_scooper_number && (
+                <Tag color="primary" fill="outline" style={{ '--border-radius': '4px' }}>
+                  Tanker {kit.tanker_scooper_number}
                 </Tag>
               )}
             </div>
@@ -244,7 +293,7 @@ export const MobileKitsList = () => {
       {/* Search Bar */}
       <div className="search-bar-container">
         <SearchBar
-          placeholder="Search kits..."
+          placeholder={`Search ${nounPlural}...`}
           value={searchQuery}
           onChange={handleSearch}
           className="search-bar"
@@ -298,7 +347,7 @@ export const MobileKitsList = () => {
             ))}
           </div>
         ) : filteredKits.length === 0 ? (
-          <Empty description="No kits found" style={{ padding: '48px 0' }} />
+          <Empty description={`No ${nounPlural} found`} style={{ padding: '48px 0' }} />
         ) : (
           <List>
             {filteredKits.map(renderKitItem)}
@@ -327,7 +376,7 @@ export const MobileKitsList = () => {
       >
         <div className="filter-popup">
           <div className="filter-header">
-            <span>Filter Kits</span>
+            <span>Filter {nounPlural[0].toUpperCase() + nounPlural.slice(1)}</span>
             <Button
               size="small"
               onClick={() => {
@@ -433,7 +482,11 @@ export const MobileKitsList = () => {
       >
         <div className="form-popup">
           <div className="form-header">
-            <span>{formMode === 'create' ? 'Add New Kit' : 'Edit Kit'}</span>
+            <span>
+              {formMode === 'create'
+                ? `Add New ${noun[0].toUpperCase() + noun.slice(1)}`
+                : `Edit ${noun[0].toUpperCase() + noun.slice(1)}`}
+            </span>
             <CloseOutline onClick={() => setShowFormPopup(false)} />
           </div>
           <Form
@@ -446,16 +499,18 @@ export const MobileKitsList = () => {
                 loading={isCreating || isUpdating}
                 onClick={handleFormSubmit}
               >
-                {formMode === 'create' ? 'Create Kit' : 'Save Changes'}
+                {formMode === 'create'
+                  ? `Create ${noun[0].toUpperCase() + noun.slice(1)}`
+                  : 'Save Changes'}
               </Button>
             }
           >
             <Form.Item
               name="name"
-              label="Kit Name"
-              rules={[{ required: true, message: 'Kit name is required' }]}
+              label={kitManagement ? 'Kit Name' : 'Field Location Name'}
+              rules={[{ required: true, message: `${kitManagement ? 'Kit' : 'Field location'} name is required` }]}
             >
-              <Input placeholder="Enter kit name" />
+              <Input placeholder={`Enter ${noun} name`} />
             </Form.Item>
             <Form.Item
               name="aircraft_type_id"
@@ -471,12 +526,40 @@ export const MobileKitsList = () => {
                 }}
               </Picker>
             </Form.Item>
+
+            {/* Tail / tanker / trailer / address are the strict identity for a
+                field location. Tail + tanker are admin-only; trailer + address
+                are editable by Materials. Surfaced in both modes so admins
+                landing in legacy kit-management mode can still update them. */}
             <Form.Item
-              name="description"
-              label="Description"
+              name="aircraft_tail_number"
+              label="Aircraft Tail Number"
+              help={isAdmin ? undefined : 'Admin-only — contact an administrator to change.'}
             >
-              <TextArea placeholder="Enter description (optional)" rows={3} />
+              <Input placeholder="e.g., N123AB" disabled={!isAdmin} />
             </Form.Item>
+            <Form.Item
+              name="tanker_scooper_number"
+              label="Tanker / Scooper Number"
+              help={isAdmin ? undefined : 'Admin-only — contact an administrator to change.'}
+            >
+              <Input placeholder="e.g., T-12" disabled={!isAdmin} />
+            </Form.Item>
+            <Form.Item name="trailer_number" label="Trailer Number">
+              <Input placeholder="e.g., TR-42" />
+            </Form.Item>
+            <Form.Item name="location_address" label="Address">
+              <Input placeholder="Street address" />
+            </Form.Item>
+
+            {kitManagement && (
+              <Form.Item
+                name="description"
+                label="Description"
+              >
+                <TextArea placeholder="Enter description (optional)" rows={3} />
+              </Form.Item>
+            )}
             <Form.Item
               name="status"
               label="Status"

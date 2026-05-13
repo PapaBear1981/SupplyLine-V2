@@ -215,8 +215,94 @@ export const toolsApi = baseApi.injectEndpoints({
     getLabelSizes: builder.query<LabelSizesResponse, void>({
       query: () => '/api/barcode/label-sizes',
     }),
+
+    // Send a tool to a pre-registered field location (kit).
+    sendToolToField: builder.mutation<
+      ToolFieldDeploymentResponse,
+      {
+        toolId: number;
+        kitId: number;
+        notes?: string;
+        expected_return_date?: string;
+      }
+    >({
+      query: ({ toolId, kitId, notes, expected_return_date }) => ({
+        url: `/api/tools/${toolId}/send-to-field`,
+        method: 'POST',
+        body: {
+          kit_id: kitId,
+          ...(notes !== undefined && { notes }),
+          ...(expected_return_date !== undefined && { expected_return_date }),
+        },
+      }),
+      invalidatesTags: (_result, _error, { toolId }) => [
+        { type: 'Tool', id: toolId },
+        { type: 'Tool', id: 'LIST' },
+      ],
+    }),
+
+    // Return a tool from its active field deployment.
+    returnToolFromField: builder.mutation<
+      ToolFieldDeploymentResponse,
+      { toolId: number; return_notes?: string }
+    >({
+      query: ({ toolId, return_notes }) => ({
+        url: `/api/tools/${toolId}/return-from-field`,
+        method: 'POST',
+        body: return_notes !== undefined ? { return_notes } : {},
+      }),
+      invalidatesTags: (_result, _error, { toolId }) => [
+        { type: 'Tool', id: toolId },
+        { type: 'Tool', id: 'LIST' },
+      ],
+    }),
+
+    // Field-deployment history for a tool.
+    getToolFieldHistory: builder.query<ToolFieldHistoryResponse, number>({
+      query: (toolId) => `/api/tools/${toolId}/field-history`,
+      providesTags: (_result, _error, toolId) => [{ type: 'Tool', id: toolId }],
+    }),
   }),
 });
+
+export interface ToolFieldDeploymentResponse {
+  message: string;
+  kit_tool_checkout: {
+    id: number;
+    tool_id: number;
+    kit_id: number;
+    kit_name: string | null;
+    status: 'active' | 'returned';
+    checkout_date: string | null;
+    return_date: string | null;
+  };
+}
+
+export interface ToolFieldHistoryEntry {
+  id: number;
+  tool_id: number;
+  kit_id: number;
+  kit_name: string | null;
+  status: 'active' | 'returned';
+  checkout_date: string | null;
+  return_date: string | null;
+  notes: string | null;
+  return_notes: string | null;
+}
+
+export interface ToolFieldHistoryResponse {
+  tool_id: number;
+  active_deployment: ToolFieldHistoryEntry | null;
+  active_kit: {
+    kit_id: number;
+    kit_name: string | null;
+    aircraft_tail_number: string | null;
+    tanker_scooper_number: string | null;
+    trailer_number: string | null;
+  } | null;
+  history: ToolFieldHistoryEntry[];
+  total: number;
+}
 
 export const {
   useGetToolsQuery,
@@ -234,4 +320,7 @@ export const {
   useGetToolBarcodeQuery,
   usePrintToolLabelMutation,
   useGetLabelSizesQuery,
+  useSendToolToFieldMutation,
+  useReturnToolFromFieldMutation,
+  useGetToolFieldHistoryQuery,
 } = toolsApi;

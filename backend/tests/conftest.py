@@ -106,7 +106,7 @@ def jwt_manager():
 def admin_user(db_session):
     """Create an admin user with a unique employee number."""
     from models import User
-    emp_num = f"ADM{uuid.uuid4().hex[:6].upper()}"
+    emp_num = f"ADM{uuid.uuid4().hex[:12].upper()}"
     user = User(
         name="Admin User",
         employee_number=emp_num,
@@ -124,7 +124,7 @@ def admin_user(db_session):
 def regular_user(db_session):
     """Create a regular (non-admin) user with a unique employee number."""
     from models import User
-    emp_num = f"USR{uuid.uuid4().hex[:6].upper()}"
+    emp_num = f"USR{uuid.uuid4().hex[:12].upper()}"
     user = User(
         name="Regular User",
         employee_number=emp_num,
@@ -142,7 +142,7 @@ def regular_user(db_session):
 def materials_user(db_session):
     """Create a Materials department user with a unique employee number."""
     from models import User
-    emp_num = f"MAT{uuid.uuid4().hex[:6].upper()}"
+    emp_num = f"MAT{uuid.uuid4().hex[:12].upper()}"
     user = User(
         name="Materials User",
         employee_number=emp_num,
@@ -208,7 +208,7 @@ def user_auth_headers(client, regular_user, jwt_manager):
 def requests_user(db_session, admin_user):
     """Non-admin user with page.requests permission only (not page.orders)."""
     from models import Permission, User, UserPermission
-    emp_num = f"REQ{uuid.uuid4().hex[:6].upper()}"
+    emp_num = f"REQ{uuid.uuid4().hex[:12].upper()}"
     user = User(
         name="Requests User",
         employee_number=emp_num,
@@ -283,7 +283,7 @@ def test_tool(db_session, test_warehouse):
 def test_chemical(db_session, test_warehouse):
     """Create a test chemical in the test warehouse."""
     from models import Chemical, ChemicalPart
-    part_number = f"CHEM{uuid.uuid4().hex[:6].upper()}"
+    part_number = f"CHEM{uuid.uuid4().hex[:12].upper()}"
     part = ChemicalPart(
         part_number=part_number,
         description="Test Chemical",
@@ -294,7 +294,7 @@ def test_chemical(db_session, test_warehouse):
     chemical = Chemical(
         part_number=part_number,
         chemical_part_id=part.id,
-        lot_number=f"LOT{uuid.uuid4().hex[:6].upper()}",
+        lot_number=f"LOT{uuid.uuid4().hex[:12].upper()}",
         description="Test Chemical",
         quantity=100,
         unit="each",
@@ -310,7 +310,7 @@ def test_chemical(db_session, test_warehouse):
 def sample_chemical(db_session, test_warehouse):
     """Create a chemical with ample stock for issuance/return workflow tests."""
     from models import Chemical, ChemicalPart
-    part_number = f"SAMP{uuid.uuid4().hex[:6].upper()}"
+    part_number = f"SAMP{uuid.uuid4().hex[:12].upper()}"
     part = ChemicalPart(
         part_number=part_number,
         description="Sample Chemical for testing",
@@ -321,7 +321,7 @@ def sample_chemical(db_session, test_warehouse):
     chemical = Chemical(
         part_number=part_number,
         chemical_part_id=part.id,
-        lot_number=f"SL{uuid.uuid4().hex[:6].upper()}",
+        lot_number=f"SL{uuid.uuid4().hex[:12].upper()}",
         description="Sample Chemical for testing",
         quantity=100,
         unit="oz",
@@ -337,7 +337,7 @@ def sample_chemical(db_session, test_warehouse):
 def test_user(db_session):
     """Alias for regular_user — used by tests that reference the fixture as 'test_user'."""
     from models import User
-    emp_num = f"TST{uuid.uuid4().hex[:6].upper()}"
+    emp_num = f"TST{uuid.uuid4().hex[:12].upper()}"
     user = User(
         name="Test User",
         employee_number=emp_num,
@@ -355,7 +355,7 @@ def test_user(db_session):
 def test_user_2(db_session):
     """A second regular user for tests that need two distinct non-admin accounts."""
     from models import User
-    emp_num = f"TS2{uuid.uuid4().hex[:6].upper()}"
+    emp_num = f"TS2{uuid.uuid4().hex[:12].upper()}"
     user = User(
         name="Test User 2",
         employee_number=emp_num,
@@ -392,7 +392,7 @@ def sample_tool(db_session, test_warehouse):
     """Alias for test_tool — used by calibration workflow tests."""
     from models import Tool
     tool = Tool(
-        tool_number=f"CAL{uuid.uuid4().hex[:6].upper()}",
+        tool_number=f"CAL{uuid.uuid4().hex[:12].upper()}",
         serial_number=f"S{uuid.uuid4().hex[:8].upper()}",
         description="Sample Tool for Calibration",
         condition="good",
@@ -452,6 +452,57 @@ def reset_rate_limiter():
 
 def assert_status(response, expected_status, message=''):
     assert response.status_code == expected_status, f'{message}'
+
+
+# ---------------------------------------------------------------------------
+# Feature-flag-gated test skipping
+# ---------------------------------------------------------------------------
+# Test modules that exercise the deactivated Kit Management or Requests UIs
+# are skipped in the main CI matrix (flags off). The nightly legacy-features
+# workflow flips the flags on and runs the full set so the dormant code can
+# still be revived without bit-rot.
+
+_KIT_MGMT_LEGACY_MODULES = {
+    "test_routes_kits.py",
+    "test_routes_kit_reorders.py",
+    "test_routes_kit_transfers.py",
+    "test_routes_kit_messages.py",
+    "test_kit_workflows.py",
+    "test_master_kits.py",
+    "test_kit_restore_and_history.py",
+}
+
+_REQUESTS_LEGACY_MODULES = {
+    "test_routes_user_request_messages.py",
+    "test_unified_requests.py",
+    "test_routes_orders.py",
+}
+
+
+def _flag_on(name: str) -> bool:
+    return os.environ.get(name, "false").lower() in ("true", "1", "yes", "on")
+
+
+def pytest_collection_modifyitems(config, items):
+    """Skip legacy kit / requests tests unless the matching flag is on."""
+    kit_mgmt_on = _flag_on("FEATURE_KIT_MANAGEMENT")
+    requests_on = _flag_on("FEATURE_REQUESTS")
+    skip_kit = pytest.mark.skip(
+        reason="Kit Management deactivated (set FEATURE_KIT_MANAGEMENT=true to run)"
+    )
+    skip_req = pytest.mark.skip(
+        reason="Requests deactivated (set FEATURE_REQUESTS=true to run)"
+    )
+
+    for item in items:
+        try:
+            module_name = item.path.name
+        except AttributeError:  # pragma: no cover — pytest <7 compat
+            module_name = os.path.basename(str(item.fspath))
+        if not kit_mgmt_on and module_name in _KIT_MGMT_LEGACY_MODULES:
+            item.add_marker(skip_kit)
+        if not requests_on and module_name in _REQUESTS_LEGACY_MODULES:
+            item.add_marker(skip_req)
 
 
 def assert_json(response, key, expected_value, message=''):

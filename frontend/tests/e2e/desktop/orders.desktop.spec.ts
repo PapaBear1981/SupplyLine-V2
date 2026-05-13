@@ -1,4 +1,7 @@
 import { test, expect } from '@playwright/test';
+import { requestsOn } from '../utils/feature-flags';
+
+test.skip(!requestsOn, 'Requests feature is deactivated');
 
 /**
  * Orders (Fulfillment) dashboard smoke coverage.

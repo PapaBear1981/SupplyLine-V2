@@ -175,6 +175,16 @@ class Config:
     TRUSTED_DEVICE_TTL_DAYS = int(os.environ.get("TRUSTED_DEVICE_TTL_DAYS", 30))
     TRUSTED_DEVICE_MAX_PER_USER = int(os.environ.get("TRUSTED_DEVICE_MAX_PER_USER", 10))
 
+    # Feature flags
+    # FEATURE_KIT_MANAGEMENT: when False, kit creation wizard, master kits, transfers,
+    #   reorders, issuance, messages, analytics, and the full requests/fulfillment
+    #   surface are deactivated. The minimal kit data (tail/tanker/trailer/location)
+    #   stays live to support the Tools-page "Send to Field" workflow.
+    # FEATURE_REQUESTS: when False, the user-requests/orders API blueprint short-circuits
+    #   with 410 Gone.
+    FEATURE_KIT_MANAGEMENT = os.environ.get("FEATURE_KIT_MANAGEMENT", "false").lower() in ("true", "1", "yes")
+    FEATURE_REQUESTS = os.environ.get("FEATURE_REQUESTS", "false").lower() in ("true", "1", "yes")
+
     # Account lockout settings
     ACCOUNT_LOCKOUT = {
         "MAX_FAILED_ATTEMPTS": int(os.environ.get("MAX_FAILED_ATTEMPTS", 5)),  # Number of failed attempts before account is locked

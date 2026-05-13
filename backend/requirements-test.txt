@@ -8,6 +8,7 @@ pytest-xdist>=3.3.1          # Parallel test execution
 pytest-timeout>=2.1.0         # Test timeout handling
 pytest-mock>=3.11.1          # Mocking support
 pytest-benchmark>=4.0.0      # Performance benchmarking
+pytest-rerunfailures>=14.0   # Retry transient CI failures (rate-limit timing, etc.)
 
 # Flask testing
 pytest-flask>=1.2.0

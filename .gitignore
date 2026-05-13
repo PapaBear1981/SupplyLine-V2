@@ -106,3 +106,4 @@ supplyline_mro_suite/.specify/
 push-to-github.bat
 *.pat
 *.token
+backend/.coverage

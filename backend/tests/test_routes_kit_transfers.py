@@ -384,7 +384,7 @@ class TestGetTransfers:
 
         user = User(
             name="History No WH",
-            employee_number=f"HNW{uuid.uuid4().hex[:6].upper()}",
+            employee_number=f"HNW{uuid.uuid4().hex[:12].upper()}",
             department="Test",
             is_admin=False,
             is_active=True,

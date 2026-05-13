@@ -7,6 +7,7 @@ import { ResponsiveAuthLayout } from '@shared/components/layouts/ResponsiveAuthL
 import { ResponsivePage } from '@shared/components/layouts/ResponsivePage';
 import { ProtectedRoute } from '@features/auth/components/ProtectedRoute';
 import { AdminRoute } from '@features/auth/components/AdminRoute';
+import { FeatureRoute } from '@features/auth/components/FeatureRoute';
 import { PermissionProvider } from '@features/auth/context/PermissionContext';
 import { MobileProvider } from '@shared/contexts/MobileContext';
 import { ScannerProvider } from '@features/scanner';
@@ -96,60 +97,107 @@ function AppContent() {
                     }
                   />
 
-                  {/* Kits Routes */}
+                  {/* Kits Routes — KITS landing stays live as the slim Field
+                      Locations admin; wizard / detail / edit are gated behind
+                      the kit-management feature flag. */}
                   <Route path={ROUTES.KITS} element={<KitsDashboard />} />
                   <Route
                     path="/kits/new"
                     element={
-                      <ResponsivePage
-                        desktop={<KitWizard />}
-                        mobile={<MobileKitWizard />}
-                      />
+                      <FeatureRoute feature="kitManagement" redirectTo={ROUTES.KITS}>
+                        <ResponsivePage
+                          desktop={<KitWizard />}
+                          mobile={<MobileKitWizard />}
+                        />
+                      </FeatureRoute>
                     }
                   />
-                  <Route path="/kits/:id" element={<KitDetailView />} />
-                  <Route path="/kits/:id/edit" element={<div>Edit Kit (Coming Soon)</div>} />
-                  <Route path="/kits/:id/duplicate" element={<div>Duplicate Kit (Coming Soon)</div>} />
+                  <Route
+                    path="/kits/:id"
+                    element={
+                      <FeatureRoute feature="kitManagement" redirectTo={ROUTES.KITS}>
+                        <KitDetailView />
+                      </FeatureRoute>
+                    }
+                  />
+                  <Route
+                    path="/kits/:id/edit"
+                    element={
+                      <FeatureRoute feature="kitManagement" redirectTo={ROUTES.KITS}>
+                        <div>Edit Kit (Coming Soon)</div>
+                      </FeatureRoute>
+                    }
+                  />
+                  <Route
+                    path="/kits/:id/duplicate"
+                    element={
+                      <FeatureRoute feature="kitManagement" redirectTo={ROUTES.KITS}>
+                        <div>Duplicate Kit (Coming Soon)</div>
+                      </FeatureRoute>
+                    }
+                  />
 
-                  {/* Orders Routes */}
-                  <Route path="/orders" element={<OrdersDashboard />} />
+                  {/* Orders Routes — gated by the requests feature flag. */}
+                  <Route
+                    path="/orders"
+                    element={
+                      <FeatureRoute feature="requests">
+                        <OrdersDashboard />
+                      </FeatureRoute>
+                    }
+                  />
                   <Route
                     path="/orders/new"
                     element={
-                      <ResponsivePage
-                        desktop={<OrderCreationForm />}
-                        mobile={<MobileOrderCreationForm />}
-                      />
+                      <FeatureRoute feature="requests">
+                        <ResponsivePage
+                          desktop={<OrderCreationForm />}
+                          mobile={<MobileOrderCreationForm />}
+                        />
+                      </FeatureRoute>
                     }
                   />
                   <Route
                     path="/orders/:orderId"
                     element={
-                      <ResponsivePage
-                        desktop={<OrderDetailView />}
-                        mobile={<MobileOrderDetail />}
-                      />
+                      <FeatureRoute feature="requests">
+                        <ResponsivePage
+                          desktop={<OrderDetailView />}
+                          mobile={<MobileOrderDetail />}
+                        />
+                      </FeatureRoute>
                     }
                   />
 
-                  {/* Requests Routes */}
-                  <Route path="/requests" element={<RequestsDashboard />} />
+                  {/* Requests Routes — gated by the requests feature flag. */}
+                  <Route
+                    path="/requests"
+                    element={
+                      <FeatureRoute feature="requests">
+                        <RequestsDashboard />
+                      </FeatureRoute>
+                    }
+                  />
                   <Route
                     path="/requests/new"
                     element={
-                      <ResponsivePage
-                        desktop={<RequestCreationForm />}
-                        mobile={<MobileRequestCreationForm />}
-                      />
+                      <FeatureRoute feature="requests">
+                        <ResponsivePage
+                          desktop={<RequestCreationForm />}
+                          mobile={<MobileRequestCreationForm />}
+                        />
+                      </FeatureRoute>
                     }
                   />
                   <Route
                     path="/requests/:requestId"
                     element={
-                      <ResponsivePage
-                        desktop={<RequestDetailView />}
-                        mobile={<MobileRequestDetail />}
-                      />
+                      <FeatureRoute feature="requests">
+                        <ResponsivePage
+                          desktop={<RequestDetailView />}
+                          mobile={<MobileRequestDetail />}
+                        />
+                      </FeatureRoute>
                     }
                   />
 

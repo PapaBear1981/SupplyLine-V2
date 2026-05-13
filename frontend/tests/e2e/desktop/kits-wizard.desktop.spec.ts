@@ -1,4 +1,7 @@
 import { test, expect } from '@playwright/test';
+import { kitManagementOn } from '../utils/feature-flags';
+
+test.skip(!kitManagementOn, 'Kit Management feature is deactivated');
 
 /**
  * Kits dashboard + creation wizard entry.

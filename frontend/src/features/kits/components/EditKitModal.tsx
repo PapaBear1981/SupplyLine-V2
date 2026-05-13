@@ -58,6 +58,14 @@ export function EditKitModal({ open, kit, onClose, onSuccess }: EditKitModalProp
 
     const { assigned_user_id, ...kitFields } = values;
 
+    // Strict tail/tanker mutation is admin-only on the backend (returns 403 if
+    // a non-admin payload even mentions these fields), so drop them entirely
+    // when the user can't change them.
+    if (!isAdmin) {
+      delete (kitFields as Record<string, unknown>).aircraft_tail_number;
+      delete (kitFields as Record<string, unknown>).tanker_scooper_number;
+    }
+
     try {
       await updateKit({
         id: kit.id,
@@ -189,18 +197,26 @@ export function EditKitModal({ open, kit, onClose, onSuccess }: EditKitModalProp
             <Form.Item
               label="Aircraft Tail Number"
               name="aircraft_tail_number"
-              help="Tail number of the aircraft this kit supports (e.g., N123AB)"
+              help={
+                isAdmin
+                  ? 'Tail number of the aircraft this kit supports (e.g., N123AB)'
+                  : 'Admin-only — contact an administrator to change.'
+              }
             >
-              <Input placeholder="e.g., N123AB" />
+              <Input placeholder="e.g., N123AB" disabled={!isAdmin} />
             </Form.Item>
           </Col>
           <Col span={12}>
             <Form.Item
               label="Tanker / Scooper Number"
               name="tanker_scooper_number"
-              help="Tanker or scooper number assigned to this kit"
+              help={
+                isAdmin
+                  ? 'Tanker or scooper number assigned to this kit'
+                  : 'Admin-only — contact an administrator to change.'
+              }
             >
-              <Input placeholder="e.g., T-12 or S-3" />
+              <Input placeholder="e.g., T-12 or S-3" disabled={!isAdmin} />
             </Form.Item>
           </Col>
         </Row>

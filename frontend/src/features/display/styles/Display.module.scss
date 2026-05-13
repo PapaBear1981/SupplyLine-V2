@@ -95,6 +95,21 @@ $success: #6dd47e;
   margin-top: 0.5rem;
 }
 
+.mapPanel {
+  margin-bottom: 1.25rem;
+  border-radius: 14px;
+  overflow: hidden;
+  background: $bgPanel;
+  border: 1px solid $border;
+
+  // Card / form controls inside the embedded KitLocationMap are spaced for a
+  // 1080p wall display — let the card breathe.
+  :global(.ant-card-head),
+  :global(.ant-card-body) {
+    padding: 0.75rem 1rem;
+  }
+}
+
 .kitsGrid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(22rem, 1fr));

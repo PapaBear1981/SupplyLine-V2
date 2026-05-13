@@ -38,6 +38,7 @@ from routes_inventory import register_inventory_routes
 from routes_kit_messages import register_kit_message_routes
 from routes_kit_reorders import register_kit_reorder_routes
 from routes_kit_tool_checkout import register_kit_tool_checkout_routes
+from routes_tool_field_deployment import register_tool_field_deployment_routes
 from routes_kit_transfers import register_kit_transfer_routes
 from routes_kits import register_kit_routes
 from routes_master_kits import register_master_kit_routes
@@ -166,6 +167,67 @@ def materials_manager_required(f):
 
 
 def register_routes(app):
+    # Feature-flag short-circuit for deactivated Kit Management / Requests
+    # endpoints. Returning 410 (Gone) rather than 404 makes the deactivation
+    # explicit to API clients and is reversible by flipping the env var.
+    import re
+
+    from auth.feature_flags import feature_enabled
+
+    # Whitelist of endpoints kept live regardless of FEATURE_KIT_MANAGEMENT —
+    # they back the Field Locations admin and the Tools-page send/return flow.
+    _KIT_LIVE_EXACT = {
+        "/api/kits",
+        "/api/kits/locations",
+        "/api/aircraft-types",
+    }
+    # `/api/kits/<id>` (detail / update / delete) and the kit-tool-checkout
+    # subtree (Tools-page send/return) stay live.
+    _KIT_LIVE_PATTERNS = (
+        re.compile(r"^/api/kits/\d+$"),
+        re.compile(r"^/api/kits/\d+/location$"),
+        re.compile(r"^/api/kits/\d+/assigned-user$"),
+        re.compile(r"^/api/kits/\d+/tool-checkouts$"),
+        re.compile(r"^/api/kit-tool-checkouts(/.*)?$"),
+        re.compile(r"^/api/aircraft-types(/.*)?$"),
+        # Tool-centric field deployment endpoints are unaffected.
+        re.compile(r"^/api/tools/\d+/send-to-field$"),
+        re.compile(r"^/api/tools/\d+/return-from-field$"),
+        re.compile(r"^/api/tools/\d+/field-history$"),
+    )
+
+    def _is_kit_always_live(path: str) -> bool:
+        if path in _KIT_LIVE_EXACT:
+            return True
+        return any(p.match(path) for p in _KIT_LIVE_PATTERNS)
+
+    _KIT_GATED_PREFIXES = ("/api/kits/", "/api/master-kits", "/api/kit-")
+    _REQUEST_PREFIXES = ("/api/user-requests", "/api/orders")
+
+    @app.before_request
+    def _feature_gate():
+        if request.method == "OPTIONS":
+            return None
+        path = request.path
+        if path.startswith(_REQUEST_PREFIXES) and not feature_enabled("requests"):
+            return jsonify({
+                "error": "feature_disabled",
+                "feature": "requests",
+                "message": "The 'requests' feature is currently deactivated.",
+            }), 410
+        if not feature_enabled("kit_management"):
+            # kit-tool-checkout lives under /api/kit-... so be careful not to
+            # gate it; the always-live patterns above cover it.
+            if _is_kit_always_live(path):
+                return None
+            if path.startswith(_KIT_GATED_PREFIXES) or path == "/api/master-kits":
+                return jsonify({
+                    "error": "feature_disabled",
+                    "feature": "kit_management",
+                    "message": "The 'kit_management' feature is currently deactivated.",
+                }), 410
+        return None
+
     # db.init_app(app) is now called in app.py, not here
     with app.app_context():
         db.create_all()
@@ -248,6 +310,7 @@ def register_routes(app):
     register_kit_reorder_routes(app)
     register_kit_message_routes(app)
     register_kit_tool_checkout_routes(app)
+    register_tool_field_deployment_routes(app)
     register_order_routes(app)
     register_user_request_routes(app)
     register_bug_report_routes(app)
