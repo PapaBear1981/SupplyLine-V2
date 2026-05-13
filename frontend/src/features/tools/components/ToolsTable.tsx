@@ -19,8 +19,15 @@ import {
   EyeOutlined,
   QrcodeOutlined,
   SearchOutlined,
+  SendOutlined,
+  RollbackOutlined,
 } from '@ant-design/icons';
-import { useGetToolsQuery, useDeleteToolMutation } from '../services/toolsApi';
+import {
+  useGetToolsQuery,
+  useDeleteToolMutation,
+  useReturnToolFromFieldMutation,
+} from '../services/toolsApi';
+import { SendToFieldModal } from './SendToFieldModal';
 import type {
   Tool,
   ToolStatus,
@@ -42,6 +49,7 @@ export const ToolsTable = ({ onView, onEdit }: ToolsTableProps) => {
   const [pageSize, setPageSize] = useState(50);
   const [searchQuery, setSearchQuery] = useState('');
   const [printModalTool, setPrintModalTool] = useState<{ id: number; description: string } | null>(null);
+  const [sendToFieldTool, setSendToFieldTool] = useState<Tool | null>(null);
   const [showAllWarehouses, setShowAllWarehouses] = useState(false);
   const [sortBy, setSortBy] = useState<ToolsSortField | undefined>(undefined);
   const [sortOrder, setSortOrder] = useState<SortOrder | undefined>(undefined);
@@ -83,6 +91,22 @@ export const ToolsTable = ({ onView, onEdit }: ToolsTableProps) => {
   };
 
   const [deleteTool] = useDeleteToolMutation();
+  const [returnFromField] = useReturnToolFromFieldMutation();
+
+  const handleReturnFromField = async (tool: Tool) => {
+    try {
+      await returnFromField({ toolId: tool.id }).unwrap();
+      message.success(`Tool ${tool.tool_number} returned from field`);
+    } catch (err) {
+      const e = err as { data?: { error?: string } };
+      message.error(e?.data?.error || 'Failed to return tool from field');
+    }
+  };
+
+  // A tool is "in the field" when its location starts with "Kit:" — that's the
+  // marker the send-to-field flow sets when a KitToolCheckout is created.
+  const isInField = (tool: Tool) =>
+    typeof tool.location === 'string' && tool.location.startsWith('Kit:');
 
   const handleDelete = async (id: number) => {
     try {
@@ -162,6 +186,19 @@ export const ToolsTable = ({ onView, onEdit }: ToolsTableProps) => {
       sorter: true,
       sortOrder: sortOrderFor('location'),
     },
+    {
+      title: 'Field Location',
+      key: 'field_location',
+      width: 160,
+      render: (_, record) =>
+        isInField(record) ? (
+          <Tag color="blue" data-testid="tool-field-location">
+            {record.location?.replace(/^Kit:\s*/, '')}
+          </Tag>
+        ) : (
+          <span style={{ color: '#999' }}>—</span>
+        ),
+    },
     ...(showAllWarehouses
       ? [{
           title: 'Warehouse',
@@ -229,7 +266,7 @@ export const ToolsTable = ({ onView, onEdit }: ToolsTableProps) => {
       title: 'Actions',
       key: 'actions',
       fixed: 'right',
-      width: 180,
+      width: 240,
       render: (_, record) => (
         <Space size="small">
           <Tooltip title="View Details">
@@ -248,6 +285,33 @@ export const ToolsTable = ({ onView, onEdit }: ToolsTableProps) => {
               />
             </Tooltip>
           </PermissionGuard>
+          {isInField(record) ? (
+            <Popconfirm
+              title="Return from field?"
+              description="This will close the active field deployment."
+              onConfirm={() => handleReturnFromField(record)}
+              okText="Return"
+              cancelText="Cancel"
+            >
+              <Tooltip title="Return from Field">
+                <Button
+                  type="text"
+                  icon={<RollbackOutlined />}
+                  data-testid="tool-return-from-field-button"
+                />
+              </Tooltip>
+            </Popconfirm>
+          ) : (
+            <Tooltip title="Send to Field">
+              <Button
+                type="text"
+                icon={<SendOutlined />}
+                onClick={() => setSendToFieldTool(record)}
+                disabled={record.status !== 'available'}
+                data-testid="tool-send-to-field-button"
+              />
+            </Tooltip>
+          )}
           <Tooltip title="Print Label">
             <Button
               type="text"
@@ -350,6 +414,12 @@ export const ToolsTable = ({ onView, onEdit }: ToolsTableProps) => {
           itemDescription={printModalTool.description}
         />
       )}
+
+      <SendToFieldModal
+        open={sendToFieldTool !== null}
+        tool={sendToFieldTool}
+        onClose={() => setSendToFieldTool(null)}
+      />
     </div>
   );
 };

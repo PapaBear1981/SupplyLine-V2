@@ -454,6 +454,57 @@ def assert_status(response, expected_status, message=''):
     assert response.status_code == expected_status, f'{message}'
 
 
+# ---------------------------------------------------------------------------
+# Feature-flag-gated test skipping
+# ---------------------------------------------------------------------------
+# Test modules that exercise the deactivated Kit Management or Requests UIs
+# are skipped in the main CI matrix (flags off). The nightly legacy-features
+# workflow flips the flags on and runs the full set so the dormant code can
+# still be revived without bit-rot.
+
+_KIT_MGMT_LEGACY_MODULES = {
+    "test_routes_kits.py",
+    "test_routes_kit_reorders.py",
+    "test_routes_kit_transfers.py",
+    "test_routes_kit_messages.py",
+    "test_kit_workflows.py",
+    "test_master_kits.py",
+    "test_kit_restore_and_history.py",
+}
+
+_REQUESTS_LEGACY_MODULES = {
+    "test_routes_user_request_messages.py",
+    "test_unified_requests.py",
+    "test_routes_orders.py",
+}
+
+
+def _flag_on(name: str) -> bool:
+    return os.environ.get(name, "false").lower() in ("true", "1", "yes", "on")
+
+
+def pytest_collection_modifyitems(config, items):
+    """Skip legacy kit / requests tests unless the matching flag is on."""
+    kit_mgmt_on = _flag_on("FEATURE_KIT_MANAGEMENT")
+    requests_on = _flag_on("FEATURE_REQUESTS")
+    skip_kit = pytest.mark.skip(
+        reason="Kit Management deactivated (set FEATURE_KIT_MANAGEMENT=true to run)"
+    )
+    skip_req = pytest.mark.skip(
+        reason="Requests deactivated (set FEATURE_REQUESTS=true to run)"
+    )
+
+    for item in items:
+        try:
+            module_name = item.path.name
+        except AttributeError:  # pragma: no cover — pytest <7 compat
+            module_name = os.path.basename(str(item.fspath))
+        if not kit_mgmt_on and module_name in _KIT_MGMT_LEGACY_MODULES:
+            item.add_marker(skip_kit)
+        if not requests_on and module_name in _REQUESTS_LEGACY_MODULES:
+            item.add_marker(skip_req)
+
+
 def assert_json(response, key, expected_value, message=''):
     json_data = response.get_json()
     actual_value = json_data.get(key) if json_data else None

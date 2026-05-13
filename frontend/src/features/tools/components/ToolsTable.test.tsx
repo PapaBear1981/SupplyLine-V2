@@ -15,10 +15,21 @@ import type { Tool } from '../types';
 
 const mockUseGetToolsQuery = vi.fn();
 const mockDeleteTool = vi.fn();
+const mockReturnFromField = vi.fn();
 
 vi.mock('../services/toolsApi', () => ({
   useGetToolsQuery: (...args: unknown[]) => mockUseGetToolsQuery(...args),
   useDeleteToolMutation: () => [mockDeleteTool, { isLoading: false }],
+  useReturnToolFromFieldMutation: () => [mockReturnFromField, { isLoading: false }],
+  useSendToolToFieldMutation: () => [vi.fn(), { isLoading: false }],
+}));
+
+vi.mock('./SendToFieldModal', () => ({
+  SendToFieldModal: () => null,
+}));
+
+vi.mock('@features/kits/services/kitsApi', () => ({
+  useGetKitsQuery: () => ({ data: [], isFetching: false }),
 }));
 
 vi.mock('@features/warehouses/hooks/useActiveWarehouse', () => ({

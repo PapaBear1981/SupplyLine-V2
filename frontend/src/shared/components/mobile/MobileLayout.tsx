@@ -34,6 +34,7 @@ import {
   AuditOutlined,
 } from '@ant-design/icons';
 import { useAppDispatch, useAppSelector } from '@app/hooks';
+import { useFeatures } from '@features/auth/hooks/useFeatures';
 import { logout } from '@features/auth/slices/authSlice';
 import { useLogoutMutation } from '@features/auth/services/authApi';
 import { socketService } from '@services/socket';
@@ -84,6 +85,7 @@ export const MobileLayout = () => {
   const location = useLocation();
   const dispatch = useAppDispatch();
   const user = useAppSelector((state) => state.auth.user);
+  const features = useFeatures();
   const [logoutApi] = useLogoutMutation();
   const [menuVisible, setMenuVisible] = useState(false);
   const { isEnabled: mobileAdminEnabled } = useMobileAdminEnabled();
@@ -138,6 +140,12 @@ export const MobileLayout = () => {
       .filter((item) => {
         if (!moreMenuRoutes.includes(item.key)) return false;
 
+        // Hide nav entries whose feature flag is off. Applies to everyone,
+        // admins included.
+        if (item.key === '/orders' || item.key === '/requests') {
+          if (!features.requests) return false;
+        }
+
         // Admin item is gated by the mobile_admin_enabled system setting
         // (Phase 5 wires the backend value; Phase 1 hard-codes false).
         if (item.key === ROUTES.ADMIN) {
@@ -159,11 +167,17 @@ export const MobileLayout = () => {
       .map((item) => ({
         key: item.key,
         // The Tools page is labelled "Inventory" in the desktop submenu for
-        // context, but appears as a standalone flat item on mobile.
-        label: item.key === ROUTES.TOOLS ? 'Tools' : item.label,
+        // context, but appears as a standalone flat item on mobile. The
+        // Kits item is re-labelled when Kit Management is deactivated.
+        label:
+          item.key === ROUTES.TOOLS
+            ? 'Tools'
+            : item.key === ROUTES.KITS && !features.kitManagement
+              ? 'Field Locations'
+              : item.label,
         icon: routeIcons[item.key],
       }));
-  }, [user?.is_admin, user?.permissions, mobileAdminEnabled]);
+  }, [user?.is_admin, user?.permissions, mobileAdminEnabled, features]);
 
   const handleLogout = async () => {
     try {

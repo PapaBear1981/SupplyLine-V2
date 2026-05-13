@@ -23,6 +23,7 @@ import { logout } from '@features/auth/slices/authSlice';
 import { useLogoutMutation } from '@features/auth/services/authApi';
 import { socketService } from '@services/socket';
 import { getMenuItems } from '@shared/constants/navigation';
+import { useFeatures } from '@features/auth/hooks/useFeatures';
 import { ROUTES } from '@shared/constants/routes';
 import { useActivityTracker } from '@shared/hooks/useActivityTracker';
 import { useTokenAutoRefresh } from '@shared/hooks/useTokenAutoRefresh';
@@ -65,11 +66,12 @@ export const MainLayout = () => {
   useTokenAutoRefresh();
 
   // Memoize menu items based on user permissions
+  const features = useFeatures();
   const menuItems = useMemo(() => {
     const isAdmin = user?.is_admin || false;
     const permissions = user?.permissions || [];
-    return getMenuItems(isAdmin, permissions);
-  }, [user?.is_admin, user?.permissions]);
+    return getMenuItems(isAdmin, permissions, features);
+  }, [user?.is_admin, user?.permissions, features]);
 
   const {
     token: { colorBgContainer, borderRadiusLG },

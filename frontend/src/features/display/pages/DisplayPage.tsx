@@ -9,6 +9,7 @@ import { DisplayClock } from '../components/DisplayClock';
 import { DisplayOnCall } from '../components/DisplayOnCall';
 import { DisplayAnnouncements } from '../components/DisplayAnnouncements';
 import { KitFieldCard } from '../components/KitFieldCard';
+import { KitLocationMap } from '@features/kits/components/KitLocationMap';
 import styles from '../styles/Display.module.scss';
 
 const POLL_INTERVAL = 30_000;
@@ -59,6 +60,10 @@ export const DisplayPage = () => {
         <DisplayAnnouncements />
         <DisplayClock />
       </header>
+
+      <section className={styles.mapPanel} aria-label="Kit Locations">
+        <KitLocationMap height={360} />
+      </section>
 
       <main className={styles.kitsGrid}>
         {activeWarehouseId == null ? (

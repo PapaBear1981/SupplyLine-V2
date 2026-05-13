@@ -25,6 +25,14 @@ vi.mock('@features/kits/services/kitsApi', () => ({
     params: { warehouse_id?: number },
     options: { skip?: boolean; pollingInterval?: number }
   ) => checkoutsSpy(params, options),
+  useGetKitLocationsQuery: () => ({ data: { kits: [] }, isLoading: false, refetch: vi.fn() }),
+  useGetAircraftTypesQuery: () => ({ data: [] }),
+}));
+
+// The map is a heavy Leaflet component; stub it for unit tests so the kit
+// grid behaviour stays the focus.
+vi.mock('@features/kits/components/KitLocationMap', () => ({
+  KitLocationMap: () => null,
 }));
 
 vi.mock('@features/warehouses/hooks/useActiveWarehouse', () => ({

@@ -7,6 +7,14 @@ on:
     branches: [ main, develop ]
   workflow_dispatch:  # Allow manual triggers
 
+# Feature flags default to OFF in main CI. The nightly legacy-features.yml
+# workflow flips them on and runs the full suite so dormant code can't rot.
+env:
+  FEATURE_KIT_MANAGEMENT: 'false'
+  FEATURE_REQUESTS: 'false'
+  VITE_FEATURE_KIT_MANAGEMENT: 'false'
+  VITE_FEATURE_REQUESTS: 'false'
+
 jobs:
   test:
     name: Run Tests

@@ -45,6 +45,36 @@ logger = logging.getLogger(__name__)
 # Decorator for Materials department access
 materials_required = department_required("Materials")
 
+# Fields that identify a kit's deployment slot. Per the field-deployment
+# refactor, these are admin-only because they're treated as a controlled
+# catalogue (no free-text registration from Materials users).
+ADMIN_ONLY_KIT_FIELDS = ("aircraft_tail_number", "tanker_scooper_number")
+
+
+def _reject_admin_only_fields(data: dict) -> tuple | None:
+    """Return a 403 response if a non-admin payload touches admin-only kit fields.
+
+    Returns ``None`` when the request is allowed. Admins always pass.
+    """
+    if request.current_user.get("is_admin", False):
+        return None
+    touched = [field for field in ADMIN_ONLY_KIT_FIELDS if field in data]
+    if not touched:
+        return None
+    return (
+        jsonify(
+            {
+                "error": (
+                    "Admin privileges required to modify "
+                    + ", ".join(touched)
+                ),
+                "code": "ADMIN_REQUIRED",
+                "fields": touched,
+            }
+        ),
+        403,
+    )
+
 
 def _clean_optional_text(field_name: str, value):
     """Normalise an optional text field from JSON input.
@@ -289,6 +319,10 @@ def register_kit_routes(app):
         data = request.get_json() or {}
         current_user_id = request.current_user.get("user_id")
 
+        admin_block = _reject_admin_only_fields(data)
+        if admin_block is not None:
+            return admin_block
+
         # Validate required fields
         if not data.get("name"):
             raise ValidationError("Kit name is required")
@@ -357,6 +391,10 @@ def register_kit_routes(app):
         kit = Kit.query.get_or_404(id)
         data = request.get_json() or {}
         current_user_id = request.current_user.get("user_id")
+
+        admin_block = _reject_admin_only_fields(data)
+        if admin_block is not None:
+            return admin_block
 
         # Update fields
         if "name" in data and data["name"] != kit.name:

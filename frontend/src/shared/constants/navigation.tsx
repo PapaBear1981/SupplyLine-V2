@@ -17,6 +17,7 @@ import {
 } from '@ant-design/icons';
 import type { MenuProps } from 'antd';
 import { ROUTES } from './routes';
+import type { FeatureFlags } from '@features/auth/hooks/useFeatures';
 
 export type MenuItem = Required<MenuProps>['items'][number];
 
@@ -63,6 +64,8 @@ interface MenuItemWithPermission {
   label: string;
   permission?: string;  // Required permission to show this item
   adminOnly?: boolean;  // If true, only admins can see this item
+  feature?: 'kitManagement' | 'requests';  // Hidden when matching feature flag is off
+  labelWhenFeatureOff?: string;  // Alternative label rendered when feature is off
   children?: MenuItemWithPermission[];
 }
 
@@ -125,6 +128,8 @@ export const ALL_MENU_ITEMS: MenuItemWithPermission[] = [
     key: ROUTES.KITS,
     icon: <InboxOutlined />,
     label: 'Kits',
+    // When Kit Management is hidden, this is the slim Field Locations admin.
+    labelWhenFeatureOff: 'Field Locations',
     permission: 'page.kits',
   },
   {
@@ -137,12 +142,14 @@ export const ALL_MENU_ITEMS: MenuItemWithPermission[] = [
         icon: <ShoppingCartOutlined />,
         label: 'Fulfillment',
         permission: 'page.orders',
+        feature: 'requests',
       },
       {
         key: '/requests',
         icon: <FormOutlined />,
         label: 'Requests',
         permission: 'page.requests',
+        feature: 'requests',
       },
       {
         key: ROUTES.TRANSFERS,
@@ -178,11 +185,18 @@ export const ALL_MENU_ITEMS: MenuItemWithPermission[] = [
  * @param permissions - Array of permission strings the user has
  * @returns Filtered menu items the user can access
  */
-export const getMenuItems = (isAdmin: boolean = false, permissions: string[] = []): MenuItem[] => {
+export const getMenuItems = (
+  isAdmin: boolean = false,
+  permissions: string[] = [],
+  features: FeatureFlags = { kitManagement: false, requests: false },
+): MenuItem[] => {
   const filterItems = (items: MenuItemWithPermission[]): MenuItem[] => {
     return items
       .filter((item) => {
-        // Admins can see everything
+        // Feature flag gate — applies to everyone, admins included.
+        if (item.feature && !features[item.feature]) return false;
+
+        // Admins can see everything else
         if (isAdmin) return true;
 
         // Admin-only items are hidden for non-admins
@@ -196,8 +210,12 @@ export const getMenuItems = (isAdmin: boolean = false, permissions: string[] = [
       })
       .map((item) => {
         // eslint-disable-next-line @typescript-eslint/no-unused-vars
-        const { permission, adminOnly, children, ...menuItem } = item;
-        const tagged = { ...menuItem, label: taggedLabel(item.key, item.label) };
+        const { permission, adminOnly, feature, labelWhenFeatureOff, children, ...menuItem } = item;
+        const effectiveLabel =
+          labelWhenFeatureOff && !features.kitManagement && item.key === ROUTES.KITS
+            ? labelWhenFeatureOff
+            : item.label;
+        const tagged = { ...menuItem, label: taggedLabel(item.key, effectiveLabel) };
         if (children) {
           const filteredChildren = filterItems(children);
           if (filteredChildren.length === 0) return null;
