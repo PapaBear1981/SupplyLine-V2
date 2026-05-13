@@ -408,6 +408,11 @@ export interface KitFormData {
   aircraft_type_id: number;
   description?: string;
   status?: KitStatus;
+  // Identity / location fields — admin-only for tail/tanker on the backend.
+  aircraft_tail_number?: string;
+  tanker_scooper_number?: string;
+  trailer_number?: string;
+  location_address?: string;
   boxes?: {
     box_number: string;
     box_type: BoxType;
