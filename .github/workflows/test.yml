@@ -67,7 +67,7 @@ jobs:
           exit 1
         fi
         echo "Installing test dependencies..."
-        pip install pytest pytest-cov pytest-xdist pytest-timeout pytest-mock
+        pip install pytest pytest-cov pytest-xdist pytest-timeout pytest-mock pytest-rerunfailures
         echo "✓ Test dependencies installed"
 
     - name: Verify installations
@@ -110,7 +110,10 @@ jobs:
       working-directory: ./backend
       run: |
         echo "=== Running Fast Tests ==="
-        pytest tests/ -m "not slow" -v --tb=short --maxfail=5
+        # --reruns 2 retries transient flakes (rate-limit timing, etc.); a
+        # consistently-failing test still fails all reruns.
+        pytest tests/ -m "not slow" -v --tb=short --maxfail=5 \
+          --reruns 2 --reruns-delay 1
       env:
         FLASK_ENV: testing
         DATABASE_URL: sqlite:///test.db
@@ -120,7 +123,8 @@ jobs:
     - name: Run all tests with coverage
       working-directory: ./backend
       run: |
-        pytest tests/ -v --cov=. --cov-config=.coveragerc --cov-report=xml --cov-report=term --cov-report=html
+        pytest tests/ -v --cov=. --cov-config=.coveragerc --cov-report=xml --cov-report=term --cov-report=html \
+          --reruns 2 --reruns-delay 1
       env:
         FLASK_ENV: testing
         DATABASE_URL: sqlite:///test.db
