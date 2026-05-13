@@ -90,9 +90,21 @@ const KitsDashboard = () => {
     key: 'name',
     render: (name: string, record: Kit) =>
       kitManagement ? (
-        <a onClick={() => navigate(`/kits/${record.id}`)}>{name}</a>
+        <Button
+          type="link"
+          style={{ padding: 0, height: 'auto' }}
+          onClick={() => navigate(`/kits/${record.id}`)}
+        >
+          {name}
+        </Button>
       ) : (
-        <a onClick={() => setEditingKit(record)}>{name}</a>
+        <Button
+          type="link"
+          style={{ padding: 0, height: 'auto' }}
+          onClick={() => setEditingKit(record)}
+        >
+          {name}
+        </Button>
       ),
     sorter: (a: Kit, b: Kit) => a.name.localeCompare(b.name),
   };

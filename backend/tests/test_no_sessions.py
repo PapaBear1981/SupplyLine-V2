@@ -19,4 +19,4 @@ def test_jwt_only_auth(client, auth_headers):
 
     # With valid JWT headers should succeed
     response = client.get('/api/tools', headers=auth_headers)
-    assert response.status_code in [200, 404]
+    assert response.status_code == 200
