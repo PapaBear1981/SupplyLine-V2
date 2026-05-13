@@ -490,7 +490,7 @@ class TestActiveScheduleOverridesManual:
 
         second_admin = User(
             name="Second Admin",
-            employee_number=f"ADM{uuid.uuid4().hex[:6].upper()}",
+            employee_number=f"ADM{uuid.uuid4().hex[:12].upper()}",
             department="Administration",
             is_admin=True,
             is_active=True,

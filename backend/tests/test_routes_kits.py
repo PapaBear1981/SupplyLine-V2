@@ -501,7 +501,7 @@ class TestKitAssignedUserEndpoint:
 
         inactive = User(
             name="Inactive Person",
-            employee_number=f"INA{uuid.uuid4().hex[:6].upper()}",
+            employee_number=f"INA{uuid.uuid4().hex[:12].upper()}",
             department="Materials",
             is_admin=False,
             is_active=False,

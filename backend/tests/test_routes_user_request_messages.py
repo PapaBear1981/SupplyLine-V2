@@ -24,7 +24,7 @@ def buyer_user(db_session):
     """A second non-admin user that will play the buyer role."""
     user = User(
         name="Buyer User",
-        employee_number=f"BUY{uuid.uuid4().hex[:6].upper()}",
+        employee_number=f"BUY{uuid.uuid4().hex[:12].upper()}",
         department="Materials",
         is_admin=False,
         is_active=True,
@@ -47,7 +47,7 @@ def outsider_user(db_session):
     """A user with no relationship to the request — used to test access control."""
     user = User(
         name="Outsider User",
-        employee_number=f"OUT{uuid.uuid4().hex[:6].upper()}",
+        employee_number=f"OUT{uuid.uuid4().hex[:12].upper()}",
         department="Engineering",
         is_admin=False,
         is_active=True,
