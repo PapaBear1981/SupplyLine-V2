@@ -290,7 +290,7 @@ const KitsDashboard = () => {
             <Row gutter={16} align="middle">
               <Col xs={24} sm={8} md={6}>
                 <Input
-                  placeholder="Search kits..."
+                  placeholder={kitManagement ? 'Search kits...' : 'Search field locations...'}
                   prefix={<SearchOutlined />}
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
@@ -339,8 +339,12 @@ const KitsDashboard = () => {
           <Card>
             {error && (
               <Alert
-                message="Error loading kits"
-                description="Unable to fetch kits data. Please try again."
+                message={kitManagement ? 'Error loading kits' : 'Error loading field locations'}
+                description={
+                  kitManagement
+                    ? 'Unable to fetch kits data. Please try again.'
+                    : 'Unable to fetch field-location data. Please try again.'
+                }
                 type="error"
                 style={{ marginBottom: 16 }}
               />
@@ -353,7 +357,8 @@ const KitsDashboard = () => {
               pagination={{
                 pageSize: 20,
                 showSizeChanger: true,
-                showTotal: (total) => `Total ${total} kits`,
+                showTotal: (total) =>
+                  `Total ${total} ${kitManagement ? 'kits' : 'field locations'}`,
               }}
             />
           </Card>

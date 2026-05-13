@@ -1,4 +1,7 @@
 import { test, expect } from '@playwright/test';
+import { kitManagementOn } from '../utils/feature-flags';
+
+test.skip(!kitManagementOn, 'Kit Management feature is deactivated');
 
 /**
  * Master kit lists admin page — relies on the seeded ADMIN001 storage state.

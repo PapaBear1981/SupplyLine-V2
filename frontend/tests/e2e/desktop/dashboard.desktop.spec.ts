@@ -1,5 +1,6 @@
 import { test, expect } from '@playwright/test';
 import { DashboardPage } from '../../pages/DashboardPage';
+import { requestsOn } from '../utils/feature-flags';
 
 /**
  * Dashboard smoke coverage — validates the shell loads, the stat grid is
@@ -50,6 +51,7 @@ test.describe('Dashboard (desktop)', () => {
   });
 
   test('clicking nav-operations expands the submenu with Fulfillment, Requests, and Transfers', async ({ page }) => {
+    test.skip(!requestsOn, 'Requests feature is deactivated; nav entries hidden');
     await page.goto('/dashboard');
     await page.getByTestId('nav-operations').click();
     await expect(page.getByTestId('nav-orders')).toBeVisible();
@@ -58,6 +60,7 @@ test.describe('Dashboard (desktop)', () => {
   });
 
   test('Operations → Fulfillment routes to /orders', async ({ page }) => {
+    test.skip(!requestsOn, 'Requests feature is deactivated; nav entries hidden');
     await page.goto('/dashboard');
     await page.getByTestId('nav-operations').click();
     await page.getByTestId('nav-orders').click();
@@ -66,6 +69,7 @@ test.describe('Dashboard (desktop)', () => {
   });
 
   test('Operations → Requests routes to /requests', async ({ page }) => {
+    test.skip(!requestsOn, 'Requests feature is deactivated; nav entries hidden');
     await page.goto('/dashboard');
     await page.getByTestId('nav-operations').click();
     await page.getByTestId('nav-requests').click();
