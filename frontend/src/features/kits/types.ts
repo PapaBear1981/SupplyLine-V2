@@ -409,10 +409,12 @@ export interface KitFormData {
   description?: string;
   status?: KitStatus;
   // Identity / location fields — admin-only for tail/tanker on the backend.
-  aircraft_tail_number?: string;
-  tanker_scooper_number?: string;
-  trailer_number?: string;
-  location_address?: string;
+  // Kept compatible with `Kit`'s `string | null` shape so existing call
+  // sites that pass `Partial<Kit>` still typecheck.
+  aircraft_tail_number?: string | null;
+  tanker_scooper_number?: string | null;
+  trailer_number?: string | null;
+  location_address?: string | null;
   boxes?: {
     box_number: string;
     box_type: BoxType;
