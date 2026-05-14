@@ -130,12 +130,18 @@ def parse_csv_content(content: str, expected_headers: list[str]) -> tuple[list[d
         return [], [f"Error parsing CSV file: {e!s}"]
 
 
-def validate_tool_data(row_data: dict[str, Any]) -> dict[str, Any]:
+def validate_tool_data(
+    row_data: dict[str, Any], default_warehouse_id: int | None = None
+) -> dict[str, Any]:
     """
     Validate and clean tool data for import
 
     Args:
         row_data: Raw row data from CSV
+        default_warehouse_id: Warehouse to assign to the tool when the CSV row
+            doesn't carry its own ``warehouse_id`` column value. A tool with no
+            warehouse is invisible in the warehouse-scoped inventory views, so
+            callers should always supply this for a real import.
 
     Returns:
         Cleaned and validated tool data
@@ -151,10 +157,10 @@ def validate_tool_data(row_data: dict[str, Any]) -> dict[str, Any]:
         "status": row_data.get("status", "available"),
         "requires_calibration": str(row_data.get("requires_calibration", "false")).lower() in ["true", "1", "yes"],
         "calibration_frequency_days": None,
-        "warehouse_id": None
+        "warehouse_id": default_warehouse_id
     }
 
-    # Handle warehouse_id
+    # Handle warehouse_id - an explicit CSV value overrides the import-level default
     warehouse_id_str = row_data.get("warehouse_id", "")
     if warehouse_id_str:
         try:
@@ -277,13 +283,21 @@ def check_duplicate_chemical(chemical_data: dict[str, Any]) -> Chemical | None:
     ).first()
 
 
-def bulk_import_tools(csv_content: str, skip_duplicates: bool = True) -> BulkImportResult:
+def bulk_import_tools(
+    csv_content: str,
+    skip_duplicates: bool = True,
+    default_warehouse_id: int | None = None,
+) -> BulkImportResult:
     """
     Bulk import tools from CSV content
 
     Args:
         csv_content: CSV content as string
         skip_duplicates: Whether to skip duplicate tools or raise error
+        default_warehouse_id: Warehouse assigned to every imported tool that
+            doesn't carry its own ``warehouse_id`` column value. Without this
+            the tool is created with a NULL warehouse and never shows up in the
+            warehouse-scoped tools inventory view.
 
     Returns:
         BulkImportResult object with import results
@@ -307,7 +321,21 @@ def bulk_import_tools(csv_content: str, skip_duplicates: bool = True) -> BulkImp
 
         try:
             # Validate tool data
-            tool_data = validate_tool_data(row)
+            tool_data = validate_tool_data(
+                row, default_warehouse_id=default_warehouse_id
+            )
+
+            # A tool with no warehouse is invisible in the warehouse-scoped
+            # inventory view, so reject the row rather than silently creating
+            # an orphaned tool.
+            if tool_data.get("warehouse_id") is None:
+                result.add_error(
+                    row_number,
+                    row,
+                    "No warehouse for this tool. Select an active warehouse "
+                    "before importing, or add a warehouse_id column to the CSV."
+                )
+                continue
 
             # Check for duplicates
             existing_tool = check_duplicate_tool(tool_data)

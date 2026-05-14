@@ -108,6 +108,17 @@ def register_bulk_import_routes(app):
             # Get import options
             skip_duplicates = request.form.get("skip_duplicates", "true").lower() == "true"
 
+            # Imported tools must land in a warehouse or they're invisible in
+            # the warehouse-scoped tools inventory view. Default every row that
+            # doesn't carry its own warehouse_id to the admin's active
+            # warehouse. Rows with neither are rejected per-row downstream.
+            active_warehouse_id = get_active_warehouse_id()
+            if active_warehouse_id:
+                try:
+                    validate_warehouse_id(active_warehouse_id)
+                except ValidationError as exc:
+                    return jsonify({"error": str(exc)}), 400
+
             # Read file content
             try:
                 csv_content = file.read().decode("utf-8")
@@ -133,7 +144,11 @@ def register_bulk_import_routes(app):
 
             # Perform bulk import
             logger.info(f"Starting bulk import of {row_count} tools, skip_duplicates={skip_duplicates}")
-            result = bulk_import_tools(csv_content, skip_duplicates=skip_duplicates)
+            result = bulk_import_tools(
+                csv_content,
+                skip_duplicates=skip_duplicates,
+                default_warehouse_id=active_warehouse_id,
+            )
 
             # Log results
             logger.info(f"Bulk import completed: {result.success_count} success, {result.error_count} errors")
