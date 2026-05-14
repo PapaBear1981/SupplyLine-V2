@@ -28,6 +28,21 @@ export interface BulkImportResponse {
   message: string;
 }
 
+/**
+ * Type guard for a structured bulk-import result body. The backend returns
+ * this same shape with HTTP 400 when every row failed, so the caller needs
+ * to recognise it inside an RTK Query error to still render the results.
+ */
+export function isBulkImportResponse(value: unknown): value is BulkImportResponse {
+  return (
+    !!value &&
+    typeof value === 'object' &&
+    'error_count' in value &&
+    'success_count' in value &&
+    Array.isArray((value as { errors?: unknown }).errors)
+  );
+}
+
 interface BulkImportRequest {
   file: File;
   /** Skip rows that duplicate existing records. Defaults to true server-side. */

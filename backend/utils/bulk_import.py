@@ -532,7 +532,7 @@ def generate_chemical_template() -> str:
         "LOT001",
         "Sample Chemical Description",
         "Sample Manufacturer",
-        "10.5",
+        "10",
         "each",
         "Storage A",
         "General",

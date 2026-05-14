@@ -22,6 +22,7 @@ import {
 } from '@ant-design/icons';
 import {
   downloadTemplate,
+  isBulkImportResponse,
   useBulkImportChemicalsMutation,
   useBulkImportToolsMutation,
   type BulkImportResponse,
@@ -102,10 +103,22 @@ export const BulkImports = () => {
         message.error(response.message);
       }
     } catch (err) {
+      // When every row failed the backend responds with HTTP 400 but still
+      // sends the full structured result. RTK Query's unwrap() throws on
+      // 400, so surface that body as a normal result to keep the per-row
+      // error table visible.
+      const data = err && typeof err === 'object' && 'data' in err
+        ? (err as { data?: unknown }).data
+        : undefined;
+      if (isBulkImportResponse(data)) {
+        setResult(data);
+        message.error(data.message);
+        return;
+      }
       const detail =
-        err && typeof err === 'object' && 'data' in err
-          ? ((err as { data?: { error?: string; message?: string } }).data?.error ??
-            (err as { data?: { error?: string; message?: string } }).data?.message)
+        data && typeof data === 'object'
+          ? ((data as { error?: string; message?: string }).error ??
+            (data as { error?: string; message?: string }).message)
           : undefined;
       message.error(detail ?? 'Import failed. Check the server logs.');
     }
