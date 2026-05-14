@@ -142,7 +142,7 @@ export const toolsApi = baseApi.injectEndpoints({
     >({
       query: ({ calibrationId, file }) => {
         const formData = new FormData();
-        formData.append('certificate', file);
+        formData.append('certificate', file, file.name);
         return {
           url: `/api/calibrations/${calibrationId}/certificate`,
           method: 'POST',

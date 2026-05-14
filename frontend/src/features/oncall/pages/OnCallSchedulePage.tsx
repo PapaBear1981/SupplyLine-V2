@@ -185,7 +185,7 @@ export const OnCallSchedulePage = () => {
   };
 
   const { data: scheduleResult, isLoading } = useGetOnCallScheduleQuery(queryArgs);
-  const schedules = scheduleResult?.schedules ?? [];
+  const schedules = useMemo(() => scheduleResult?.schedules ?? [], [scheduleResult?.schedules]);
   const scheduleUnavailable = scheduleResult?.unavailable === true;
   const { data: currentOnCall } = useGetOnCallPersonnelQuery();
 

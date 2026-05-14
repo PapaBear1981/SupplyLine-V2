@@ -4,7 +4,13 @@ import { getFeatures } from './useFeatures';
 
 const setEnv = (overrides: Record<string, string | undefined>) => {
   // Vite injects env into import.meta.env at build time but it's writable in tests.
-  Object.assign(import.meta.env, overrides);
+  Object.entries(overrides).forEach(([key, value]) => {
+    if (value === undefined) {
+      delete import.meta.env[key];
+    } else {
+      import.meta.env[key] = value;
+    }
+  });
 };
 
 const ORIGINAL = { ...import.meta.env };

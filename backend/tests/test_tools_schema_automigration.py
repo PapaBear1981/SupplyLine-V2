@@ -29,6 +29,7 @@ EXPECTED_BACKFILLED = {
     "last_calibration_date",
     "next_calibration_date",
     "calibration_status",
+    "warehouse_id",
 }
 
 
@@ -49,7 +50,6 @@ def _create_legacy_tools_db(db_path):
                 description VARCHAR,
                 condition VARCHAR,
                 location VARCHAR,
-                warehouse_id INTEGER,
                 created_at DATETIME
             )
             """
