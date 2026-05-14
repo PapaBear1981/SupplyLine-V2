@@ -15,7 +15,8 @@ from utils.bulk_import import (
     generate_tool_template,
 )
 from utils.file_validation import FileValidationError, validate_csv_upload
-from utils.validation import ValidationError
+from utils.validation import ValidationError, validate_warehouse_id
+from utils.warehouse_scope import get_active_warehouse_id
 
 
 logger = logging.getLogger(__name__)
@@ -184,6 +185,17 @@ def register_bulk_import_routes(app):
                 request.form.get("create_missing_parts", "false").lower() == "true"
             )
 
+            # Imported lots must land in a warehouse or they're invisible in
+            # the warehouse-scoped chemical inventory views. Default every row
+            # that doesn't carry its own warehouse_id to the admin's active
+            # warehouse. Rows with neither are rejected per-row downstream.
+            active_warehouse_id = get_active_warehouse_id()
+            if active_warehouse_id:
+                try:
+                    validate_warehouse_id(active_warehouse_id)
+                except ValidationError as exc:
+                    return jsonify({"error": str(exc)}), 400
+
             # Read file content
             try:
                 csv_content = file.read().decode("utf-8")
@@ -216,6 +228,7 @@ def register_bulk_import_routes(app):
                 csv_content,
                 skip_duplicates=skip_duplicates,
                 create_missing_parts=create_missing_parts,
+                default_warehouse_id=active_warehouse_id,
             )
 
             # Log results

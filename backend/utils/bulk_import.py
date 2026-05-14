@@ -181,12 +181,18 @@ def validate_tool_data(row_data: dict[str, Any]) -> dict[str, Any]:
     return validated_tool
 
 
-def validate_chemical_data(row_data: dict[str, Any]) -> dict[str, Any]:
+def validate_chemical_data(
+    row_data: dict[str, Any], default_warehouse_id: int | None = None
+) -> dict[str, Any]:
     """
     Validate and clean chemical data for import
 
     Args:
         row_data: Raw row data from CSV
+        default_warehouse_id: Warehouse to assign to the lot when the CSV row
+            doesn't carry its own ``warehouse_id`` column value. A lot with no
+            warehouse is invisible in the warehouse-scoped inventory views, so
+            callers should always supply this for a real import.
 
     Returns:
         Cleaned and validated chemical data
@@ -203,10 +209,10 @@ def validate_chemical_data(row_data: dict[str, Any]) -> dict[str, Any]:
         "category": row_data.get("category", "General"),
         "expiration_date": None,
         "msds_url": row_data.get("msds_url", "") or None,  # Convert empty string to None
-        "warehouse_id": None
+        "warehouse_id": default_warehouse_id
     }
 
-    # Handle warehouse_id
+    # Handle warehouse_id - an explicit CSV value overrides the import-level default
     warehouse_id_str = row_data.get("warehouse_id", "")
     if warehouse_id_str:
         try:
@@ -357,6 +363,7 @@ def bulk_import_chemicals(
     csv_content: str,
     skip_duplicates: bool = True,
     create_missing_parts: bool = False,
+    default_warehouse_id: int | None = None,
 ) -> BulkImportResult:
     """
     Bulk import chemicals from CSV content
@@ -369,6 +376,10 @@ def bulk_import_chemicals(
             the metadata (description/manufacturer/category/unit/min stock)
             from the CSV row. If False, rows with unknown part_numbers are
             rejected.
+        default_warehouse_id: Warehouse assigned to every imported lot that
+            doesn't carry its own ``warehouse_id`` column value. Without this
+            the lot is created with a NULL warehouse and never shows up in the
+            warehouse-scoped chemical inventory views.
 
     Returns:
         BulkImportResult object with import results
@@ -396,7 +407,21 @@ def bulk_import_chemicals(
 
         try:
             # Validate chemical data
-            chemical_data = validate_chemical_data(row)
+            chemical_data = validate_chemical_data(
+                row, default_warehouse_id=default_warehouse_id
+            )
+
+            # A lot with no warehouse is invisible in the warehouse-scoped
+            # inventory views, so reject the row rather than silently
+            # creating an orphaned lot.
+            if chemical_data.get("warehouse_id") is None:
+                result.add_error(
+                    row_number,
+                    row,
+                    "No warehouse for this lot. Select an active warehouse "
+                    "before importing, or add a warehouse_id column to the CSV."
+                )
+                continue
 
             # Resolve (or create) the master ChemicalPart for this lot.
             part = ChemicalPart.query.filter_by(
