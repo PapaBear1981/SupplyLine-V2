@@ -9,22 +9,18 @@ part shows a rolled-up quantity of 0 and no lot detail). The import code
 has since been fixed to default to the importing admin's active
 warehouse, but lots imported before that fix still need to be backfilled.
 
-Usage:
-    python scripts/backfill_chemical_warehouse.py            # assign to "GEG", apply
-    python scripts/backfill_chemical_warehouse.py --dry-run  # preview only
-    python scripts/backfill_chemical_warehouse.py --warehouse "Main Warehouse"
-    python scripts/backfill_chemical_warehouse.py --warehouse 3
+Run it from inside the backend container (working dir /app):
+    python backfill_chemical_warehouse.py --dry-run   # preview only
+    python backfill_chemical_warehouse.py             # assign to "GEG", apply
+    python backfill_chemical_warehouse.py --warehouse "Main Warehouse"
+    python backfill_chemical_warehouse.py --warehouse 3
 """
 
 import argparse
-import os
 import sys
 
-# Add parent directory to path so ``backend`` is importable
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
-
-from backend.models import Chemical, Warehouse, db
-from backend.run import app
+from models import Chemical, Warehouse, db
+from run import app
 
 
 DEFAULT_WAREHOUSE = "GEG"
@@ -81,7 +77,7 @@ def main():
 
         print(
             f"Found {len(orphans)} chemical lot(s) with no warehouse. "
-            f'Target: [{warehouse.id}] {warehouse.name}'
+            f"Target: [{warehouse.id}] {warehouse.name}"
         )
         for chemical in orphans:
             print(
