@@ -32,6 +32,10 @@ EXPECTED_BACKFILLED = {
 }
 
 
+def _noop(*args, **kwargs):
+    """Stand-in for background-service initializers during the test."""
+
+
 def _create_legacy_tools_db(db_path):
     """Create a `tools` table with only the original, pre-expansion columns."""
     conn = sqlite3.connect(db_path)
@@ -72,17 +76,19 @@ def legacy_db_url(tmp_path, monkeypatch):
     monkeypatch.setenv("CI", "true")
     # Neuter the background schedulers create_app() spins up in non-testing
     # mode so no threads leak into the test session.
-    monkeypatch.setattr("app.init_scheduled_backup", lambda *a, **k: None)
-    monkeypatch.setattr("app.init_scheduled_maintenance", lambda *a, **k: None)
+    monkeypatch.setattr("app.init_scheduled_backup", _noop)
+    monkeypatch.setattr("app.init_scheduled_maintenance", _noop)
     return f"sqlite:///{db_path}"
 
 
 def test_startup_backfills_missing_tool_columns(legacy_db_url, monkeypatch):
     # create_app() treats pytest as a testing environment and skips both
-    # create_all() and the auto-migration. pytest re-sets PYTEST_CURRENT_TEST
-    # at the start of the call phase, so it must be dropped here in the test
-    # body — not in the fixture — for the real startup migration path to run.
+    # create_all() and the auto-migration. The signals are PYTEST_CURRENT_TEST
+    # (which pytest re-sets at the start of the call phase, so it must be
+    # dropped here in the test body, not the fixture) and FLASK_ENV=testing
+    # (set by the CI test job). Drop both so the real startup migration runs.
     monkeypatch.delenv("PYTEST_CURRENT_TEST", raising=False)
+    monkeypatch.delenv("FLASK_ENV", raising=False)
 
     # create_app() applies the DATABASE_URL override at call time, so building
     # an app here boots the startup auto-migration against the legacy DB.
