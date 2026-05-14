@@ -27,12 +27,12 @@ afterEach(() => {
 });
 
 describe('getFeatures', () => {
-  it('defaults all flags to true when env vars are missing', () => {
+  it('defaults all flags to false when env vars are missing', () => {
     setEnv({
       VITE_FEATURE_KIT_MANAGEMENT: undefined,
       VITE_FEATURE_REQUESTS: undefined,
     });
-    expect(getFeatures()).toEqual({ kitManagement: true, requests: true });
+    expect(getFeatures()).toEqual({ kitManagement: false, requests: false });
   });
 
   it('treats "false" as off', () => {
