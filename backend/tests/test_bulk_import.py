@@ -384,10 +384,13 @@ class TestToolBulkImport:
 
     def test_bulk_import_tools_from_csv(self, client, db_session, admin_user, auth_headers, test_warehouse):
         """Test importing tools from CSV"""
+        admin_user.active_warehouse_id = test_warehouse.id
+        db_session.commit()
+
         csv_data = """tool_number,serial_number,description,condition,location,category,status
-TBULK001,SN001,Test Tool 1,Good,Location A,Category1,available
-TBULK002,SN002,Test Tool 2,Good,Location B,Category2,available
-TBULK003,SN003,Test Tool 3,Excellent,Location C,Category1,available
+TBULK001,SN001,Test Tool 1,good,Location A,Category1,available
+TBULK002,SN002,Test Tool 2,good,Location B,Category2,available
+TBULK003,SN003,Test Tool 3,excellent,Location C,Category1,available
 """
 
         data = {
@@ -412,11 +415,14 @@ TBULK003,SN003,Test Tool 3,Excellent,Location C,Category1,available
         """Test importing tools with calibration dates"""
         from datetime import datetime, timedelta
 
+        admin_user.active_warehouse_id = test_warehouse.id
+        db_session.commit()
+
         future_date = (datetime.utcnow() + timedelta(days=365)).strftime("%Y-%m-%d")
 
         csv_data = f"""tool_number,serial_number,description,condition,location,category,status,calibration_due
-TCAL001,SN001,Calibrated Tool 1,Good,Location A,Measurement,available,{future_date}
-TCAL002,SN002,Calibrated Tool 2,Good,Location B,Measurement,available,{future_date}
+TCAL001,SN001,Calibrated Tool 1,good,Location A,Measurement,available,{future_date}
+TCAL002,SN002,Calibrated Tool 2,good,Location B,Measurement,available,{future_date}
 """
 
         data = {
@@ -431,6 +437,93 @@ TCAL002,SN002,Calibrated Tool 2,Good,Location B,Measurement,available,{future_da
         )
 
         assert response.status_code in [200, 201, 400, 404]
+
+    def test_bulk_import_tools_defaults_to_active_warehouse(
+        self, client, db_session, admin_user, auth_headers, test_warehouse
+    ):
+        """A CSV with no warehouse_id column lands tools in the importer's active warehouse.
+
+        Regression: imported tools used to get a NULL warehouse, making them
+        invisible in the warehouse-scoped tools inventory view (the table only
+        populated them under "All warehouses").
+        """
+        admin_user.active_warehouse_id = test_warehouse.id
+        db_session.commit()
+
+        csv_data = """tool_number,serial_number,description,condition,location,category,status
+TWHDEF001,SNW1,Tool one,good,Location A,Category1,available
+TWHDEF002,SNW2,Tool two,good,Location B,Category1,available
+"""
+        data = {"file": (BytesIO(csv_data.encode()), "tools.csv")}
+        response = client.post(
+            "/api/tools/bulk-import",
+            headers=auth_headers,
+            data=data,
+            content_type="multipart/form-data",
+        )
+
+        assert response.status_code == 200
+        body = response.get_json()
+        assert body["success_count"] == 2
+        assert body["error_count"] == 0
+
+        imported = Tool.query.filter(Tool.tool_number.like("TWHDEF%")).all()
+        assert len(imported) == 2
+        assert all(tool.warehouse_id == test_warehouse.id for tool in imported)
+
+    def test_bulk_import_tools_rejects_tool_with_no_warehouse(
+        self, client, db_session, admin_user, auth_headers
+    ):
+        """A row with no warehouse_id column and no active warehouse is rejected, not orphaned."""
+        # admin_user intentionally has no active_warehouse_id set
+        csv_data = """tool_number,serial_number,description,condition,location,category,status
+TWHNONE001,SNNONE,Tool,good,Location A,Category1,available
+"""
+        data = {"file": (BytesIO(csv_data.encode()), "tools.csv")}
+        response = client.post(
+            "/api/tools/bulk-import",
+            headers=auth_headers,
+            data=data,
+            content_type="multipart/form-data",
+        )
+
+        assert response.status_code == 400
+        body = response.get_json()
+        assert body["success_count"] == 0
+        assert body["error_count"] == 1
+        error_messages = " ".join(err.get("error", "") for err in body.get("errors", []))
+        assert "warehouse" in error_messages.lower()
+
+        assert Tool.query.filter_by(tool_number="TWHNONE001").first() is None
+
+    def test_bulk_import_tools_csv_warehouse_id_overrides_default(
+        self, client, db_session, admin_user, auth_headers, test_warehouse
+    ):
+        """An explicit warehouse_id column value wins over the importer's active warehouse."""
+        from models import Warehouse
+
+        other_warehouse = Warehouse(name="Override Target WH", warehouse_type="satellite")
+        db_session.add(other_warehouse)
+        db_session.flush()
+
+        admin_user.active_warehouse_id = test_warehouse.id
+        db_session.commit()
+
+        csv_data = f"""tool_number,serial_number,description,condition,location,category,status,warehouse_id
+TWHOVR001,SNOVR,Tool,good,Location A,Category1,available,{other_warehouse.id}
+"""
+        data = {"file": (BytesIO(csv_data.encode()), "tools.csv")}
+        response = client.post(
+            "/api/tools/bulk-import",
+            headers=auth_headers,
+            data=data,
+            content_type="multipart/form-data",
+        )
+
+        assert response.status_code == 200
+        imported = Tool.query.filter_by(tool_number="TWHOVR001").first()
+        assert imported is not None
+        assert imported.warehouse_id == other_warehouse.id
 
 
 @pytest.mark.bulk
