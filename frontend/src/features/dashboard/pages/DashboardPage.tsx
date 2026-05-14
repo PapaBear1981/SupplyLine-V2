@@ -12,6 +12,7 @@ import {
 } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 import { useAppSelector } from '@app/hooks';
+import { useFeatures } from '@features/auth/hooks/useFeatures';
 import { useTheme } from '@features/settings/contexts/ThemeContext';
 import { COLOR_THEMES } from '@features/settings/types/theme';
 import { ROUTES } from '@shared/constants/routes';
@@ -49,6 +50,7 @@ export const DashboardPage = () => {
   const isMobile = useIsMobile();
   const navigate = useNavigate();
   const user = useAppSelector((state) => state.auth.user);
+  const features = useFeatures();
   const { themeConfig } = useTheme();
   const primaryColor = COLOR_THEMES[themeConfig.colorTheme].primary;
 
@@ -146,8 +148,8 @@ export const DashboardPage = () => {
       });
     }
 
-    // Out of stock chemicals
-    if (chemicalStats.outOfStock > 0) {
+    // Out of stock chemicals — part of the chemical reorder system
+    if (features.chemicalReorder && chemicalStats.outOfStock > 0) {
       alertsList.push({
         id: 'chemicals-oos',
         type: 'low_stock',
@@ -159,8 +161,8 @@ export const DashboardPage = () => {
       });
     }
 
-    // Low stock chemicals
-    if (chemicalStats.lowStock > 0) {
+    // Low stock chemicals — part of the chemical reorder system
+    if (features.chemicalReorder && chemicalStats.lowStock > 0) {
       alertsList.push({
         id: 'chemicals-low',
         type: 'low_stock',
@@ -225,7 +227,7 @@ export const DashboardPage = () => {
     }
 
     return alertsList;
-  }, [toolStats, chemicalStats, kitStats]);
+  }, [toolStats, chemicalStats, kitStats, features.chemicalReorder]);
 
   const handleRefreshAlerts = () => {
     refetchTools();
@@ -341,17 +343,19 @@ export const DashboardPage = () => {
             onClick={() => navigate(ROUTES.CHEMICALS)}
           />
         </Col>
-        <Col xs={12} sm={6}>
-          <StatCard
-            title="Low Stock Items"
-            value={chemicalStats.lowStock + chemicalStats.outOfStock}
-            icon={<AlertOutlined />}
-            iconBg={chemicalStats.outOfStock > 0 ? "rgba(255, 77, 79, 0.1)" : "rgba(250, 173, 20, 0.1)"}
-            iconColor={chemicalStats.outOfStock > 0 ? "#ff4d4f" : "#faad14"}
-            loading={chemicalsLoading}
-            onClick={() => navigate(ROUTES.CHEMICALS + '?status=low_stock')}
-          />
-        </Col>
+        {features.chemicalReorder && (
+          <Col xs={12} sm={6}>
+            <StatCard
+              title="Low Stock Items"
+              value={chemicalStats.lowStock + chemicalStats.outOfStock}
+              icon={<AlertOutlined />}
+              iconBg={chemicalStats.outOfStock > 0 ? "rgba(255, 77, 79, 0.1)" : "rgba(250, 173, 20, 0.1)"}
+              iconColor={chemicalStats.outOfStock > 0 ? "#ff4d4f" : "#faad14"}
+              loading={chemicalsLoading}
+              onClick={() => navigate(ROUTES.CHEMICALS + '?status=low_stock')}
+            />
+          </Col>
+        )}
         <Col xs={12} sm={6}>
           <StatCard
             title="Pending Reorders"

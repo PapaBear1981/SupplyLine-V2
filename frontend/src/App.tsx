@@ -90,10 +90,12 @@ function AppContent() {
                   <Route
                     path={ROUTES.CHEMICAL_FORECAST}
                     element={
-                      <ResponsivePage
-                        desktop={<ChemicalForecastPage />}
-                        mobile={<MobileChemicalForecast />}
-                      />
+                      <FeatureRoute feature="chemicalReorder" redirectTo={ROUTES.CHEMICALS}>
+                        <ResponsivePage
+                          desktop={<ChemicalForecastPage />}
+                          mobile={<MobileChemicalForecast />}
+                        />
+                      </FeatureRoute>
                     }
                   />
 

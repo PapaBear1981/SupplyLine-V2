@@ -1,9 +1,10 @@
-name: Legacy Features (Kit Management + Requests)
+name: Legacy Features (Kit Management + Requests + Chemical Reorder)
 
-# Runs the test suites with FEATURE_KIT_MANAGEMENT and FEATURE_REQUESTS turned
-# ON so the deactivated UIs and APIs don't bit-rot while disabled. Triggered
-# nightly + on demand. Not gated to main CI — `continue-on-error: true` during
-# the initial deactivation window so a regression here doesn't block releases.
+# Runs the test suites with FEATURE_KIT_MANAGEMENT, FEATURE_REQUESTS, and
+# FEATURE_CHEMICAL_REORDER turned ON so the deactivated UIs and APIs don't
+# bit-rot while disabled. Triggered nightly + on demand. Not gated to main CI —
+# `continue-on-error: true` during the initial deactivation window so a
+# regression here doesn't block releases.
 
 on:
   schedule:
@@ -13,8 +14,10 @@ on:
 env:
   FEATURE_KIT_MANAGEMENT: 'true'
   FEATURE_REQUESTS: 'true'
+  FEATURE_CHEMICAL_REORDER: 'true'
   VITE_FEATURE_KIT_MANAGEMENT: 'true'
   VITE_FEATURE_REQUESTS: 'true'
+  VITE_FEATURE_CHEMICAL_REORDER: 'true'
 
 jobs:
   backend-legacy-tests:

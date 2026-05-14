@@ -172,7 +172,7 @@ def register_routes(app):
     # explicit to API clients and is reversible by flipping the env var.
     import re
 
-    from auth.feature_flags import feature_enabled
+    from auth.feature_flags import feature_enabled, require_feature
 
     # Whitelist of endpoints kept live regardless of FEATURE_KIT_MANAGEMENT —
     # they back the Field Locations admin and the Tools-page send/return flow.
@@ -346,6 +346,7 @@ def register_routes(app):
 
     # Add direct routes for chemicals management
     @app.route("/api/chemicals/reorder-needed", methods=["GET"])
+    @require_feature("chemical_reorder")
     @materials_manager_required
     def chemicals_reorder_needed_direct_route():
         try:
@@ -365,6 +366,7 @@ def register_routes(app):
             return jsonify({"error": "An error occurred while fetching chemicals that need reordering"}), 500
 
     @app.route("/api/chemicals/on-order", methods=["GET"])
+    @require_feature("chemical_reorder")
     @materials_manager_required
     @handle_errors
     def chemicals_on_order_direct_route():

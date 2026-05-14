@@ -5,6 +5,7 @@ from flask import current_app, jsonify, request
 from sqlalchemy.orm import joinedload
 
 from auth import department_required, jwt_required
+from auth.feature_flags import feature_enabled, require_feature
 from models import (
     AuditLog,
     Chemical,
@@ -658,7 +659,7 @@ def register_chemical_routes(app):
 
             # Create unified request if reorder was just triggered
             auto_request = None
-            if chemical.needs_reorder and not reorder_was_needed:
+            if feature_enabled("chemical_reorder") and chemical.needs_reorder and not reorder_was_needed:
                 from utils.unified_requests import create_chemical_reorder_request
                 auto_request = create_chemical_reorder_request(
                     chemical=chemical,
@@ -731,7 +732,7 @@ def register_chemical_routes(app):
                 chemical.update_reorder_status()
 
             # Create unified request if reorder was just triggered
-            if chemical.needs_reorder and not reorder_was_needed:
+            if feature_enabled("chemical_reorder") and chemical.needs_reorder and not reorder_was_needed:
                 from utils.unified_requests import create_chemical_reorder_request
                 auto_request = create_chemical_reorder_request(
                     chemical=chemical,
@@ -786,7 +787,7 @@ def register_chemical_routes(app):
 
         # Auto-create reorder request if chemical is now low stock or out of stock
         auto_request = None
-        if chemical.status in ("low_stock", "out_of_stock"):
+        if feature_enabled("chemical_reorder") and chemical.status in ("low_stock", "out_of_stock"):
             try:
                 auto_request = _create_auto_reorder_request(chemical, request.current_user["user_id"])
             except Exception as e:
@@ -1117,6 +1118,7 @@ def register_chemical_routes(app):
 
     # Request reorder for a chemical
     @app.route("/api/chemicals/<int:id>/request-reorder", methods=["POST"])
+    @require_feature("chemical_reorder")
     @materials_manager_required
     def request_chemical_reorder_route(id):
         try:
@@ -1215,6 +1217,7 @@ def register_chemical_routes(app):
 
     # Mark a chemical as ordered
     @app.route("/api/chemicals/<int:id>/mark-ordered", methods=["POST"])
+    @require_feature("chemical_reorder")
     @materials_manager_required
     def mark_chemical_as_ordered_route(id):
         try:
@@ -1712,6 +1715,7 @@ def register_chemical_routes(app):
         })
 
     @app.route("/api/chemicals/forecast", methods=["GET"])
+    @require_feature("chemical_reorder")
     @jwt_required
     @handle_errors
     def chemical_forecast_route():

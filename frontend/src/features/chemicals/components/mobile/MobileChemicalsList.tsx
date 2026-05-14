@@ -32,6 +32,7 @@ import { useGetChemicalsQuery, useCreateChemicalMutation, useUpdateChemicalMutat
 import { useGetWarehousesQuery } from '@features/warehouses/services/warehousesApi';
 import { useGetUsersQuery } from '@features/users/services/usersApi';
 import { useAppSelector } from '@app/hooks';
+import { useFeatures } from '@features/auth/hooks/useFeatures';
 import type { Chemical, ChemicalStatus, ChemicalFormData } from '../../types';
 import './MobileChemicalsList.css';
 
@@ -64,6 +65,7 @@ export const MobileChemicalsList = () => {
   const [page, setPage] = useState(1);
   const [form] = Form.useForm();
   const [issuanceForm] = Form.useForm();
+  const features = useFeatures();
 
   // API queries
   const { data: chemicalsData, isLoading, isFetching, refetch } = useGetChemicalsQuery({
@@ -279,7 +281,7 @@ export const MobileChemicalsList = () => {
                   <ClockCircleOutlined /> Expiring Soon
                 </Tag>
               )}
-              {chemical.needs_reorder && (
+              {features.chemicalReorder && chemical.needs_reorder && (
                 <Tag
                   color="#ff4d4f"
                   fill="outline"
@@ -547,7 +549,8 @@ export const MobileChemicalsList = () => {
                 style={{ marginBottom: 12 }}
               />
             )}
-            {selectedChemical.minimum_stock_level !== null &&
+            {features.chemicalReorder &&
+              selectedChemical.minimum_stock_level !== null &&
               selectedChemical.minimum_stock_level !== undefined &&
               selectedChemical.quantity <= selectedChemical.minimum_stock_level &&
               selectedChemical.status !== 'expired' &&

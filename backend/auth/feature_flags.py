@@ -15,6 +15,7 @@ from flask import current_app, jsonify, request
 _FEATURE_CONFIG_KEYS = {
     "kit_management": "FEATURE_KIT_MANAGEMENT",
     "requests": "FEATURE_REQUESTS",
+    "chemical_reorder": "FEATURE_CHEMICAL_REORDER",
 }
 
 

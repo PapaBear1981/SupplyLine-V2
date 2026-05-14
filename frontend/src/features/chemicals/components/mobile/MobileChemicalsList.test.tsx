@@ -68,6 +68,12 @@ vi.mock('@features/users/services/usersApi', () => ({
   }),
 }));
 
+// Exercise the reorder-enabled path so the low-stock reorder warning renders.
+vi.mock('@features/auth/hooks/useFeatures', () => ({
+  useFeatures: () => ({ kitManagement: false, requests: false, chemicalReorder: true }),
+  getFeatures: () => ({ kitManagement: false, requests: false, chemicalReorder: true }),
+}));
+
 // ─── Store + render helpers ───────────────────────────────────────────────────
 
 const createMockStore = () =>

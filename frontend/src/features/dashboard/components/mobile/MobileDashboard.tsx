@@ -32,6 +32,7 @@ import {
   PlusOutlined,
 } from '@ant-design/icons';
 import { useAppSelector } from '@app/hooks';
+import { useFeatures } from '@features/auth/hooks/useFeatures';
 import { ROUTES } from '@shared/constants/routes';
 
 // API hooks
@@ -50,6 +51,7 @@ import './MobileDashboard.css';
 export const MobileDashboard = () => {
   const navigate = useNavigate();
   const user = useAppSelector((state) => state.auth.user);
+  const features = useFeatures();
   const [announcementsPopupOpen, setAnnouncementsPopupOpen] = useState(false);
   const { activeWarehouseId } = useActiveWarehouse();
 
@@ -177,13 +179,16 @@ export const MobileDashboard = () => {
       color: chemicalStats.expired > 0 ? '#ff4d4f' : '#faad14',
       path: ROUTES.CHEMICALS,
     },
-    {
-      label: 'Low Stock',
-      value: chemicalStats.lowStock + chemicalStats.outOfStock,
-      icon: <AlertOutlined />,
-      color: chemicalStats.outOfStock > 0 ? '#ff4d4f' : '#faad14',
-      path: ROUTES.CHEMICALS + '?status=low_stock',
-    },
+    // 'Low Stock' alert is part of the chemical reorder system.
+    ...(features.chemicalReorder
+      ? [{
+          label: 'Low Stock',
+          value: chemicalStats.lowStock + chemicalStats.outOfStock,
+          icon: <AlertOutlined />,
+          color: chemicalStats.outOfStock > 0 ? '#ff4d4f' : '#faad14',
+          path: ROUTES.CHEMICALS + '?status=low_stock',
+        }]
+      : []),
     {
       label: 'Reorders',
       value: kitStats.pendingReorders,

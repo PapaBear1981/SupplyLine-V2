@@ -79,6 +79,13 @@ vi.mock('@features/scanner', () => ({
   }),
 }));
 
+// Chemical Forecast is gated behind the chemical-reorder feature flag; turn it
+// on so the permission-driven visibility test still exercises that nav entry.
+vi.mock('@features/auth/hooks/useFeatures', () => ({
+  useFeatures: () => ({ kitManagement: false, requests: false, chemicalReorder: true }),
+  getFeatures: () => ({ kitManagement: false, requests: false, chemicalReorder: true }),
+}));
+
 // MobileActiveWarehouseSelect pulls in its own RTK Query and slice. The
 // MobileLayout tests don't exercise warehouse switching, so render a stub.
 vi.mock('@features/warehouses/components/mobile', () => ({

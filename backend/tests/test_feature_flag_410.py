@@ -119,3 +119,55 @@ class TestRequestsDisabled:
         with _Override(app, "FEATURE_REQUESTS"):
             resp = client.get("/api/orders", headers=auth_headers_materials)
             assert resp.status_code == 410
+
+
+class TestChemicalReorderDisabled:
+    def test_reorder_needed_returns_410(self, app, client, auth_headers_materials):
+        with _Override(app, "FEATURE_CHEMICAL_REORDER"):
+            resp = client.get(
+                "/api/chemicals/reorder-needed", headers=auth_headers_materials
+            )
+            assert resp.status_code == 410
+            body = resp.get_json()
+            assert body["feature"] == "chemical_reorder"
+            assert body["error"] == "feature_disabled"
+
+    def test_on_order_returns_410(self, app, client, auth_headers_materials):
+        with _Override(app, "FEATURE_CHEMICAL_REORDER"):
+            resp = client.get(
+                "/api/chemicals/on-order", headers=auth_headers_materials
+            )
+            assert resp.status_code == 410
+
+    def test_forecast_returns_410(self, app, client, auth_headers_materials):
+        with _Override(app, "FEATURE_CHEMICAL_REORDER"):
+            resp = client.get(
+                "/api/chemicals/forecast", headers=auth_headers_materials
+            )
+            assert resp.status_code == 410
+
+    def test_request_reorder_returns_410(self, app, client, auth_headers_materials):
+        # The feature gate short-circuits before the chemical is looked up, so a
+        # placeholder id is enough to prove the endpoint is deactivated.
+        with _Override(app, "FEATURE_CHEMICAL_REORDER"):
+            resp = client.post(
+                "/api/chemicals/1/request-reorder",
+                json={"requested_quantity": 1},
+                headers=auth_headers_materials,
+            )
+            assert resp.status_code == 410
+
+    def test_mark_ordered_returns_410(self, app, client, auth_headers_materials):
+        with _Override(app, "FEATURE_CHEMICAL_REORDER"):
+            resp = client.post(
+                "/api/chemicals/1/mark-ordered",
+                json={},
+                headers=auth_headers_materials,
+            )
+            assert resp.status_code == 410
+
+    def test_chemical_list_still_live(self, app, client, auth_headers_materials):
+        # Core chemical inventory stays live when reorder is deactivated.
+        with _Override(app, "FEATURE_CHEMICAL_REORDER"):
+            resp = client.get("/api/chemicals", headers=auth_headers_materials)
+            assert resp.status_code == 200

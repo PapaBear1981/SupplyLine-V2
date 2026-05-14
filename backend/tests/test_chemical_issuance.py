@@ -363,6 +363,7 @@ class TestChemicalIssuanceEndpoint:
         )
         assert open_items == []
 
+    @pytest.mark.chemical_reorder
     def test_reorder_triggered_when_all_lots_of_part_drop_below_min(
         self, client, admin_user, jwt_manager, db_session
     ):

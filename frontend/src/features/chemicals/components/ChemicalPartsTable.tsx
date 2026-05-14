@@ -29,6 +29,7 @@ import {
 } from '../services/chemicalsApi';
 import type { Chemical, ChemicalPart, ChemicalPartStatus } from '../types';
 import { PermissionGuard } from '@features/auth/components/PermissionGuard';
+import { useFeatures } from '@features/auth/hooks/useFeatures';
 import { useActiveWarehouse } from '@features/warehouses/hooks/useActiveWarehouse';
 
 const { Text } = Typography;
@@ -57,6 +58,7 @@ export const ChemicalPartsTable = ({
   const [showAllWarehouses, setShowAllWarehouses] = useState(false);
 
   const { activeWarehouseId, activeWarehouseName } = useActiveWarehouse();
+  const features = useFeatures();
 
   const { data, isLoading, isFetching } = useGetChemicalPartsQuery({
     page,
@@ -88,7 +90,7 @@ export const ChemicalPartsTable = ({
       render: (text, record) => (
         <Space direction="vertical" size={2}>
           <Text strong>{text}</Text>
-          {record.has_open_reorder_request && (
+          {features.chemicalReorder && record.has_open_reorder_request && (
             <Tag color="blue">Reorder Open</Tag>
           )}
         </Space>

@@ -64,7 +64,7 @@ interface MenuItemWithPermission {
   label: string;
   permission?: string;  // Required permission to show this item
   adminOnly?: boolean;  // If true, only admins can see this item
-  feature?: 'kitManagement' | 'requests';  // Hidden when matching feature flag is off
+  feature?: keyof FeatureFlags;  // Hidden when matching feature flag is off
   labelWhenFeatureOff?: string;  // Alternative label rendered when feature is off
   children?: MenuItemWithPermission[];
 }
@@ -121,6 +121,7 @@ export const ALL_MENU_ITEMS: MenuItemWithPermission[] = [
         icon: <BarChartOutlined />,
         label: 'Forecast',
         permission: 'page.chemicals',
+        feature: 'chemicalReorder',
       },
     ],
   },
@@ -188,7 +189,7 @@ export const ALL_MENU_ITEMS: MenuItemWithPermission[] = [
 export const getMenuItems = (
   isAdmin: boolean = false,
   permissions: string[] = [],
-  features: FeatureFlags = { kitManagement: false, requests: false },
+  features: FeatureFlags = { kitManagement: false, requests: false, chemicalReorder: false },
 ): MenuItem[] => {
   const filterItems = (items: MenuItemWithPermission[]): MenuItem[] => {
     return items

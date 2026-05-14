@@ -142,9 +142,7 @@ export const MobileLayout = () => {
 
         // Hide nav entries whose feature flag is off. Applies to everyone,
         // admins included.
-        if (item.key === '/orders' || item.key === '/requests') {
-          if (!features.requests) return false;
-        }
+        if (item.feature && !features[item.feature]) return false;
 
         // Admin item is gated by the mobile_admin_enabled system setting
         // (Phase 5 wires the backend value; Phase 1 hard-codes false).

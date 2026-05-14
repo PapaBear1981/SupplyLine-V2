@@ -22,6 +22,9 @@ afterEach(() => {
       | string
       | undefined,
     VITE_FEATURE_REQUESTS: ORIGINAL.VITE_FEATURE_REQUESTS as string | undefined,
+    VITE_FEATURE_CHEMICAL_REORDER: ORIGINAL.VITE_FEATURE_CHEMICAL_REORDER as
+      | string
+      | undefined,
   });
   vi.restoreAllMocks();
 });
@@ -31,16 +34,26 @@ describe('getFeatures', () => {
     setEnv({
       VITE_FEATURE_KIT_MANAGEMENT: undefined,
       VITE_FEATURE_REQUESTS: undefined,
+      VITE_FEATURE_CHEMICAL_REORDER: undefined,
     });
-    expect(getFeatures()).toEqual({ kitManagement: false, requests: false });
+    expect(getFeatures()).toEqual({
+      kitManagement: false,
+      requests: false,
+      chemicalReorder: false,
+    });
   });
 
   it('treats "false" as off', () => {
     setEnv({
       VITE_FEATURE_KIT_MANAGEMENT: 'false',
       VITE_FEATURE_REQUESTS: 'false',
+      VITE_FEATURE_CHEMICAL_REORDER: 'false',
     });
-    expect(getFeatures()).toEqual({ kitManagement: false, requests: false });
+    expect(getFeatures()).toEqual({
+      kitManagement: false,
+      requests: false,
+      chemicalReorder: false,
+    });
   });
 
   it.each(['true', '1', 'yes', 'on', 'TRUE', 'On'])(
@@ -49,8 +62,18 @@ describe('getFeatures', () => {
       setEnv({
         VITE_FEATURE_KIT_MANAGEMENT: value,
         VITE_FEATURE_REQUESTS: undefined,
+        VITE_FEATURE_CHEMICAL_REORDER: undefined,
       });
       expect(getFeatures().kitManagement).toBe(true);
     },
   );
+
+  it('parses VITE_FEATURE_CHEMICAL_REORDER independently', () => {
+    setEnv({
+      VITE_FEATURE_KIT_MANAGEMENT: undefined,
+      VITE_FEATURE_REQUESTS: undefined,
+      VITE_FEATURE_CHEMICAL_REORDER: 'true',
+    });
+    expect(getFeatures().chemicalReorder).toBe(true);
+  });
 });

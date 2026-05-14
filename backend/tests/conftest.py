@@ -484,14 +484,18 @@ def _flag_on(name: str) -> bool:
 
 
 def pytest_collection_modifyitems(config, items):
-    """Skip legacy kit / requests tests unless the matching flag is on."""
+    """Skip legacy kit / requests / chemical-reorder tests unless the matching flag is on."""
     kit_mgmt_on = _flag_on("FEATURE_KIT_MANAGEMENT")
     requests_on = _flag_on("FEATURE_REQUESTS")
+    chemical_reorder_on = _flag_on("FEATURE_CHEMICAL_REORDER")
     skip_kit = pytest.mark.skip(
         reason="Kit Management deactivated (set FEATURE_KIT_MANAGEMENT=true to run)"
     )
     skip_req = pytest.mark.skip(
         reason="Requests deactivated (set FEATURE_REQUESTS=true to run)"
+    )
+    skip_chem_reorder = pytest.mark.skip(
+        reason="Chemical reorder deactivated (set FEATURE_CHEMICAL_REORDER=true to run)"
     )
 
     for item in items:
@@ -503,6 +507,8 @@ def pytest_collection_modifyitems(config, items):
             item.add_marker(skip_kit)
         if not requests_on and module_name in _REQUESTS_LEGACY_MODULES:
             item.add_marker(skip_req)
+        if not chemical_reorder_on and item.get_closest_marker("chemical_reorder"):
+            item.add_marker(skip_chem_reorder)
 
 
 def assert_json(response, key, expected_value, message=''):

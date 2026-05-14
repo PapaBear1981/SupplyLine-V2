@@ -12,6 +12,8 @@ export interface FeatureFlags {
   kitManagement: boolean;
   /** User Requests / Fulfillment surface. */
   requests: boolean;
+  /** Chemical reorder system: reorder requests, forecast page, reorder alerts. */
+  chemicalReorder: boolean;
 }
 
 function parseFlag(value: string | undefined): boolean {
@@ -23,6 +25,7 @@ export function getFeatures(): FeatureFlags {
   return {
     kitManagement: parseFlag(import.meta.env.VITE_FEATURE_KIT_MANAGEMENT),
     requests: parseFlag(import.meta.env.VITE_FEATURE_REQUESTS),
+    chemicalReorder: parseFlag(import.meta.env.VITE_FEATURE_CHEMICAL_REORDER),
   };
 }
 

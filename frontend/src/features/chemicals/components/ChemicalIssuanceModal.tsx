@@ -14,6 +14,7 @@ import { WarningOutlined } from '@ant-design/icons';
 import { useIssueChemicalMutation } from '../services/chemicalsApi';
 import { useGetUsersQuery } from '@features/users/services/usersApi';
 import { useAppSelector } from '@app/hooks';
+import { useFeatures } from '@features/auth/hooks/useFeatures';
 import type { Chemical } from '../types';
 
 const { TextArea } = Input;
@@ -37,6 +38,7 @@ export const ChemicalIssuanceModal = ({
   const [issueChemical, { isLoading }] = useIssueChemicalMutation();
   const { data: users } = useGetUsersQuery();
   const currentUser = useAppSelector((state) => state.auth.user);
+  const features = useFeatures();
 
   useEffect(() => {
     if (open && chemical) {
@@ -166,7 +168,7 @@ export const ChemicalIssuanceModal = ({
           />
         )}
 
-        {isLowStock && !isExpired && !isOutOfStock && (
+        {features.chemicalReorder && isLowStock && !isExpired && !isOutOfStock && (
           <Alert
             message="Low Stock Warning"
             description={`This chemical is at or below minimum stock level (${chemical.minimum_stock_level}). Issuing will trigger an automatic reorder request.`}
@@ -200,7 +202,12 @@ export const ChemicalIssuanceModal = ({
               addonAfter={chemical.unit}
               disabled={isExpired || isOutOfStock}
               onChange={(value) => {
-                if (value && willTriggerReorder(value) && !isLowStock) {
+                if (
+                  features.chemicalReorder &&
+                  value &&
+                  willTriggerReorder(value) &&
+                  !isLowStock
+                ) {
                   message.info('This quantity will trigger an automatic reorder request');
                 }
               }}

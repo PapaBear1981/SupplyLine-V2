@@ -182,8 +182,13 @@ class Config:
     #   stays live to support the Tools-page "Send to Field" workflow.
     # FEATURE_REQUESTS: when False, the user-requests/orders API blueprint short-circuits
     #   with 410 Gone.
+    # FEATURE_CHEMICAL_REORDER: when False, the chemical reorder system is deactivated —
+    #   the reorder-needed/on-order/request-reorder/mark-ordered/forecast endpoints return
+    #   410 Gone, and issuance no longer auto-creates reorder requests. Chemical inventory,
+    #   issuance, and expiry tracking stay live.
     FEATURE_KIT_MANAGEMENT = os.environ.get("FEATURE_KIT_MANAGEMENT", "false").lower() in ("true", "1", "yes")
     FEATURE_REQUESTS = os.environ.get("FEATURE_REQUESTS", "false").lower() in ("true", "1", "yes")
+    FEATURE_CHEMICAL_REORDER = os.environ.get("FEATURE_CHEMICAL_REORDER", "false").lower() in ("true", "1", "yes")
 
     # Account lockout settings
     ACCOUNT_LOCKOUT = {
