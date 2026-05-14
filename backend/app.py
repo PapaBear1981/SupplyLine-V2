@@ -337,6 +337,31 @@ def create_app():
                         _auto_add_col("tools", "next_calibration_date TIMESTAMP NULL", "next_calibration_date", tool_cols)
                         _auto_add_col("tools", "calibration_status VARCHAR(50) NULL", "calibration_status", tool_cols)
 
+                        # Tool rows that predate the warehouse_id column land as
+                        # NULL. The Tools page scoped to a user's active warehouse
+                        # then hides them — they only show under "All warehouses".
+                        # Backfill NULLs to the main warehouse so the default
+                        # scoped view populates. Idempotent and runs every startup;
+                        # new tools always carry a warehouse_id (required by
+                        # POST /api/tools), so this only ever touches legacy rows.
+                        _tool_backfill = _conn.execute(sa_text(
+                            "UPDATE tools SET warehouse_id = ("
+                            "  SELECT id FROM warehouses"
+                            "  WHERE warehouse_type = 'main' AND is_active = TRUE"
+                            "  ORDER BY id LIMIT 1"
+                            ") WHERE warehouse_id IS NULL"
+                            "  AND EXISTS ("
+                            "    SELECT 1 FROM warehouses"
+                            "    WHERE warehouse_type = 'main' AND is_active = TRUE"
+                            "  )"
+                        ))
+                        _conn.commit()
+                        if _tool_backfill.rowcount:
+                            logger.info(
+                                "Phase 2 auto-migration: backfilled %d tools.warehouse_id from main warehouse",
+                                _tool_backfill.rowcount,
+                            )
+
                     if "kits" in tables:
                         kit_cols = {c["name"] for c in inspector.get_columns("kits")}
                         _auto_add_col(

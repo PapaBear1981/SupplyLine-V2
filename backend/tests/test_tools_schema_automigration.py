@@ -65,11 +65,75 @@ def _create_legacy_tools_db(db_path):
         conn.close()
 
 
-@pytest.fixture
-def legacy_db_url(tmp_path, monkeypatch):
-    db_path = tmp_path / "legacy_tools.db"
-    _create_legacy_tools_db(str(db_path))
-    monkeypatch.setenv("DATABASE_URL", f"sqlite:///{db_path}")
+def _create_warehouses_table(conn):
+    """Create a `warehouses` table matching the Warehouse model schema."""
+    conn.execute(
+        """
+        CREATE TABLE warehouses (
+            id INTEGER PRIMARY KEY,
+            name VARCHAR(200) NOT NULL UNIQUE,
+            address VARCHAR(500),
+            city VARCHAR(100),
+            state VARCHAR(50),
+            zip_code VARCHAR(20),
+            country VARCHAR(100) DEFAULT 'USA',
+            warehouse_type VARCHAR(50) NOT NULL DEFAULT 'satellite',
+            is_active BOOLEAN NOT NULL DEFAULT 1,
+            contact_person VARCHAR(200),
+            contact_phone VARCHAR(50),
+            contact_email VARCHAR(200),
+            created_at DATETIME NOT NULL,
+            updated_at DATETIME NOT NULL,
+            created_by_id INTEGER
+        )
+        """
+    )
+
+
+def _create_legacy_tools_db_with_warehouse(db_path):
+    """Legacy `tools` table that already has a NULL `warehouse_id` column,
+    alongside a `warehouses` table holding an active main warehouse.
+
+    This is the real-world bug state: the warehouse_id column exists (added by
+    an earlier startup) but pre-existing rows are NULL, so the warehouse-scoped
+    Tools view hides them.
+    """
+    conn = sqlite3.connect(db_path)
+    try:
+        _create_warehouses_table(conn)
+        conn.execute(
+            "INSERT INTO warehouses (id, name, warehouse_type, is_active, "
+            "created_at, updated_at) VALUES "
+            "(1, 'Main', 'main', 1, '2024-01-01 00:00:00', "
+            "'2024-01-01 00:00:00')"
+        )
+        conn.execute(
+            """
+            CREATE TABLE tools (
+                id INTEGER PRIMARY KEY,
+                tool_number VARCHAR NOT NULL,
+                serial_number VARCHAR NOT NULL,
+                description VARCHAR,
+                condition VARCHAR,
+                location VARCHAR,
+                created_at DATETIME,
+                warehouse_id INTEGER REFERENCES warehouses(id)
+            )
+            """
+        )
+        conn.execute(
+            "INSERT INTO tools (tool_number, serial_number, description, "
+            "condition, location, created_at, warehouse_id) VALUES "
+            "('T-200', 'SN-200', 'Unscoped drill', 'good', 'Bench B', "
+            "'2024-01-01 00:00:00', NULL)"
+        )
+        conn.commit()
+    finally:
+        conn.close()
+
+
+def _prepare_startup_env(monkeypatch):
+    """Shared monkeypatching so create_app() runs the real startup migration."""
     # Running create_app() outside testing mode triggers the production
     # security-config check; the CI flag makes it generate ephemeral keys
     # instead of demanding real ones.
@@ -78,6 +142,23 @@ def legacy_db_url(tmp_path, monkeypatch):
     # mode so no threads leak into the test session.
     monkeypatch.setattr("app.init_scheduled_backup", _noop)
     monkeypatch.setattr("app.init_scheduled_maintenance", _noop)
+
+
+@pytest.fixture
+def legacy_db_url(tmp_path, monkeypatch):
+    db_path = tmp_path / "legacy_tools.db"
+    _create_legacy_tools_db(str(db_path))
+    monkeypatch.setenv("DATABASE_URL", f"sqlite:///{db_path}")
+    _prepare_startup_env(monkeypatch)
+    return f"sqlite:///{db_path}"
+
+
+@pytest.fixture
+def legacy_db_url_with_warehouse(tmp_path, monkeypatch):
+    db_path = tmp_path / "legacy_tools_wh.db"
+    _create_legacy_tools_db_with_warehouse(str(db_path))
+    monkeypatch.setenv("DATABASE_URL", f"sqlite:///{db_path}")
+    _prepare_startup_env(monkeypatch)
     return f"sqlite:///{db_path}"
 
 
@@ -110,3 +191,26 @@ def test_startup_backfills_missing_tool_columns(legacy_db_url, monkeypatch):
         tool = Tool.query.filter_by(tool_number="T-100").one()
         assert tool.serial_number == "SN-100"
         assert tool.lot_number is None
+
+
+def test_startup_backfills_null_tool_warehouse_id(
+    legacy_db_url_with_warehouse, monkeypatch
+):
+    """Tools with a NULL warehouse_id must be backfilled to the main warehouse.
+
+    Otherwise the warehouse-scoped Tools view (filtered to the user's active
+    warehouse) hides them, and they only appear under "All warehouses".
+    """
+    monkeypatch.delenv("PYTEST_CURRENT_TEST", raising=False)
+    monkeypatch.delenv("FLASK_ENV", raising=False)
+
+    from app import create_app
+
+    application = create_app()
+
+    with application.app_context():
+        from models import Tool, Warehouse
+
+        main = Warehouse.query.filter_by(warehouse_type="main").one()
+        tool = Tool.query.filter_by(tool_number="T-200").one()
+        assert tool.warehouse_id == main.id
