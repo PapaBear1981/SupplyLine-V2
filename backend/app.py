@@ -314,7 +314,21 @@ def create_app():
 
                     if "tools" in tables:
                         tool_cols = {c["name"] for c in inspector.get_columns("tools")}
+                        # The Tool model gained these columns over time but only
+                        # maintenance_return_date was wired into auto-migration.
+                        # A deployment whose `tools` table predates any of the
+                        # others makes SELECT * fail, so GET /api/tools 500s and
+                        # the inventory page renders empty. Backfill them all.
+                        _auto_add_col("tools", "lot_number VARCHAR(100) NULL", "lot_number", tool_cols)
+                        _auto_add_col("tools", "category VARCHAR(100) NULL", "category", tool_cols)
+                        _auto_add_col("tools", "status VARCHAR(50) NULL", "status", tool_cols)
+                        _auto_add_col("tools", "status_reason VARCHAR(255) NULL", "status_reason", tool_cols)
                         _auto_add_col("tools", "maintenance_return_date TIMESTAMP NULL", "maintenance_return_date", tool_cols)
+                        _auto_add_col("tools", "requires_calibration BOOLEAN NOT NULL DEFAULT FALSE", "requires_calibration", tool_cols)
+                        _auto_add_col("tools", "calibration_frequency_days INTEGER NULL", "calibration_frequency_days", tool_cols)
+                        _auto_add_col("tools", "last_calibration_date TIMESTAMP NULL", "last_calibration_date", tool_cols)
+                        _auto_add_col("tools", "next_calibration_date TIMESTAMP NULL", "next_calibration_date", tool_cols)
+                        _auto_add_col("tools", "calibration_status VARCHAR(50) NULL", "calibration_status", tool_cols)
 
                     if "kits" in tables:
                         kit_cols = {c["name"] for c in inspector.get_columns("kits")}
