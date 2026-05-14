@@ -316,6 +316,66 @@ BULK_NO_MASTER,LOT_BAD,Unknown Master,Manufacturer,100.0,ml,Storage,Category,{te
         rejected = Chemical.query.filter_by(part_number="BULK_NO_MASTER").first()
         assert rejected is None
 
+    def test_bulk_import_defaults_to_active_warehouse(
+        self, client, db_session, admin_user, auth_headers, test_warehouse
+    ):
+        """A CSV with no warehouse_id column lands lots in the importer's active warehouse.
+
+        Regression: imported lots used to get a NULL warehouse, making them
+        invisible in the warehouse-scoped chemical inventory views.
+        """
+        _ensure_chemical_parts(db_session, ["WHDEF001", "WHDEF002"])
+        admin_user.active_warehouse_id = test_warehouse.id
+        db_session.commit()
+
+        csv_data = """part_number,lot_number,description,manufacturer,quantity,unit,location,category
+WHDEF001,LOTW1,Chem one,Acme,5,ml,Storage,Category1
+WHDEF002,LOTW2,Chem two,Acme,8,ml,Storage,Category1
+"""
+        data = {"file": (BytesIO(csv_data.encode()), "chemicals.csv")}
+        response = client.post(
+            "/api/chemicals/bulk-import",
+            headers=auth_headers,
+            data=data,
+            content_type="multipart/form-data",
+        )
+
+        assert response.status_code == 200
+        body = response.get_json()
+        assert body["success_count"] == 2
+        assert body["error_count"] == 0
+
+        lots = Chemical.query.filter(Chemical.part_number.like("WHDEF%")).all()
+        assert len(lots) == 2
+        assert all(lot.warehouse_id == test_warehouse.id for lot in lots)
+
+    def test_bulk_import_rejects_lot_with_no_warehouse(
+        self, client, db_session, admin_user, auth_headers
+    ):
+        """A row with no warehouse_id column and no active warehouse is rejected, not orphaned."""
+        _ensure_chemical_parts(db_session, ["WHNONE001"])
+        # admin_user intentionally has no active_warehouse_id set
+
+        csv_data = """part_number,lot_number,description,manufacturer,quantity,unit,location,category
+WHNONE001,LOTNONE,Chem,Acme,5,ml,Storage,Category1
+"""
+        data = {"file": (BytesIO(csv_data.encode()), "chemicals.csv")}
+        response = client.post(
+            "/api/chemicals/bulk-import",
+            headers=auth_headers,
+            data=data,
+            content_type="multipart/form-data",
+        )
+
+        assert response.status_code == 400
+        body = response.get_json()
+        assert body["success_count"] == 0
+        assert body["error_count"] == 1
+        error_messages = " ".join(err.get("error", "") for err in body.get("errors", []))
+        assert "warehouse" in error_messages.lower()
+
+        assert Chemical.query.filter_by(part_number="WHNONE001").first() is None
+
 
 @pytest.mark.bulk
 @pytest.mark.integration
