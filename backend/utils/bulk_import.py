@@ -9,10 +9,38 @@ from typing import Any
 
 from models import Chemical, ChemicalPart, Tool, db
 from utils.file_validation import neutralize_csv_formula, sanitize_csv_cell
-from utils.validation import ValidationError, validate_schema
+from utils.validation import ValidationError, validate_schema, validate_warehouse_id
 
 
 logger = logging.getLogger(__name__)
+
+
+def _validate_warehouse_reference(
+    warehouse_id: int, cache: dict[int, object] | None = None
+) -> None:
+    """Verify ``warehouse_id`` points to an existing, active warehouse.
+
+    Raises ``ValidationError`` with a human-readable explanation when the
+    warehouse is missing or inactive, so a bad reference rejects the row
+    instead of creating a lot/tool with a dangling foreign key. Results are
+    memoized in ``cache`` so a multi-row import doesn't re-query the same
+    warehouse for every row.
+    """
+    if cache is not None and warehouse_id in cache:
+        cached = cache[warehouse_id]
+        if isinstance(cached, str):
+            raise ValidationError(cached)
+        return
+
+    try:
+        validate_warehouse_id(warehouse_id)
+    except ValidationError as exc:
+        if cache is not None:
+            cache[warehouse_id] = str(exc)
+        raise
+
+    if cache is not None:
+        cache[warehouse_id] = True
 
 
 class BulkImportError(Exception):
@@ -130,12 +158,16 @@ def parse_csv_content(content: str, expected_headers: list[str]) -> tuple[list[d
         return [], [f"Error parsing CSV file: {e!s}"]
 
 
-def validate_tool_data(row_data: dict[str, Any]) -> dict[str, Any]:
+def validate_tool_data(
+    row_data: dict[str, Any], warehouse_cache: dict[int, object] | None = None
+) -> dict[str, Any]:
     """
     Validate and clean tool data for import
 
     Args:
         row_data: Raw row data from CSV
+        warehouse_cache: Optional memo dict shared across rows so a
+            CSV-supplied ``warehouse_id`` is only looked up once per import.
 
     Returns:
         Cleaned and validated tool data
@@ -161,6 +193,9 @@ def validate_tool_data(row_data: dict[str, Any]) -> dict[str, Any]:
             tool_data["warehouse_id"] = int(warehouse_id_str)
         except ValueError:
             raise ValidationError(f"Invalid warehouse_id: {warehouse_id_str}")
+        # Reject a tool pointed at a warehouse that doesn't exist (or is
+        # inactive) instead of creating a row with a dangling reference.
+        _validate_warehouse_reference(tool_data["warehouse_id"], warehouse_cache)
 
     # Handle calibration frequency
     if tool_data["requires_calibration"]:
@@ -182,7 +217,9 @@ def validate_tool_data(row_data: dict[str, Any]) -> dict[str, Any]:
 
 
 def validate_chemical_data(
-    row_data: dict[str, Any], default_warehouse_id: int | None = None
+    row_data: dict[str, Any],
+    default_warehouse_id: int | None = None,
+    warehouse_cache: dict[int, object] | None = None,
 ) -> dict[str, Any]:
     """
     Validate and clean chemical data for import
@@ -193,6 +230,8 @@ def validate_chemical_data(
             doesn't carry its own ``warehouse_id`` column value. A lot with no
             warehouse is invisible in the warehouse-scoped inventory views, so
             callers should always supply this for a real import.
+        warehouse_cache: Optional memo dict shared across rows so a resolved
+            ``warehouse_id`` is only looked up once per import.
 
     Returns:
         Cleaned and validated chemical data
@@ -219,6 +258,12 @@ def validate_chemical_data(
             chemical_data["warehouse_id"] = int(warehouse_id_str)
         except ValueError:
             raise ValidationError(f"Invalid warehouse_id: {warehouse_id_str}")
+
+    # Reject a lot pointed at a warehouse that doesn't exist (or is inactive)
+    # instead of creating a row with a dangling reference. A None warehouse_id
+    # is handled separately by the import loop.
+    if chemical_data["warehouse_id"] is not None:
+        _validate_warehouse_reference(chemical_data["warehouse_id"], warehouse_cache)
 
     # Handle quantity - must be integer
     quantity_str = row_data.get("quantity", "0")
@@ -301,13 +346,17 @@ def bulk_import_tools(csv_content: str, skip_duplicates: bool = True) -> BulkImp
             result.add_error(0, {}, error)
         return result
 
+    # Memoize warehouse lookups across rows so a CSV that reuses the same
+    # warehouse_id doesn't hit the database once per row.
+    warehouse_cache: dict[int, object] = {}
+
     # Process each row
     for row in rows:
         row_number = row.pop("_row_number")
 
         try:
             # Validate tool data
-            tool_data = validate_tool_data(row)
+            tool_data = validate_tool_data(row, warehouse_cache=warehouse_cache)
 
             # Check for duplicates
             existing_tool = check_duplicate_tool(tool_data)
@@ -401,6 +450,11 @@ def bulk_import_chemicals(
     # reuse a newly-created master part across multiple lot rows.
     created_part_numbers: set[str] = set()
 
+    # Memoize warehouse lookups across rows so a CSV that reuses the same
+    # warehouse_id (or relies on the import-level default) doesn't hit the
+    # database once per row.
+    warehouse_cache: dict[int, object] = {}
+
     # Process each row
     for row in rows:
         row_number = row.pop("_row_number")
@@ -408,7 +462,9 @@ def bulk_import_chemicals(
         try:
             # Validate chemical data
             chemical_data = validate_chemical_data(
-                row, default_warehouse_id=default_warehouse_id
+                row,
+                default_warehouse_id=default_warehouse_id,
+                warehouse_cache=warehouse_cache,
             )
 
             # A lot with no warehouse is invisible in the warehouse-scoped

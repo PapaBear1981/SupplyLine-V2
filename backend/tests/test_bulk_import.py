@@ -376,6 +376,61 @@ WHNONE001,LOTNONE,Chem,Acme,5,ml,Storage,Category1
 
         assert Chemical.query.filter_by(part_number="WHNONE001").first() is None
 
+    def test_bulk_import_rejects_nonexistent_warehouse(
+        self, client, db_session, admin_user, auth_headers
+    ):
+        """A CSV warehouse_id that doesn't exist rejects the row with an explanation."""
+        _ensure_chemical_parts(db_session, ["WHBAD001"])
+
+        csv_data = """part_number,lot_number,description,manufacturer,quantity,unit,location,category,warehouse_id
+WHBAD001,LOTBAD,Chem,Acme,5,ml,Storage,Category1,999999
+"""
+        data = {"file": (BytesIO(csv_data.encode()), "chemicals.csv")}
+        response = client.post(
+            "/api/chemicals/bulk-import",
+            headers=auth_headers,
+            data=data,
+            content_type="multipart/form-data",
+        )
+
+        assert response.status_code == 400
+        body = response.get_json()
+        assert body["success_count"] == 0
+        assert body["error_count"] == 1
+        error_messages = " ".join(err.get("error", "") for err in body.get("errors", []))
+        assert "999999" in error_messages
+        assert "not found" in error_messages.lower()
+
+        assert Chemical.query.filter_by(part_number="WHBAD001").first() is None
+
+    def test_bulk_import_rejects_inactive_warehouse(
+        self, client, db_session, admin_user, auth_headers, test_warehouse
+    ):
+        """A CSV warehouse_id for an inactive warehouse is rejected with an explanation."""
+        _ensure_chemical_parts(db_session, ["WHINA001"])
+        test_warehouse.is_active = False
+        db_session.commit()
+
+        csv_data = f"""part_number,lot_number,description,manufacturer,quantity,unit,location,category,warehouse_id
+WHINA001,LOTINA,Chem,Acme,5,ml,Storage,Category1,{test_warehouse.id}
+"""
+        data = {"file": (BytesIO(csv_data.encode()), "chemicals.csv")}
+        response = client.post(
+            "/api/chemicals/bulk-import",
+            headers=auth_headers,
+            data=data,
+            content_type="multipart/form-data",
+        )
+
+        assert response.status_code == 400
+        body = response.get_json()
+        assert body["success_count"] == 0
+        assert body["error_count"] == 1
+        error_messages = " ".join(err.get("error", "") for err in body.get("errors", []))
+        assert "inactive" in error_messages.lower()
+
+        assert Chemical.query.filter_by(part_number="WHINA001").first() is None
+
 
 @pytest.mark.bulk
 @pytest.mark.integration
@@ -431,6 +486,31 @@ TCAL002,SN002,Calibrated Tool 2,Good,Location B,Measurement,available,{future_da
         )
 
         assert response.status_code in [200, 201, 400, 404]
+
+    def test_bulk_import_tools_rejects_nonexistent_warehouse(
+        self, client, db_session, admin_user, auth_headers
+    ):
+        """A tool CSV warehouse_id that doesn't exist rejects the row with an explanation."""
+        csv_data = """tool_number,serial_number,description,warehouse_id
+TWHBAD1,SNWHBAD1,Tool with bad warehouse,999999
+"""
+        data = {"file": (BytesIO(csv_data.encode()), "tools.csv")}
+        response = client.post(
+            "/api/tools/bulk-import",
+            headers=auth_headers,
+            data=data,
+            content_type="multipart/form-data",
+        )
+
+        assert response.status_code == 400
+        body = response.get_json()
+        assert body["success_count"] == 0
+        assert body["error_count"] == 1
+        error_messages = " ".join(err.get("error", "") for err in body.get("errors", []))
+        assert "999999" in error_messages
+        assert "not found" in error_messages.lower()
+
+        assert Tool.query.filter_by(tool_number="TWHBAD1").first() is None
 
 
 @pytest.mark.bulk
