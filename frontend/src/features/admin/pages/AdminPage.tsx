@@ -29,10 +29,13 @@ import { OnCallAdmin } from '../components/OnCallAdmin';
 import { BulkImports } from '../components/BulkImports';
 import { WarehousesPage } from '@features/warehouses/pages/WarehousesPage';
 import MasterKitsAdmin from '@features/master-kits/pages/MasterKitsAdmin';
+import { useFeatures } from '@features/auth/hooks/useFeatures';
 
 const { Title, Paragraph } = Typography;
 
 export const AdminPage = () => {
+  const { kitManagement } = useFeatures();
+
   const tabItems = [
     {
       key: 'overview',
@@ -124,16 +127,20 @@ export const AdminPage = () => {
       ),
       children: <AircraftTypeManagement />,
     },
-    {
-      key: 'master-kits',
-      label: (
-        <span>
-          <AppstoreOutlined />
-          Master Kits
-        </span>
-      ),
-      children: <MasterKitsAdmin />,
-    },
+    ...(kitManagement
+      ? [
+          {
+            key: 'master-kits',
+            label: (
+              <span>
+                <AppstoreOutlined />
+                Master Kits
+              </span>
+            ),
+            children: <MasterKitsAdmin />,
+          },
+        ]
+      : []),
     {
       key: 'imports',
       label: (
