@@ -143,12 +143,12 @@ describe('toolsApi mutations — record calibration workflow', () => {
     const ct = request.headers.get('Content-Type') ?? '';
     expect(ct.startsWith('multipart/form-data')).toBe(true);
 
-    const form = await request.clone().formData();
-    const certField = form.get('certificate');
-    // The body is multipart with a "certificate" part carrying the file
-    // contents. (undici loses the filename when round-tripping in node, so
-    // we assert size rather than name — the browser preserves both.)
-    expect(certField).not.toBeNull();
-    expect((certField as Blob).size).toBe(3);
+    const body = await request.clone().text();
+    expect(body).toContain('name="certificate"');
+    // In jsdom/undici the File instance is downgraded to a Blob while
+    // serializing the Request, so the filename may round-trip as "blob" in
+    // tests even though browsers preserve file.name.
+    expect(body).toContain('filename=');
+    expect(body).toContain('Content-Type: application/pdf');
   });
 });

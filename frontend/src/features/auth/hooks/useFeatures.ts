@@ -2,8 +2,8 @@
  * Feature flag hook.
  *
  * Mirrors the backend `FEATURE_*` env vars exposed at build time via Vite.
- * Defaults to `false` so a missing var deactivates the feature rather than
- * leaving disabled UI exposed.
+ * Defaults to `true` so existing deployments keep their established
+ * navigation/API surfaces unless an operator explicitly disables them.
  *
  * Keep flag names in sync with `backend/auth/feature_flags.py`.
  */
@@ -15,7 +15,7 @@ export interface FeatureFlags {
 }
 
 function parseFlag(value: string | undefined): boolean {
-  if (!value) return false;
+  if (!value) return true;
   return ['true', '1', 'yes', 'on'].includes(value.toLowerCase());
 }
 

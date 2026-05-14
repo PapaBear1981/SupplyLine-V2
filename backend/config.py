@@ -182,8 +182,8 @@ class Config:
     #   stays live to support the Tools-page "Send to Field" workflow.
     # FEATURE_REQUESTS: when False, the user-requests/orders API blueprint short-circuits
     #   with 410 Gone.
-    FEATURE_KIT_MANAGEMENT = os.environ.get("FEATURE_KIT_MANAGEMENT", "false").lower() in ("true", "1", "yes")
-    FEATURE_REQUESTS = os.environ.get("FEATURE_REQUESTS", "false").lower() in ("true", "1", "yes")
+    FEATURE_KIT_MANAGEMENT = os.environ.get("FEATURE_KIT_MANAGEMENT", "true").lower() in ("true", "1", "yes")
+    FEATURE_REQUESTS = os.environ.get("FEATURE_REQUESTS", "true").lower() in ("true", "1", "yes")
 
     # Account lockout settings
     ACCOUNT_LOCKOUT = {

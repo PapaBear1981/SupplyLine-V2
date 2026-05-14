@@ -323,6 +323,13 @@ def create_app():
                         _auto_add_col("tools", "category VARCHAR(100) NULL", "category", tool_cols)
                         _auto_add_col("tools", "status VARCHAR(50) NULL", "status", tool_cols)
                         _auto_add_col("tools", "status_reason VARCHAR(255) NULL", "status_reason", tool_cols)
+                        _auto_add_col("tools", "warehouse_id INTEGER REFERENCES warehouses(id)", "warehouse_id", tool_cols)
+                        if "warehouse_id" not in tool_cols:
+                            _conn.execute(sa_text(
+                                "CREATE INDEX IF NOT EXISTS ix_tools_warehouse_id "
+                                "ON tools(warehouse_id)"
+                            ))
+                            _conn.commit()
                         _auto_add_col("tools", "maintenance_return_date TIMESTAMP NULL", "maintenance_return_date", tool_cols)
                         _auto_add_col("tools", "requires_calibration BOOLEAN NOT NULL DEFAULT FALSE", "requires_calibration", tool_cols)
                         _auto_add_col("tools", "calibration_frequency_days INTEGER NULL", "calibration_frequency_days", tool_cols)
@@ -419,6 +426,43 @@ def create_app():
                             "chemical_part_id",
                             chem_cols,
                         )
+                        # Keep legacy chemical-lot tables readable after the
+                        # warehouse/part-master refactors. The master-part
+                        # backfill below references these columns directly, so
+                        # add any optional model columns before issuing UPDATEs.
+                        _auto_add_col("chemicals", "manufacturer VARCHAR NULL", "manufacturer", chem_cols)
+                        _auto_add_col("chemicals", "unit VARCHAR NOT NULL DEFAULT 'each'", "unit", chem_cols)
+                        _auto_add_col("chemicals", "location VARCHAR NULL", "location", chem_cols)
+                        _auto_add_col("chemicals", "category VARCHAR(100) NULL DEFAULT 'General'", "category", chem_cols)
+                        _auto_add_col("chemicals", "status VARCHAR NOT NULL DEFAULT 'available'", "status", chem_cols)
+                        _auto_add_col("chemicals", "expiration_date TIMESTAMP NULL", "expiration_date", chem_cols)
+                        _auto_add_col("chemicals", "minimum_stock_level INTEGER NULL", "minimum_stock_level", chem_cols)
+                        _auto_add_col("chemicals", "notes VARCHAR NULL", "notes", chem_cols)
+                        _auto_add_col("chemicals", "is_archived BOOLEAN NOT NULL DEFAULT FALSE", "is_archived", chem_cols)
+                        _auto_add_col("chemicals", "archived_reason VARCHAR NULL", "archived_reason", chem_cols)
+                        _auto_add_col("chemicals", "archived_date TIMESTAMP NULL", "archived_date", chem_cols)
+                        _auto_add_col("chemicals", "needs_reorder BOOLEAN NOT NULL DEFAULT FALSE", "needs_reorder", chem_cols)
+                        _auto_add_col("chemicals", "reorder_status VARCHAR NULL DEFAULT 'not_needed'", "reorder_status", chem_cols)
+                        _auto_add_col("chemicals", "reorder_date TIMESTAMP NULL", "reorder_date", chem_cols)
+                        _auto_add_col("chemicals", "expected_delivery_date TIMESTAMP NULL", "expected_delivery_date", chem_cols)
+                        _auto_add_col("chemicals", "warehouse_id INTEGER REFERENCES warehouses(id)", "warehouse_id", chem_cols)
+                        if "warehouse_id" not in chem_cols:
+                            _conn.execute(sa_text(
+                                "CREATE INDEX IF NOT EXISTS ix_chemicals_warehouse_id "
+                                "ON chemicals(warehouse_id)"
+                            ))
+                            _conn.commit()
+                            logger.info("Phase 2 auto-migration: indexed chemicals.warehouse_id")
+                        _auto_add_col("chemicals", "parent_lot_number VARCHAR(100) NULL", "parent_lot_number", chem_cols)
+                        _auto_add_col("chemicals", "lot_sequence INTEGER NULL DEFAULT 0", "lot_sequence", chem_cols)
+                        _auto_add_col("chemicals", "requested_quantity INTEGER NULL", "requested_quantity", chem_cols)
+                        _auto_add_col("chemicals", "procurement_order_id INTEGER REFERENCES procurement_orders(id)", "procurement_order_id", chem_cols)
+                        if "procurement_order_id" not in chem_cols:
+                            _conn.execute(sa_text(
+                                "CREATE INDEX IF NOT EXISTS ix_chemicals_procurement_order_id "
+                                "ON chemicals(procurement_order_id)"
+                            ))
+                            _conn.commit()
                         if "chemical_part_id" not in chem_cols:
                             _conn.execute(sa_text(
                                 "CREATE INDEX IF NOT EXISTS ix_chemicals_chemical_part_id "

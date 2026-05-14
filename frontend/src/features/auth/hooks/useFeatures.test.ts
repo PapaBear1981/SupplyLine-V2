@@ -4,7 +4,13 @@ import { getFeatures } from './useFeatures';
 
 const setEnv = (overrides: Record<string, string | undefined>) => {
   // Vite injects env into import.meta.env at build time but it's writable in tests.
-  Object.assign(import.meta.env, overrides);
+  Object.entries(overrides).forEach(([key, value]) => {
+    if (value === undefined) {
+      delete import.meta.env[key];
+    } else {
+      import.meta.env[key] = value;
+    }
+  });
 };
 
 const ORIGINAL = { ...import.meta.env };
@@ -21,12 +27,12 @@ afterEach(() => {
 });
 
 describe('getFeatures', () => {
-  it('defaults all flags to false when env vars are missing', () => {
+  it('defaults all flags to true when env vars are missing', () => {
     setEnv({
       VITE_FEATURE_KIT_MANAGEMENT: undefined,
       VITE_FEATURE_REQUESTS: undefined,
     });
-    expect(getFeatures()).toEqual({ kitManagement: false, requests: false });
+    expect(getFeatures()).toEqual({ kitManagement: true, requests: true });
   });
 
   it('treats "false" as off', () => {
